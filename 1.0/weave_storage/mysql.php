@@ -37,106 +37,11 @@
 #
 # ***** END LICENSE BLOCK *****
 	
-require_once 'weave_constants.php';
+require_once 'weave_storage/base.php';
 require_once 'weave_basic_object.php';
 
 
-#Returns the storage object. Takes three arguments
-#username: username to be operated on
-#type: explicit type of storage. Usually set by the WEAVE_STORAGE_ENGINE environment variable
-#dbh: an already existing database handle to use. If a non-object, will not create
-#a db connection (must be done explicitly)
-
-function get_storage_read_object($username, $dbh = null)
-{
-	try
-	{
-		switch(WEAVE_STORAGE_ENGINE)
-		{
-			case 'mysql':
-				return new WeaveStorageMysql($username, $dbh);
-			case 'sqlite':
-				return new WeaveStorageSqlite($username, $dbh);
-			default:
-				throw new Exception("Unknown storage type", 503);
-		}				
-	}
-	catch(Exception $e)
-	{
-		header("X-Weave-Backoff: 1800");
-		report_problem($e->getMessage(), $e->getCode());
-	}
-}
-
-
-function get_storage_write_object($username, $dbh = null)
-{
-	try
-	{
-		switch(WEAVE_STORAGE_ENGINE)
-		{
-			case 'mysql':
-			return new WeaveStorageMysql($username, $dbh ? $dbh : 'write');
-			case 'sqlite':
-				return new WeaveStorageSqlite($username, $dbh);
-			default:
-				throw new Exception("Unknown storage type", 503);
-		}				
-	}
-	catch(Exception $e)
-	{
-		header("X-Weave-Backoff: 1800");
-		report_problem($e->getMessage(), $e->getCode());
-	}
-}
-
-
-#PDO wrapper to an underlying SQLite storage engine.
-#Note that username is only needed for opening the file. All operations after that will be on that user.
-
-interface WeaveStorageBase
-{
-	function __construct($username, $dbh = null);
-
-	function open_connection();
-
-	function get_connection();
-	
-	function begin_transaction();
-
-	function commit_transaction();
-
-	function get_max_timestamp($collection);
-	
-	function get_collection_list();
-	
-	function get_collection_list_with_timestamps();
-
-	function get_collection_list_with_counts();
-
-	function store_object(&$wbos);
-	
-	function delete_object($collection, $id);
-	
-	function delete_objects($collection, $id = null, $parentid = null, $newer = null, $older = null, $limit = null, $offset = null);
-	
-	function retrieve_object($collection, $id);
-	
-	function retrieve_objects($collection, $id = null, $full = null, $direct_output = null, $parentid = null, $newer = null, $older = null, $limit = null, $offset = null);
-
-	function get_storage_total();
-
-	function create_user();
-
-	function delete_user();
-
-	function heartbeat();
-}
-
-
-
-
-#Mysql version of the above.
+#Mysql version of the storage object.
 #Note that this object does not contain any database setup information. It assumes that the mysql
 #instance is already fully configured
 
@@ -169,7 +74,6 @@ interface WeaveStorageBase
 class WeaveStorage implements WeaveStorageBase
 {
 	private $_username;
-	private $_type = 'read';
 	private $_dbh;
 	private $_db_name = 'wbo';
 	private $_collection_table_name = 'collections';
@@ -180,25 +84,12 @@ class WeaveStorage implements WeaveStorageBase
 									
 	private $WEAVE_COLLECTION_NAMES;
 	
-	function __construct($username, $dbh = null) 
+	function __construct($username) 
 	{
 		$this->_username = $username;
 		$this->WEAVE_COLLECTION_NAMES = array_flip($this->WEAVE_COLLECTION_KEYS);
 		
-		if (!$dbh)
-		{
-			$this->open_connection();
-		}
-		elseif (is_object($dbh))
-		{
-			$this->_dbh = $dbh;
-		}
-		elseif (is_string($dbh) && $dbh == 'write')
-		{
-			$this->_type = 'write';
-			$this->open_connection();
-		}
-		#otherwise we do nothing with the connection and wait for it to be directly opened
+		$this->open_connection();
 
 		if (defined('WEAVE_MYSQL_STORE_TABLE_NAME'))
 			$this->_db_name = WEAVE_MYSQL_STORE_TABLE_NAME;
@@ -210,15 +101,15 @@ class WeaveStorage implements WeaveStorageBase
 	{		
 		try
 		{
-			if ($this->_type == 'write')
-			{
-				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_WRITE_HOST . ';dbname=' . WEAVE_MYSQL_STORE_WRITE_DB, 
-									WEAVE_MYSQL_STORE_WRITE_USER, WEAVE_MYSQL_STORE_WRITE_PASS);
-			}
-			else
+			if ($_SERVER['REQUEST_METHOD'] == 'GET')
 			{
 				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_READ_HOST . ';dbname=' . WEAVE_MYSQL_STORE_READ_DB, 
 									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS);
+			}
+			else
+			{
+				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_WRITE_HOST . ';dbname=' . WEAVE_MYSQL_STORE_WRITE_DB, 
+									WEAVE_MYSQL_STORE_WRITE_USER, WEAVE_MYSQL_STORE_WRITE_PASS);
 			}
 			$this->_dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		}
@@ -665,24 +556,6 @@ class WeaveStorage implements WeaveStorageBase
 		catch( PDOException $exception )
 		{
 			error_log("delete_object: " . $exception->getMessage());
-			throw new Exception("Database unavailable", 503);
-		}
-		return 1;
-	}
-	
-	function delete_user()
-	{
-		try
-		{
-			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username';
-			$sth = $this->_dbh->prepare($delete_stmt);
-			$sth->bindParam(':username', $this->_username);
-
-			$sth->execute();
-		}
-		catch( PDOException $exception )
-		{
-			error_log("delete_user: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		return 1;

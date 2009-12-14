@@ -37,35 +37,37 @@
 #
 # ***** END LICENSE BLOCK *****
 
+#secret using the admin interface, if you are doing so
+if (!defined('WEAVE_USER_ADMIN_SECRET')) { define('WEAVE_USER_ADMIN_SECRET', 'bad secret'); }
+
 #engine for storage.
-#Acceptable values: mysql. There are no other storage engines at this point.
-#If you want sqlite, please check out the Weave Minimal server
+#Acceptable values: mysql | sqlite | none
 if (!defined('WEAVE_STORAGE_ENGINE')) { define('WEAVE_STORAGE_ENGINE', 'mysql'); }
 
 if (WEAVE_STORAGE_ENGINE == 'mysql')
 {
-	#host, db name, username and password for the auth store
+	#if using mysql, host, db name, username and password for the auth store
 	if (!defined('WEAVE_MYSQL_STORE_READ_HOST')) { define('WEAVE_MYSQL_STORE_READ_HOST', 'localhost'); }
 	if (!defined('WEAVE_MYSQL_STORE_READ_DB')) { define('WEAVE_MYSQL_STORE_READ_DB', 'weave'); }
 	if (!defined('WEAVE_MYSQL_STORE_READ_USER')) { define('WEAVE_MYSQL_STORE_READ_USER', 'weave'); }
 	if (!defined('WEAVE_MYSQL_STORE_READ_PASS')) { define('WEAVE_MYSQL_STORE_READ_PASS', 'weave'); }
 
-	#host, db name, username and password for the auth store read replica (leave as is if you're on one box)
+	#if using mysql, host, db name, username and password for the auth store writer
 	if (!defined('WEAVE_MYSQL_STORE_WRITE_HOST')) { define('WEAVE_MYSQL_STORE_WRITE_HOST', WEAVE_MYSQL_STORE_READ_HOST); }
 	if (!defined('WEAVE_MYSQL_STORE_WRITE_DB')) { define('WEAVE_MYSQL_STORE_WRITE_DB', WEAVE_MYSQL_STORE_READ_DB); }
 	if (!defined('WEAVE_MYSQL_STORE_WRITE_USER')) { define('WEAVE_MYSQL_STORE_WRITE_USER', WEAVE_MYSQL_STORE_READ_USER); }
 	if (!defined('WEAVE_MYSQL_STORE_WRITE_PASS')) { define('WEAVE_MYSQL_STORE_WRITE_PASS', WEAVE_MYSQL_STORE_READ_PASS); }
-
-	#keep these commented out unless you know that you need multiple tables. You don't.
-	#if (!defined('WEAVE_MYSQL_STORE_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'wbo'); }
-	#if (!defined('WEAVE_MYSQL_COLLECTION_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'collections'); }
-
+}
+elseif (WEAVE_STORAGE_ENGINE == 'sqlite')
+{
+	#if using sqlite, path to the sqlite db
+	if (!defined('WEAVE_SQLITE_STORE_DIRECTORY')) { define('WEAVE_SQLITE_STORE_DIRECTORY', '/Library/WebServer/dbs'); }
 }
 
 
+
 #engine for auth
-#Acceptable values: mysql | sqlite | mozilla | none
-#This should match the values defined in your Weave Registration constants file
+#Acceptable values: mysql | sqlite | none
 if (!defined('WEAVE_AUTH_ENGINE')) { define('WEAVE_AUTH_ENGINE', 'mysql'); }
 
 if (WEAVE_AUTH_ENGINE == 'mysql')
@@ -76,29 +78,32 @@ if (WEAVE_AUTH_ENGINE == 'mysql')
 	if (!defined('WEAVE_MYSQL_AUTH_USER')) { define('WEAVE_MYSQL_AUTH_USER', 'weave'); }
 	if (!defined('WEAVE_MYSQL_AUTH_PASS')) { define('WEAVE_MYSQL_AUTH_PASS', 'weave'); }
 }
-elseif (WEAVE_AUTH_ENGINE == 'mozilla')
+elseif (WEAVE_AUTH_ENGINE == 'sqlite')
 {
-	if (!defined('WEAVE_LDAP_AUTH_HOST')) { define('WEAVE_LDAP_AUTH_HOST', 'localhost'); }
-	if (!defined('WEAVE_LDAP_AUTH_USER')) { define('WEAVE_LDAP_AUTH_USER', 'uid=binduser,ou=logins'); }
-	if (!defined('WEAVE_LDAP_AUTH_PASS')) { define('WEAVE_LDAP_AUTH_PASS', 'password'); }
-	if (!defined('WEAVE_LDAP_AUTH_DN')) { define('WEAVE_LDAP_AUTH_DN', 'dc='); }
-	if (!defined('WEAVE_LDAP_AUTH_USER_PARAM_NAME')) { define('WEAVE_LDAP_AUTH_USER_PARAM_NAME', 'uid'); }
+	#path to the sqlite db
+	if (!defined('WEAVE_SQLITE_AUTH_DIRECTORY')) { define('WEAVE_SQLITE_AUTH_DIRECTORY', '/Library/WebServer/dbs'); }
 }
+
+#if you are using mysql for both auth and storage and they live in the same table, you may
+#share the database handle
+if (!defined('WEAVE_SHARE_DBH')) { define('WEAVE_SHARE_DBH', 0); }
 
 #The maximum size of a payload (set to 0 for unlimited) in bytes. Watch out for large characters!
 if (!defined('WEAVE_PAYLOAD_MAX_SIZE')) { define('WEAVE_PAYLOAD_MAX_SIZE', 262144); } #256K
 
-#The maximum quota per user in bytes. Keep commented out to turn quotas off
-#if (!defined('WEAVE_QUOTA')) { define('WEAVE_QUOTA', 5120000); } #5M
-
-#Keep this disabled unless you have a memcache install running
-#if (!defined('WEAVE_STORAGE_MEMCACHE_HOST')) { define('WEAVE_STORAGE_MEMCACHE_HOST', localhost); }
-#if (!defined('WEAVE_STORAGE_MEMCACHE_PORT')) { define('WEAVE_STORAGE_MEMCACHE_PORT', null); }
-#if (!defined('WEAVE_STORAGE_MEMCACHE_DECAY')) { define('WEAVE_STORAGE_MEMCACHE_DECAY', null); }
+#The maximum quota per user in bytes (not really used yet)
+if (!defined('WEAVE_QUOTA')) { define('WEAVE_QUOTA', 5120000); } #5M
 
 #A default username and password, useful for testing suites and the heartbeat
-#if (!defined('WEAVE_DEFAULT_TEST_USERNAME')) { define('WEAVE_DEFAULT_TEST_USERNAME', 'testuser'); }
-#if (!defined('WEAVE_DEFAULT_TEST_PASSWORD')) { define('WEAVE_DEFAULT_TEST_PASSWORD', 'testpass'); }
+if (!defined('WEAVE_DEFAULT_TEST_USERNAME')) { define('WEAVE_DEFAULT_TEST_USERNAME', 'ktnwhxqmk'); }
+if (!defined('WEAVE_DEFAULT_TEST_PASSWORD')) { define('WEAVE_DEFAULT_TEST_PASSWORD', '‡¶ts9Ò'); }
+
+#Enable memcache for collection timestamps
+if (!defined('WEAVE_STORAGE_MEMCACHE_HOST')) { define('WEAVE_STORAGE_MEMCACHE_HOST', 'localhost'); }
+if (!defined('WEAVE_STORAGE_MEMCACHE_PORT')) { define('WEAVE_STORAGE_MEMCACHE_PORT', '11211'); }
+if (!defined('WEAVE_STORAGE_MEMCACHE_DECAY')) { define('WEAVE_STORAGE_MEMCACHE_DECAY', '2400'); }
+
+
 
 #Error constants
 define ('WEAVE_ERROR_INVALID_PROTOCOL', 1);
@@ -113,7 +118,6 @@ define ('WEAVE_ERROR_BAD_PASSWORD_STRENGTH', 9);
 define ('WEAVE_ERROR_INVALID_RESET_CODE', 10);
 define ('WEAVE_ERROR_FUNCTION_NOT_SUPPORTED', 11);
 define ('WEAVE_ERROR_NO_EMAIL', 12);
-
 
 
 ?>
