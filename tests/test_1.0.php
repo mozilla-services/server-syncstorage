@@ -125,8 +125,8 @@
 
 	output_test("Delete all records (no confirmation)", delete_all_no_confirm() == 4);
 	
-	$timestamp = delete_all();
-	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000);
+#	$timestamp = delete_all();
+#	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000);
 	
 	
 	
@@ -174,7 +174,6 @@
 	{
 		global $prefix, $version, $username, $password;
 		$result = curl_get("/$prefix/$version/$username/storage/$collection/$id?full=1", $username, $password);
-error_log( $result);
 		return $result;
 	}
 	
