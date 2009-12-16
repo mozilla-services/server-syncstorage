@@ -109,7 +109,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		
 		// Check if assigned node is same as current host
 		$nd = "";
-		$attrs = $this->getUserAttributes($this->_username, array("primaryNode", "uidNumber"));
+		$attrs = $this->getUserAttributes(array("primaryNode", "uidNumber"));
 		for ($i = 0; $i < $attrs["primaryNode"]["count"]; $i++)
 		{
 			$node = $attrs["primaryNode"][$i];

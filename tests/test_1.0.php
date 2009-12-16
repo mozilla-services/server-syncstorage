@@ -87,12 +87,11 @@
 	$timestamp2 = put_item('foo', $item2);
 	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000);
 
-	output_test("Get collection counts", get_collection_counts() == '{"history":"1","foo":"1"}');
+	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "1")));
 
-	output_test("Get collection timestamps", get_collection_timestamps() == '{"history":' . $timestamp1 . ',"foo":' . $timestamp2 . '}');
+	output_test("Get collection timestamps", compare_arrays(json_get(get_collection_timestamps()), array('history' => $timestamp1, 'foo' => $timestamp2)));
 
-	output_test("Get item", get_item('foo', '2') == '{"id":"2","modified":' . $timestamp2 . ',"sortindex":2,"payload":"abcdef123456789"}');
-
+	output_test("Get item", compare_arrays(json_get(get_item('foo', '2')), array('id' => "2", 'modified' => $timestamp2, 'sortindex' => "2", 'payload' => 'abcdef123456789')));
 
 	output_test("Get collection ids", get_collection_ids('foo') == '["2"]');
 
@@ -109,24 +108,24 @@
 
 	output_test("Get collection ids (sortindex)", get_collection_ids('foo', "sort=index") == '["4","2"]');
 
-	output_test("Get collection counts", get_collection_counts() == '{"history":"1","foo":"2"}');
+	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "2")));
 
 	$timestamp4 = put_item('foo', $item6); #updates item 4
 	output_test("Update item", is_numeric($timestamp4) && $timestamp4 > 1000000000);
 
-	output_test("Get item (after update)", get_item('foo', '4') == '{"id":"4","parentid":"1","modified":' . $timestamp4 . ',"sortindex":5,"payload":"567abcdef123456789"}');
+	output_test("Get item", compare_arrays(json_get(get_item('foo', '4')), array('id' => "4", 'modified' => $timestamp4, 'sortindex' => "5", 'payload' => '567abcdef123456789')));
 
 	$timestamp5 = delete_items_by_timestamp('foo', $timestamp2 + .01);
 	output_test("Delete items by timestamp", is_numeric($timestamp5) && $timestamp5 > 1000000000);
 
-	output_test("Get collection counts", get_collection_counts() == '{"history":"1","foo":"1"}');
+	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "1")));
 
-	output_test("Get collection timestamps", get_collection_timestamps() == '{"history":' . $timestamp1 . ',"foo":' . $timestamp5 . '}');
+	output_test("Get collection timestamps", compare_arrays(json_get(get_collection_timestamps()), array('history' => $timestamp1, 'foo' => $timestamp4)));
 
 	output_test("Delete all records (no confirmation)", delete_all_no_confirm() == 4);
 	
-#	$timestamp = delete_all();
-#	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000);
+	$timestamp = delete_all();
+	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000);
 	
 	
 	
@@ -138,9 +137,36 @@
 		echo "\n";
 		return $condition;
 	}
+
+	function json_get($string)
+	{
+		$tmp = json_decode($string, true);
+		foreach ($tmp as $k => $v)
+			$tmp[$k] = (string)$v;
+		
+		return $tmp;
+	}
 	
+	function compare_arrays($a1, $a2)
+	{
+		if (!is_array($a1))
+			return false;
+		if (!is_array($a2))
+			return false;
 
-
+		foreach ($a1 as $k => $v)
+		{
+			if ($a2[$k] != $v)
+				return false;
+		}
+		foreach ($a2 as $k => $v)
+		{
+			if ($a1[$k] != $v)
+				return false;
+		}
+		return true;
+	}
+	
 	
 	function get_quota()
 	{
@@ -228,6 +254,7 @@
 		if ($password)
 			curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 		$result = curl_exec($ch);
 		curl_close($ch);
 		
@@ -242,6 +269,7 @@
 			curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
 		if ($mod_date)
 			curl_setopt($ch, CURLOPT_HTTPHEADER, array("X-If-Unmodified-Since: $mod_date"));
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_POST, true);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
@@ -263,6 +291,7 @@
 			curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
 		if ($mod_date)
 			curl_setopt($ch, CURLOPT_HTTPHEADER, array("X-If-Unmodified-Since: $mod_date"));
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_PUT, true);
 		curl_setopt($ch, CURLOPT_INFILE, $data);
@@ -282,6 +311,7 @@
 			curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
 		if ($header)
 			curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
 		$result = curl_exec($ch);
