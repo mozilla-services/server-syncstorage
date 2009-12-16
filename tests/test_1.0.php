@@ -36,7 +36,7 @@
 #
 # ***** END LICENSE BLOCK *****
 
-	$protocol = "http";
+	$protocol = "https";
 	$host = "localhost";
 	$server = "$protocol://$host";
 	$prefix = "";
@@ -113,7 +113,7 @@
 	$timestamp4 = put_item('foo', $item6); #updates item 4
 	output_test("Update item", is_numeric($timestamp4) && $timestamp4 > 1000000000);
 
-	output_test("Get item", compare_arrays(json_get(get_item('foo', '4')), array('id' => "4", 'modified' => $timestamp4, 'sortindex' => "5", 'payload' => '567abcdef123456789')));
+	output_test("Get item", compare_arrays(json_get(get_item('foo', '4')), array('id' => "4", 'parentid' => '1', 'modified' => $timestamp4, 'sortindex' => "5", 'payload' => '567abcdef123456789')));
 
 	$timestamp5 = delete_items_by_timestamp('foo', $timestamp2 + .01);
 	output_test("Delete items by timestamp", is_numeric($timestamp5) && $timestamp5 > 1000000000);
