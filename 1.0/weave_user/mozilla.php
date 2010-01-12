@@ -51,7 +51,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 	private function authorize() {
 		if (!ldap_bind($this->_conn, WEAVE_LDAP_AUTH_USER.",".
 			WEAVE_LDAP_AUTH_DN, WEAVE_LDAP_AUTH_PASS))
-			throw new Exception("Database Unavailable", 503);
+			throw new Exception("Invalid LDAP Admin", 503);
 	}
 	
  	private function constructUserDN() {
