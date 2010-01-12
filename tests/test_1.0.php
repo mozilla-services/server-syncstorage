@@ -163,7 +163,7 @@
 	{
 		$tmp = json_decode($string, true);
 		if (!is_array($tmp))
-			return
+			return;
 			
 		foreach ($tmp as $k => $v)
 			$tmp[$k] = (string)$v;
