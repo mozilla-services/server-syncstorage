@@ -36,7 +36,7 @@
 #
 # ***** END LICENSE BLOCK *****
 
-	$protocol = "https";
+	$protocol = "http";
 	$host = "localhost";
 	$server = "$protocol://$host";
 	$prefix = "";
@@ -79,62 +79,83 @@
 	
 	
 	$timestamp1 = put_item('history', $item1);
-	output_test("Put an item", is_numeric($timestamp1) && $timestamp1 > 1000000000);
+	output_test("Put an item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp);
 	
 	if (defined('WEAVE_QUOTA'))
-		output_test("Check quota", get_quota($username) == ('[0,' . (int)(WEAVE_QUOTA/1024) . ']'));
-
-	$timestamp2 = put_item('foo', $item2);
-	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000);
-
-	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "1")));
-
-	output_test("Get collection timestamps", compare_arrays(json_get(get_collection_timestamps()), array('history' => $timestamp1, 'foo' => $timestamp2)));
-
-	output_test("Get item", compare_arrays(json_get(get_item('foo', '2')), array('id' => "2", 'modified' => $timestamp2, 'sortindex' => "2", 'payload' => 'abcdef123456789')));
-
-	output_test("Get collection ids", get_collection_ids('foo') == '["2"]');
-
-	output_test("Bad put (timestamp too old)", put_item('foo', $item1, $timestamp2 - 1) == 4);
+	{
+		$quota = get_quota($username);
+		output_test("Check quota", $quota == ('[0,' . (int)(WEAVE_QUOTA/1024) . ']'), $quota);
+	}
 	
-	output_test("Post", post_items('foo', '[' . $item4 . ',' . $item3 . ',' . $item5 . ']') == '{"success":[4,3],"failed":{"":["invalid id"]}}');
+	$timestamp2 = put_item('foo', $item2);
+	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000, $timestap2);
 
-	output_test("Get collection ids (sortindex)", get_collection_ids('foo', "sort=index") == '["4","3","2"]');
+	$result = get_collection_counts();
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1")), $result);
 
-	output_test("Get items by parent id", get_collection_ids('foo', 'sort=index&parentid=1') == '["4","3"]');
+	$result = get_collection_timestamps();
+	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp2)), $result);
+
+	$result = get_item('foo', '2');
+	output_test("Get item", compare_arrays(json_get($result), array('id' => "2", 'modified' => $timestamp2, 'sortindex' => "2", 'payload' => 'abcdef123456789')), $result);
+
+	$result = get_collection_ids('foo');
+	output_test("Get collection ids", $result == '["2"]', $result);
+
+	$result = put_item('foo', $item1, $timestamp2 - 1);
+	output_test("Bad put (timestamp too old)", $result == 4, $result);
+
+	$result = post_items('foo', '[' . $item4 . ',' . $item3 . ',' . $item5 . ']');
+	output_test("Post", $result == '{"success":["4","3"],"failed":{"":["invalid id"]}}', $result);
+
+	$result = get_collection_ids('foo', "sort=index");
+	output_test("Get collection ids (sortindex)", $result == '["4","3","2"]', $result);
+
+	$result = get_collection_ids('foo', 'sort=index&parentid=1');
+	output_test("Get items by parent id", $result == '["4","3"]', $result);
 
 	$timestamp3 = delete_item('foo', "3");
-	output_test("Delete item", is_numeric($timestamp1) && $timestamp1 > 1000000000);
+	output_test("Delete item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp3);	
 
-	output_test("Get collection ids (sortindex)", get_collection_ids('foo', "sort=index") == '["4","2"]');
+	$result = get_collection_ids('foo', "sort=index");
+	output_test("Get collection ids (sortindex)", $result == '["4","2"]', $result);
 
-	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "2")));
+	$result = get_collection_counts();
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "2")), $result);
 
 	$timestamp4 = put_item('foo', $item6); #updates item 4
-	output_test("Update item", is_numeric($timestamp4) && $timestamp4 > 1000000000);
+	output_test("Update item", is_numeric($timestamp4) && $timestamp4 > 1000000000, $timestamp4);
 
-	output_test("Get item", compare_arrays(json_get(get_item('foo', '4')), array('id' => "4", 'parentid' => '1', 'modified' => $timestamp4, 'sortindex' => "5", 'payload' => '567abcdef123456789')));
+	$result = get_item('foo', '4');
+	output_test("Get item", compare_arrays(json_get($result), array('id' => "4", 'parentid' => '1', 'modified' => $timestamp4, 'sortindex' => 5, 'payload' => '567abcdef123456789')), $result);
 
 	$timestamp5 = delete_items_by_timestamp('foo', $timestamp2 + .01);
-	output_test("Delete items by timestamp", is_numeric($timestamp5) && $timestamp5 > 1000000000);
+	output_test("Delete items by timestamp", is_numeric($timestamp5) && $timestamp5 > 1000000000, $timestamp5);
 
-	output_test("Get collection counts", compare_arrays(json_get(get_collection_counts()), array('history' => "1", 'foo' => "1")));
+	$result = get_collection_counts();
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1")), $result);
 
-	output_test("Get collection timestamps", compare_arrays(json_get(get_collection_timestamps()), array('history' => $timestamp1, 'foo' => $timestamp4)));
+	$result = get_collection_timestamps();
+	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp4)), $result);
 
-	output_test("Delete all records (no confirmation)", delete_all_no_confirm() == 4);
+	$result = delete_all_no_confirm();
+	output_test("Delete all records (no confirmation)", $result == 4, $result);
 	
 	$timestamp = delete_all();
-	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000);
+	output_test("Delete all records", is_numeric($timestamp) && $timestamp > 1000000000, $timestamp);
 	
 	
 	
-	function output_test ($name, $condition)
+	function output_test ($name, $condition, $result = null, $expected = null)
 	{
 		echo $name;
 		echo '...';
 		echo $condition ? 'OK' : 'NOT OK';
 		echo "\n";
+		if (!$condition && $result)
+		{
+			echo "\tgot: $result\n";
+		}
 		return $condition;
 	}
 

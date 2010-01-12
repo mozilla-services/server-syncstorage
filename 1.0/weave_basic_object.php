@@ -98,7 +98,7 @@ class wbo
 
 	function id($id = null)
 	{
-		if (!is_null($id)) { $this->wbo_hash['id'] = $id; }
+		if (!is_null($id)) { $this->wbo_hash['id'] = (string)$id; }
 		return array_key_exists('id', $this->wbo_hash) ?  $this->wbo_hash['id'] : null;
 	}
 	
@@ -110,7 +110,7 @@ class wbo
 	
 	function parentid($parentid = null)
 	{
-		if (!is_null($parentid)){ $this->wbo_hash['parentid'] = $parentid; }
+		if (!is_null($parentid)){ $this->wbo_hash['parentid'] = (string)$parentid; }
 		return array_key_exists('parentid', $this->wbo_hash) ?  $this->wbo_hash['parentid'] : null;
 	}
 	
@@ -121,7 +121,7 @@ class wbo
 	
 	function predecessorid($predecessorid = null)
 	{
-		if (!is_null($predecessorid)){ $this->wbo_hash['predecessorid'] = $predecessorid; }
+		if (!is_null($predecessorid)){ $this->wbo_hash['predecessorid'] = (string)$predecessorid; }
 		return array_key_exists('predecessorid', $this->wbo_hash) ?  $this->wbo_hash['predecessorid'] : null;
 	}
 	
@@ -212,6 +212,11 @@ class wbo
 	function clear_error()
 	{
 		$this->_error = array();
+	}
+	
+	function raw_hash()
+	{
+		return $this->wbo_hash;
 	}
 	
 	function json()

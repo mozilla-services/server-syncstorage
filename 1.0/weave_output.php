@@ -9,6 +9,7 @@ class WBOOutput
 {
 	private $_full = false;
 	private $_comma_flag = false;
+	private $_rowcount = 0;
 	private $_output_format = 'json';
 	
 	function __construct ($full = false)
@@ -31,80 +32,59 @@ class WBOOutput
 			
 		}
 	}
-	
-	function output($sth)
+		
+	function set_rowcount($rowcount)
 	{
-		if (($rowcount = $sth->rowCount()) > 0)
-		{
-			header('X-Weave-Records: ' . $rowcount);
-		}
+		$this->_rowcount = $rowcount;
+	}
+	
+	function first()
+	{
+		if ($this->_rowcount)
+			header('X-Weave-Records: ' . $this->_rowcount);
+
+		if ($this->_output_format == 'json')
+			echo '[';
+	}
+	
+	function output($wbo)
+	{		
 		if ($this->_output_format == 'newlines')
 		{
-			return $this->output_newlines($sth);
+			if ($this->_full)
+			{
+				echo preg_replace('/\n/', '\u000a', $wbo->json());
+			}
+			else
+				echo json_encode($wbo->id());
+			echo "\n";
 		}
 		elseif ($this->_output_format == 'whoisi')
 		{
-			return $this->output_whoisi($sth);
+			if ($this->_full)
+			{
+				$output = $wbo->json();
+			}
+			else
+				$output = json_encode($wbo->id());
+			echo pack('N', mb_strlen($output, '8bit')) . $output;
 		}
 		else
-		{
-			return $this->output_json($sth);
-		}
-	}
-	
-	function output_json($sth)
-	{
-		echo '[';
-		
-		while ($result = $sth->fetch(PDO::FETCH_ASSOC))
 		{
 			if ($this->_comma_flag) { echo ','; } else { $this->_comma_flag = true; }
 			if ($this->_full)
 			{
-				$wbo = new wbo();
-				$wbo->populate($result);
 				echo $wbo->json();
 			}
 			else
-				echo json_encode($result{'id'});
+				echo json_encode($wbo->id());
 		}
-
-		echo ']';
-		return 1;
 	}
-
-	function output_whoisi($sth)
-	{		
-		while ($result = $sth->fetch(PDO::FETCH_ASSOC))
-		{
-			if ($this->_full)
-			{
-				$wbo = new wbo();
-				$wbo->populate($result);
-				$output = $wbo->json();
-			}
-			else
-				$output = json_encode($result{'id'});
-			echo pack('N', mb_strlen($output, '8bit')) . $output;
-		}
-		return 1;
-	}
-
-	function output_newlines($sth)
-	{		
-		while ($result = $sth->fetch(PDO::FETCH_ASSOC))
-		{
-			if ($this->_full)
-			{
-				$wbo = new wbo();
-				$wbo->populate($result);
-				echo preg_replace('/\n/', '\u000a', $wbo->json());
-			}
-			else
-				echo json_encode($result{'id'});
-			echo "\n";
-		}
-		return 1;
+	
+	function last()
+	{
+		if ($this->_output_format == 'json')
+			echo ']';
 	}
 }
 

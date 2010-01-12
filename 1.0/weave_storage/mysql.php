@@ -273,7 +273,7 @@ class WeaveStorage implements WeaveStorageBase
 			$this->WEAVE_COLLECTION_NAMES[$result[0]] = $result[1];
 		}
 		
-		return $collections;		
+		return $this->WEAVE_COLLECTION_NAMES;		
 		
 	}
 	
@@ -325,7 +325,7 @@ class WeaveStorage implements WeaveStorageBase
 		$collections = array();
 		foreach ($results as $result)
 		{
-			if (!array_key_exists($result, $this->WEAVE_COLLECTION_NAMES) && !user_collections)
+			if (!array_key_exists($result, $this->WEAVE_COLLECTION_NAMES) && !$user_collections)
 			{
 				$this->get_users_collection_list();
 				$user_collections = 1;
@@ -791,8 +791,21 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("retrieve_collection: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
+
 		if ($direct_output)
-			return $direct_output->output($sth);
+		{
+			$direct_output->set_rowcount($sth->rowCount());
+			$direct_output->first();
+			while($result = $sth->fetch(PDO::FETCH_ASSOC))
+			{
+				$wbo = new wbo();
+				$wbo->populate($result);
+				$direct_output->output($wbo);
+			}
+			$direct_output->last();
+			return;
+		}
+			
 
 		$ids = array();
 		while ($result = $sth->fetch(PDO::FETCH_ASSOC))
