@@ -79,7 +79,7 @@
 	
 	
 	$timestamp1 = put_item('history', $item1);
-	output_test("Put an item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp);
+	output_test("Put an item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp1);
 	
 	if (defined('WEAVE_QUOTA'))
 	{
@@ -88,7 +88,7 @@
 	}
 	
 	$timestamp2 = put_item('foo', $item2);
-	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000, $timestap2);
+	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000, $timestamp2);
 
 	$result = get_collection_counts();
 	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1")), $result);
@@ -162,6 +162,9 @@
 	function json_get($string)
 	{
 		$tmp = json_decode($string, true);
+		if (!is_array($tmp))
+			return
+			
 		foreach ($tmp as $k => $v)
 			$tmp[$k] = (string)$v;
 		
