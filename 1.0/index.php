@@ -72,14 +72,14 @@
 		report_problem(WEAVE_ERROR_INVALID_PROTOCOL, 400);
 
 
-	$db = new WeaveStorage($userid);	
-	
-	$metadata_store = new WeaveMetadata($userid, $db);
-
 
 	#user passes preliminaries, connections made, onto actually getting the data
 	try
 	{
+		$db = new WeaveStorage($userid);	
+		
+		$metadata_store = new WeaveMetadata($userid, $db);
+
 		if ($_SERVER['REQUEST_METHOD'] == 'GET')
 		{
 			if ($function == 'info')
