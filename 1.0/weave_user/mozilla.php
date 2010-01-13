@@ -112,9 +112,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		if (trim($nd) != $_SERVER['HTTP_HOST'])
 			return 0;
 		
-			return $attrs['uidNumber'][0];
-			
-		return 0;
+		return $attrs['uidNumber'][0];
 	}
 
 
