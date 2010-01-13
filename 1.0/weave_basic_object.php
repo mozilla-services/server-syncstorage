@@ -87,13 +87,26 @@ class wbo
 	
 	function populate(&$datahash)
 	{
-		$this->id($datahash['id']);
-		$this->collection($datahash['collection']);
-		$this->parentid($datahash['parentid']);
-		$this->modified($datahash['modified']);
-		$this->predecessorid($datahash['predecessorid']);
-		$this->sortindex($datahash['sortindex']);
-		$this->payload($datahash['payload']);
+		if (array_key_exists('id', $datahash))
+			$this->id($datahash['id']);
+			
+		if (array_key_exists('collection', $datahash))
+			$this->collection($datahash['collection']);
+
+		if (array_key_exists('parentid', $datahash))
+			$this->parentid($datahash['parentid']);
+
+		if (array_key_exists('modified', $datahash))
+			$this->modified($datahash['modified']);
+		
+		if (array_key_exists('predecessorid', $datahash))
+			$this->predecessorid($datahash['predecessorid']);
+
+		if (array_key_exists('sortindex', $datahash))
+			$this->sortindex($datahash['sortindex']);
+		
+		if (array_key_exists('payload', $datahash))
+			$this->payload($datahash['payload']);
 	}
 
 	function id($id = null)
