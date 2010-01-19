@@ -48,18 +48,10 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 	var $_username = null;
 	var $_alert;
 		
- 	private function constructUserDN() {
-
-		$md = md5($this->_username);
-		$a1 = substr($md, 0, 5);
-		$a2 = substr($md, 1, 4);
-		$a3 = substr($md, 2, 3);
-		$a4 = substr($md, 3, 2);
-		$a5 = substr($md, 4, 1);
+ 	private function constructUserDN() 
+ 	{
 		
-		$dn = WEAVE_LDAP_AUTH_USER_PARAM_NAME . "=" . $this->_username . ",";
-		$dn .= "dc=$a1,dc=$a2,dc=$a3,dc=$a4,dc=$a5,".WEAVE_LDAP_AUTH_DN;
-		return $dn;
+		return WEAVE_LDAP_AUTH_USER_PARAM_NAME . "=" . $this->_username . "," . WEAVE_LDAP_AUTH_DN;
 	}
 	
 	function __construct($username)
@@ -91,23 +83,9 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		if (!ldap_bind($this->_conn, $dn, $password))
 			return 0;
 
-		$re = ldap_read($this->_conn, $dn, "objectClass=*", array("primaryNode", "uidNumber"));
+		$re = ldap_read($this->_conn, $dn, "objectClass=*", array("uidNumber"));
 
-		// Check if assigned node is same as current host
-		$nd = "";
 		$attrs = ldap_get_attributes($this->_conn, ldap_first_entry($this->_conn, $re));
-		
-		for ($i = 0; $i < $attrs["primaryNode"]["count"]; $i++)
-		{
-			$node = $attrs["primaryNode"][$i];
-			if (substr($node, 0, 6) == "weave:") {
-				$nd = substr($node, 6);
-				break;
-			}
-		}
-	
-		if (trim($nd) != $_SERVER['HTTP_HOST'])
-			return 0;
 		
 		return $attrs['uidNumber'][0];
 	}
