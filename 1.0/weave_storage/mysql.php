@@ -609,13 +609,13 @@ class WeaveStorage implements WeaveStorageBase
 		if ($index_above)
 		{
 			$select_stmt .= " and sortindex > ?";
-			$params[] = $parentid;
+			$params[] = $index_above;
 		}
 
 		if ($index_below)
 		{
 			$select_stmt .= " and sortindex < ?";
-			$params[] = $parentid;
+			$params[] = $index_below;
 		}
 				
 		if ($newer)
@@ -826,7 +826,7 @@ class WeaveStorage implements WeaveStorageBase
 	{
 		try
 		{
-			$select_stmt = 'select sum(length(payload)) from ' . $this->_db_name . ' where username = :username';
+			$select_stmt = 'select sum(payload_size) from ' . $this->_db_name . ' where username = :username';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
