@@ -17,7 +17,7 @@ APACHE CONFIG:
 Apache configs can vary widely, depending on whether you are doing this inside a VirtualHost and how
 your system is configured. The Aliases that need to be set up are as follows:
 
-Alias /weave-sync/1.0 <full path to install directory>/weaveserver-sync/1.0/index.php
+Alias /1.0 <full path to install directory>/weaveserver-sync/1.0/index.php
 
 
 MYSQL SETUP:
