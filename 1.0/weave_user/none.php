@@ -45,8 +45,11 @@ require_once 'weave_constants.php';
 #Dummy object for no-auth and .htaccess setups
 class WeaveAuthentication implements WeaveAuthenticationBase
 {
+	var $_username = null;
+
 	function __construct($username)
 	{
+		$this->_username = $username;
 	}
 
 	function open_connection()
@@ -59,9 +62,9 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		return null;
 	}
 	
-	function authenticate_user($username, $password)
+	function authenticate_user($password)
 	{
-		return $username;
+		return $this->_username;
 	}
 	
 	function get_user_alert()
