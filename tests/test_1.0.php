@@ -78,6 +78,9 @@
 	$item6 = '{"id": 4, "parentid": 1, "sortindex": 5}';
 	
 	
+	$result = get_collection_timestamps();
+	output_test("Get collection timestamps", $result == '[]', $result);
+	
 	$timestamp1 = put_item('history', $item1);
 	output_test("Put an item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp1);
 	
@@ -324,6 +327,8 @@
 		curl_setopt($ch, CURLOPT_INFILE, $data);
 		curl_setopt($ch, CURLOPT_INFILESIZE, strlen($body));
 		$result = curl_exec($ch);
+		if (curl_getinfo($ch, CURLINFO_HTTP_CODE) != 200)
+			error_log(curl_getinfo($ch, CURLINFO_HTTP_CODE));
 		fclose($data);
 		curl_close($ch);
 		
