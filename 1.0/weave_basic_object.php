@@ -185,7 +185,7 @@ class wbo
 	function validate()
 	{
 		
-		if (!$this->id() || strlen($this->id()) > 64)
+		if (!$this->id() || strlen($this->id()) > 64 || strpos($this->id(), '/') !== false)
 		{ $this->_error[] = "invalid id"; }
 
 		if ($this->parentid_exists() && strlen($this->parentid()) > 64)
