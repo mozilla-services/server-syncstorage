@@ -170,9 +170,10 @@ class WeaveMetadata
 			return;
 		}	
 		
-		if ($collections = $this->_db->get_collection_list_with_timestamps())
+		$collections = $this->_db->get_collection_list_with_timestamps();
+		if (is_array($collections))
 		{
-			#get_collection_list_with_timestamps always returns an array, so we're guaranteed to have one
+			#get_collection_list_with_timestamps always returns an array, so we should be guaranteed to have one
 			$this->_collections = $collections;
 			$this->collections_set();
 		}
