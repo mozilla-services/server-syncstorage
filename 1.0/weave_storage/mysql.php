@@ -688,7 +688,10 @@ class WeaveStorage implements WeaveStorageBase
 		$result = $sth->fetch(PDO::FETCH_ASSOC);
 		$wbo = new wbo();
 		$wbo->populate($result);
-		return $wbo;
+		if ($wbo->validate())
+			return $wbo;
+		else
+			return null;
 	}
 	
 	function retrieve_objects($collection, $id = null, $full = null, $direct_output = null, $parentid = null, 
@@ -800,7 +803,8 @@ class WeaveStorage implements WeaveStorageBase
 			{
 				$wbo = new wbo();
 				$wbo->populate($result);
-				$direct_output->output($wbo);
+				if (!$full || $wbo->validate())
+					$direct_output->output($wbo);
 			}
 			$direct_output->last();
 			return;
@@ -814,7 +818,8 @@ class WeaveStorage implements WeaveStorageBase
 			{
 				$wbo = new wbo();
 				$wbo->populate($result);
-				$ids[] = $wbo;
+				if ($wbo->validate())
+					$ids[] = $wbo;
 			}
 			else
 				$ids[] = $result['id'];
