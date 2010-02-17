@@ -76,7 +76,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 
 		ldap_set_option($this->_conn, LDAP_OPT_PROTOCOL_VERSION, 3);
 		
-		return 1;
+		return true;
 	}
 
 	function get_connection()
@@ -89,7 +89,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		$dn = $this->constructUserDN($this->_username);
 		
 		if (!ldap_bind($this->_conn, $dn, $password))
-			return 0;
+			return false;
 
 		$re = ldap_read($this->_conn, $dn, "objectClass=*", array("primaryNode", "uidNumber"));
 
@@ -107,7 +107,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		}
 	
 		if (trim($nd) != $_SERVER['HTTP_HOST'])
-			return 0;
+			return false;
 		
 		return $attrs['uidNumber'][0];
 	}

@@ -74,7 +74,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 				error_log($exception->getMessage());
 				throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	}
 	
 	function get_connection()

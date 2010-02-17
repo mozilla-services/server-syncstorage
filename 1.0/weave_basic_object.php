@@ -54,7 +54,7 @@ class wbo
 		if ($extracted === null)
 		{
 			$this->_error[] = "unable to extract from json";
-			return 0;
+			return false;
 		}
 		
 		#must have an id, or all sorts of badness happens. However, it can be added later
@@ -82,7 +82,7 @@ class wbo
 		{
 			$this->payload($extracted['payload']);
 		}
-		return 1;
+		return true;
 	}
 	
 	function populate(&$datahash)
