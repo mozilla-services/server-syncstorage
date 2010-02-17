@@ -56,12 +56,27 @@
 		$path = $_SERVER['PATH_INFO'];
 	else if (!empty($_SERVER['ORIG_PATH_INFO']))
 		$path = $_SERVER['ORIG_PATH_INFO'];
+	else
+		report_problem("No path found", 404);
 	
 	$path = substr($path, 1); #chop the lead slash
 	list($username, $function, $collection, $id) = explode('/', $path . '///');
 	
+	if ($function != "info" && $function != "storage")
+		report_problem(WEAVE_ERROR_FUNCTION_NOT_SUPPORTED, 400);
+	
 	if (!validate_username($username))
 		report_problem(WEAVE_ERROR_INVALID_USERNAME, 400);
+	
+	#only a delete has meaning without a collection
+	if ($collection)
+	{
+		if (!validate_collection($collection))
+			report_problem(WEAVE_ERROR_INVALID_COLLECTION, 400);		
+	}
+	else if ($_SERVER['REQUEST_METHOD'] != 'DELETE')
+		report_problem(WEAVE_ERROR_INVALID_PROTOCOL, 400);
+
 	
 	#Auth the user
 	$userid = verify_user($username);
@@ -70,10 +85,6 @@
 	if ($function != 'storage' && $_SERVER['REQUEST_METHOD'] != 'GET')
 		report_problem(WEAVE_ERROR_INVALID_PROTOCOL, 400);
 	
-	#only a delete has meaning without a collection (DELETE purges, GET uses it as an action)
-	if (!$collection && $_SERVER['REQUEST_METHOD'] != 'DELETE')
-		report_problem(WEAVE_ERROR_INVALID_PROTOCOL, 400);
-
 
 
 	#user passes preliminaries, connections made, onto actually getting the data

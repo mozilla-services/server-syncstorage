@@ -44,6 +44,28 @@
 		return $json;
 	}
 
+	function validate_username($username)
+	{
+		if (!$username)
+			return false;
+		
+		if (strlen($username) > 32)
+			return false;
+			
+		return preg_match('/[^A-Z0-9._-]/i', $username) ? false : true;
+	}
+	
+	function validate_collection($collection)
+	{
+		if (!$collection)
+			return false;
+		
+		if (strlen($collection) > 32)
+			return false;
+			
+		return preg_match('/[^A-Z0-9._-]/i', $collection) ? false : true;
+	}
+	
 
 	# Gets the username and password out of the http headers, and checks them against the auth
 	function verify_user($url_user)
