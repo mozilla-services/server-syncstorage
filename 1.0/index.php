@@ -119,7 +119,7 @@
 				{
 					$wbo = $db->retrieve_objects($collection, $id, 1); #get the full contents of one record
 					
-					if (count($wbo) > 0)
+					if (count($wbo) > 0 && $wbo[0]->validate())
 						echo $wbo[0]->json();
 					else
 						report_problem("record not found", 404);

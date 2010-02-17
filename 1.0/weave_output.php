@@ -53,6 +53,8 @@ class WBOOutput
 		{
 			if ($this->_full)
 			{
+				if (!$wbo->validate())
+					return;
 				echo preg_replace('/\n/', '\u000a', $wbo->json());
 			}
 			else
@@ -63,6 +65,8 @@ class WBOOutput
 		{
 			if ($this->_full)
 			{
+				if (!$wbo->validate())
+					return;
 				$output = $wbo->json();
 			}
 			else
@@ -74,6 +78,8 @@ class WBOOutput
 			if ($this->_comma_flag) { echo ','; } else { $this->_comma_flag = true; }
 			if ($this->_full)
 			{
+				if (!$wbo->validate())
+					return;
 				echo $wbo->json();
 			}
 			else
