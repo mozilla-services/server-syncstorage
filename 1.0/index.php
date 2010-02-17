@@ -60,6 +60,9 @@
 	$path = substr($path, 1); #chop the lead slash
 	list($username, $function, $collection, $id) = explode('/', $path . '///');
 	
+	if (!validate_username($username))
+		report_problem(WEAVE_ERROR_INVALID_USERNAME, 400);
+	
 	#Auth the user
 	$userid = verify_user($username);
 		
@@ -138,9 +141,6 @@
 			$wbo = new wbo();
 			if (!$wbo->extract_json(get_json()))
 				report_problem(WEAVE_ERROR_JSON_PARSE, 400);
-	
-			if (defined('WEAVE_DATA_PROFILE'))
-				error_log('PUT payload: ' . $json);
 							
 			$metadata_store->check_quota();
 			$metadata_store->check_timestamp($collection);
@@ -178,9 +178,6 @@
 			
 			$json = get_json();
 			
-			if (defined('WEAVE_DATA_PROFILE'))
-				error_log('POST payload: ' . $jsonstring);
-	
 			$metadata_store->check_quota();
 			$metadata_store->check_timestamp($collection);
 			
