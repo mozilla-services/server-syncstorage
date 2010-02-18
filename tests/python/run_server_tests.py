@@ -22,17 +22,15 @@ if __name__ == '__main__':
 	tests = filter(lambda x:x[0] != '-', sys.argv[1:])
 	anyProblems = False
 	if len(tests) > 0:
+		results = []
 		runner = unittest.TextTestRunner(verbosity=3)
 		for a in tests:
-			result = runner.run(unittest.defaultTestLoader.loadTestsFromName(a, module=server_tests))
-			if len(result.failures) > 0 or len(result.errors) > 0:
-				anyProblems = True			
+			results.append(runner.run(unittest.defaultTestLoader.loadTestsFromName(a, module=server_tests)))
 	else:
-		result = Run()
-		if len(result.failures) > 0 or len(result.errors) > 0:
-			anyProblems = True
+		results = Run()
 
-	if anyProblems:
-		sys.exit(1)
-	else:
-		sys.exit(0)
+	for r in results:
+		if len(r.failures) > 0 or len(r.errors) > 0:
+			sys.exit(1)
+
+	sys.exit(0)

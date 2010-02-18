@@ -32,9 +32,10 @@ class ModuleTestRunner(object):
 		"""Executes all tests present in the list of modules."""
 		if self.asXML:
 			runner = xmlrunner.XMLTestRunner()
-			return runner.result
 		else:
 			runner = unittest.TextTestRunner(verbosity=3)
+
+		results = []
 		for module in self.modules:
 			for setting, value in self.settings.iteritems():
 				try:
@@ -42,6 +43,6 @@ class ModuleTestRunner(object):
 				except AttributeError:
 					pass
 			print '\nRunning all tests in module', module.__name__
-			runner.run(unittest.defaultTestLoader.loadTestsFromModule(module))
-			return runner.result
+			results.append(runner.run(unittest.defaultTestLoader.loadTestsFromModule(module)))
+		return results
 
