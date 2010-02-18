@@ -54,7 +54,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 
 	function open_connection()
 	{
-		return 1;
+		return true;
 	}
 	
 	function get_connection()

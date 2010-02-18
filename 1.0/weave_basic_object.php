@@ -54,7 +54,7 @@ class wbo
 		if ($extracted === null)
 		{
 			$this->_error[] = "unable to extract from json";
-			return 0;
+			return false;
 		}
 		
 		#must have an id, or all sorts of badness happens. However, it can be added later
@@ -82,7 +82,7 @@ class wbo
 		{
 			$this->payload($extracted['payload']);
 		}
-		return 1;
+		return true;
 	}
 	
 	function populate(&$datahash)
@@ -210,7 +210,7 @@ class wbo
 		{
 			if (!is_string($this->wbo_hash['payload']))
 			{ $this->_error[] = "payload needs to be json-encoded"; }
-			else if (WEAVE_PAYLOAD_MAX_SIZE && strlen($this->wbo_hash['payload']) > WEAVE_PAYLOAD_MAX_SIZE)
+			else if (WEAVE_PAYLOAD_MAX_SIZE && mb_strlen($this->wbo_hash['payload'], '8bit') > WEAVE_PAYLOAD_MAX_SIZE)
 			{ $this->_error[] = "payload too large"; }
 		}
 		
@@ -235,8 +235,9 @@ class wbo
 	function json()
 	{
 		$this->wbo_hash['modified'] /= 100; #stupid hack to output timestamps in decimal
-		return json_encode($this->wbo_hash);
+		$jsonstring = json_encode($this->wbo_hash);
 		$this->wbo_hash['modified'] *= 100;
+		return $jsonstring;
 	}
 }
 

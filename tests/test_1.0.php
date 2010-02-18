@@ -327,8 +327,6 @@
 		curl_setopt($ch, CURLOPT_INFILE, $data);
 		curl_setopt($ch, CURLOPT_INFILESIZE, strlen($body));
 		$result = curl_exec($ch);
-		if (curl_getinfo($ch, CURLINFO_HTTP_CODE) != 200)
-			error_log(curl_getinfo($ch, CURLINFO_HTTP_CODE));
 		fclose($data);
 		curl_close($ch);
 		

@@ -75,6 +75,11 @@ if (WEAVE_AUTH_ENGINE == 'mysql')
 	if (!defined('WEAVE_MYSQL_AUTH_DB')) { define('WEAVE_MYSQL_AUTH_DB', 'weave'); }
 	if (!defined('WEAVE_MYSQL_AUTH_USER')) { define('WEAVE_MYSQL_AUTH_USER', 'weave'); }
 	if (!defined('WEAVE_MYSQL_AUTH_PASS')) { define('WEAVE_MYSQL_AUTH_PASS', 'weave'); }
+
+	#set the salt to a secret value for hashing with passwords. Make sure it matches the one in weaveserver-registration 
+	if (!defined('WEAVE_SHA_SALT')) { define('WEAVE_SHA_SALT', 'salt goes here'); }
+	#if you have older users using the older password scheme (md5), enable this
+	#if (!defined('WEAVE_MD5_FALLBACK')) { define('WEAVE_MD5_FALLBACK', false); }
 }
 elseif (WEAVE_AUTH_ENGINE == 'mozilla')
 {
@@ -87,6 +92,7 @@ elseif (WEAVE_AUTH_ENGINE == 'mozilla')
 
 #The maximum size of a payload (set to 0 for unlimited) in bytes. Watch out for large characters!
 if (!defined('WEAVE_PAYLOAD_MAX_SIZE')) { define('WEAVE_PAYLOAD_MAX_SIZE', 262144); } #256K
+
 
 #The maximum quota per user in bytes. Keep commented out to turn quotas off
 #if (!defined('WEAVE_QUOTA')) { define('WEAVE_QUOTA', 5120000); } #5M
@@ -113,6 +119,7 @@ define ('WEAVE_ERROR_BAD_PASSWORD_STRENGTH', 9);
 define ('WEAVE_ERROR_INVALID_RESET_CODE', 10);
 define ('WEAVE_ERROR_FUNCTION_NOT_SUPPORTED', 11);
 define ('WEAVE_ERROR_NO_EMAIL', 12);
+define ('WEAVE_ERROR_INVALID_COLLECTION', 13);
 
 
 

@@ -51,6 +51,19 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 	var $_username = null;
 	var $_alert = null;
 	
+	function hash_password($password)
+	{
+		if (defined('WEAVE_SHA_SALT'))
+		{
+			$p_array = str_split($password,(floor(strlen($password)/2))+1);
+			return hash('sha256', $p_array[0] . WEAVE_SHA_SALT . $p_array[1]);
+		}
+		else
+		{
+			return md5($password);
+		}
+	}
+
 	function __construct($username) 
 	{
 		$this->open_connection();
@@ -74,7 +87,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 				error_log($exception->getMessage());
 				throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	}
 	
 	function get_connection()
@@ -85,24 +98,32 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 
 	function authenticate_user($password)
 	{
+		$result = null;
 		try
 		{
-			$select_stmt = 'select id, status, alert from users where username = :username and md5 = :md5';
+			$select_stmt = 'select id, status, alert from users where username = ? and md5 = ?';
 			$sth = $this->_dbh->prepare($select_stmt);
-			$pwhash = md5($password);
-			$sth->bindParam(':username', $this->_username);
-			$sth->bindParam(':md5', $pwhash);
-			$sth->execute();
+			$phash = $this->hash_password($password);
+
+			$sth->execute(array($this->_username, $phash));
+		
+			if (!$result = $sth->fetch(PDO::FETCH_ASSOC))
+			{
+				if (defined('WEAVE_SHA_SALT') && defined('WEAVE_MD5_FALLBACK') && WEAVE_MD5_FALLBACK) #fall back to md5
+				{
+					$sth->closeCursor();
+					$phash = md5($password);
+					$sth->execute(array($this->_username, $phash));
+					$result = $sth->fetch(PDO::FETCH_ASSOC);
+				}
+				if (!$result)
+					return null;
+			}
 		}
 		catch( PDOException $exception )
 		{
 			error_log("authenticate_user: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
-		}
-
-		if (!$result = $sth->fetch(PDO::FETCH_ASSOC))
-		{
-			return null;
 		}
 		
 		$this->_alert = $result['alert'];
@@ -112,7 +133,6 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 			
 		return $result['id'];
 	}
-
 	
 	function get_user_alert()
 	{

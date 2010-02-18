@@ -136,20 +136,20 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("begin_transaction: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	}
 
 	function commit_transaction()
 	{
 		$this->_dbh->commit();
-		return 1;
+		return true;
 	}
 	
 	function get_collection_id($collection)
 	{
 		if (!$collection)
 		{
-			return 0;
+			return null;
 		}
 		
 		if (array_key_exists($collection, $this->WEAVE_COLLECTION_KEYS))
@@ -282,7 +282,7 @@ class WeaveStorage implements WeaveStorageBase
 	{
 		if (!$collection)
 		{
-			return 0;
+			return null;
 		}
 		
 		try
@@ -452,7 +452,7 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("store_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	
 	}
 
@@ -466,7 +466,7 @@ class WeaveStorage implements WeaveStorageBase
 		if (!$wbo->id() || !$wbo->collection())
 		{
 			error_log('Trying to update without a valid id or collection!');
-			return 0;
+			return false;
 		}
 		
 		if ($wbo->parentid_exists())
@@ -513,7 +513,7 @@ class WeaveStorage implements WeaveStorageBase
 		
 		if (count($params) == 0)
 		{
-			return 0;
+			return false;
 		}
 		
 		$update .= join($update_list, ",");
@@ -535,7 +535,7 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("update_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;		
+		return true;		
 	}
 	
 	function delete_object($collection, $id)
@@ -558,7 +558,7 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("delete_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	}
 	
 	
@@ -662,7 +662,7 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("delete_objects: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 	}
 
 	function retrieve_object($collection, $id)
@@ -688,7 +688,10 @@ class WeaveStorage implements WeaveStorageBase
 		$result = $sth->fetch(PDO::FETCH_ASSOC);
 		$wbo = new wbo();
 		$wbo->populate($result);
-		return $wbo;
+		if ($wbo->validate())
+			return $wbo;
+		else
+			return null;
 	}
 	
 	function retrieve_objects($collection, $id = null, $full = null, $direct_output = null, $parentid = null, 
@@ -800,7 +803,8 @@ class WeaveStorage implements WeaveStorageBase
 			{
 				$wbo = new wbo();
 				$wbo->populate($result);
-				$direct_output->output($wbo);
+				if (!$full || $wbo->validate())
+					$direct_output->output($wbo);
 			}
 			$direct_output->last();
 			return;
@@ -814,7 +818,8 @@ class WeaveStorage implements WeaveStorageBase
 			{
 				$wbo = new wbo();
 				$wbo->populate($result);
-				$ids[] = $wbo;
+				if ($wbo->validate())
+					$ids[] = $wbo;
 			}
 			else
 				$ids[] = $result['id'];
@@ -842,7 +847,7 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function create_user()
 	{
-		return 1; #nothing needs doing on the storage side
+		return true; #nothing needs doing on the storage side
 	}
 	
 	function delete_user()
@@ -860,7 +865,7 @@ class WeaveStorage implements WeaveStorageBase
 			error_log("delete_user: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return 1;
+		return true;
 
 	}
 

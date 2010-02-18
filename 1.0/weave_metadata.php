@@ -54,7 +54,7 @@ class WeaveMetadata
 	{
 		$this->_userid = $userid;
 		$this->_db = $db;
-		
+				
 		if (defined('WEAVE_STORAGE_MEMCACHE_PORT') && WEAVE_STORAGE_MEMCACHE_PORT)
 		{
 			$this->_memc = new Memcache;
@@ -142,7 +142,10 @@ class WeaveMetadata
 		if ($this->_memc) #to our advantage to leverage the collection object we'll be updating soon.
 		{
 			$this->collections_get();
-			return $this->_collections[$collection];
+			if ($this->_collections)
+				return $this->_collections[$collection];
+			else
+				return null;
 		}
 		else
 		{
@@ -158,22 +161,22 @@ class WeaveMetadata
 	
 	function collections_get()
 	{
-		if ($this->_collections)
-			return $this->_collections;
+		if ($this->_collections !== null) #already have it
+			return;
 			
-		if ($this->_memc)
+		if ($this->_memc && $collections = $this->_memc->get('coll:' . $this->_userid) && is_array($collections))
 		{
-			if ($collections = $this->_memc->get('coll:' . $this->_userid))
-			{
-				$this->_collections = $collections;
-				return;
-			}
+			$this->_collections = $collections;
+			return;
 		}	
 		
 		$collections = $this->_db->get_collection_list_with_timestamps();
-		
-		$this->_collections = $collections;
-		$this->collections_set();
+		if (is_array($collections))
+		{
+			#get_collection_list_with_timestamps always returns an array, so we should be guaranteed to have one
+			$this->_collections = $collections;
+			$this->collections_set();
+		}
 	}
 	
 	function collections_update($collection, $timestamp)
@@ -198,6 +201,7 @@ class WeaveMetadata
 	{
 		if ($this->_memc)
 			$this->_memc->delete('coll:' . $this->_userid);	
+		$this->_collections = array();
 	}
 
 	#we don't use this enough yet to justify memcaching it.
