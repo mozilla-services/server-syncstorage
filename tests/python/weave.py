@@ -97,7 +97,10 @@ def getUserStorageNode(serverURL, userID, password):
 		return result
 			
 	except urllib2.URLError, e:
-		raise WeaveException("Unable to communicate with Weave server: " + str(e))
+		if str(e).find("404") >= 0:
+			return serverURL
+		else:
+			raise WeaveException("Unable to communicate with Weave server: " + str(e))
 
 
 def changeUserEmail(serverURL, userID, password, newemail):
@@ -310,7 +313,7 @@ def get_collection_ids(storageServerURL, userID, password, collection, params=No
 def get_item(storageServerURL, userID, password, collection, id, asJSON=True, withAuthUser=None, withAuth=True):
 	"""withAuth is used for testing only: if set to False the Authorization header is omitted.
 	 withAuthUser is used for testing only: it sets the HTTP Authorize user to something other than userID"""
-	url = storageServerURL + "/1.0/%s/storage/%s/%s?full=1" % (userID, collection, id)
+	url = storageServerURL + "/1.0/%s/storage/%s/%s?full=1" % (userID, collection, urllib.quote(id))
 	authUser = userID
 	if withAuthUser: authUser = withAuthUser
 	return storage_http_op("GET", authUser, password, url, asJSON=asJSON, withAuth=withAuth)
