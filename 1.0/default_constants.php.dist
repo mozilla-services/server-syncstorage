@@ -88,6 +88,9 @@ elseif (WEAVE_AUTH_ENGINE == 'mozilla')
 #The maximum size of a payload (set to 0 for unlimited) in bytes. Watch out for large characters!
 if (!defined('WEAVE_PAYLOAD_MAX_SIZE')) { define('WEAVE_PAYLOAD_MAX_SIZE', 262144); } #256K
 
+if (!defined('WEAVE_SHA_SALT')) { define('WEAVE_SHA_SALT', 'salt goes here'); }
+#if (!defined('WEAVE_MD5_FALLBACK')) { define('WEAVE_MD5_FALLBACK', false); }
+
 #The maximum quota per user in bytes. Keep commented out to turn quotas off
 #if (!defined('WEAVE_QUOTA')) { define('WEAVE_QUOTA', 5120000); } #5M
 
