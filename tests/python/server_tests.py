@@ -851,12 +851,23 @@ class TestStorage(unittest.TestCase):
 		self.failUnlessEqual("\x00\x00\x00\x05\"id1\"\x00\x00\x00\x05\"id2\"", result)
 
 	def testGet_whoisi_full(self):
-		"testGet_whoisi: Attempt to get multiple objects, specifying whoisi output format, with 'full'"
+		"testGet_whoisi_full: Attempt to get multiple objects, specifying whoisi output format, with 'full'"
 		userID, storageServer = self.createCaseUser()
 		ts = [weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':"id%s" % i, 'payload':'aPayload', 'sortindex': i}, withHost=test_config.HOST_NAME) for i in range(1,3)]
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', asJSON=False, params="full=1", outputFormat="application/whoisi", withHost=test_config.HOST_NAME)
-		self.failUnlessEqual('\x00\x00\x00H{"id":"id1","modified":'+ts[0]+',"sortindex":1,"payload":"aPayload"}\x00\x00\x00H{"id":"id2","modified":'+ts[1]+',"sortindex":2,"payload":"aPayload"}',
-			result)
+		
+		# The whoisi format starts with a hex-encoded length.
+		# Since modified strings could be variable length depending on how many
+		# fractional digits are present, we have to calculate.
+		
+		# Default python conversion does what we want here - "5", "5.1", or "5.11".
+		expected1 = '{"id":"id1","modified":' + ts[0] + ',"sortindex":1,"payload":"aPayload"}'
+		expected2 = '{"id":"id2","modified":' + ts[1] + ',"sortindex":2,"payload":"aPayload"}'
+		
+		expectedWhoisiPayload = """\x00\x00\x00""" + chr(len(expected1)) + expected1 + """\x00\x00\x00""" + chr(len(expected2)) + expected2 
+
+		self.failUnlessEqual(expectedWhoisiPayload, result)
+		#'\x00\x00\x00H{"id":"id1","modified":'+ts[0]+',"sortindex":1,"payload":"aPayload"}\x00\x00\x00H{"id":"id2","modified":'+ts[1]+',"sortindex":2,"payload":"aPayload"}',	result)
 
 	def testGet_newLines(self):
 		"testGet_newLines: Attempt to get multiple objects, specifying newlines output format, without 'full'"
