@@ -164,7 +164,7 @@ class WeaveMetadata
 		if ($this->_collections !== null) #already have it
 			return;
 			
-		if ($this->_memc && $collections = $this->_memc->get('coll:' . $this->_userid) && is_array($collections))
+		if ($this->_memc && ($collections = $this->_memc->get('coll:' . $this->_userid)) && is_array($collections))
 		{
 			$this->_collections = $collections;
 			return;
