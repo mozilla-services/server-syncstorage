@@ -10,19 +10,58 @@ import unittest
 import logging
 import sys
 
+import test_config
 
 def Run():
 	test_runner = module_test_runner.ModuleTestRunner(asXML='-xml' in sys.argv)
 	test_runner.modules = [server_tests]
-	test_runner.RunAllTests()
+	return test_runner.RunAllTests()
+
+
+# python run_server_tests.py --scheme=https --server=pm-weave04.mozilla.org --host=sj-weave01.services.mozilla.com --username=weavetest-sj01 --password=caid2raefoWi
+
 
 if __name__ == '__main__':
 	logging.basicConfig(level = logging.DEBUG)
 
-	tests = filter(lambda x:x[0] != '-', sys.argv[1:])
+
+	from optparse import OptionParser
+
+	# process arguments
+	usage = "usage: %prog [options] [ test-class | test-class.test-method ] "
+	parser = OptionParser(usage=usage)
+	parser.add_option("--scheme", help="http or https", dest="scheme")
+	parser.add_option("--server", help="the actual internet host to contact", dest="server")
+	parser.add_option("--host", help="the Host name to present in the HTTP request", dest="host")
+	parser.add_option("--username", help="the Weave username to send", dest="username")
+	parser.add_option("--password", help="the Weave password to send", dest="password")
+
+	(options, args) = parser.parse_args()
+	
+	if options.scheme:
+		test_config.STORAGE_SCHEME = options.scheme
+	if options.server:
+		test_config.STORAGE_SERVER =  options.server
+
+	if options.host:
+		test_config.HOST_NAME = options.host
+	if options.username:
+		test_config.USERNAME = options.username
+	if options.password:
+		test_config.PASSWORD = options.password
+		
+	tests = args
+	anyProblems = False
 	if len(tests) > 0:
+		results = []
 		runner = unittest.TextTestRunner(verbosity=3)
 		for a in tests:
-			runner.run(unittest.defaultTestLoader.loadTestsFromName(a, module=server_tests))
+			results.append(runner.run(unittest.defaultTestLoader.loadTestsFromName(a, module=server_tests)))
 	else:
-		Run()
+		results = Run()
+
+	for r in results:
+		if len(r.failures) > 0 or len(r.errors) > 0:
+			sys.exit(1)
+
+	sys.exit(0)

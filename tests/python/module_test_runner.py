@@ -34,6 +34,8 @@ class ModuleTestRunner(object):
 			runner = xmlrunner.XMLTestRunner()
 		else:
 			runner = unittest.TextTestRunner(verbosity=3)
+
+		results = []
 		for module in self.modules:
 			for setting, value in self.settings.iteritems():
 				try:
@@ -41,5 +43,6 @@ class ModuleTestRunner(object):
 				except AttributeError:
 					pass
 			print '\nRunning all tests in module', module.__name__
-			runner.run(unittest.defaultTestLoader.loadTestsFromModule(module))
+			results.append(runner.run(unittest.defaultTestLoader.loadTestsFromModule(module)))
+		return results
 

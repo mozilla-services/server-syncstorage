@@ -20,7 +20,7 @@ class WeaveException(Exception):
 	def __str__(self):
 		return repr(self.value)
 
-def createUser(serverURL, userID, password, email, secret = None, captchaChallenge = None, captchaResponse = None):
+def createUser(serverURL, userID, password, email, secret = None, captchaChallenge = None, captchaResponse = None, withHost =None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 	if email.find('"') >=0:
@@ -43,6 +43,9 @@ def createUser(serverURL, userID, password, email, secret = None, captchaChallen
 	payload = '''{"password":"%s", "email": "%s"%s%s}''' % (password, email, secretStr, captchaStr)
 
 	req = urllib2.Request(url, data=payload)
+	if withHost:
+		req.add_header("Host", withHost)
+
 	req.get_method = lambda: 'PUT'
 	try:
 		f = opener.open(req)
@@ -59,13 +62,15 @@ def createUser(serverURL, userID, password, email, secret = None, captchaChallen
 		raise WeaveException("Unable to communicate with Weave server: " + str(e) + "; %s" % msg)
 
 
-def checkNameAvailable(serverURL, userID):
+def checkNameAvailable(serverURL, userID, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 
 	url = serverURL + "/user/1/%s/" % userID
 
 	req = urllib2.Request(url)
+	if withHost:
+		req.add_header("Host", withHost)
 	try:
 		f = urllib2.urlopen(req)
 		result = f.read()
@@ -79,7 +84,7 @@ def checkNameAvailable(serverURL, userID):
 		raise WeaveException("Unable to communicate with Weave server: " + str(e))
 
 
-def getUserStorageNode(serverURL, userID, password):
+def getUserStorageNode(serverURL, userID, password, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 
@@ -89,6 +94,8 @@ def getUserStorageNode(serverURL, userID, password):
 	req = urllib2.Request(url)
 	base64string = base64.encodestring('%s:%s' % (userID, password))[:-1]
 	req.add_header("Authorization", "Basic %s" % base64string)
+	if withHost:
+		req.add_header("Host", withHost)
 
 	try:
 		f = opener.open(req)
@@ -97,10 +104,13 @@ def getUserStorageNode(serverURL, userID, password):
 		return result
 			
 	except urllib2.URLError, e:
-		raise WeaveException("Unable to communicate with Weave server: " + str(e))
+		if str(e).find("404") >= 0:
+			return serverURL
+		else:
+			raise WeaveException("Unable to communicate with Weave server: " + str(e))
 
 
-def changeUserEmail(serverURL, userID, password, newemail):
+def changeUserEmail(serverURL, userID, password, newemail, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 	if newemail.find('"') >=0:
@@ -113,6 +123,8 @@ def changeUserEmail(serverURL, userID, password, newemail):
 	req = urllib2.Request(url, data=payload)
 	base64string = base64.encodestring('%s:%s' % (userID, password))[:-1]
 	req.add_header("Authorization", "Basic %s" % base64string)
+	if withHost:
+		req.add_header("Host", withHost)
 	req.get_method = lambda: 'POST'
 	try:
 		f = opener.open(req)
@@ -125,7 +137,7 @@ def changeUserEmail(serverURL, userID, password, newemail):
 
 
 
-def changeUserPassword(serverURL, userID, password, newpassword):
+def changeUserPassword(serverURL, userID, password, newpassword, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 
@@ -135,6 +147,8 @@ def changeUserPassword(serverURL, userID, password, newpassword):
 	req = urllib2.Request(url, data=payload)
 	base64string = base64.encodestring('%s:%s' % (userID, password))[:-1]
 	req.add_header("Authorization", "Basic %s" % base64string)
+	if withHost:
+		req.add_header("Host", withHost)
 	req.get_method = lambda: 'POST'
 	try:
 
@@ -148,7 +162,7 @@ def changeUserPassword(serverURL, userID, password, newpassword):
 
 
 
-def deleteUser(serverURL, userID, password):
+def deleteUser(serverURL, userID, password, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 
@@ -157,6 +171,8 @@ def deleteUser(serverURL, userID, password):
 	req = urllib2.Request(url)
 	base64string = base64.encodestring('%s:%s' % (userID, password))[:-1]
 	req.add_header("Authorization", "Basic %s" % base64string)
+	if withHost:
+		req.add_header("Host", withHost)
 	req.get_method = lambda: 'DELETE'
 	try:
 		f = opener.open(req)
@@ -172,7 +188,7 @@ def deleteUser(serverURL, userID, password):
 
 
 
-def setUserProfile(serverURL, userID, profileField, profileValue):
+def setUserProfile(serverURL, userID, profileField, profileValue, withHost=None):
 	if userID.find('"') >=0:
 		raise ValueError("Weave userIDs may not contain the quote character")
 
@@ -183,6 +199,8 @@ def setUserProfile(serverURL, userID, profileField, profileValue):
 	base64string = base64.encodestring('%s:%s' % (userID, password))[:-1]
 	req.add_header("Authorization", "Basic %s" % base64string)
 	req.get_method = lambda: 'POST'
+	if withHost:
+		req.add_header("Host", withHost)
 	try:
 		f = opener.open(req)
 		result = f.read()
@@ -196,7 +214,7 @@ def setUserProfile(serverURL, userID, profileField, profileValue):
 
 
 
-def storage_http_op(method, userID, password, url, payload=None, asJSON=True, ifUnmodifiedSince=None, withConfirmation=None, withAuth=True, outputFormat=None):
+def storage_http_op(method, userID, password, url, payload=None, asJSON=True, ifUnmodifiedSince=None, withConfirmation=None, withAuth=True, withHost=None, outputFormat=None):
 
 	req = urllib2.Request(url, data=payload)
 	if withAuth:
@@ -208,7 +226,9 @@ def storage_http_op(method, userID, password, url, payload=None, asJSON=True, if
 		req.add_header("X-Confirm-Delete", "true")
 	if outputFormat:
 		req.add_header("Accept", outputFormat)
-	
+	if withHost:
+		req.add_header("Host", withHost)
+
 	req.get_method = lambda: method
 
 	try:
@@ -228,7 +248,7 @@ def storage_http_op(method, userID, password, url, payload=None, asJSON=True, if
 		raise WeaveException("Unable to communicate with Weave server: %s" % e)
 
 
-def add_or_modify_item(storageServerURL, userID, password, collection, item, urlID=None, ifUnmodifiedSince=None):
+def add_or_modify_item(storageServerURL, userID, password, collection, item, urlID=None, ifUnmodifiedSince=None, withHost=None):
 	'''Adds the WBO defined in 'item' to 'collection'.  If the WBO does
 	not contain a payload, will update the provided metadata fields on an
 	already-defined object.
@@ -242,9 +262,9 @@ def add_or_modify_item(storageServerURL, userID, password, collection, item, url
 		itemJSON = item
 	else:
 		itemJSON = json.dumps(item)
-	return storage_http_op("PUT", userID, password, url, itemJSON, asJSON=False, ifUnmodifiedSince=ifUnmodifiedSince)
+	return storage_http_op("PUT", userID, password, url, itemJSON, asJSON=False, ifUnmodifiedSince=ifUnmodifiedSince, withHost=withHost)
 
-def add_or_modify_items(storageServerURL, userID, password, collection, itemArray, ifUnmodifiedSince=None):
+def add_or_modify_items(storageServerURL, userID, password, collection, itemArray, ifUnmodifiedSince=None, withHost=None):
 	'''Adds all the items defined in 'itemArray' to 'collection'; effectively
 	performs an add_or_modifiy_item for each.
 	
@@ -263,14 +283,14 @@ def add_or_modify_items(storageServerURL, userID, password, collection, itemArra
 		itemArrayJSON = itemArray
 	else:
 		itemArrayJSON = json.dumps(itemArray)
-	return storage_http_op("POST", userID, password, url, itemArrayJSON, ifUnmodifiedSince=ifUnmodifiedSince)
+	return storage_http_op("POST", userID, password, url, itemArrayJSON, ifUnmodifiedSince=ifUnmodifiedSince, withHost=withHost)
 
 
-def delete_item(storageServerURL, userID, password, collection, id, ifUnmodifiedSince=None):
+def delete_item(storageServerURL, userID, password, collection, id, ifUnmodifiedSince=None, withHost=None):
 	url = storageServerURL + "/1.0/%s/storage/%s/%s" % (userID, collection, urllib.quote(id))
-	return storage_http_op("DELETE", userID, password, url, ifUnmodifiedSince=ifUnmodifiedSince)
+	return storage_http_op("DELETE", userID, password, url, ifUnmodifiedSince=ifUnmodifiedSince, withHost=withHost)
 
-def delete_items(storageServerURL, userID, password, collection, idArray=None, params=None):
+def delete_items(storageServerURL, userID, password, collection, idArray=None, params=None, withHost=None):
 	if params:
 		if idArray:
 			url = storageServerURL + "/1.0/%s/storage/%s?ids=%s&%s" % (userID, collection, urllib.quote(','.join(idArray)), params)
@@ -281,41 +301,41 @@ def delete_items(storageServerURL, userID, password, collection, idArray=None, p
 			url = storageServerURL + "/1.0/%s/storage/%s?ids=%s" % (userID, collection, urllib.quote(','.join(idArray)))
 		else:
 			url = storageServerURL + "/1.0/%s/storage/%s" % (userID, collection)
-	return storage_http_op("DELETE", userID, password, url)
+	return storage_http_op("DELETE", userID, password, url, withHost=withHost)
 
-def delete_items_older_than(storageServerURL, userID, password, collection, timestamp):
+def delete_items_older_than(storageServerURL, userID, password, collection, timestamp, withHost=None):
 	url = storageServerURL + "/1.0/%s/storage/%s?older=%s" % (userID, collection, timestamp)
-	return storage_http_op("DELETE", userID, password, url)
+	return storage_http_op("DELETE", userID, password, url, withHost=withHost)
 
-def delete_all(storageServerURL, userID, password, confirm=True):
+def delete_all(storageServerURL, userID, password, confirm=True, withHost=None):
 	'''The only reason you'd want confirm=False is for unit testing'''
 	url = storageServerURL + "/1.0/%s/storage" % (userID)
-	return storage_http_op("DELETE", userID, password, url, asJSON=False, withConfirmation=confirm)
+	return storage_http_op("DELETE", userID, password, url, asJSON=False, withConfirmation=confirm, withHost=withHost)
 		
-def get_collection_counts(storageServerURL, userID, password):
+def get_collection_counts(storageServerURL, userID, password, withHost=None):
 	url = storageServerURL + "/1.0/%s/info/collection_counts" % (userID)
-	return storage_http_op("GET", userID, password, url)
+	return storage_http_op("GET", userID, password, url, withHost=withHost)
 
-def get_collection_timestamps(storageServerURL, userID, password):
+def get_collection_timestamps(storageServerURL, userID, password, withHost=None):
 	url = storageServerURL + "/1.0/%s/info/collections" % (userID)
-	return storage_http_op("GET", userID, password, url)
+	return storage_http_op("GET", userID, password, url, withHost=withHost)
 
-def get_collection_ids(storageServerURL, userID, password, collection, params=None, asJSON=True, outputFormat=None):
+def get_collection_ids(storageServerURL, userID, password, collection, params=None, asJSON=True, outputFormat=None, withHost=None):
 	if params:
 		url = storageServerURL + "/1.0/%s/storage/%s?%s" % (userID, collection, params)
 	else:
 		url = storageServerURL + "/1.0/%s/storage/%s" % (userID, collection)
-	return storage_http_op("GET", userID, password, url, asJSON=asJSON, outputFormat=outputFormat)
+	return storage_http_op("GET", userID, password, url, asJSON=asJSON, outputFormat=outputFormat, withHost=withHost)
 
-def get_item(storageServerURL, userID, password, collection, id, asJSON=True, withAuthUser=None, withAuth=True):
+def get_item(storageServerURL, userID, password, collection, id, asJSON=True, withAuthUser=None, withAuth=True, withHost=None):
 	"""withAuth is used for testing only: if set to False the Authorization header is omitted.
 	 withAuthUser is used for testing only: it sets the HTTP Authorize user to something other than userID"""
-	url = storageServerURL + "/1.0/%s/storage/%s/%s?full=1" % (userID, collection, id)
+	url = storageServerURL + "/1.0/%s/storage/%s/%s?full=1" % (userID, collection, urllib.quote(id))
 	authUser = userID
 	if withAuthUser: authUser = withAuthUser
-	return storage_http_op("GET", authUser, password, url, asJSON=asJSON, withAuth=withAuth)
+	return storage_http_op("GET", authUser, password, url, asJSON=asJSON, withAuth=withAuth, withHost=withHost)
 
-def get_quota(storageServerURL, userID, password):
+def get_quota(storageServerURL, userID, password, withHost=None):
 	"Returns an array of [<amount used>,<limit>]"
 	url = storageServerURL + "/1.0/%s/info/quota" % (userID)
-	return storage_http_op("GET", userID, password, url)
+	return storage_http_op("GET", userID, password, url, withHost=withHost)
