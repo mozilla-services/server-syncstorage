@@ -75,6 +75,12 @@ class wbo
 
 		if (array_key_exists('sortindex', $extracted))
 		{
+			# Due to complicated logic in the getter, we need to validate
+			# the value space of sortindex here.
+			if (!is_numeric($extracted['sortindex'])) {
+				$this->_error[] = "invalid sortindex";
+				return false;
+			}
 			$this->sortindex($extracted['sortindex']);
 		}
 		
@@ -172,7 +178,9 @@ class wbo
 	
 	function sortindex($index = null)
 	{
-		if (!is_null($index)){ $this->wbo_hash['sortindex'] = (int)$index; }
+		if (!is_null($index)){ 
+			$this->wbo_hash['sortindex'] = (int)($index); 
+		}
 		return array_key_exists('sortindex', $this->wbo_hash) ?  $this->wbo_hash['sortindex'] : null;
 	}
 
@@ -185,7 +193,7 @@ class wbo
 	function validate()
 	{
 		
-		if (!$this->id() || strlen($this->id()) > 64 || strpos($this->id(), '/') !== false)
+		if (!$this->id() || strlen($this->id()) > 64  || strpos($this->id(), '/') !== false)
 		{ $this->_error[] = "invalid id"; }
 
 		if ($this->parentid_exists() && strlen($this->parentid()) > 64)
@@ -203,7 +211,10 @@ class wbo
 		if (!$this->_collection || strlen($this->_collection) > 64)
 		{ $this->_error[] = "invalid collection"; }
 		
-		if ($this->sortindex_exists() && !is_numeric($this->sortindex()))
+		if ($this->sortindex_exists() && 
+                    (!is_numeric($this->wbo_hash['sortindex']) || 
+                     intval($this->sortindex()) > 999999999 || 
+                     intval($this->sortindex()) < -999999999 ))
 		{ $this->_error[] = "invalid sortindex"; }
 		
 		if ($this->payload_exists())
@@ -234,7 +245,7 @@ class wbo
 	
 	function json()
 	{
-		$this->wbo_hash['modified'] /= 100; #stupid hack to output timestamps in decimal
+ 		$this->wbo_hash['modified'] /= 100; #stupid hack to output timestamps in decimal
 		$jsonstring = json_encode($this->wbo_hash);
 		$this->wbo_hash['modified'] = round ($this->wbo_hash['modified'] * 100);
 		return $jsonstring;
