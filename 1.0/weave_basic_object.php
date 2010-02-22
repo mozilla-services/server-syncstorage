@@ -236,7 +236,7 @@ class wbo
 	{
 		$this->wbo_hash['modified'] /= 100; #stupid hack to output timestamps in decimal
 		$jsonstring = json_encode($this->wbo_hash);
-		$this->wbo_hash['modified'] *= 100;
+		$this->wbo_hash['modified'] = round ($this->wbo_hash['modified'] * 100);
 		return $jsonstring;
 	}
 }

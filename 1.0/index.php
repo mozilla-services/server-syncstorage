@@ -48,7 +48,7 @@
 	
 	$server_time = round(microtime(1), 2);
 	header("X-Weave-Timestamp: " . $server_time);
-	$storage_time = $server_time * 100; #internal representation as bigint
+	$storage_time = round($server_time * 100); #internal representation as bigint
 
 	#Basic path extraction and validation. No point in going on if these are missing
 	$path = '/';
@@ -134,8 +134,8 @@
 					$ids = $db->retrieve_objects($collection, null, $full, $outputter,
 								array_key_exists('parentid', $_GET) ? $_GET['parentid'] : null, 
 								array_key_exists('predecessorid', $_GET) ? $_GET['predecessorid'] : null, 
-								array_key_exists('newer', $_GET) ? $_GET['newer'] * 100 : null, 
-								array_key_exists('older', $_GET) ? $_GET['older'] * 100 : null, 
+								array_key_exists('newer', $_GET) ? round($_GET['newer'] * 100) : null, 
+								array_key_exists('older', $_GET) ? round($_GET['older'] * 100) : null, 
 								array_key_exists('sort', $_GET) ? $_GET['sort'] : null, 
 								array_key_exists('limit', $_GET) ? $_GET['limit'] : null, 
 								array_key_exists('offset', $_GET) ? $_GET['offset'] : null,

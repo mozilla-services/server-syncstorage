@@ -89,7 +89,7 @@ class WeaveMetadata
 	function check_timestamp($collection)
 	{
 		if (array_key_exists('HTTP_X_IF_UNMODIFIED_SINCE', $_SERVER) 
-			&& $this->get_max_timestamp($collection) > $_SERVER['HTTP_X_IF_UNMODIFIED_SINCE'] * 100)
+			&& $this->get_max_timestamp($collection) > round($_SERVER['HTTP_X_IF_UNMODIFIED_SINCE'] * 100))
 				report_problem(WEAVE_ERROR_NO_OVERWRITE, 412);			
 	}
 
