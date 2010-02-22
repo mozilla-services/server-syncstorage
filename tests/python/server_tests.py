@@ -343,8 +343,11 @@ class TestStorage(unittest.TestCase):
 	def testAdd_IfUnmodifiedSince_NotModified(self):
 		"testAdd_IfUnmodifiedSince_NotModified: If an IfUnmodifiedSince header is provided, and the collection has not been changed, an attempt succeeds."
 		userID, storageServer = self.createCaseUser()
+
 		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+		time.sleep(.01)		
 		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
+
 		result = weave.get_item(storageServer, userID, self.password, 'coll', '1234', withHost=test_config.HOST_NAME)
 		self.failUnlessObjsEqualWithDrift(result, {'id':'1234', 'payload':'ThisIsThePayload', 'modified':float(ts2)})
 
@@ -620,7 +623,7 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer = self.createCaseUser()
 		result = weave.add_or_modify_items(storageServer, userID, self.password, 'coll', [{'id':'1234', 'payload':'ThisIsThePayload'}], withHost=test_config.HOST_NAME)
 		ts = weave.get_item(storageServer, userID, self.password, 'coll', '1234', withHost=test_config.HOST_NAME)['modified'] # TODO should use header
-		weave.add_or_modify_items(storageServer, userID, self.password, 'coll', [{'id':'1234', 'payload':'ThisIsThePayload2'}], ifUnmodifiedSince=float(ts)+.01, withHost=test_config.HOST_NAME)
+		weave.add_or_modify_items(storageServer, userID, self.password, 'coll', [{'id':'1234', 'payload':'ThisIsThePayload2'}], ifUnmodifiedSince=float(ts), withHost=test_config.HOST_NAME)
 		result = weave.get_item(storageServer, userID, self.password, 'coll', '1234', withHost=test_config.HOST_NAME)
 		self.failUnlessEqual(result['payload'], 'ThisIsThePayload2')
 
@@ -630,7 +633,7 @@ class TestStorage(unittest.TestCase):
 		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
 		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload2'}, withHost=test_config.HOST_NAME)
 		try:
-			ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=float(ts)+.01, withHost=test_config.HOST_NAME)
+			ts3 = weave.add_or_modify_items(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=float(ts), withHost=test_config.HOST_NAME)
 			self.fail("Attempt to add an item when the collection had changed after the ifUnmodifiedSince time should have failed")
 		except weave.WeaveException, e:
 			self.failUnless(str(e).find("HTTP Error 412: Precondition Failed") > 0, "Should have been an HTTP 412 error")
@@ -899,7 +902,7 @@ class TestStorage(unittest.TestCase):
 			self.failUnless(str(e).find("HTTP Error 404: Not Found") > 0, "Should have been an HTTP 404 error")
 
 		# Delete always updates the timestamp: even if nothing changes
-		# TODO This fails if memcache isn't turned on
+		# TODO This fails if memcache isn't turned on; the timestamp rolls backwards
 		timestamps = weave.get_collection_timestamps(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
 		self.failUnlessEqual({'coll':float(ts)}, timestamps)
 
@@ -1034,17 +1037,35 @@ class TestStorage(unittest.TestCase):
 class TestStorageLarge(unittest.TestCase):
 
 	def setUp(self):
+		self.userList = []
 		self.email = 'testuser@test.com'
-		self.password = 'mypassword'
-		while True:
-			self.userID = 'weaveunittest_' + ''.join([chr(random.randint(ord('a'), ord('z'))) for i in xrange(10)])
-			if not weave.checkNameAvailable(test_config.SERVER_BASE, self.userID, withHost=test_config.HOST_NAME):
-				print "%s not available" % self.userID
-				continue
-			weave.createUser(test_config.SERVER_BASE, self.userID, self.password, self.email, withHost=test_config.HOST_NAME)
-			break
-		self.failIf(weave.checkNameAvailable(test_config.SERVER_BASE, self.userID, withHost=test_config.HOST_NAME))
-		self.storageServer = weave.getUserStorageNode(test_config.SERVER_BASE, self.userID, self.password, withHost=test_config.HOST_NAME)
+
+		if test_config.USERNAME:
+			# Specified username: hard-code it, and clear out any old records
+			
+			if not test_config.PASSWORD:
+				raise ValueError("If username is provided, a password must also be provided")
+			self.userID = test_config.USERNAME
+			self.password = test_config.PASSWORD
+
+			if test_config.STORAGE_SCHEME and test_config.STORAGE_SERVER:
+				self.storageServer = "%s://%s" % (test_config.STORAGE_SCHEME, test_config.STORAGE_SERVER)
+
+			weave.delete_all(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
+
+		else:
+
+			self.email = 'testuser@test.com'
+			self.password = 'mypassword'
+			while True:
+				self.userID = 'weaveunittest_' + ''.join([chr(random.randint(ord('a'), ord('z'))) for i in xrange(10)])
+				if not weave.checkNameAvailable(test_config.SERVER_BASE, self.userID, withHost=test_config.HOST_NAME):
+					print "%s not available" % self.userID
+					continue
+				weave.createUser(test_config.SERVER_BASE, self.userID, self.password, self.email, withHost=test_config.HOST_NAME)
+				break
+			self.failIf(weave.checkNameAvailable(test_config.SERVER_BASE, self.userID, withHost=test_config.HOST_NAME))
+			self.storageServer = weave.getUserStorageNode(test_config.SERVER_BASE, self.userID, self.password, withHost=test_config.HOST_NAME)
 
 	def testStorage(self):
 		item1 = '{"id": 1, "sortindex": 1, "payload": "123456789abcdef"}'
