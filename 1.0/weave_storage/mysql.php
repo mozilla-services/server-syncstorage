@@ -643,13 +643,24 @@ class WeaveStorage implements WeaveStorageBase
 			$select_stmt .= " order by modified";
 		}
 		
+
 		if ($limit)
 		{
-			$select_stmt .= " limit " . intval($limit);
+			$limitVal = intval($limit);
+			if ($limitVal < 0) {
+				throw new Exception("Illegal limit value", 400);
+			}
+			$select_stmt .= " limit " . $limitVal;
 			if ($offset)
 			{
-				$select_stmt .= " offset " . intval($offset);
+				$offsetVal = intval($offset);
+				if ($offsetVal < 0) {
+					throw new Exception("Illegal offset value", 400);
+				}
+				$select_stmt .= " offset " . $offsetVal;
 			}
+		} else if ($offset) {
+			throw new Exception("Offset requires limit", 400); 
 		}
 
 		try
@@ -777,11 +788,21 @@ class WeaveStorage implements WeaveStorageBase
 		
 		if ($limit)
 		{
-			$select_stmt .= " limit " . intval($limit);
+			$limitVal = intval($limit);
+			if ($limitVal < 0) {
+				throw new Exception("Illegal limit value", 400);
+			}
+			$select_stmt .= " limit " . $limitVal;
 			if ($offset)
 			{
-				$select_stmt .= " offset " . intval($offset);
+				$offsetVal = intval($offset);
+				if ($offsetVal < 0) {
+					throw new Exception("Illegal offset value", 400);
+				}
+				$select_stmt .= " offset " . $offsetVal;
 			}
+		} else if ($offset) {
+			throw new Exception("Offset requires limit", 400);		
 		}
 		
 		try
