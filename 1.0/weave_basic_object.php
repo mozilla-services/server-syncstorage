@@ -185,13 +185,13 @@ class wbo
 	function validate()
 	{
 		
-		if (!$this->id() || strlen($this->id()) > 64 || strpos($this->id(), '/') !== false)
+		if (!$this->id() || mb_strlen($this->id(), '8bit') > 64)
 		{ $this->_error[] = "invalid id"; }
 
-		if ($this->parentid_exists() && strlen($this->parentid()) > 64)
+		if ($this->parentid_exists() && mb_strlen($this->parentid(), '8bit') > 64)
 		{ $this->_error[] = "invalid parentid"; }
 
-		if ($this->predecessorid_exists() && strlen($this->predecessorid()) > 64)
+		if ($this->predecessorid_exists() && mb_strlen($this->predecessorid(), '8bit') > 64)
 		{ $this->_error[] = "invalid predecessorid"; }
 
 		if (!is_numeric($this->modified()))
@@ -200,7 +200,7 @@ class wbo
 		if (!$this->modified())
 		{ $this->_error[] = "no modification date"; }
 
-		if (!$this->_collection || strlen($this->_collection) > 64)
+		if (!$this->_collection || mb_strlen($this->_collection, '8bit') > 64)
 		{ $this->_error[] = "invalid collection"; }
 		
 		if ($this->sortindex_exists() && !is_numeric($this->sortindex()))
