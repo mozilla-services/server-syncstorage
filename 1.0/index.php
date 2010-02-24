@@ -92,12 +92,11 @@
 	{
 		$db = new WeaveStorage($userid);	
 		
-		$metadata_store = new WeaveMetadata($userid, $db);
-
 		if ($_SERVER['REQUEST_METHOD'] == 'GET')
 		{
 			if ($function == 'info')
 			{
+				$metadata_store = new WeaveMetadata($userid, $db);
 				switch ($collection)
 				{
 					case 'quota':
@@ -149,6 +148,7 @@
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'PUT') #add a single record to the server
 		{		
+			$metadata_store = new WeaveMetadata($userid, $db);
 			$wbo = new wbo();
 			if (!$wbo->extract_json(get_json()))
 				report_problem(WEAVE_ERROR_JSON_PARSE, 400);
@@ -185,8 +185,8 @@
 					
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'POST')
-		{
-			
+		{		
+			$metadata_store = new WeaveMetadata($userid, $db);
 			$json = get_json();
 			
 			$metadata_store->check_quota();
@@ -253,6 +253,7 @@
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'DELETE')
 		{	
+			$metadata_store = new WeaveMetadata($userid, $db);
 			$metadata_store->check_timestamp($collection);
 			
 			if ($id)
