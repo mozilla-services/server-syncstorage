@@ -8,3 +8,5 @@ STORAGE_SERVER = None
 HOST_NAME = None
 USERNAME = None
 PASSWORD = None
+
+memcache = False

@@ -35,6 +35,7 @@ if __name__ == '__main__':
 	parser.add_option("--host", help="the Host name to present in the HTTP request", dest="host")
 	parser.add_option("--username", help="the Weave username to send", dest="username")
 	parser.add_option("--password", help="the Weave password to send", dest="password")
+	parser.add_option("--with-memcache", help="whether the server is running with memcache (1 if true; 0 if not)", dest="memcache")
 
 	(options, args) = parser.parse_args()
 	
@@ -49,6 +50,12 @@ if __name__ == '__main__':
 		test_config.USERNAME = options.username
 	if options.password:
 		test_config.PASSWORD = options.password
+
+	test_config.memcache = False
+	if options.memcache:
+		if options.memcache == "1":
+			test_config.memcache = True
+			
 		
 	tests = args
 	anyProblems = False
