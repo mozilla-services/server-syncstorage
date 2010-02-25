@@ -193,7 +193,7 @@ class wbo
 	function validate()
 	{
 		
-		if (!$this->id() || mb_strlen($this->id(), '8bit') > 64)
+		if (!$this->id() || mb_strlen($this->id(), '8bit') > 64 || strpos($this->id(), '/') !== false)
 		{ $this->_error[] = "invalid id"; }
 
 		if ($this->parentid_exists() && mb_strlen($this->parentid(), '8bit') > 64)
