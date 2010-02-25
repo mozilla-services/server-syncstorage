@@ -74,7 +74,7 @@ require_once 'weave_basic_object.php';
 class WeaveStorage implements WeaveStorageBase
 {
 	private $_username;
-	private $_dbh;
+	private $_dbh = null;
 	private $_db_name = 'wbo';
 	private $_collection_table_name = 'collections';
 
@@ -89,7 +89,6 @@ class WeaveStorage implements WeaveStorageBase
 		$this->_username = $username;
 		$this->WEAVE_COLLECTION_NAMES = array_flip($this->WEAVE_COLLECTION_KEYS);
 		
-		$this->open_connection();
 
 		if (defined('WEAVE_MYSQL_STORE_TABLE_NAME'))
 			$this->_db_name = WEAVE_MYSQL_STORE_TABLE_NAME;
@@ -99,6 +98,9 @@ class WeaveStorage implements WeaveStorageBase
 
 	function open_connection() 
 	{		
+		if ($this->_dbh)
+			return;
+			
 		try
 		{
 			if ($_SERVER['REQUEST_METHOD'] == 'GET')
@@ -122,11 +124,13 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function get_connection()
 	{
+		$this->open_connection();
 		return $this->_dbh;
 	}
 
 	function begin_transaction()
 	{
+		$this->open_connection();
 		try
 		{
 			$this->_dbh->beginTransaction();
@@ -147,6 +151,7 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function get_collection_id($collection)
 	{
+		$this->open_connection();
 		if (!$collection)
 		{
 			return null;
@@ -182,6 +187,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function store_collection_id($collection)
 	{
+		$this->open_connection();
+
 		#get the current max collection id
 		try
 		{
@@ -223,6 +230,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function get_collection_name($collection_id)
 	{		
+		$this->open_connection();
+
 		if (!$collection_id)
 		{
 			return null;
@@ -253,6 +262,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function get_users_collection_list()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select collectionid, name from ' . $this->_collection_table_name . ' where userid = :userid';
@@ -280,6 +291,8 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function get_max_timestamp($collection)
 	{
+		$this->open_connection();
+
 		if (!$collection)
 		{
 			return null;
@@ -307,6 +320,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function get_collection_list()
 	{		
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select distinct(collection) from ' . $this->_db_name . ' where username = :username';
@@ -344,6 +359,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function get_collection_list_with_timestamps()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select collection, max(modified) as timestamp from ' . $this->_db_name . ' where username = :username group by collection';
@@ -381,6 +398,8 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function get_collection_list_with_counts()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select collection, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
@@ -418,6 +437,7 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function store_object(&$wbos) 
 	{
+		$this->open_connection();
 		
 		$insert_stmt = 'insert into ' . $this->_db_name . ' (username, id, collection, parentid, 
 						predecessorid, sortindex, modified, payload, payload_size) values ';
@@ -458,6 +478,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function update_object(&$wbo)
 	{
+		$this->open_connection();
+
 		$update = 'update ' . $this->_db_name . ' set ';
 		$params = array();
 		$update_list = array();
@@ -540,6 +562,8 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function delete_object($collection, $id)
 	{
+		$this->open_connection();
+
 		try
 		{
 			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
@@ -566,6 +590,8 @@ class WeaveStorage implements WeaveStorageBase
 								$older = null, $sort = null, $limit = null, $offset = null, $ids = null, 
 								$index_above = null, $index_below = null)
 	{
+		$this->open_connection();
+
 		$params = array();
 		
 		$select_stmt = 'delete from ' . $this->_db_name . ' where username = ? and collection = ?';
@@ -678,6 +704,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function retrieve_object($collection, $id)
 	{
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select * from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
@@ -710,6 +738,8 @@ class WeaveStorage implements WeaveStorageBase
 								$older = null, $sort = null, $limit = null, $offset = null, $ids = null, 
 								$index_above = null, $index_below = null)
 	{
+		$this->open_connection();
+
 		$full_list = $full ? '*' : 'id';
 		
 		$select_stmt = "select $full_list from " . $this->_db_name . ' where username = ? and collection = ?';
@@ -850,6 +880,8 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function get_storage_total()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$select_stmt = 'select sum(payload_size) from ' . $this->_db_name . ' where username = :username';
@@ -873,6 +905,8 @@ class WeaveStorage implements WeaveStorageBase
 	
 	function delete_user()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username';
@@ -892,6 +926,8 @@ class WeaveStorage implements WeaveStorageBase
 
 	function heartbeat()
 	{
+		$this->open_connection();
+
 		try
 		{
 			$sth = $this->_dbh->prepare('select 1');
