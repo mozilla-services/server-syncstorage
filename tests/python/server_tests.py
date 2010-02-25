@@ -733,6 +733,10 @@ class TestStorage(unittest.TestCase):
 
 	def testGet_UserPathMismatch(self):
 		"testGet_UserPathMismatch: Attempt to get an object with wrong user account should return an error"
+		if test_config.USERNAME:
+			# We do not currently support this test with specified usernames
+			return
+
 		userID, storageServer = self.createCaseUser()
 		userID2, storageServer2 = self.createCaseUser(forceNewUser=True)
 		try:
