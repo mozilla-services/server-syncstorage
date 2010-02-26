@@ -761,24 +761,28 @@ class TestStorage(unittest.TestCase):
 		"testGet_ByParentID: Attempt to get objects with a ParentID filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="parentid=ABC", withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '3'], result)
 
 	def testGet_ByPredecessorID(self):
 		"testGet_ByPredecessorID: Attempt to get objects with a PredecessorID filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="predecessorid=abc", withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '3'], result)
 
 	def testGet_ByNewer(self):
 		"testGet_ByNewer: Attempt to get objects with a Newer filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="newer=%s" % ts[0], withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['2', '3'], result)
 
 	def testGet_ByOlder(self):
 		"testGet_ByOlder: Attempt to get objects with a Older filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="older=%s" % ts[2], withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '2'], result)
 
 	def testGet_Sort_Oldest(self):
@@ -898,7 +902,12 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		ts = weave.delete_item(storageServer, userID, self.password, 'coll', '1', withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
-		self.failUnlessEqual(['2', '3'], result)
+
+		# Should be ['2', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('2' in result)
+		self.failUnless('3' in result)
+
 		try:
 			ts2 = weave.get_item(storageServer, userID, self.password, 'coll', '1', withHost=test_config.HOST_NAME)
 			self.fail("Should have raised a 404 exception on attempt to access deleted object")
@@ -989,6 +998,12 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		result = weave.delete_items(storageServer, userID, self.password, 'coll', params="sort=index&limit=1&offset=1", withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
+
+		# Should be ['1', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('1' in result)
+		self.failUnless('3' in result)
+
 		self.failUnlessEqual(['1', '3'], result)
 		
 	def testDelete_indexAbove(self):
