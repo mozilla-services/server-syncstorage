@@ -975,7 +975,11 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		result = weave.delete_items(storageServer, userID, self.password, 'coll', params="sort=oldest&limit=1", withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
-		self.failUnlessEqual(['2', '3'], result)
+
+		# Should be ['2', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('2' in result)
+		self.failUnless('3' in result)
 
 	def skip_testDelete_LimitOffset(self):
 		"testDelete_LimitOffset: Attempt to delete objects with a 'limit' and 'offset' parameter works"
