@@ -76,6 +76,7 @@
 	$item4 = '{"id": 4, "parentid": 1, "sortindex": 4, "payload":"567abcdef123456789"}';
 	$item5 = '{"parentid": 1, "sortindex": 4, "payload":"567abcdef123456789"}';
 	$item6 = '{"id": 4, "parentid": 1, "sortindex": 5}';
+	$item7 = '{"id": 1,"payload": "123456789abcdefg"}';
 	
 	
 	$result = get_collection_timestamps();
@@ -93,22 +94,34 @@
 	$timestamp2 = put_item('foo', $item2);
 	output_test("Put an item", is_numeric($timestamp2) && $timestamp2 > 1000000000, $timestamp2);
 
+	$timestamptab = put_item('tabs', $item1);
+	output_test("Put an item", is_numeric($timestamptab) && $timestamptab > 1000000000, $timestamptab);
+
 	$result = get_collection_counts();
-	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1")), $result);
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1", 'tabs' => "1")), $result);
 
 	$result = get_collection_timestamps();
-	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp2)), $result);
+	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp2, 'tabs' => $timestamptab)), $result);
 
 	$result = get_item('foo', '2');
 	output_test("Get item", compare_arrays(json_get($result), array('id' => "2", 'modified' => $timestamp2, 'sortindex' => "2", 'payload' => 'abcdef123456789')), $result);
 
+	$result = get_item('tabs', '1');
+	output_test("Get item", compare_arrays(json_get($result), array('id' => "1", 'modified' => $timestamptab, 'payload' => '123456789abcdef')), $result);
+
 	$result = get_collection_ids('foo');
+	output_test("Get collection ids", $result == '["2"]', $result);
+
+	$result = get_collection_ids('tabs');
 	output_test("Get collection ids", $result == '["2"]', $result);
 
 	$result = put_item('foo', $item1, $timestamp2 - 1);
 	output_test("Bad put (timestamp too old)", $result == 4, $result);
 
 	$result = post_items('foo', '[' . $item4 . ',' . $item3 . ',' . $item5 . ']');
+	output_test("Post", $result == '{"success":["4","3"],"failed":{"":["invalid id"]}}', $result);
+
+	$result = post_items('tabs', '[' . $item4 . ',' . $item3 . ',' . $item5 . ']');
 	output_test("Post", $result == '{"success":["4","3"],"failed":{"":["invalid id"]}}', $result);
 
 	$result = get_collection_ids('foo', "sort=index");
@@ -118,28 +131,37 @@
 	output_test("Get items by parent id", $result == '["4","3"]', $result);
 
 	$timestamp3 = delete_item('foo', "3");
-	output_test("Delete item", is_numeric($timestamp1) && $timestamp1 > 1000000000, $timestamp3);	
+	output_test("Delete item", is_numeric($timestamp3) && $timestamp3 > 1000000000, $timestamp3);	
+
+	$timestamptab2 = delete_item('tabs', "3");
+	output_test("Delete item", is_numeric($timestamptab2) && $timestamptab2 > 1000000000, $timestamptab2);	
 
 	$result = get_collection_ids('foo', "sort=index");
 	output_test("Get collection ids (sortindex)", $result == '["4","2"]', $result);
 
 	$result = get_collection_counts();
-	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "2")), $result);
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "2", 'tabs' => "2")), $result);
 
 	$timestamp4 = put_item('foo', $item6); #updates item 4
 	output_test("Update item", is_numeric($timestamp4) && $timestamp4 > 1000000000, $timestamp4);
 
+	$timestamptab3 = put_item('tabs', $item7); #updates item 1
+	output_test("Update item", is_numeric($timestamptab3) && $timestamptab3 > 1000000000, $timestamptab3);
+
 	$result = get_item('foo', '4');
 	output_test("Get item", compare_arrays(json_get($result), array('id' => "4", 'parentid' => '1', 'modified' => $timestamp4, 'sortindex' => 5, 'payload' => '567abcdef123456789')), $result);
+
+	$result = get_item('tabs', '1');
+	output_test("Get item", compare_arrays(json_get($result), array('id' => "1", 'modified' => $timestamptab3, 'payload' => '123456789abcdefg')), $result);
 
 	$timestamp5 = delete_items_by_timestamp('foo', $timestamp2 + .01);
 	output_test("Delete items by timestamp", is_numeric($timestamp5) && $timestamp5 > 1000000000, $timestamp5);
 
 	$result = get_collection_counts();
-	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1")), $result);
+	output_test("Get collection counts", compare_arrays(json_get($result), array('history' => "1", 'foo' => "1", 'tabs' => "2")), $result);
 
 	$result = get_collection_timestamps();
-	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp4)), $result);
+	output_test("Get collection timestamps", compare_arrays(json_get($result), array('history' => $timestamp1, 'foo' => $timestamp5, 'tabs' => $timestamptab3)), $result);
 
 	$result = delete_all_no_confirm();
 	output_test("Delete all records (no confirmation)", $result == 4, $result);

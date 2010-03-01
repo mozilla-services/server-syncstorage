@@ -106,7 +106,7 @@ class WeaveStorage implements WeaveStorageBase
 			if ($_SERVER['REQUEST_METHOD'] == 'GET')
 			{
 				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_READ_HOST . ';dbname=' . WEAVE_MYSQL_STORE_READ_DB, 
-									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS);
+									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS); #, array(PDO::ATTR_PERSISTENT => true));
 			}
 			else
 			{
@@ -434,6 +434,45 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		return $collections;		
 	}
+
+	function get_collection_list_with_all()
+	{
+		$this->open_connection();
+
+		try
+		{
+			$select_stmt = 'select collection, max(modified) as timestamp, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
+			$sth = $this->_dbh->prepare($select_stmt);
+			$sth->bindParam(':username', $this->_username);
+			$sth->execute();
+		}
+		catch( PDOException $exception )
+		{
+			error_log("get_collection_list_with_counts: " . $exception->getMessage());
+			throw new Exception("Database unavailable", 503);
+		}
+		$results = $sth->fetchAll(PDO::FETCH_NUM);
+		$sth->closeCursor();
+		
+		$collections = array();
+		$user_collections = 0;
+		foreach ($results as $result)
+		{
+			if (!array_key_exists($result[0], $this->WEAVE_COLLECTION_NAMES) && !$user_collections)
+			{
+				$this->get_users_collection_list();
+				$user_collections = 1;
+			}
+			
+			if (array_key_exists($result[0], $this->WEAVE_COLLECTION_NAMES))
+				$result[0] = $this->WEAVE_COLLECTION_NAMES[$result[0]];
+			else
+				continue;
+
+			$collections[$result[0]] = array($result[1], $result[2]);
+		}
+		return $collections;		
+	}
 	
 	function store_object(&$wbos) 
 	{
@@ -466,14 +505,13 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			$sth = $this->_dbh->prepare($insert_stmt);
 			$sth->execute($values);
+			return $sth->rowCount();
 		}
 		catch( PDOException $exception )
 		{
 			error_log("store_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return true;
-	
 	}
 
 	function update_object(&$wbo)
@@ -551,13 +589,13 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			$sth = $this->_dbh->prepare($update);
 			$sth->execute($params);
+			return $sth->rowCount();
 		}
 		catch( PDOException $exception )
 		{
 			error_log("update_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return true;		
 	}
 	
 	function delete_object($collection, $id)
@@ -576,13 +614,13 @@ class WeaveStorage implements WeaveStorageBase
 
 			$sth->bindParam(':id', $id);
 			$sth->execute();
+			return $sth->rowCount();
 		}
 		catch( PDOException $exception )
 		{
 			error_log("delete_object: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return true;
 	}
 	
 	
@@ -693,13 +731,13 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->execute($params);
+			return $sth->rowCount();
 		}
 		catch( PDOException $exception )
 		{
 			error_log("delete_objects: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
-		return true;
 	}
 
 	function retrieve_object($collection, $id)
@@ -911,6 +949,11 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username';
 			$sth = $this->_dbh->prepare($delete_stmt);
+			$sth->bindParam(':username', $this->_username);
+			$sth->execute();
+
+			$delete_stmt2 = 'delete from ' . $this->_collection_table_name . ' where userid = :username';
+			$sth = $this->_dbh->prepare($delete_stmt2);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
 

@@ -137,5 +137,21 @@
 
 		return $userid;
 	}
+
+	function check_quota(&$db)
+	{
+		if (!defined('WEAVE_QUOTA'))
+			return;
+		
+		if ($db->get_storage_total() > WEAVE_QUOTA)
+				report_problem("Over Quota", 403); 
+	}
+	
+	function check_timestamp($collection, &$db)
+	{
+		if (array_key_exists('HTTP_X_IF_UNMODIFIED_SINCE', $_SERVER) 
+			&& $db->get_max_timestamp($collection) > round($_SERVER['HTTP_X_IF_UNMODIFIED_SINCE'] * 100))
+				report_problem(WEAVE_ERROR_NO_OVERWRITE, 412);			
+	}
 	
 ?>

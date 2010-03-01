@@ -39,9 +39,8 @@
 # ***** END LICENSE BLOCK *****
 
 	require_once 'weave_constants.php';
-	require_once 'weave_storage/' . WEAVE_STORAGE_ENGINE . '.php';
 	require_once 'weave_basic_object.php';
-	require_once 'weave_metadata.php';
+#	require_once 'weave_metadata.php';
 	require_once 'weave_utils.php';
 	
 	header("Content-type: application/json");
@@ -90,24 +89,37 @@
 	#user passes preliminaries, connections made, onto actually getting the data
 	try
 	{
-		$db = new WeaveStorage($userid);	
+		if (WEAVE_STORAGE_MEMCACHE_HOST)
+		{
+			require_once 'weave_storage/memcache_layer.php';
+			$db = new WeaveMemcache($userid);	
+		}
+		else
+		{
+			require_once 'weave_storage/' . WEAVE_STORAGE_ENGINE . '.php';
+			$db = new WeaveStorage($userid);	
+		}	
 		
 		if ($_SERVER['REQUEST_METHOD'] == 'GET')
 		{
 			if ($function == 'info')
 			{
-				$metadata_store = new WeaveMetadata($userid, $db);
+#				$metadata_store = new WeaveMetadata($userid, $db);
 				switch ($collection)
 				{
 					case 'quota':
-						exit(json_encode(array((int)($metadata_store->storage_total_get()/1024), $metadata_store->get_system_quota_display())));
+						exit(json_encode(array((int)($db->get_storage_total()/1024), defined('WEAVE_QUOTA') ? (int)(WEAVE_QUOTA/1024) : null)));
+#						exit(json_encode(array((int)($metadata_store->storage_total_get()/1024), $metadata_store->get_system_quota_display())));
 					case 'collections':
-						$results = $metadata_store->get_collection_timestamps();
+
+						$results = $db->get_collection_list_with_timestamps();
+#						$results = $metadata_store->get_collection_timestamps();
 						foreach ($results as $k => $v)
 							$results[$k] = $results[$k]/100;
 						exit(json_encode($results));
 					case 'collection_counts':
-						exit(json_encode($metadata_store->get_collection_list_with_counts()));
+						exit(json_encode($db->get_collection_list_with_counts()));
+#						exit(json_encode($metadata_store->get_collection_list_with_counts()));
 					default:
 						report_problem(WEAVE_ERROR_INVALID_PROTOCOL, 400);
 				}
@@ -117,9 +129,11 @@
 				if ($id) #retrieve a single record
 				{
 					$wbo = $db->retrieve_objects($collection, $id, 1); #get the full contents of one record
-					
 					if (count($wbo) > 0)
-						echo $wbo[0]->json();
+					{
+						$item = array_shift($wbo);
+						echo $item->json();
+					}
 					else
 						report_problem("record not found", 404);
 				}
@@ -148,13 +162,15 @@
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'PUT') #add a single record to the server
 		{		
-			$metadata_store = new WeaveMetadata($userid, $db);
+#			$metadata_store = new WeaveMetadata($userid, $db);
 			$wbo = new wbo();
 			if (!$wbo->extract_json(get_json()))
 				report_problem(WEAVE_ERROR_JSON_PARSE, 400);
 							
-			$metadata_store->check_quota();
-			$metadata_store->check_timestamp($collection);
+			check_quota($db);
+			check_timestamp($collection, $db);
+#			$metadata_store->check_quota();
+#			$metadata_store->check_timestamp($collection);
 			
 			#use the url if the json object doesn't have an id
 			if (!$wbo->id() && $id) { $wbo->id($id); }
@@ -169,7 +185,7 @@
 				{
 					$wbos = array($wbo);
 					$db->store_object($wbos);
-					$metadata_store->storage_total_add(strlen($wbo->payload()));
+#					$metadata_store->storage_total_add(strlen($wbo->payload()));
 				}
 				else
 					$db->update_object($wbo);
@@ -179,18 +195,20 @@
 				report_problem(WEAVE_ERROR_INVALID_WBO, 400);
 			}
 			
-			$metadata_store->collections_update($collection, $storage_time);
+#			$metadata_store->collections_update($collection, $storage_time);
 
 			echo json_encode($server_time);
 					
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'POST')
 		{		
-			$metadata_store = new WeaveMetadata($userid, $db);
+#			$metadata_store = new WeaveMetadata($userid, $db);
 			$json = get_json();
 			
-			$metadata_store->check_quota();
-			$metadata_store->check_timestamp($collection);
+			check_quota($db);
+			check_timestamp($collection, $db);
+#			$metadata_store->check_quota();
+#			$metadata_store->check_timestamp($collection);
 			
 			$payload_size_total = 0;
 			$success_ids = array();
@@ -246,15 +264,15 @@
 			
 			$db->commit_transaction();
 	
-			$metadata_store->storage_total_add($payload_size_total);
-			$metadata_store->collections_update($collection, $storage_time);
+#			$metadata_store->storage_total_add($payload_size_total);
+#			$metadata_store->collections_update($collection, $storage_time);
 			
 			echo json_encode(array('success' => $success_ids, 'failed' => $failed_ids));
 		}
 		else if ($_SERVER['REQUEST_METHOD'] == 'DELETE')
 		{	
-			$metadata_store = new WeaveMetadata($userid, $db);
-			$metadata_store->check_timestamp($collection);
+#			$metadata_store = new WeaveMetadata($userid, $db);
+#			$metadata_store->check_timestamp($collection);
 			
 			if ($id)
 			{
@@ -282,8 +300,8 @@
 				$db->delete_user();
 			}
 	
-			$metadata_store->collections_update($collection, $storage_time);
-			$metadata_store->storage_total_flush(); #don't know the impact, so simply delete it and grab it next time
+#			$metadata_store->collections_update($collection, $storage_time);
+#			$metadata_store->storage_total_flush(); #don't know the impact, so simply delete it and grab it next time
 			echo json_encode($server_time);
 
 		}
