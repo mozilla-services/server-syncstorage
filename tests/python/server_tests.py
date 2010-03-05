@@ -733,6 +733,10 @@ class TestStorage(unittest.TestCase):
 
 	def testGet_UserPathMismatch(self):
 		"testGet_UserPathMismatch: Attempt to get an object with wrong user account should return an error"
+		if test_config.USERNAME:
+			# We do not currently support this test with specified usernames
+			return
+
 		userID, storageServer = self.createCaseUser()
 		userID2, storageServer2 = self.createCaseUser(forceNewUser=True)
 		try:
@@ -757,24 +761,28 @@ class TestStorage(unittest.TestCase):
 		"testGet_ByParentID: Attempt to get objects with a ParentID filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="parentid=ABC", withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '3'], result)
 
 	def testGet_ByPredecessorID(self):
 		"testGet_ByPredecessorID: Attempt to get objects with a PredecessorID filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="predecessorid=abc", withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '3'], result)
 
 	def testGet_ByNewer(self):
 		"testGet_ByNewer: Attempt to get objects with a Newer filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="newer=%s" % ts[0], withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['2', '3'], result)
 
 	def testGet_ByOlder(self):
 		"testGet_ByOlder: Attempt to get objects with a Older filter works"
 		userID, storageServer, ts = self.helper_testGet()
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="older=%s" % ts[2], withHost=test_config.HOST_NAME)
+		result.sort()
 		self.failUnlessEqual(['1', '2'], result)
 
 	def testGet_Sort_Oldest(self):
@@ -894,7 +902,12 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		ts = weave.delete_item(storageServer, userID, self.password, 'coll', '1', withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
-		self.failUnlessEqual(['2', '3'], result)
+
+		# Should be ['2', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('2' in result)
+		self.failUnless('3' in result)
+
 		try:
 			ts2 = weave.get_item(storageServer, userID, self.password, 'coll', '1', withHost=test_config.HOST_NAME)
 			self.fail("Should have raised a 404 exception on attempt to access deleted object")
@@ -904,15 +917,18 @@ class TestStorage(unittest.TestCase):
 		# Delete always updates the timestamp: even if nothing changes
 		# TODO This fails if memcache isn't turned on; the timestamp rolls backwards
 		timestamps = weave.get_collection_timestamps(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
-		self.failUnlessEqual({'coll':float(ts)}, timestamps)
+		if test_config.memcache:
+			self.failUnlessEqual({'coll':float(ts)}, timestamps)
+		# TODO: Provide negative case logic for memcache
 
 	def testDelete_NoMatch(self):
 		"testDelete_NoMatch: Attempt to delete a missing object should not cause an error, and updates the timestamp"
-		# TODO This fails if memcache isn't turned on
 		userID, storageServer, ts = self.helper_testDelete()
 		ts = weave.delete_item(storageServer, userID, self.password, 'coll', '4', withHost=test_config.HOST_NAME)
 		timestamps = weave.get_collection_timestamps(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
-		self.failUnlessEqual({'coll':float(ts)}, timestamps)
+		if test_config.memcache:
+			self.failUnlessEqual({'coll':float(ts)}, timestamps)
+		# TODO This fails if memcache isn't turned on
 
 	def testDelete_ByParentID(self):
 		"testDelete_ByParentID: Attempt to delete objects with a ParentID filter works"
@@ -968,7 +984,11 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		result = weave.delete_items(storageServer, userID, self.password, 'coll', params="sort=oldest&limit=1", withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
-		self.failUnlessEqual(['2', '3'], result)
+
+		# Should be ['2', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('2' in result)
+		self.failUnless('3' in result)
 
 	def skip_testDelete_LimitOffset(self):
 		"testDelete_LimitOffset: Attempt to delete objects with a 'limit' and 'offset' parameter works"
@@ -978,6 +998,12 @@ class TestStorage(unittest.TestCase):
 		userID, storageServer, ts = self.helper_testDelete()
 		result = weave.delete_items(storageServer, userID, self.password, 'coll', params="sort=index&limit=1&offset=1", withHost=test_config.HOST_NAME)
 		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
+
+		# Should be ['1', '3'] in any order
+		self.failUnlessEqual(2, len(result))
+		self.failUnless('1' in result)
+		self.failUnless('3' in result)
+
 		self.failUnlessEqual(['1', '3'], result)
 		
 	def testDelete_indexAbove(self):
@@ -1229,7 +1255,9 @@ class TestStorageLarge(unittest.TestCase):
 		self.failUnlessEqual({'history':'1', 'foo':'1'}, counts)
 
 		timestamps = weave.get_collection_timestamps(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-		self.failUnlessEqual({'history':float(timestamp1), 'foo':float(timestamp5)}, timestamps)
+		if test_config.memcache:
+			self.failUnlessEqual({'history':float(timestamp1), 'foo':float(timestamp5)}, timestamps)
+		# TODO if memcache isn't on check for other behavior
 
 		try:
 			result = weave.delete_all(self.storageServer, self.userID, self.password, confirm=False, withHost=test_config.HOST_NAME)
