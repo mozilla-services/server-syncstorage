@@ -113,7 +113,7 @@
 	output_test("Get collection ids", $result == '["2"]', $result);
 
 	$result = get_collection_ids('tabs');
-	output_test("Get collection ids", $result == '["2"]', $result);
+	output_test("Get collection ids", $result == '["1"]', $result);
 
 	$result = put_item('foo', $item1, $timestamp2 - 1);
 	output_test("Bad put (timestamp too old)", $result == 4, $result);

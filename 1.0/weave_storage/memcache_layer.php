@@ -168,7 +168,7 @@ class WeaveMemcache implements WeaveStorageBase
 			
 			foreach ($wbos as $wbo)
 			{
-				if (!array_key_exists($wbo->id(), $this->_tabs) || $wbo->payload != $this->_tabs[$wbo->id()][1])
+				if (!array_key_exists($wbo->id(), $this->_tabs) || $wbo->payload() != $this->_tabs[$wbo->id()][1])
 					$affected++;
 				$this->_tabs[$wbo->id()] = array($wbo->modified(), $wbo->payload());
 			}
