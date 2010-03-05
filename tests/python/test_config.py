@@ -1,5 +1,5 @@
 SCHEME = "http"
-SERVER_NAME = "pm-weave06.mozilla.org"
+SERVER_NAME = "localhost"
 SERVER_BASE = "%s://%s" % (SCHEME, SERVER_NAME)
 
 STORAGE_SCHEME = None

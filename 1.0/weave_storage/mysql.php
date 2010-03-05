@@ -106,7 +106,7 @@ class WeaveStorage implements WeaveStorageBase
 			if ($_SERVER['REQUEST_METHOD'] == 'GET')
 			{
 				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_READ_HOST . ';dbname=' . WEAVE_MYSQL_STORE_READ_DB, 
-									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS); #, array(PDO::ATTR_PERSISTENT => true));
+									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS); 
 			}
 			else
 			{

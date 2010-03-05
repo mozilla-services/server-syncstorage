@@ -1022,6 +1022,102 @@ class TestStorage(unittest.TestCase):
 			self.failUnless(str(e).find("HTTP Error 412: Precondition Failed") > 0, "Should have been an HTTP 412 error")
 
 
+	def testAddTab(self):
+		"testAddTab: A tab object can be created with all relevant parameters, and everything persists correctly."
+		userID, storageServer = self.createCaseUser()
+		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'abcd1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+		result = weave.get_item(storageServer, userID, self.password, 'tabs', 'abcd1234', withHost=test_config.HOST_NAME)
+		self.failUnlessObjsEqualWithDrift(result, {'id':'abcd1234', 'payload':'ThisIsThePayload', 'modified':float(ts)})
+
+	def testAddTab_IfUnmodifiedSince_NotModified(self):
+		"testAddTab_IfUnmodifiedSince_NotModified: If an IfUnmodifiedSince header is provided, and the collection has not been changed, an attempt succeeds."
+		userID, storageServer = self.createCaseUser()
+
+		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+		time.sleep(.01)		
+		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
+
+		result = weave.get_item(storageServer, userID, self.password, 'tabs', '1234', withHost=test_config.HOST_NAME)
+		self.failUnlessObjsEqualWithDrift(result, {'id':'1234', 'payload':'ThisIsThePayload', 'modified':float(ts2)})
+
+	def testAddTab_IfUnmodifiedSince_Modified(self):
+		"testAddTab_IfUnmodifiedSince_Modified: If an IfUnmodifiedSince header is provided, and the collection has changed, the attempt fails."
+		userID, storageServer = self.createCaseUser()
+		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload2'}, withHost=test_config.HOST_NAME)
+		try:
+			ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
+			self.fail("Attempt to add an item when the collection had changed after the ifModifiedSince time should have failed")
+		except weave.WeaveException, e:
+			self.failUnless(str(e).find("HTTP Error 412: Precondition Failed") > 0, "Should have been an HTTP 412 error")
+
+	def testGetTab_ByNewer(self):
+		"testGetTab_ByNewer: Attempt to get tabs with a Newer filter works"
+		userID, storageServer, ts = self.helper_tabTestGet()
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', params="newer=%s" % ts[0], withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['2', '3'], result)
+
+	def testGetTab_ByOlder(self):
+		"testGetTab_ByOlder: Attempt to get tabs with a Older filter works"
+		userID, storageServer, ts = self.helper_tabTestGet()
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', params="older=%s" % ts[2], withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['1', '2'], result)
+
+	def testGetTab_ByIds(self):
+		"testGetTab_ByIds: Attempt to get tabs from a set of ids"
+		userID, storageServer, ts = self.helper_tabTestGet()
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', params="ids=1,2,4", withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['1', '2'], result)
+
+	def helper_tabTestGet(self):
+		'Helper function to set up many of the testGet functions'
+		userID, storageServer = self.createCaseUser()
+		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '3'}, withHost=test_config.HOST_NAME)
+		time.sleep(.02)
+		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'2', 'payload':'aPayload', 'parentid':'def', 'predecessorid': 'def', 'sortindex': '5'}, withHost=test_config.HOST_NAME)
+		time.sleep(.02)
+		ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'3', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '1'}, withHost=test_config.HOST_NAME)
+		return (userID, storageServer, [ts, ts2, ts3])
+
+	def testDeleteTab(self):
+		"testDeleteTab: Attempt to delete tabs by ID should work"
+		userID, storageServer, ts = self.helper_testDeleteTab()
+		ts = weave.delete_item(storageServer, userID, self.password, 'tabs', '1', withHost=test_config.HOST_NAME)
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['2', '3'], result)
+		try:
+			ts2 = weave.get_item(storageServer, userID, self.password, 'tabs', '1', withHost=test_config.HOST_NAME)
+			self.fail("Should have raised a 404 exception on attempt to access deleted object")
+		except weave.WeaveException, e:
+			self.failUnless(str(e).find("HTTP Error 404: Not Found") > 0, "Should have been an HTTP 404 error")
+
+		# Delete always updates the timestamp: even if nothing changes
+		# TODO This fails if memcache isn't turned on; the timestamp rolls backwards
+		timestamps = weave.get_collection_timestamps(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
+		self.failUnlessEqual({'tabs':float(ts)}, timestamps)
+
+	def testDeleteTab_ByNewer(self):
+		"testDeleteTab_ByNewer: Attempt to delete tabs with a Newer filter works"
+		userID, storageServer, ts = self.helper_testDeleteTab()
+		result = weave.delete_items(storageServer, userID, self.password, 'tabs', params="newer=%s" % ts[0], withHost=test_config.HOST_NAME)
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['1'], result)
+
+	def testDeleteTab_ByOlder(self):
+		"testDeleteTab_ByOlder: Attempt to delete tabs with a Older filter works"
+		userID, storageServer, ts = self.helper_testDeleteTab()
+		result = weave.delete_items(storageServer, userID, self.password, 'tabs', params="older=%s" % ts[2], withHost=test_config.HOST_NAME)
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'tabs', withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['3'], result)
+
+	def helper_testDeleteTab(self):
+		'Helper function to set up many of the testDelete functions'
+		userID, storageServer = self.createCaseUser()
+		ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '3'}, withHost=test_config.HOST_NAME)
+		ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'2', 'payload':'aPayload', 'parentid':'def', 'predecessorid': 'def', 'sortindex': '5'}, withHost=test_config.HOST_NAME)
+		ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'3', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '1'}, withHost=test_config.HOST_NAME)
+		return (userID, storageServer, [ts, ts2, ts3])
+
 
 
 # TODO: Test X-Weave-Timestamp header
