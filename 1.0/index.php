@@ -88,7 +88,7 @@
 	#user passes preliminaries, connections made, onto actually getting the data
 	try
 	{
-		if (WEAVE_STORAGE_MEMCACHE_HOST)
+		if (defined('WEAVE_STORAGE_MEMCACHE_HOST') && WEAVE_STORAGE_MEMCACHE_HOST)
 		{
 			require_once 'weave_storage/memcache_layer.php';
 			$db = new WeaveMemcache($userid);	
