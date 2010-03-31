@@ -49,6 +49,7 @@ class WeaveMemcache implements WeaveStorageBase
 	private $_memc = null;
 	private $_collections = null;
 	private $_tabs = null;
+	private $_writes = null;
 	
 	function __construct($username) 
 	{
@@ -179,6 +180,13 @@ class WeaveMemcache implements WeaveStorageBase
 		}
 		else
 		{
+			$payload_total = 0;
+			foreach ($wbos as $wbo)
+			{
+				$payload_total += $wbo->payload_size();
+			}
+			$this->add_to_write_quota($payload_total);
+			
 			$affected = $this->_dbh->store_object($wbos);
 			if ($affected)
 			{
@@ -225,6 +233,7 @@ class WeaveMemcache implements WeaveStorageBase
 		}
 		else
 		{
+			$this->add_to_write_quota($wbo->payload_size());
 			$affected = $this->_dbh->update_object($wbo);		
 			if ($affected)
 				$this->collections_update($wbo->collection(), $wbo->modified());
@@ -470,6 +479,29 @@ class WeaveMemcache implements WeaveStorageBase
 			throw new Exception("Database unavailable", 503);			
 		}
 
+	}
+	function add_to_write_quota($total)
+	{
+		if (!defined(WEAVE_QUOTA_WRITE_CAP) && $this->_memc)
+			return;
+			
+		list($date, $volume) = $current_total = $this->_memc->get('write_vol:' . $this->_username);
+		$now = date("Ymd");
+		if ($now > $date)
+		{
+			$date = $now;
+			$volume = $total;
+		}
+		else
+			$volume += $total;
+		
+		
+		if ($volume > WEAVE_QUOTA_WRITE_CAP)
+			throw new Exception("Over write quota", 503);			
+
+		$this->_memc->set('write_vol:' . $this->_username, array($date, $volume), true, WEAVE_STORAGE_MEMCACHE_DECAY);	
+		return $volume;
+		
 	}
 	
 	function collections_set()

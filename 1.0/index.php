@@ -88,6 +88,9 @@
 	#user passes preliminaries, connections made, onto actually getting the data
 	try
 	{
+		$db = null;
+		$db2 = null;
+		
 		if (defined('WEAVE_STORAGE_MEMCACHE_HOST') && WEAVE_STORAGE_MEMCACHE_HOST)
 		{
 			require_once 'weave_storage/memcache_layer.php';
@@ -98,6 +101,12 @@
 			require_once 'weave_storage/' . WEAVE_STORAGE_ENGINE . '.php';
 			$db = new WeaveStorage($userid);	
 		}	
+		
+		if (defined('WEAVE_STORAGE_SECONDARY_ENGINE') && WEAVE_STORAGE_SECONDARY_ENGINE)
+		{
+			require_once 'weave_secondary_storage/' . WEAVE_STORAGE_SECONDARY_ENGINE . '.php';
+			$db2 = new WeaveSecondaryStorage($userid);
+		}
 		
 		if ($_SERVER['REQUEST_METHOD'] == 'GET')
 		{
@@ -177,9 +186,31 @@
 				{
 					$wbos = array($wbo);
 					$db->store_object($wbos);
+					if ($db2)
+					{
+						try
+						{
+							$db2->store_object($wbos);
+						}
+						catch(Exception $e)
+						{
+							#ignore any error. Backend should have logged it
+						}					
+					}
 				}
 				else
 					$db->update_object($wbo);
+					if ($db2)
+					{
+						try
+						{
+							$db2->update_object($wbo);
+						}
+						catch(Exception $e)
+						{
+							#ignore any error. Backend should have logged it
+						}					
+					}
 			}
 			else
 			{
@@ -224,7 +255,20 @@
 					if ($wbo->payload_exists())
 						$wbos[] = $wbo;
 					else
+					{
 						$db->update_object($wbo);
+						if ($db2)
+						{
+							try
+							{
+								$db2->update_object($wbo);
+							}
+							catch(Exception $e)
+							{
+								#ignore any error. Backend should have logged it
+							}					
+						}
+					}						
 					$payload_size_total += strlen($wbo->payload());
 					$success_ids[] = $wbo->id();
 				}
@@ -240,6 +284,17 @@
 				try
 				{
 					$db->store_object($wbos_slice);
+					if ($db2)
+					{
+						try
+						{
+							$db2->store_object($wbos_slice);
+						}
+						catch(Exception $e)
+						{
+							#ignore any error. Backend should have logged it
+						}					
+					}
 				}
 				catch (Exception $e)
 				{
@@ -260,6 +315,17 @@
 			if ($id)
 			{
 				$db->delete_object($collection, $id);
+				if ($db2)
+				{
+					try
+					{
+						$db2->delete_object($collection, $id);
+					}
+					catch(Exception $e)
+					{
+						#ignore any error. Backend should have logged it
+					}					
+				}
 			}
 			else if ($collection)
 			{
@@ -275,12 +341,45 @@
 							array_key_exists('index_above', $_GET) ? $_GET['index_above'] : null, 
 							array_key_exists('index_below', $_GET) ? $_GET['index_below'] : null
 							);			
+				if ($db2)
+				{
+					try
+					{
+						$db2->delete_objects($collection, null,  
+									array_key_exists('parentid', $_GET) ? $_GET['parentid'] : null, 
+									array_key_exists('predecessorid', $_GET) ? $_GET['predecessorid'] : null, 
+									array_key_exists('newer', $_GET) ? round($_GET['newer'] * 100) : null, 
+									array_key_exists('older', $_GET) ? round($_GET['older'] * 100) : null, 
+									array_key_exists('sort', $_GET) ? $_GET['sort'] : null, 
+									array_key_exists('limit', $_GET) ? $_GET['limit'] : null, 
+									array_key_exists('offset', $_GET) ? $_GET['offset'] : null,
+									array_key_exists('ids', $_GET) ? explode(',', $_GET['ids']) : null,
+									array_key_exists('index_above', $_GET) ? $_GET['index_above'] : null, 
+									array_key_exists('index_below', $_GET) ? $_GET['index_below'] : null
+									);			
+					}
+					catch(Exception $e)
+					{
+						#ignore any error. Backend should have logged it
+					}					
+				}
 			}
 			else
 			{
 				if (!array_key_exists('HTTP_X_CONFIRM_DELETE', $_SERVER))
 					report_problem(WEAVE_ERROR_NO_OVERWRITE, 412);
 				$db->delete_user();
+				if ($db2)
+				{
+					try
+					{
+						$db2->delete_user();
+					}
+					catch(Exception $e)
+					{
+						#ignore any error. Backend should have logged it
+					}					
+				}
 			}
 	
 			echo json_encode($server_time);

@@ -42,25 +42,25 @@
 #If you want sqlite, please check out the Weave Minimal server
 if (!defined('WEAVE_STORAGE_ENGINE')) { define('WEAVE_STORAGE_ENGINE', 'mysql'); }
 
-if (WEAVE_STORAGE_ENGINE == 'mysql')
-{
-	#host, db name, username and password for the auth store
-	if (!defined('WEAVE_MYSQL_STORE_READ_HOST')) { define('WEAVE_MYSQL_STORE_READ_HOST', 'localhost'); }
-	if (!defined('WEAVE_MYSQL_STORE_READ_DB')) { define('WEAVE_MYSQL_STORE_READ_DB', 'weave'); }
-	if (!defined('WEAVE_MYSQL_STORE_READ_USER')) { define('WEAVE_MYSQL_STORE_READ_USER', 'weave'); }
-	if (!defined('WEAVE_MYSQL_STORE_READ_PASS')) { define('WEAVE_MYSQL_STORE_READ_PASS', 'weave'); }
+#host, db name, username and password for the auth store
+if (!defined('WEAVE_MYSQL_STORE_READ_HOST')) { define('WEAVE_MYSQL_STORE_READ_HOST', 'localhost'); }
+if (!defined('WEAVE_MYSQL_STORE_READ_DB')) { define('WEAVE_MYSQL_STORE_READ_DB', 'weave'); }
+if (!defined('WEAVE_MYSQL_STORE_READ_USER')) { define('WEAVE_MYSQL_STORE_READ_USER', 'weave'); }
+if (!defined('WEAVE_MYSQL_STORE_READ_PASS')) { define('WEAVE_MYSQL_STORE_READ_PASS', 'weave'); }
 
-	#host, db name, username and password for the auth store read replica (leave as is if you're on one box)
-	if (!defined('WEAVE_MYSQL_STORE_WRITE_HOST')) { define('WEAVE_MYSQL_STORE_WRITE_HOST', WEAVE_MYSQL_STORE_READ_HOST); }
-	if (!defined('WEAVE_MYSQL_STORE_WRITE_DB')) { define('WEAVE_MYSQL_STORE_WRITE_DB', WEAVE_MYSQL_STORE_READ_DB); }
-	if (!defined('WEAVE_MYSQL_STORE_WRITE_USER')) { define('WEAVE_MYSQL_STORE_WRITE_USER', WEAVE_MYSQL_STORE_READ_USER); }
-	if (!defined('WEAVE_MYSQL_STORE_WRITE_PASS')) { define('WEAVE_MYSQL_STORE_WRITE_PASS', WEAVE_MYSQL_STORE_READ_PASS); }
+#host, db name, username and password for the auth store read replica (leave as is if you're on one box)
+if (!defined('WEAVE_MYSQL_STORE_WRITE_HOST')) { define('WEAVE_MYSQL_STORE_WRITE_HOST', WEAVE_MYSQL_STORE_READ_HOST); }
+if (!defined('WEAVE_MYSQL_STORE_WRITE_DB')) { define('WEAVE_MYSQL_STORE_WRITE_DB', WEAVE_MYSQL_STORE_READ_DB); }
+if (!defined('WEAVE_MYSQL_STORE_WRITE_USER')) { define('WEAVE_MYSQL_STORE_WRITE_USER', WEAVE_MYSQL_STORE_READ_USER); }
+if (!defined('WEAVE_MYSQL_STORE_WRITE_PASS')) { define('WEAVE_MYSQL_STORE_WRITE_PASS', WEAVE_MYSQL_STORE_READ_PASS); }
 
-	#keep these commented out unless you know that you need multiple tables. You don't.
-	#if (!defined('WEAVE_MYSQL_STORE_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'wbo'); }
-	#if (!defined('WEAVE_MYSQL_COLLECTION_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'collections'); }
+#keep these commented out unless you know that you need multiple tables. You don't.
+#if (!defined('WEAVE_MYSQL_STORE_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'wbo'); }
+#if (!defined('WEAVE_MYSQL_COLLECTION_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'collections'); }
 
-}
+#secondary storage engine. Do not uncomment unless you know why you should
+#if (!defined('WEAVE_STORAGE_SECONDARY_ENGINE')) { define('WEAVE_STORAGE_SECONDARY_ENGINE', 'mysql'); }
+
 
 
 #engine for auth
