@@ -92,6 +92,10 @@ class WeaveStorage implements WeaveStorageBase
 
 		if (defined('WEAVE_MYSQL_STORE_TABLE_NAME'))
 			$this->_db_name = WEAVE_MYSQL_STORE_TABLE_NAME;
+		
+		if (defined('WEAVE_USER_TABLE_MODULO') && is_int(WEAVE_USER_TABLE_MODULO))
+			$this->_db_name .= '_' . ($this->_username % WEAVE_USER_TABLE_MODULO);
+			
 		if (defined('WEAVE_MYSQL_COLLECTION_TABLE_NAME'))
 			$this->_collection_table_name = WEAVE_MYSQL_COLLECTION_TABLE_NAME;
 	}
