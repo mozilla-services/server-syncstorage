@@ -148,18 +148,15 @@
 					require_once 'weave_output.php';
 					$outputter = new WBOOutput($full);
 		
+					$params = validate_search_params();
+
 					$ids = $db->retrieve_objects($collection, null, $full, $outputter,
-								array_key_exists('parentid', $_GET) ? $_GET['parentid'] : null, 
-								array_key_exists('predecessorid', $_GET) ? $_GET['predecessorid'] : null, 
-								array_key_exists('newer', $_GET) ? round($_GET['newer'] * 100) : null, 
-								array_key_exists('older', $_GET) ? round($_GET['older'] * 100) : null, 
-								array_key_exists('sort', $_GET) ? $_GET['sort'] : null, 
-								array_key_exists('limit', $_GET) ? $_GET['limit'] : null, 
-								array_key_exists('offset', $_GET) ? $_GET['offset'] : null,
-								array_key_exists('ids', $_GET) ? explode(',', $_GET['ids']) : null,
-								array_key_exists('index_above', $_GET) ? $_GET['index_above'] : null, 
-								array_key_exists('index_below', $_GET) ? $_GET['index_below'] : null,
-								array_key_exists('depth', $_GET) ? $_GET['depth'] : null
+								$params['parentid'], $params['predecessorid'], 
+								$params['newer'], $params['older'], 
+								$params['sort'], 
+								$params['limit'], $params['offset'], 
+								$params['ids'], 
+								$params['index_above'], $params['index_below'], $params['depth']
 								);
 				}
 			}
@@ -329,34 +326,28 @@
 			}
 			else if ($collection)
 			{
+				$params = validate_search_params();
+
 				$db->delete_objects($collection, null,  
-							array_key_exists('parentid', $_GET) ? $_GET['parentid'] : null, 
-							array_key_exists('predecessorid', $_GET) ? $_GET['predecessorid'] : null, 
-							array_key_exists('newer', $_GET) ? round($_GET['newer'] * 100) : null, 
-							array_key_exists('older', $_GET) ? round($_GET['older'] * 100) : null, 
-							array_key_exists('sort', $_GET) ? $_GET['sort'] : null, 
-							array_key_exists('limit', $_GET) ? $_GET['limit'] : null, 
-							array_key_exists('offset', $_GET) ? $_GET['offset'] : null,
-							array_key_exists('ids', $_GET) ? explode(',', $_GET['ids']) : null,
-							array_key_exists('index_above', $_GET) ? $_GET['index_above'] : null, 
-							array_key_exists('index_below', $_GET) ? $_GET['index_below'] : null
+								$params['parentid'], $params['predecessorid'], 
+								$params['newer'], $params['older'], 
+								$params['sort'], 
+								$params['limit'], $params['offset'], 
+								$params['ids'], 
+								$params['index_above'], $params['index_below']
 							);			
 				if ($db2)
 				{
 					try
 					{
-						$db2->delete_objects($collection, null,  
-									array_key_exists('parentid', $_GET) ? $_GET['parentid'] : null, 
-									array_key_exists('predecessorid', $_GET) ? $_GET['predecessorid'] : null, 
-									array_key_exists('newer', $_GET) ? round($_GET['newer'] * 100) : null, 
-									array_key_exists('older', $_GET) ? round($_GET['older'] * 100) : null, 
-									array_key_exists('sort', $_GET) ? $_GET['sort'] : null, 
-									array_key_exists('limit', $_GET) ? $_GET['limit'] : null, 
-									array_key_exists('offset', $_GET) ? $_GET['offset'] : null,
-									array_key_exists('ids', $_GET) ? explode(',', $_GET['ids']) : null,
-									array_key_exists('index_above', $_GET) ? $_GET['index_above'] : null, 
-									array_key_exists('index_below', $_GET) ? $_GET['index_below'] : null
-									);			
+						$db->delete_objects($collection, null,  
+									$params['parentid'], $params['predecessorid'], 
+									$params['newer'], $params['older'], 
+									$params['sort'], 
+									$params['limit'], $params['offset'], 
+									$params['ids'], 
+									$params['index_above'], $params['index_below']
+							);			
 					}
 					catch(Exception $e)
 					{
