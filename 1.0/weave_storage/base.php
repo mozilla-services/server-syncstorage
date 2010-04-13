@@ -62,7 +62,7 @@ interface WeaveStorageBase
 	
 	function delete_object($collection, $id);
 	
-	function delete_objects($collection, $id = null, $parentid = null, $newer = null, $older = null, $limit = null, $offset = null);
+	function delete_objects($collection, $id = null, $parentid = null, $predecessorid = null, $newer = null, $older = null, $limit = null, $offset = null);
 	
 	function retrieve_object($collection, $id);
 	

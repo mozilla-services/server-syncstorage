@@ -160,8 +160,8 @@
 		$params['parentid'] = (array_key_exists('parentid', $_GET) && mb_strlen($_GET['parentid'], '8bit') <= 64 && strpos($_GET['parentid'], '/') === false) ? $_GET['parentid'] : null;
 		$params['predecessorid'] = (array_key_exists('predecessorid', $_GET) && mb_strlen($_GET['predecessorid'], '8bit') <= 64 && strpos($_GET['predecessorid'], '/') === false) ? $_GET['predecessorid'] : null;
 	
-		$params['newer'] = (array_key_exists('newer', $_GET) && is_numeric($_GET['newer'])) ? (int)$_GET['newer'] : null;
-		$params['older'] = (array_key_exists('older', $_GET) && is_numeric($_GET['older'])) ? (int)$_GET['older'] : null;
+		$params['newer'] = (array_key_exists('newer', $_GET) && is_numeric($_GET['newer'])) ? round($_GET['newer'] * 100) : null;
+		$params['older'] = (array_key_exists('older', $_GET) && is_numeric($_GET['older'])) ? round($_GET['older'] * 100) : null;
 			
 		$params['sort'] = (array_key_exists('sort', $_GET) && ($_GET['sort'] == 'oldest' || $_GET['sort'] == 'newest' || $_GET['sort'] == 'index')) ? $_GET['sort'] : null;
 		$params['limit'] = (array_key_exists('limit', $_GET) && is_numeric($_GET['limit']) && $_GET['limit'] > 0) ? (int)$_GET['limit'] : null;
