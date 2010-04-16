@@ -50,7 +50,7 @@ require_once 'weave_constants.php';
 #(
 # id int(11) NOT NULL PRIMARY KEY auto_increment
 # username varchar(32),
-# md5 varbinary(64),
+# password_hash varbinary(128),
 # email varbinary(64),
 # status tinyint(4) default '1',
 # alert text,
@@ -85,13 +85,17 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 
 		// see also: http://blog.coenbijlsma.nl/2009/01/17/php-and-ssha-ldap-passwords/
 		if (null === $salt) {
-			mt_srand((double)microtime()*1000000);
-			$salt = pack("CCCCCCCC", 
-				mt_rand(), mt_rand(), mt_rand(), mt_rand(), 
-				mt_rand(), mt_rand(), mt_rand(), mt_rand());
+			if (function_exists('mcrypt_create_iv')) {
+				$salt = mcrypt_create_iv(8, MCRYPT_DEV_RANDOM);
+			} else {
+			   mt_srand((double)microtime()*1000000);
+			   $salt = pack("CCCCCCCC", 
+					   mt_rand(), mt_rand(), mt_rand(), mt_rand(), 
+					   mt_rand(), mt_rand(), mt_rand(), mt_rand());
+			}
 		}
-		$ssha = "{SSHA}" . 
-			base64_encode( pack("H*", sha1($password . $salt)) . $salt);
+		$ssha = "{SSHA-256}" . 
+			base64_encode( hash('sha256', $password . $salt, true) . $salt);
 		return $ssha;
 	}
 
@@ -105,7 +109,8 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 	 */
 	function validateSSHAPassword($password, $ssha_hash)
 	{
-		$salt	   = substr(base64_decode(substr($ssha_hash, 6)), 20);
+		$tag_len   = strlen('{SSHA-256}');
+		$salt	   = substr(base64_decode(substr($ssha_hash, $tag_len)), 32);
 		$test_hash = $this->generateSSHAPassword($password, $salt);
 		return ($ssha_hash == $test_hash);
 	}
@@ -162,11 +167,11 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 			
 		try
 		{
-			$insert_stmt = 'update users set md5 = :md5 where username = :username';
+			$insert_stmt = 'update users set password_hash = :password_hash where username = :username';
 			$sth = $this->_dbh->prepare($insert_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$phash = $this->hash_password($password);
-			$sth->bindParam(':md5', $phash);
+			$sth->bindParam(':password_hash', $phash);
 			$sth->execute();
 		}
 		catch( PDOException $exception )
@@ -214,7 +219,7 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		try
 		{
 			$select_stmt = '
-				SELECT id, md5, status, alert 
+				SELECT id, password_hash, status, alert 
 				FROM users 
 				WHERE username=?
 			';
@@ -229,22 +234,22 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 			} else if ($result['status'] != 1) {
 				// User disabled.
 				return null;
-			} else if (strpos($result['md5'], '{SSHA}') !== false) {
-				// Looks like a {SSHA} password, so try validating it.
-				if (!$this->validateSSHAPassword($password, $result['md5'])) {
+			} else if (strpos($result['password_hash'], '{SSHA-256}') !== false) {
+				// Looks like a {SSHA-256} password, so try validating it.
+				if (!$this->validateSSHAPassword($password, $result['password_hash'])) {
 					return null;
 				}
 			} else {
 				// This might be a legacy password hash, so try fallbacks...
 				if (defined('WEAVE_MD5_FALLBACK') && WEAVE_MD5_FALLBACK &&
-						($result['md5'] == md5($password)) ) {
+						($result['password_hash'] == md5($password)) ) {
 					// Looks like a valid MD5 hash, so accept it but update it.
 					$this->update_password($password);
 				} else if (defined('WEAVE_SHA_SALT')) {
 					// We have a SHA salt, so try generating a hash with it.
 					$p_array = str_split($password, (floor(strlen($password)/2))+1);
 					$sha_hash = hash('sha256', $p_array[0].WEAVE_SHA_SALT.$p_array[1]);
-					if ($result['md5'] == $sha_hash) {
+					if ($result['password_hash'] == $sha_hash) {
 						// Looks like a valid SHA hash, so accept it but update it.
 						$this->update_password($password);
 					} else {
