@@ -482,7 +482,7 @@ class WeaveMemcache implements WeaveStorageBase
 	}
 	function add_to_write_quota($total)
 	{
-		if (!defined(WEAVE_QUOTA_WRITE_CAP) && $this->_memc)
+		if (!defined('WEAVE_QUOTA_WRITE_CAP') && $this->_memc)
 			return;
 			
 		list($date, $volume) = $current_total = $this->_memc->get('write_vol:' . $this->_username);
