@@ -122,12 +122,27 @@
 
 		try 
 		{
+			$lockout = null;
+			if (defined('WEAVE_STORAGE_LOCKOUT_COUNT') && WEAVE_STORAGE_LOCKOUT_COUNT)
+			{
+				require_once 'lockout.php';
+				$lockout = new WeaveLockout($url_user);
+				if ($lockout->is_locked())
+				{
+					report_problem('Account locked', '401');						
+				}
+			}
+			
 			$authdb = new WeaveAuthentication($url_user);
 			if (!$userid = $authdb->authenticate_user(fix_utf8_encoding($auth_pw)))
 			{
 				$message = new CommonEventFormatMessage('AuthFail', 'Authentication', 5, 
 									array('suser' => $url_user));
 				$cef->logMessage($message);
+
+				if ($lockout)
+					$lockout->increment_lockout();
+					
 				report_problem('Authentication failed', '401');				
 			}
 		}
