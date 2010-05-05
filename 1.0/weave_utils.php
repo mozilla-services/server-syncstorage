@@ -190,5 +190,13 @@
 	
 		return $params;
 	}
+
+	function get_source_ip()
+	{
+		if (array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER))
+			return $_SERVER['HTTP_X_FORWARDED_FOR'];
+		return $_SERVER['REMOTE_ADDR'];
+	
+	}
 	
 ?>
