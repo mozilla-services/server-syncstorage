@@ -70,6 +70,7 @@
 	# Gets the username and password out of the http headers, and checks them against the auth
 	function verify_user($url_user)
 	{
+		global $cef;
 		if (!$url_user || !preg_match('/^[A-Z0-9._-]+$/i', $url_user)) 
 			report_problem(WEAVE_ERROR_INVALID_USERNAME, 400);
 
@@ -123,7 +124,12 @@
 		{
 			$authdb = new WeaveAuthentication($url_user);
 			if (!$userid = $authdb->authenticate_user(fix_utf8_encoding($auth_pw)))
-				report_problem('Authentication failed', '401');
+			{
+				$message = new CommonEventFormatMessage('AuthFail', 'Authentication', 5, 
+									array('suser' => $url_user));
+				$cef->logMessage($message);
+				report_problem('Authentication failed', '401');				
+			}
 		}
 		catch(Exception $e)
 		{

@@ -41,6 +41,9 @@
 	require_once 'weave_constants.php';
 	require_once 'weave_basic_object.php';
 	require_once 'weave_utils.php';
+	require_once 'cef.php';
+
+	$cef = new CommonEventFormat('mozilla', 'weave', '1.3');
 	
 	header("Content-type: application/json");
 	
