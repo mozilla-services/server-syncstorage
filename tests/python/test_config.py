@@ -1,12 +1,12 @@
-SCHEME = "http"
-SERVER_NAME = "pm-weave06.mozilla.org"
+SCHEME = "https"
+SERVER_NAME = "stage-auth.services.mozilla.com"
 SERVER_BASE = "%s://%s" % (SCHEME, SERVER_NAME)
 
-STORAGE_SCHEME = None
-STORAGE_SERVER = None
+STORAGE_SCHEME = "https"
+STORAGE_SERVER = "stage-node01.services.mozilla.com"
 
 HOST_NAME = None
-USERNAME = None
-PASSWORD = None
+USERNAME = "zandr03"
+PASSWORD = "zandr03password"
 
 memcache = False

@@ -24,7 +24,7 @@
 	
 	function fix_utf8_encoding($string)
 	{
-		if(mb_detect_encoding($string) == 'UTF-8')
+		if(mb_detect_encoding($string, 'UTF-8,ISO-8859-1') == 'UTF-8')
 			return $string;
 		else
 			return utf8_encode($string);
