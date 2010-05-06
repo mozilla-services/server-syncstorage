@@ -810,14 +810,12 @@ class TestStorage(unittest.TestCase):
 		self.failUnlessEqual(['2', '1'], result)
 
 	def testGet_Limit_Negative(self):
-		"testGet_Limit_Negative: Attempt to get objects with a negative 'limit' should cause an error"
+		"testGet_Limit_Negative: Attempt to get objects with a negative 'limit' should ignore the limit"
 		userID, storageServer = self.createCaseUser()
 		weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1', 'payload':'aPayload', 'sortindex': 5}, withHost=test_config.HOST_NAME)
-		try:
-			result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&limit=-5", withHost=test_config.HOST_NAME)
-			self.fail("Attempt to use offset without a negative limit should have raised an error; got %s" % result)
-		except weave.WeaveException, e:
-			self.failUnless(str(e).find("HTTP Error 400: Bad Request") > 0, "Should have been an HTTP 400 error, was %s" % str(e))
+		weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'2', 'payload':'aPayload', 'sortindex': 6}, withHost=test_config.HOST_NAME)
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&limit=-5", withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['2', '1'], result)
 
 	def testGet_Offset(self):
 		"testGet_Offset: Attempt to get objects with an 'offset' parameter works"
@@ -834,14 +832,11 @@ class TestStorage(unittest.TestCase):
 		self.failUnlessEqual([], result) 
 
 	def testGet_Offset_Negative(self):
-		"testGet_Offset_Negative: Attempt to get objects with a negative 'offset' should cause an error"
+		"testGet_Offset_Negative: Attempt to get objects with a negative 'offset' ignore the offset"
 		userID, storageServer = self.createCaseUser()
 		weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1', 'payload':'aPayload', 'sortindex': 5}, withHost=test_config.HOST_NAME)
-		try:
-			result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&limit=2&offset=-5", withHost=test_config.HOST_NAME)
-			self.fail("Attempt to use offset with a negative offset should have raised an error; got %s" % result)
-		except weave.WeaveException, e:
-			self.failUnless(str(e).find("HTTP Error 400: Bad Request") > 0, "Should have been an HTTP 400 error, was %s" % str(e))
+		result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&limit=2&offset=-5", withHost=test_config.HOST_NAME)
+		self.failUnlessEqual(['1'], result)
 
 	def testGet_Offset_NoLimit(self):
 		"testGet_Offset_NoLimit: Attempt to get objects with an 'offset' parameter without a 'limit' parameter should report an error"
