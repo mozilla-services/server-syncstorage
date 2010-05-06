@@ -10,6 +10,7 @@ class CommonEventFormat
 		$this->_deviceVersion = preg_replace('/\|/', '\\\|', $deviceVersion);
 		$this->_version = preg_replace('/\|/', '\\\|', $version);
 		$this->_filehandle = $filehandle;
+		openlog('weave', LOG_ODELAY, LOG_LOCAL4);
 	}
 
 	function logMessage($message)
