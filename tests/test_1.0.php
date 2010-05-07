@@ -107,7 +107,7 @@
 	output_test("Get item", compare_arrays(json_get($result), array('id' => "2", 'modified' => $timestamp2, 'sortindex' => "2", 'payload' => 'abcdef123456789')), $result);
 
 	$result = get_item('tabs', '1');
-	output_test("Get item", compare_arrays(json_get($result), array('id' => "1", 'modified' => $timestamptab, 'payload' => '123456789abcdef')), $result);
+	output_test("Get item", compare_arrays(json_get($result), array('id' => "1", 'modified' => $timestamptab, 'sortindex' => "1", 'payload' => '123456789abcdef')), $result);
 
 	$result = get_collection_ids('foo');
 	output_test("Get collection ids", $result == '["2"]', $result);
