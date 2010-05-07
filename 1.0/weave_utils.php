@@ -120,9 +120,12 @@
 
 		if ($auth_user != $url_user)
 		{
-			$message = new CommonEventFormatMessage(WEAVE_CEF_AUTH_FAILURE, 'Username Does Not Match URL', 7, 
-								array('url_user' => $url_user, 'suser' => $auth_user));
-			$cef->logMessage($message);
+			if ($cef)
+			{
+				$message = new CommonEventFormatMessage(WEAVE_CEF_AUTH_FAILURE, 'Username Does Not Match URL', 7, 
+									array('url_user' => $url_user, 'suser' => $auth_user));
+				$cef->logMessage($message);
+			}
 			report_problem(WEAVE_ERROR_USERID_PATH_MISMATCH, 400);
 		}
 
@@ -142,10 +145,13 @@
 			$authdb = new WeaveAuthentication($url_user);
 			if (!$userid = $authdb->authenticate_user(fix_utf8_encoding($auth_pw)))
 			{
-				$message = new CommonEventFormatMessage(WEAVE_CEF_AUTH_FAILURE, 'User Authentication Failed', 5, 
-									array('suser' => $url_user));
-				$cef->logMessage($message);
-
+				if ($cef)
+				{
+					$message = new CommonEventFormatMessage(WEAVE_CEF_AUTH_FAILURE, 'User Authentication Failed', 5, 
+										array('suser' => $url_user));
+					$cef->logMessage($message);
+				}
+				
 				if ($lockout)
 					$lockout->increment_lockout();
 					
