@@ -101,10 +101,16 @@ if (!defined('WEAVE_PAYLOAD_MAX_SIZE')) { define('WEAVE_PAYLOAD_MAX_SIZE', 26214
 #if (!defined('WEAVE_STORAGE_MEMCACHE_HOST')) { define('WEAVE_STORAGE_MEMCACHE_HOST', localhost); }
 #if (!defined('WEAVE_STORAGE_MEMCACHE_PORT')) { define('WEAVE_STORAGE_MEMCACHE_PORT', null); }
 #if (!defined('WEAVE_STORAGE_MEMCACHE_DECAY')) { define('WEAVE_STORAGE_MEMCACHE_DECAY', null); }
+#keep disabled unless you are doing lockouts
+#if (!defined('WEAVE_STORAGE_LOCKOUT_COUNT')) { define('WEAVE_STORAGE_LOCKOUT_COUNT', null); }
+#if (!defined('WEAVE_STORAGE_LOCKOUT_DECAY')) { define('WEAVE_STORAGE_LOCKOUT_DECAY', null); }
 
 #A default username and password, useful for testing suites and the heartbeat
 #if (!defined('WEAVE_DEFAULT_TEST_USERNAME')) { define('WEAVE_DEFAULT_TEST_USERNAME', 'testuser'); }
 #if (!defined('WEAVE_DEFAULT_TEST_PASSWORD')) { define('WEAVE_DEFAULT_TEST_PASSWORD', 'testpass'); }
+
+#Logging prefix
+if (!defined('WEAVE_CEF_DEVICE')) { define('WEAVE_CEF_DEVICE', 'weave'); }
 
 #Error constants
 define ('WEAVE_ERROR_INVALID_PROTOCOL', 1);

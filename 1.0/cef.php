@@ -1,5 +1,10 @@
 <?php
 
+if (!defined('WEAVE_CEF_AUTH_FAILURE')) { define('WEAVE_CEF_AUTH_FAILURE', 'AuthFail'); }
+if (!defined('WEAVE_CEF_CAPTCHA_FAILURE')) { define('WEAVE_CEF_CAPTCHA_FAILURE', 'CaptchaFail'); }
+if (!defined('WEAVE_CEF_OVERRIDE_FAILURE')) { define('WEAVE_CEF_OVERRIDE_FAILURE', 'InvalidAdmin'); }
+if (!defined('WEAVE_CEF_ACCOUNT_LOCKED')) { define('WEAVE_CEF_ACCOUNT_LOCKED', 'AccountLockout'); }
+
 class CommonEventFormat
 {
 

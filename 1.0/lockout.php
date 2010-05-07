@@ -72,10 +72,12 @@ class WeaveLockout
 		global $cef;
 		if ($this->get_lockout() >= WEAVE_STORAGE_LOCKOUT_COUNT)
 		{
-			$message = new CommonEventFormatMessage('AccountLockout', 'Account Lockout Hit', 1, 
-										array('suser' => $this->_username));
-			$cef->logMessage($message);
-
+			if ($cef)
+			{
+				$message = new CommonEventFormatMessage(WEAVE_CEF_ACCOUNT_LOCKED, 'Account Lockout Hit', 1, 
+											array('suser' => $this->_username));
+				$cef->logMessage($message);
+			}
 			return true;
 		}	
 
@@ -128,7 +130,7 @@ class WeaveLockout
 
 		try
 		{
-			$this->_memc->set('lockout:' . $this->_username, $this->_lockout, 0, WEAVE_STORAGE_MEMCACHE_LOCKOUT_DECAY);	
+			$this->_memc->set('lockout:' . $this->_username, $this->_lockout, 0, WEAVE_STORAGE_LOCKOUT_DECAY);	
 		}
 		catch (Exception $e)
 		{
