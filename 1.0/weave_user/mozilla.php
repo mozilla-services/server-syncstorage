@@ -75,6 +75,11 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 			throw new Exception("Cannot contact LDAP server", 503);
 
 		ldap_set_option($this->_conn, LDAP_OPT_PROTOCOL_VERSION, 3);
+		if (!ldap_start_tls($this->_conn))
+		{
+			error_log("Unable to start TLS");
+			throw new Exception("Database Unavailable", 503);
+		}
 		
 		return true;
 	}
