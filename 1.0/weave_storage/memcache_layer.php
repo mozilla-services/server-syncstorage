@@ -308,8 +308,12 @@ class WeaveMemcache implements WeaveStorageBase
 				return true; #nothing has changed
 				
 			$this->_tabs = $new_tabs;
-			$this->tabs_set();
 
+			if (count($this->_tabs))
+				$this->tabs_set();
+			else
+				$this->tabs_flush();
+				
 			$this->collections_update('tabs', $storage_time, count($new_tabs));
 		}
 		else
