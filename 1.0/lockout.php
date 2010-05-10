@@ -56,13 +56,15 @@ class WeaveLockout
 	function open_connection() 
 	{		
 		$this->_memc = new Memcache;
+		$hosts = explode(":", WEAVE_STORAGE_MEMCACHE_HOST);
 		try
 		{
-			$this->_memc->pconnect(WEAVE_STORAGE_MEMCACHE_HOST, WEAVE_STORAGE_MEMCACHE_PORT);
+			foreach ($hosts as $host)
+				$this->_memc->addServer($host, WEAVE_STORAGE_MEMCACHE_PORT);
 		}			
 		catch( Exception $exception )
 		{
-			error_log("memcache open_connection: " . $exception->getMessage());
+			error_log("memcache addServer: " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}				
 	}
