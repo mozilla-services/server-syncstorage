@@ -47,12 +47,14 @@ if (!defined('WEAVE_MYSQL_STORE_READ_HOST')) { define('WEAVE_MYSQL_STORE_READ_HO
 if (!defined('WEAVE_MYSQL_STORE_READ_DB')) { define('WEAVE_MYSQL_STORE_READ_DB', 'weave'); }
 if (!defined('WEAVE_MYSQL_STORE_READ_USER')) { define('WEAVE_MYSQL_STORE_READ_USER', 'weave'); }
 if (!defined('WEAVE_MYSQL_STORE_READ_PASS')) { define('WEAVE_MYSQL_STORE_READ_PASS', 'weave'); }
+#if (!defined('WEAVE_MYSQL_STORE_READ_PORT')) { define('WEAVE_MYSQL_STORE_READ_PORT', '3306'); }
 
 #host, db name, username and password for the auth store read replica (leave as is if you're on one box)
 if (!defined('WEAVE_MYSQL_STORE_WRITE_HOST')) { define('WEAVE_MYSQL_STORE_WRITE_HOST', WEAVE_MYSQL_STORE_READ_HOST); }
 if (!defined('WEAVE_MYSQL_STORE_WRITE_DB')) { define('WEAVE_MYSQL_STORE_WRITE_DB', WEAVE_MYSQL_STORE_READ_DB); }
 if (!defined('WEAVE_MYSQL_STORE_WRITE_USER')) { define('WEAVE_MYSQL_STORE_WRITE_USER', WEAVE_MYSQL_STORE_READ_USER); }
 if (!defined('WEAVE_MYSQL_STORE_WRITE_PASS')) { define('WEAVE_MYSQL_STORE_WRITE_PASS', WEAVE_MYSQL_STORE_READ_PASS); }
+#if (!defined('WEAVE_MYSQL_STORE_WRITE_PORT')) { define('WEAVE_MYSQL_STORE_WEAVE_MYSQL_STORE_READ_PORT_PORT', WEAVE_MYSQL_STORE_READ_PORT); }
 
 #keep these commented out unless you know that you need multiple tables. You don't.
 #if (!defined('WEAVE_MYSQL_STORE_TABLE_NAME')) { define('WEAVE_MYSQL_STORE_TABLE_NAME', 'wbo'); }
@@ -75,9 +77,10 @@ if (WEAVE_AUTH_ENGINE == 'mysql')
 	if (!defined('WEAVE_MYSQL_AUTH_DB')) { define('WEAVE_MYSQL_AUTH_DB', 'weave'); }
 	if (!defined('WEAVE_MYSQL_AUTH_USER')) { define('WEAVE_MYSQL_AUTH_USER', 'weave'); }
 	if (!defined('WEAVE_MYSQL_AUTH_PASS')) { define('WEAVE_MYSQL_AUTH_PASS', 'weave'); }
+	#if (!defined('WEAVE_MYSQL_AUTH_PORT')) { define('WEAVE_MYSQL_AUTH_PORT', '3306'); }
 
 	#set the salt to a secret value for hashing with passwords. Make sure it matches the one in weaveserver-registration 
-	if (!defined('WEAVE_SHA_SALT')) { define('WEAVE_SHA_SALT', 'salt goes here'); }
+	#if (!defined('WEAVE_SHA_SALT')) { define('WEAVE_SHA_SALT', 'salt goes here'); }
 	#if you have older users using the older password scheme (md5), enable this
 	#if (!defined('WEAVE_MD5_FALLBACK')) { define('WEAVE_MD5_FALLBACK', false); }
 }

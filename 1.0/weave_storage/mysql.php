@@ -109,13 +109,17 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			if ($_SERVER['REQUEST_METHOD'] == 'GET')
 			{
-				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_READ_HOST . ';dbname=' . WEAVE_MYSQL_STORE_READ_DB, 
+				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_READ_HOST . 
+									(defined('WEAVE_MYSQL_STORE_READ_PORT') ? ';port=' . WEAVE_MYSQL_STORE_READ_PORT : '') . 
+									';dbname=' . WEAVE_MYSQL_STORE_READ_DB, 
 									WEAVE_MYSQL_STORE_READ_USER, WEAVE_MYSQL_STORE_READ_PASS); 
 			}
 			else
 			{
-				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_WRITE_HOST . ';dbname=' . WEAVE_MYSQL_STORE_WRITE_DB, 
-									WEAVE_MYSQL_STORE_WRITE_USER, WEAVE_MYSQL_STORE_WRITE_PASS);
+				$this->_dbh = new PDO('mysql:host=' . WEAVE_MYSQL_STORE_WRITE_HOST . 
+									(defined('WEAVE_MYSQL_STORE_WRITE_PORT') ? ';port=' . WEAVE_MYSQL_STORE_WRITE_PORT : '') . 
+									';dbname=' . WEAVE_MYSQL_STORE_WRITE_DB, 
+									WEAVE_MYSQL_STORE_WRITE_USER, WEAVE_MYSQL_STORE_WRITE_PASS); 
 			}
 			$this->_dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		}

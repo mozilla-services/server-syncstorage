@@ -132,10 +132,12 @@ class WeaveAuthentication implements WeaveAuthenticationBase
 		$dbname = WEAVE_MYSQL_AUTH_DB;
 		$dbuser = WEAVE_MYSQL_AUTH_USER;
 		$dbpass = WEAVE_MYSQL_AUTH_PASS;
-		
+			
 		try
 		{
-			$this->_dbh = new PDO('mysql:host=' . $hostname . ';dbname=' . $dbname, $dbuser, $dbpass);
+			$this->_dbh = new PDO('mysql:host=' . $hostname . 
+												(defined('WEAVE_MYSQL_AUTH_PORT') ? ';port=' . WEAVE_MYSQL_AUTH_PORT : '') . 
+												';dbname=' . $dbname, $dbuser, $dbpass);
 			$this->_dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		}
 		catch( PDOException $exception )
