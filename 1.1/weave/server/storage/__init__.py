@@ -119,6 +119,10 @@ class WeaveStorageBase(object):
     def get_collection_names(self, user_name):
         """return the collection names"""
 
+    @abc.abstractmethod
+    def get_collection_timestamps(self, user_name):
+        """return the collection names"""
+
     #
     # Items APIs
     #

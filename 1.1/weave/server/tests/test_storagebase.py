@@ -76,6 +76,9 @@ class IAmAValidStorage(object):
     def get_collection_names(self, user_name):
         """return the collection id"""
 
+    def get_collection_timestamps(self, user_name):
+        """return the collection id + timestamp"""
+
     def item_exists(self, user_name, collection_name, item_id):
         """Returns user infos. user is the key"""
 

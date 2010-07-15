@@ -36,6 +36,8 @@
 """
 SQL backend
 """
+from time import time
+
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 
@@ -229,6 +231,19 @@ class WeaveSQLStorage(object):
                      'where userid = :userid')
         return self._conn.execute(query, userid=user_id).fetchall()
 
+    def get_collection_timestamps(self, user_name):
+        """return the collection names for a given user"""
+        user_id = self._get_user_id(user_name)
+
+        # XXX doing a call on two tables to get the collection name
+        #   - see if we should drop ids here and use names
+        #   - see if a client-side (eg this code) list of collections
+        #   makes things faster but I doubt it
+        query = text('select name, max(modified) as timestamp '
+                     'from wbo, collections where username = :userid '
+                     'group by name')
+        return self._conn.execute(query, userid=user_id).fetchall()
+
 
     #
     # Items APIs
@@ -278,7 +293,7 @@ class WeaveSQLStorage(object):
         values['collection'] = self._get_collection_id(user_name,
                                                        collection_name)
         values['id'] = item_id
-
+        values['modified'] = time()
         if not self.item_exists(user_name, collection_name, item_id):
             fields = values.keys()
             params = ','.join([':%s' % field for field in fields])

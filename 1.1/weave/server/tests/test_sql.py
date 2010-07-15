@@ -140,6 +140,20 @@ class TestSQLStorage(unittest.TestCase):
         items = storage.get_items(_TEST_USER, 'col')
         self.assertEquals(len(items), 0)
 
+    def test_get_collection_timestamps(self):
+        storage = get_storage('sql')
+        storage.set_user(_TEST_USER, email='tarek@ziade.org')
+        storage.set_collection(_TEST_USER, 'col1')
+        storage.set_collection(_TEST_USER, 'col2')
+
+        storage.set_item(_TEST_USER, 'col1', 1, payload='XXX')
+        storage.set_item(_TEST_USER, 'col2', 1, payload='XXX')
+
+        timestamps = storage.get_collection_timestamps(_TEST_USER)
+        names = [entry[0] for entry in timestamps]
+        names.sort()
+        self.assertEquals(names, ['col1', 'col2'])
+
 
 def test_suite():
     suite = unittest.TestSuite()
