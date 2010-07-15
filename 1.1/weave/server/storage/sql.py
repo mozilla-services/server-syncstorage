@@ -239,8 +239,9 @@ class WeaveSQLStorage(object):
         user_id = self._get_user_id(user_name)
         collection_id = self._get_collection_id(user_name, collection_name)
         query = text('select id from wbo where '
-                     'username = :user_id and collection = :collection_id')
-        res = self._conn.execute(query, user_id=user_id,
+                     'username = :user_id and collection = :collection_id '
+                     'and id = :item_id')
+        res = self._conn.execute(query, user_id=user_id, item_id=item_id,
                                  collection_id=collection_id)
         res = res.fetchone()
         return res is not None
