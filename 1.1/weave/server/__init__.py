@@ -34,3 +34,5 @@
 #
 # ***** END LICENSE BLOCK *****
 
+config = dict()
+

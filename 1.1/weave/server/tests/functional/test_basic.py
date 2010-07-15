@@ -33,15 +33,22 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+"""
+Basic tests to verify that the dispatching mechanism works.
+"""
+import unittest
+from webtest import TestApp
 
-setup(name='WeaveServer', version=0.1,
-      packages=find_packages(),
-      install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                        'PasteScript', 'Routes', 'WebOb', 'WebTest'],
-      entry_points="""
-      [paste.app_factory]
-      main = weave.server.wsgiapp:make_app
-      """
-      )
+from weave.server.wsgiapp import make_app
+
+class TestBasic(unittest.TestCase):
+
+    def test_root(self):
+        # sanity check: make sure the dispatcher works
+        config = {}
+        app = TestApp(make_app(config))
+        res = app.get('/')
+        self.assertEquals(res.status, '200 OK')
+        self.assertEquals(res.body, 'Sync Server')
+
 

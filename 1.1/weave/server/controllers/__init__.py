@@ -33,15 +33,34 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+"""
+Convention over configuration controllers collection.
 
-setup(name='WeaveServer', version=0.1,
-      packages=find_packages(),
-      install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                        'PasteScript', 'Routes', 'WebOb', 'WebTest'],
-      entry_points="""
-      [paste.app_factory]
-      main = weave.server.wsgiapp:make_app
-      """
-      )
+To add a 'foo' controller, add a foo.py module here, and add a "FooController"
+class in it.
 
+get_controller('foo') will return the FooController class
+
+"""
+
+_controllers = {}
+
+
+def get_controller(name):
+    """Will grab a controller in the controllers dir.
+
+    """
+    if name in _controllers:
+        return _controllers[name]
+
+    # try to load it
+    mod_name = 'weave.server.controllers.%s' % name
+    mod = __import__(mod_name)
+    for part in mod_name.split('.')[1:]:
+        mod = getattr(mod, part)
+        if mod is None:
+            raise KeyError(name)
+    klass = getattr(mod, '%sController' % name.capitalize())
+    if mod is not None:
+        _controllers[name] = klass()
+    return _controllers[name]
