@@ -15,3 +15,7 @@ You can then run all tests with::
 
     $ bin/nosetests -sv weave
 
+To launch the Sync Server locally, you can use the paste script::
+
+    $ bin/paste serve development.ini
+
