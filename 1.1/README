@@ -1,0 +1,17 @@
+========
+Sync 1.1
+========
+
+This is the Python implementation of the Sync Server 1.1.
+
+To set up a development environment, make sure you are using Python 2.6,
+with virtualenv installed, then type::
+
+    $ virtualenv --distribute --no-site-packages .
+    $ bin/python setup.py develop
+    $ bin/pip install nose
+
+You can then run all tests with::
+
+    $ bin/nosetests -sv weave
+
