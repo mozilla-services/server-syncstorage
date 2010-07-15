@@ -1,1 +1,5 @@
 pyc$
+lib
+include
+bin
+WeaveServer.egg-info
