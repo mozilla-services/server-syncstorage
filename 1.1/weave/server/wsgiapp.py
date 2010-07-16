@@ -41,11 +41,14 @@ from webob.dec import wsgify
 from webob.exc import HTTPNotFound
 
 from weave.server import config
+from weave.server import API_VERSION
 from weave.server.controllers import get_controller
 
 # URL dispatching happens here
-# name / match / controller / method
-URLS = [('', '/', 'main', 'index')]
+# methods / match / controller / method
+URLS = [('GET', '/', 'main', 'index'),
+        ('GET', '/%s/{username}/info/collections' % API_VERSION,
+         'storage', 'get_collections_info')]
 
 
 class SyncServerApp(object):
@@ -55,9 +58,11 @@ class SyncServerApp(object):
 
     def __init__(self):
         self.mapper = Mapper()
-        for name, match, controller, method in URLS:
-            self.mapper.connect(name, match, controller=controller,
-                                method=method)
+        for verbs, match, controller, method in URLS:
+            if isinstance(verbs, str):
+                verbs = [verbs]
+            self.mapper.connect(None, match, controller=controller,
+                                method=method, conditions=dict(method=verbs))
 
     @wsgify
     def __call__(self, request):
@@ -71,6 +76,8 @@ class SyncServerApp(object):
         function = self._get_function(match['controller'], match['method'])
         if function is None:
             raise HTTPNotFound('Unkown URL %r' % request.path_info)
+
+        # make sure the verb matches
 
         # XXX see if we want to build arguments with the query here
         return function(request)
