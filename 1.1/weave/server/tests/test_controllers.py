@@ -33,40 +33,33 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import unittest
+import os
+
+from weave.server.controllers import get_controller
+from weave.server import controllers
+
+_DIR = os.path.dirname(controllers.__file__)
+_BAD = """\
+class BadController(object):
+    def __init__(self):
+        raise IOError('bam!')
 """
-Convention over configuration controllers collection.
 
-To add a 'foo' controller, add a foo.py module here, and add a "FooController"
-class in it.
+class TestController(unittest.TestCase):
 
-get_controller('foo') will return the FooController class
-
-"""
-
-_controllers = {}
-
-
-def get_controller(name):
-    """Will grab a controller in the controllers dir.
-
-    """
-    if name in _controllers:
-        return _controllers[name]
-
-    # try to load it
-    mod_name = 'weave.server.controllers.%s' % name
-    mod = __import__(mod_name)
-    for part in mod_name.split('.')[1:]:
-        mod = getattr(mod, part)
-        if mod is None:
-            raise KeyError(name)
-    klass = getattr(mod, '%sController' % name.capitalize())
-    if mod is not None:
+    def test_bad_controller(self):
+        # check that a controller that can get instanciated, is managed
+        module = os.path.join(_DIR, 'bad.py')
+        with open(module, 'w') as f:
+            f.write(_BAD)
         try:
-            ob = klass()
-        except Exception, e:
-            msg = 'Could not instanciate the controller "%s" (%s)' % \
-                    (name, str(e))
-            raise TypeError(msg)
-        _controllers[name] = ob
-    return _controllers[name]
+            get_controller('bad')
+        except TypeError:
+            # that's what we want
+            pass
+        else:
+            raise AssertionError
+        finally:
+            os.remove(module)
+
