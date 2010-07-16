@@ -64,18 +64,18 @@ class WeaveSQLStorage(object):
     # Users APIs -- the user identifier is the 'username' field
     #
 
-    def user_exists(self, user_name):
+    def user_exists(self, user_id):
         """Returns true if the user exists."""
-        query = text('select id from users where username = :username')
-        res = self._conn.execute(query, username=user_name).fetchone()
+        query = text('select id from users where id = :user_id')
+        res = self._conn.execute(query, user_id=user_id).fetchone()
         return res is not None
 
-    def set_user(self, user_name, **values):
+    def set_user(self, user_id, **values):
         """set information for a user. values contains the fields to set.
 
         If the user doesn't exists, it will be created."""
-        values['username'] = user_name
-        if not self.user_exists(user_name):
+        values['id'] = user_id
+        if not self.user_exists(user_id):
             fields = values.keys()
             params = ','.join([':%s' % field for field in fields])
             fields = ','.join(fields)
@@ -85,12 +85,12 @@ class WeaveSQLStorage(object):
             fields = values.keys()
             params = ','.join(['%s = :%s' % (field, field)
                                for field in fields])
-            query = text('update users set %s where username = :username' \
+            query = text('update users set %s where id = :id' \
                          % params)
 
         return self._conn.execute(query, **values)
 
-    def get_user(self, user_name, fields=None):
+    def get_user(self, user_id, fields=None):
         """Returns user information.
 
         If fields is provided, its a list of fields to return
@@ -98,46 +98,34 @@ class WeaveSQLStorage(object):
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
-        query = text('select %s from users where username = :username' \
+        query = text('select %s from users where id = :user_id' \
                      % fields)
-        return self._conn.execute(query, username=user_name).first()
+        return self._conn.execute(query, user_id=user_id).first()
 
-    def delete_user(self, user_name):
+    def delete_user(self, user_id):
         """Removes a user (and all its data)"""
-        user_id = self._get_user_id(user_name)
-
-        # remocing collections
+        # removing collections
         query = text('delete from collections where '
-                     'userid = :userid')
-        self._conn.execute(query, userid=user_id)
+                     'userid = :user_id')
+        self._conn.execute(query, user_id=user_id)
 
         # removing items
         query = text('delete from wbo where '
-                     'username = :userid')
-        self._conn.execute(query, userid=user_id)
+                     'username = :user_id')
+        self._conn.execute(query, user_id=user_id)
 
         # XXX remove reset codes
 
         # removing user
-        query = 'delete from users where username = :username'
-        return self._conn.execute(query, username=user_name)
+        query = 'delete from users where id = :user_id'
+        return self._conn.execute(query, user_id=user_id)
 
-    def _get_user_id(self, user_name):
-        """Returns a user id, given the name
-
-        XXX We need to cache this, or to alter the DB (userid -> username)
-        """
-        data = self.get_user(user_name, ['id'])
-        if data is None:
-            return None
-        return data[0]
-
-    def _get_collection_id(self, user_name, collection_name):
+    def _get_collection_id(self, user_id, collection_name):
         """Returns a collection id, given the name
 
-        XXX We need to cache this, or to alter the DB
+        XXX We need to cache this
         """
-        data = self.get_collection(user_name, collection_name,
+        data = self.get_collection(user_id, collection_name,
                                    ['collectionid'])
         if data is None:
             return None
@@ -147,47 +135,43 @@ class WeaveSQLStorage(object):
     # Collections APIs
     #
 
-    def delete_collection(self, user_name, collection_name):
+    def delete_collection(self, user_id, collection_name):
         """deletes a collection"""
-        if not self.collection_exists(user_name, collection_name):
+        if not self.collection_exists(user_id, collection_name):
             return
 
         # removing items first
-        self.delete_items(user_name, collection_name)
-
-        user_id = self._get_user_id(user_name)
+        self.delete_items(user_id, collection_name)
         query = text('delete from collections where '
-                     'userid = :userid and name = :name')
+                     'userid = :user_id and name = :name')
 
-        return self._conn.execute(query, userid=user_id, name=collection_name)
+        return self._conn.execute(query, user_id=user_id, name=collection_name)
 
-    def collection_exists(self, user_name, collection_name):
+    def collection_exists(self, user_id, collection_name):
         """Returns True if the collection exists"""
-        user_id = self._get_user_id(user_name)
         query = text('select collectionid from collections where '
-                     'userid = :userid and name = :name')
-        res = self._conn.execute(query, userid=user_id,
+                     'userid = :user_id and name = :name')
+        res = self._conn.execute(query, user_id=user_id,
                                  name=collection_name)
         res = res.fetchone()
         return res is not None
 
-    def set_collection(self, user_name, collection_name, **values):
+    def set_collection(self, user_id, collection_name, **values):
         """Creates a collection"""
         # XXX values is not used for now because there are no values besides
         # the name
-        if self.collection_exists(user_name, collection_name):
+        if self.collection_exists(user_id, collection_name):
             return
 
-        user_id = self._get_user_id(user_name)
         values['userid'] = user_id
         values['name'] = collection_name
 
         # getting the max collection_id
         # XXX why don't we have an autoinc here ?
-        # instead
+        # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
         max = ('select max(collectionid) from collections where '
-                'userid = :userid')
-        max = self._conn.execute(max, userid=user_id).first()
+                'userid = :user_id')
+        max = self._conn.execute(max, user_id=user_id).first()
         if max[0] is None:
             next_id = 1
         else:
@@ -202,57 +186,50 @@ class WeaveSQLStorage(object):
                         (fields, params))
         return self._conn.execute(query, **values)
 
-    def get_collection(self, user_name, collection_name, fields=None):
+    def get_collection(self, user_id, collection_name, fields=None):
         """Return information about a collection."""
-        user_id = self._get_user_id(user_name)
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
         query = text('select %s from collections where '
-                     'userid = :userid and name = :name'\
+                     'userid = :user_id and name = :name'\
                      % fields)
-        return self._conn.execute(query, userid=user_id,
+        return self._conn.execute(query, user_id=user_id,
                                   name=collection_name).first()
 
-    def get_collections(self, user_name, fields=None):
+    def get_collections(self, user_id, fields=None):
         """returns the collections information """
-        user_id = self._get_user_id(user_name)
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
-        query = text('select %s from collections where userid = :userid'
+        query = text('select %s from collections where userid = :user_id'
                      % fields)
-        return self._conn.execute(query, userid=user_id).fetchall()
+        return self._conn.execute(query, user_id=user_id).fetchall()
 
-    def get_collection_names(self, user_name):
+    def get_collection_names(self, user_id):
         """return the collection names for a given user"""
-        user_id = self._get_user_id(user_name)
         query = text('select name from collections '
-                     'where userid = :userid')
-        return self._conn.execute(query, userid=user_id).fetchall()
+                     'where userid = :user_id')
+        return self._conn.execute(query, user_id=user_id).fetchall()
 
-    def get_collection_timestamps(self, user_name):
+    def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        user_id = self._get_user_id(user_name)
-
         # XXX doing a call on two tables to get the collection name
-        #   - see if we should drop ids here and use names
-        #   - see if a client-side (eg this code) list of collections
-        #   makes things faster but I doubt it
+        # see if a client-side (eg this code) list of collections
+        # makes things faster but I doubt it
         query = text('select name, max(modified) as timestamp '
-                     'from wbo, collections where username = :userid '
+                     'from wbo, collections where username = :user_id '
                      'group by name')
-        return self._conn.execute(query, userid=user_id).fetchall()
+        return self._conn.execute(query, user_id=user_id).fetchall()
 
 
     #
     # Items APIs
     #
 
-    def item_exists(self, user_name, collection_name, item_id):
+    def item_exists(self, user_id, collection_name, item_id):
         """Returns True if an item exists."""
-        user_id = self._get_user_id(user_name)
-        collection_id = self._get_collection_id(user_name, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name)
         query = text('select id from wbo where '
                      'username = :user_id and collection = :collection_id '
                      'and id = :item_id')
@@ -261,10 +238,9 @@ class WeaveSQLStorage(object):
         res = res.fetchone()
         return res is not None
 
-    def get_items(self, user_name, collection_name, fields=None):
+    def get_items(self, user_id, collection_name, fields=None):
         """returns items from a collection"""
-        user_id = self._get_user_id(user_name)
-        collection_id = self._get_collection_id(user_name, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
@@ -274,10 +250,9 @@ class WeaveSQLStorage(object):
         return self._conn.execute(query, user_id=user_id,
                                   collection_id=collection_id).fetchall()
 
-    def get_item(self, user_name, collection_name, item_id, fields=None):
+    def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
-        user_id = self._get_user_id(user_name)
-        collection_id = self._get_collection_id(user_name, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
@@ -287,14 +262,15 @@ class WeaveSQLStorage(object):
         return self._conn.execute(query, user_id=user_id, item_id=item_id,
                                   collection_id=collection_id).first()
 
-    def set_item(self, user_name, collection_name, item_id, **values):
+    def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        values['username'] = self._get_user_id(user_name)
-        values['collection'] = self._get_collection_id(user_name,
+        values['collection'] = self._get_collection_id(user_id,
                                                        collection_name)
         values['id'] = item_id
         values['modified'] = time()
-        if not self.item_exists(user_name, collection_name, item_id):
+        values['username'] = user_id
+
+        if not self.item_exists(user_id, collection_name, item_id):
             fields = values.keys()
             params = ','.join([':%s' % field for field in fields])
             fields = ','.join(fields)
@@ -309,19 +285,17 @@ class WeaveSQLStorage(object):
 
         return self._conn.execute(query, **values)
 
-    def delete_item(self, user_name, collection_name, item_id):
+    def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
-        user_id = self._get_user_id(user_name)
-        collection_id = self._get_collection_id(user_name, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name)
         query = text('delete from wbo where username = :user_id and '
                      'collection = :collection_id and id = :item_id')
         return self._conn.execute(query, user_id=user_id,
                                   collection_id=collection_id, item_id=item_id)
 
-    def delete_items(self, user_name, collection_name, item_ids=None):
+    def delete_items(self, user_id, collection_name, item_ids=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        user_id = self._get_user_id(user_name)
-        collection_id = self._get_collection_id(user_name, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name)
 
         if item_ids is None:
             query = text('delete from wbo where username = :user_id and '
