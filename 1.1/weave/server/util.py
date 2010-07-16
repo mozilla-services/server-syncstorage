@@ -36,7 +36,10 @@
 """
 Various utilities
 """
+import base64
+import json
 
+from webob.exc import HTTPUnauthorized
 
 def _normalize(path):
     """Remove extra '/'s"""
@@ -44,9 +47,16 @@ def _normalize(path):
         path = path[1:]
     return path.replace('//', '/')
 
+# various authorization header names, depending on the setup
+_AUTH_HEADERS = ('Authorization', 'AUTHORIZATION', 'HTTP_AUTHORIZATION',
+                 'REDIRECT_HTTP_AUTHORIZATION')
 
-def extract_info(request):
-    """Extract information from a storage request.
+
+def authenticate_user(request, authtool):
+    """Authenticate user and extract information from a storage request.
+
+    "request" is the request received, "authtool" is the authentication tool
+    that will be used to authenticate the user from the request.
 
     From the path:
       - api version
@@ -55,13 +65,84 @@ def extract_info(request):
       - params
 
     From the headers:
+      - user name
       - password
 
-
+    The function makes sure that the user name found in the headers
+    is compatible with the request path, then calls the authentication tool
+    that returns the user id from the database, if the password is the right
+    one.
     """
     path = _normalize(request.path_info)
     paths = path.split('/')
+
+    # basically, any call that does not match an API
+    # XXX see if we need to support thoses
+    if len(path) <= 3:
+        return {}
+
     res = {'api': paths[0], 'username': paths[1], 'function': paths[2],
            'params': paths[3:]}
 
+    # authenticating, if REMOTE_USER is not present in the environ
+    if 'REMOTE_USER' not in request.environ:
+        auth = None
+        for auth_header in _AUTH_HEADERS:
+            if auth_header in request.environ:
+                auth = request.environ[auth_header]
+                break
+
+        if auth is not None:
+            # for now, only supporting basic authentication
+            # let's decipher the base64 encoded value
+            if not auth.startswith('Basic '):
+                raise HTTPUnauthorized('Invalid token')
+
+            auth = auth.split('Basic ')[-1].strip()
+            user_name, password = base64.decodestring(auth).split(':')
+
+            # let's reject the call if the url is not owned by the user
+            if user_name != res['username']:
+                raise HTTPUnauthorized
+
+
+            # let's try an authentication
+            user_id = authtool.authenticate_user(user_name, password)
+            if user_id is None:
+                raise HTTPUnauthorized
+
+        # we're all clear ! setting up REMOTE_USER and user_id
+            request.environ['REMOTE_USER'] = user_name
+            res['userid']  = user_id
+    else:
+        # how do we get the user id in this case ?
+        pass
+
+
     return res
+
+
+def authenticated(function):
+    """This decorator checks that the user was authenticated.
+
+    If not, raise an authentication error
+    """
+    def _authenticated(*args, **kwargs):
+        # we make the assumption that the request is the first arg here
+        # from a controller class
+        request = args[1]
+        if 'userid' not in request.sync_info:
+            raise HTTPUnauthorized
+        if 'REMOTE_USER' not in request.environ:
+            raise HTTPUnauthorized
+
+        # we're good
+        return function(*args, **kwargs)
+    return _authenticated
+
+
+def jsonify(function):
+    """This decorator will dump the result in json"""
+    def _jsonify(*args, **kw):
+        return json.dumps(function(*args, **kw))
+    return _jsonify

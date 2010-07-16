@@ -34,22 +34,41 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from weave.server.util import extract_info
+from base64 import encodestring
+
+from weave.server.util import authenticate_user
 
 
 class Request(object):
-    def __init__(self, path_info):
+    def __init__(self, path_info, environ):
         self.path_info = path_info
+        self.environ = environ
+
+class AuthTool(object):
+    def authenticate_user(self, *args):
+        return 1
 
 
 class TestUtil(unittest.TestCase):
 
-    def test_extract_info(self):
+    def test_authenticate_user(self):
 
-        req = Request('/1.0/tarek/info/collections')
-        res = extract_info(req)
+        token = 'Basic ' + encodestring('tarek:tarek')
+        req = Request('/1.0/tarek/info/collections', {})
+        res = authenticate_user(req, AuthTool())
 
         self.assertEquals(res['api'], '1.0')
         self.assertEquals(res['username'], 'tarek')
         self.assertEquals(res['function'], 'info')
         self.assertEquals(res['params'], ['collections'])
+
+        # now authenticated
+        req = Request('/1.0/tarek/info/collections',
+                {'REMOTE_USER': 'tarek'})
+        res = authenticate_user(req, AuthTool())
+
+        # authenticated by auth
+        req = Request('/1.0/tarek/info/collections',
+                {'Authorization': token})
+        res = authenticate_user(req, AuthTool())
+        self.assertEquals(res['userid'], 1)

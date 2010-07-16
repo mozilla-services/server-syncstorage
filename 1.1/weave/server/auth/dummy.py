@@ -33,32 +33,21 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Dummy Authentication
 """
-Basic tests to verify that the dispatching mechanism works.
-"""
-import base64
-from weave.server.tests.functional import support
+from weave.server.auth import WeaveAuthBase, register
 
 
-class TestBasic(support.TestWsgiApp):
+class DummyAuth(WeaveAuthBase):
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
+    def get_name(self):
+        """Returns the name of the authentication backend"""
+        return 'dummy'
 
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        #
-        # XXX this test supposes that infos/collections is implemented
-        res = self.app.get('/1.0/tarek/info/collections', status=401)
-        self.assertEquals(res.status_int, 401)
+    def authenticate_user(self, username, password):
+        """Authenticates a user given a username and password.
 
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
+        Returns the user id in case of success. Returns None otherwise."""
+        return 1
 
-        res = self.app.get('/1.0/tarek/info/collections',
-                           extra_environ=environ)
-        self.assertEquals(res.status, '200 OK')
-
+register(DummyAuth)

@@ -33,32 +33,50 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Authentication tool
 """
-Basic tests to verify that the dispatching mechanism works.
-"""
-import base64
-from weave.server.tests.functional import support
+import abc
+
+_BACKENDS = {}
 
 
-class TestBasic(support.TestWsgiApp):
+class WeaveAuthBase(object):
+    """Abstract Base Class for the authentication APIs."""
+    __metaclass__ = abc.ABCMeta
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
+    @classmethod
+    def __subclasshook__(cls, klass):
+        if cls is WeaveAuthBase:
+            for method in cls.__abstractmethods__:
+                if any(method in base.__dict__ for base in klass.__mro__):
+                    continue
+                return NotImplemented
+            return True
+        return NotImplemented
 
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        #
-        # XXX this test supposes that infos/collections is implemented
-        res = self.app.get('/1.0/tarek/info/collections', status=401)
-        self.assertEquals(res.status_int, 401)
+    @abc.abstractmethod
+    def get_name(self):
+        """Returns the name of the authentication backend"""
 
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
+    @abc.abstractmethod
+    def authenticate_user(self, username, password):
+        """Authenticates a user given a username and password.
 
-        res = self.app.get('/1.0/tarek/info/collections',
-                           extra_environ=environ)
-        self.assertEquals(res.status, '200 OK')
+        Returns the user id in case of success. Returns None otherwise."""
 
+
+def register(klass):
+    """Registers a new storage."""
+    if not issubclass(klass, WeaveAuthBase):
+        raise TypeError('Not an authentication class')
+
+    auth = klass()
+    _BACKENDS[auth.get_name()] = auth
+
+
+def get_auth_tool(name):
+    """Returns an authentication tool."""
+    # hard-load existing tools
+    # XXX see if we want to load them dynamically
+    from weave.server.auth import dummy
+    return _BACKENDS[name]

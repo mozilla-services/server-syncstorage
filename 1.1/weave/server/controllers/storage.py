@@ -13,7 +13,7 @@
 #
 # The Original Code is Sync Server
 #
-# The Initial Developer of the Original Code is the Mozilla Foundation.
+# The Initial Developer of the Original Code is Mozilla Foundation.
 # Portions created by the Initial Developer are Copyright (C) 2010
 # the Initial Developer. All Rights Reserved.
 #
@@ -34,31 +34,28 @@
 #
 # ***** END LICENSE BLOCK *****
 """
-Basic tests to verify that the dispatching mechanism works.
+Storage controller. Implements all info, user APIs from:
+
+https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
+
 """
-import base64
-from weave.server.tests.functional import support
+from weave.server import config
+from weave.server.storage import get_storage
+from weave.server.util import authenticated, jsonify
 
+class StorageController(object):
 
-class TestBasic(support.TestWsgiApp):
+    def __init__(self):
+        self.storage = get_storage(config['storage'])
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
-
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        #
-        # XXX this test supposes that infos/collections is implemented
-        res = self.app.get('/1.0/tarek/info/collections', status=401)
-        self.assertEquals(res.status_int, 401)
-
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
-
-        res = self.app.get('/1.0/tarek/info/collections',
-                           extra_environ=environ)
-        self.assertEquals(res.status, '200 OK')
+    @authenticated
+    @jsonify
+    def get_collections_info(self, request):
+        """Returns a hash of collections associated with the account,
+        Along with the last modified timestamp for each collection
+        """
+        user_id = request.sync_info['userid']
+        collections = self.storage.get_collection_timestamps(user_id)
+        # XXX see if we need more processing here
+        return dict([(name, stamp) for name, stamp in collections])
 

@@ -37,28 +37,24 @@
 Basic tests to verify that the dispatching mechanism works.
 """
 import base64
+import json
+
 from weave.server.tests.functional import support
 
 
-class TestBasic(support.TestWsgiApp):
+class TestStorage(support.TestWsgiApp):
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
-
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        #
-        # XXX this test supposes that infos/collections is implemented
-        res = self.app.get('/1.0/tarek/info/collections', status=401)
-        self.assertEquals(res.status_int, 401)
-
+    def setUp(self):
+        super(TestStorage, self).setUp()
+        # user auth token
         environ = {'Authorization': 'Basic %s' % \
                         base64.encodestring('tarek:tarek')}
+        self.app.extra_environ = environ
 
-        res = self.app.get('/1.0/tarek/info/collections',
-                           extra_environ=environ)
+    def test_get_collections_info(self):
+
+        res = self.app.get('/1.0/tarek/info/collections')
         self.assertEquals(res.status, '200 OK')
+        res = json.dumps(res.body)
 
+        # XXX need to test collections timestamps here

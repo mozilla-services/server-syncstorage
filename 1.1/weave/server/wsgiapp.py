@@ -43,6 +43,8 @@ from webob.exc import HTTPNotFound
 from weave.server import config
 from weave.server import API_VERSION
 from weave.server.controllers import get_controller
+from weave.server.util import authenticate_user
+from weave.server.auth import get_auth_tool
 
 # URL dispatching happens here
 # methods / match / controller / method
@@ -56,8 +58,9 @@ class SyncServerApp(object):
     by using Routes.
     """
 
-    def __init__(self):
+    def __init__(self, authtool):
         self.mapper = Mapper()
+        self.authtool = authtool
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
@@ -71,13 +74,16 @@ class SyncServerApp(object):
             return HTTPNotFound('Unkwown URL %r' % request.path_info)
 
         match, __ = match
-        request.link = URLGenerator(self.mapper, request.environ)
-        request.urlvars = ((), match)
         function = self._get_function(match['controller'], match['method'])
         if function is None:
             raise HTTPNotFound('Unkown URL %r' % request.path_info)
 
         # make sure the verb matches
+
+        # extracting all the info from the headers and the url
+        request.sync_info = authenticate_user(request, self.authtool)
+        request.link = URLGenerator(self.mapper, request.environ)
+        request.urlvars = ((), match)
 
         # XXX see if we want to build arguments with the query here
         return function(request)
@@ -95,5 +101,5 @@ def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
     config.update(global_conf)
     config.update(app_conf)
-    app = SyncServerApp()
+    app = SyncServerApp(get_auth_tool(config['auth']))
     return app
