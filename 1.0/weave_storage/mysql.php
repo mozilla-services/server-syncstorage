@@ -170,7 +170,7 @@ class WeaveStorage implements WeaveStorageBase
 		
 		try
 		{
-			$select_stmt = 'select collectionid from ' . $this->_collection_table_name . ' where userid = :userid and name = :collection';
+			$select_stmt = '/*[queryName=get_collection_id]*/ select collectionid from ' . $this->_collection_table_name . ' where userid = :userid and name = :collection';
 				
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':userid', $this->_username);
@@ -200,7 +200,7 @@ class WeaveStorage implements WeaveStorageBase
 		#get the current max collection id
 		try
 		{
-			$select_stmt = 'select max(collectionid) from ' . $this->_collection_table_name . ' where userid = :userid';
+			$select_stmt = '/*[queryName=get_max_collection_id]*/ select max(collectionid) from ' . $this->_collection_table_name . ' where userid = :userid';
 				
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':userid', $this->_username);
@@ -218,7 +218,7 @@ class WeaveStorage implements WeaveStorageBase
 		
 		$sth->closeCursor();
 
-		$insert_stmt = 'insert into ' . $this->_collection_table_name . ' (userid, collectionid, name) values (?, ?, ?)';
+		$insert_stmt = '/*[queryName=store_collection_id]*/ insert into ' . $this->_collection_table_name . ' (userid, collectionid, name) values (?, ?, ?)';
 		$values = array($this->_username, $result, $collection);
 		
 		try
@@ -250,7 +250,7 @@ class WeaveStorage implements WeaveStorageBase
 		
 		try
 		{
-			$select_stmt = 'select name from ' . $this->_collection_table_name . ' where userid = :userid and collectionid = :collection';
+			$select_stmt = '/*[queryName=get_collection_name]*/ select name from ' . $this->_collection_table_name . ' where userid = :userid and collectionid = :collection';
 				
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':userid', $this->_username);
@@ -274,7 +274,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select collectionid, name from ' . $this->_collection_table_name . ' where userid = :userid';
+			$select_stmt = '/*[queryName=get_users_collection_list]*/ select collectionid, name from ' . $this->_collection_table_name . ' where userid = :userid';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':userid', $this->_username);
 			$sth->execute();
@@ -308,7 +308,7 @@ class WeaveStorage implements WeaveStorageBase
 		
 		try
 		{
-			$select_stmt = 'select max(modified) from ' . $this->_db_name . ' where username = :username and collection = :collection';
+			$select_stmt = '/*[queryName=get_max_timestamp]*/ select max(modified) from ' . $this->_db_name . ' where username = :username and collection = :collection';
 			$collection = $this->get_collection_id($collection);
 				
 			$sth = $this->_dbh->prepare($select_stmt);
@@ -332,7 +332,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select distinct(collection) from ' . $this->_db_name . ' where username = :username';
+			$select_stmt = '/*[queryName=get_collection_list]*/ select distinct(collection) from ' . $this->_db_name . ' where username = :username';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -371,7 +371,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select collection, max(modified) as timestamp from ' . $this->_db_name . ' where username = :username group by collection';
+			$select_stmt = '/*[queryName=get_collection_list_with_timestamps]*/ select collection, max(modified) as timestamp from ' . $this->_db_name . ' where username = :username group by collection';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -410,7 +410,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select collection, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
+			$select_stmt = '/*[queryName=get_collection_list_with_counts]*/ select collection, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -449,7 +449,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select collection, max(modified) as timestamp, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
+			$select_stmt = '/*[queryName=get_collection_list_with_all]*/ select collection, max(modified) as timestamp, count(*) as ct from ' . $this->_db_name . ' where username = :username group by collection';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -486,7 +486,7 @@ class WeaveStorage implements WeaveStorageBase
 	{
 		$this->open_connection();
 		
-		$insert_stmt = 'insert into ' . $this->_db_name . ' (username, id, collection, parentid, 
+		$insert_stmt = '/*[queryName=store_object]*/ insert into ' . $this->_db_name . ' (username, id, collection, parentid, 
 						predecessorid, sortindex, modified, payload, payload_size) values ';
 
 		$param_string = '(?, ?, ?, ?, ?, ?, ?, ?, ?)';
@@ -526,7 +526,7 @@ class WeaveStorage implements WeaveStorageBase
 	{
 		$this->open_connection();
 
-		$update = 'update ' . $this->_db_name . ' set ';
+		$update = '/*[queryName=update_object]*/ update ' . $this->_db_name . ' set ';
 		$params = array();
 		$update_list = array();
 		
@@ -612,7 +612,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
+			$delete_stmt = '/*[queryName=delete_object]*/ delete from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
 			$sth = $this->_dbh->prepare($delete_stmt);
 
 			$sth->bindParam(':username', $this->_username);
@@ -639,6 +639,7 @@ class WeaveStorage implements WeaveStorageBase
 		$this->open_connection();
 
 		$params = array();
+		$param_names = array('delete_objects');
 		
 		$select_stmt = 'delete from ' . $this->_db_name . ' where username = ? and collection = ?';
 		$params[] = $this->_username;
@@ -651,6 +652,7 @@ class WeaveStorage implements WeaveStorageBase
 		{
 			$select_stmt .= " and id = ?";
 			$params[] = $id;
+			$param_names[] = 'id';
 		}
 		
 		if ($ids && count($ids) > 0)
@@ -664,60 +666,71 @@ class WeaveStorage implements WeaveStorageBase
 			}
 			$select_stmt .= implode(",", $qmarks);
 			$select_stmt .= ')';
+			$param_names[] = 'id_in';
 		}
 		
 		if ($parentid)
 		{
 			$select_stmt .= " and parentid = ?";
 			$params[] = $parentid;
+			$param_names[] = 'parentid';
 		}
 		
 		if ($predecessorid)
 		{
 			$select_stmt .= " and predecessorid = ?";
 			$params[] = $predecessorid;
+			$param_names[] = 'predecessorid';
 		}
 
 		if ($index_above)
 		{
 			$select_stmt .= " and sortindex > ?";
 			$params[] = $index_above;
+			$param_names[] = 'index_above';
 		}
 
 		if ($index_below)
 		{
 			$select_stmt .= " and sortindex < ?";
 			$params[] = $index_below;
+			$param_names[] = 'index_below';
 		}
 				
 		if ($newer)
 		{
 			$select_stmt .= " and modified > ?";
 			$params[] = $newer;
+			$param_names[] = 'newer';
 		}
 	
 		if ($older)
 		{
 			$select_stmt .= " and modified < ?";
 			$params[] = $older;
+			$param_names[] = 'older';
 		}
 	
 		if ($sort == 'index')
 		{
 			$select_stmt .= " order by sortindex desc";
+			$param_names[] = 'sortindex';
 		}
 		else if ($sort == 'newest')
 		{
 			$select_stmt .= " order by modified desc";
+			$param_names[] = 'modified_desc';
 		}
 		else if ($sort == 'oldest')
 		{
 			$select_stmt .= " order by modified";
+			$param_names[] = 'modified_asc';
 		}
 		
-
+		
 		if ($limit)
 		{
+			$param_names[] = 'limit';
 			$limitVal = intval($limit);
 			if ($limitVal < 0) {
 				throw new Exception("Illegal limit value", 400);
@@ -734,6 +747,8 @@ class WeaveStorage implements WeaveStorageBase
 		} else if ($offset) {
 			throw new Exception("Offset requires limit", 400); 
 		}
+
+		$select_stmt = '/*[queryName=' . implode('|', $param_names) . ']*/ ' . $select_stmt;
 
 		try
 		{
@@ -754,7 +769,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select * from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
+			$select_stmt = '/*[queryName=retrieve_object]*/ select * from ' . $this->_db_name . ' where username = :username and collection = :collection and id = :id';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 
@@ -792,12 +807,14 @@ class WeaveStorage implements WeaveStorageBase
 		$params[] = $this->_username;
 		$collectionid = $this->get_collection_id($collection);
 		$params[] = $collectionid;
-		
+
+		$param_names = array('retrieve_objects');		
 		
 		if ($id)
 		{
 			$select_stmt .= " and id = ?";
 			$params[] = $id;
+			$param_names[] = 'id';
 		}
 		
 		if ($ids && count($ids) > 0)
@@ -811,59 +828,70 @@ class WeaveStorage implements WeaveStorageBase
 			}
 			$select_stmt .= implode(",", $qmarks);
 			$select_stmt .= ')';
+			$param_names[] = 'id_in';
 		}
 		
 		if ($parentid)
 		{
 			$select_stmt .= " and parentid = ?";
 			$params[] = $parentid;
+			$param_names[] = 'parentid';
 		}
 		
 		if ($predecessorid)
 		{
 			$select_stmt .= " and predecessorid = ?";
 			$params[] = $predecessorid;
+			$param_names[] = 'predecessorid';
 		}
 		
 		if ($index_above)
 		{
 			$select_stmt .= " and sortindex > ?";
 			$params[] = $parentid;
+			$param_names[] = 'index_above';
 		}
 
 		if ($index_below)
 		{
 			$select_stmt .= " and sortindex < ?";
 			$params[] = $parentid;
+			$param_names[] = 'index_below';
 		}
 		
 		if ($newer)
 		{
 			$select_stmt .= " and modified > ?";
 			$params[] = $newer;
+			$param_names[] = 'newer';
 		}
 	
 		if ($older)
 		{
 			$select_stmt .= " and modified < ?";
 			$params[] = $older;
+			$param_names[] = 'older';
 		}
 	
 		if ($sort == 'index')
 		{
 			$select_stmt .= " order by sortindex desc";
+			$param_names[] = 'sortindex';
 		}
 		else if ($sort == 'newest')
 		{
 			$select_stmt .= " order by modified desc";
+			$param_names[] = 'modified_desc';
 		}
 		else if ($sort == 'oldest')
 		{
 			$select_stmt .= " order by modified";
+			$param_names[] = 'modified_asc';
 		}
 		
 		if ($limit)
 		{
+			$param_names[] = 'limit';
 			$limitVal = intval($limit);
 			if ($limitVal < 0) {
 				throw new Exception("Illegal limit value", 400);
@@ -881,6 +909,8 @@ class WeaveStorage implements WeaveStorageBase
 			throw new Exception("Offset requires limit", 400);		
 		}
 		
+		$select_stmt = '/*[queryName=' . implode('|', $param_names) . ']*/ ' . $select_stmt;
+
 		try
 		{
 			$sth = $this->_dbh->prepare($select_stmt);
@@ -930,7 +960,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$select_stmt = 'select sum(payload_size) from ' . $this->_db_name . ' where username = :username';
+			$select_stmt = '/*[queryName=get_storage_total]*/ select sum(payload_size) from ' . $this->_db_name . ' where username = :username';
 			$sth = $this->_dbh->prepare($select_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -944,6 +974,45 @@ class WeaveStorage implements WeaveStorageBase
 		return $sth->fetchColumn();		
 	}
 	
+	function get_collection_storage_totals()
+	{
+		$this->open_connection();
+
+		try
+		{
+			$select_stmt = '/*[queryName=get_collection_storage_totals]*/ select collection, sum(payload_size) from ' . $this->_db_name . ' where username = :username group by collection';
+			$sth = $this->_dbh->prepare($select_stmt);
+			$sth->bindParam(':username', $this->_username);
+			$sth->execute();
+		}
+		catch( PDOException $exception )
+		{
+			error_log("get_storage_total: " . $exception->getMessage());
+			throw new Exception("Database unavailable", 503);
+		}
+		$results = $sth->fetchAll(PDO::FETCH_NUM);
+		$sth->closeCursor();			
+		
+		$collections = array();
+		$user_collections = 0;
+		foreach ($results as $result)
+		{
+			if (!array_key_exists($result[0], $this->WEAVE_COLLECTION_NAMES) && !$user_collections)
+			{
+				$this->get_users_collection_list();
+				$user_collections = 1;
+			}
+			
+			if (array_key_exists($result[0], $this->WEAVE_COLLECTION_NAMES))
+				$result[0] = $this->WEAVE_COLLECTION_NAMES[$result[0]];
+			else
+				continue;
+
+			$collections[$result[0]] = (int)$result[1];
+		}
+		return $collections;		
+	}
+	
 	function create_user()
 	{
 		return true; #nothing needs doing on the storage side
@@ -955,7 +1024,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$delete_stmt = 'delete from ' . $this->_db_name . ' where username = :username';
+			$delete_stmt = '/*[queryName=delete_user]*/ delete from ' . $this->_db_name . ' where username = :username';
 			$sth = $this->_dbh->prepare($delete_stmt);
 			$sth->bindParam(':username', $this->_username);
 			$sth->execute();
@@ -981,7 +1050,7 @@ class WeaveStorage implements WeaveStorageBase
 
 		try
 		{
-			$sth = $this->_dbh->prepare('select 1');
+			$sth = $this->_dbh->prepare('/*[queryName=heartbeat]*/ select 1');
 			$sth->execute();
 		}
 		catch( PDOException $exception )
