@@ -33,15 +33,26 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Base test class, with an instanciated app.
 """
-Basic tests to verify that the dispatching mechanism works.
-"""
-from weave.server.tests.functional import support
+import os
+import unittest
+from ConfigParser import RawConfigParser
 
+from webtest import TestApp
+from weave.server.wsgiapp import make_app
+import weave.server
 
-class TestBasic(support.TestWsgiApp):
+_TOPDIR = _WEAVEDIR = os.path.dirname(weave.server.__file__)
+for i in range(2):
+    _TOPDIR = os.path.split(_TOPDIR)[0]
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
+class TestWsgiApp(unittest.TestCase):
+
+    def setUp(self):
+        # loading tests.ini
+        cfg = RawConfigParser()
+        cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
+        config = dict(cfg.items('DEFAULT') + cfg.items('server:main'))
+        self.app = TestApp(make_app(config))
+
