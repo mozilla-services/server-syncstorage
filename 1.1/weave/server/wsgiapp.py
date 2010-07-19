@@ -42,16 +42,13 @@ from webob.exc import HTTPNotFound, HTTPUnauthorized
 
 from weave.server import API_VERSION
 from weave.server.util import authenticate_user
+from weave.server.storage import get_storage
 from weave.server.auth import get_auth_tool
 
-# controllers
-from weave.server.storagecontroller import StorageController
-
-# storages
-# XXX see if we want to load them dynamically
-# depending on the configuration
-from weave.server.storage import get_storage
+# XXX see if we want to load these dynamically
 from weave.server.storage import sql
+from weave.server.auth import dummy
+from weave.server.storagecontroller import StorageController
 
 # URL dispatching happens here
 # methods / match / controller / method

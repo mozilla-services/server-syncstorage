@@ -39,7 +39,6 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
-from weave.server.storage import get_storage
 from weave.server.util import json_response
 
 class StorageController(object):

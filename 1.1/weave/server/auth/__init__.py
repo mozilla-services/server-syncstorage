@@ -78,5 +78,4 @@ def get_auth_tool(name):
     """Returns an authentication tool."""
     # hard-load existing tools
     # XXX see if we want to load them dynamically
-    from weave.server.auth import dummy
     return _BACKENDS[name]
