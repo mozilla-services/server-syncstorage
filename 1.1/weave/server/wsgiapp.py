@@ -41,13 +41,21 @@ from webob.dec import wsgify
 from webob.exc import HTTPNotFound
 
 from weave.server import API_VERSION
-from weave.server.controllers import get_controller
 from weave.server.util import authenticate_user
 from weave.server.auth import get_auth_tool
 
+# controllers
+from weave.server.storagecontroller import StorageController
+
+# storages
+# XXX see if we want to load them dynamically
+# depending on the configuration
+from weave.server.storage import get_storage
+from weave.server.storage import sql
+
 # URL dispatching happens here
 # methods / match / controller / method
-URLS = [('GET', '/', 'main', 'index'),
+URLS = [('GET', '/', 'storage', 'index'),
         ('GET', '/%s/{username}/info/collections' % API_VERSION,
          'storage', 'get_collections_info')]
 
@@ -62,7 +70,13 @@ class SyncServerApp(object):
         self.config = {}
         self.config.update(global_conf)
         self.config.update(app_conf)
+
+        # loading authentication and storage backends
         self.authtool = get_auth_tool(self.config['auth'])
+        self.storage = get_storage(self.config['storage'])
+
+        # loading and connecting controllers
+        self.controllers= {'storage': StorageController(self.storage)}
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
@@ -94,7 +108,7 @@ class SyncServerApp(object):
     def _get_function(self, controller, method):
         """Return the method of the right controller."""
         try:
-            controller = get_controller(controller)
+            controller = self.controllers[controller]
         except KeyError:
             return None
         return getattr(controller, method)

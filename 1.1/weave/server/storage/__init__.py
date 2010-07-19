@@ -163,7 +163,4 @@ def register(klass):
 
 def get_storage(name):
     """Returns a storage."""
-    # hard-load existing storages
-    # XXX see if we want to load them dynamically
-    from weave.server.storage import sql
     return _BACKENDS[name]

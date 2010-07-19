@@ -13,7 +13,7 @@
 #
 # The Original Code is Sync Server
 #
-# The Initial Developer of the Original Code is the Mozilla Foundation.
+# The Initial Developer of the Original Code is Mozilla Foundation.
 # Portions created by the Initial Developer are Copyright (C) 2010
 # the Initial Developer. All Rights Reserved.
 #
@@ -33,9 +33,31 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+"""
+Storage controller. Implements all info, user APIs from:
 
+https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
-class MainController(object):
+"""
+from weave.server.storage import get_storage
+from weave.server.util import authenticated, jsonify
 
-    def index(self, request, **kwargs):
-        return 'Sync Server'
+class StorageController(object):
+
+    def __init__(self, storage):
+        self.storage = storage
+
+    def index(self, request):
+        return "Sync Server"
+
+    @authenticated
+    @jsonify
+    def get_collections_info(self, request):
+        """Returns a hash of collections associated with the account,
+        Along with the last modified timestamp for each collection
+        """
+        user_id = request.sync_info['userid']
+        collections = self.storage.get_collection_timestamps(user_id)
+        # XXX see if we need more processing here
+        return dict([(name, stamp) for name, stamp in collections])
+
