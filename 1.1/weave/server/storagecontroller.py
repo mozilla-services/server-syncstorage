@@ -41,6 +41,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 """
 from weave.server.util import json_response
 
+
 class StorageController(object):
 
     def __init__(self, storage):
@@ -69,4 +70,3 @@ class StorageController(object):
 
         # XXX see if we need more processing here
         return json_response(res)
-

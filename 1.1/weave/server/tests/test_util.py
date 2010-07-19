@@ -40,11 +40,14 @@ from weave.server.util import authenticate_user
 
 
 class Request(object):
+
     def __init__(self, path_info, environ):
         self.path_info = path_info
         self.environ = environ
 
+
 class AuthTool(object):
+
     def authenticate_user(self, *args):
         return 1
 

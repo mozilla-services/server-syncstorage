@@ -78,7 +78,7 @@ class SyncServerApp(object):
                                    **self._get_params('storage'))
 
         # loading and connecting controllers
-        self.controllers= {'storage': StorageController(self.storage)}
+        self.controllers = {'storage': StorageController(self.storage)}
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
@@ -89,7 +89,7 @@ class SyncServerApp(object):
         """Returns options filtered by names starting with 'prefix.'"""
         return dict([(param.split('.')[-1], value)
                       for param, value in self.config.items()
-                    if param.startswith(prefix+'.')])
+                    if param.startswith(prefix + '.')])
 
     @wsgify
     def __call__(self, request):

@@ -54,4 +54,3 @@ class TestBasic(support.TestWsgiApp):
         res = self.app.get('/', extra_environ=environ)
         self.assertEquals(res.status, '200 OK')
         self.assertEquals(res.body, 'Sync Server')
-

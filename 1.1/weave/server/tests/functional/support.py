@@ -48,6 +48,7 @@ _TOPDIR = _WEAVEDIR = os.path.dirname(weave.server.__file__)
 for i in range(2):
     _TOPDIR = os.path.split(_TOPDIR)[0]
 
+
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):

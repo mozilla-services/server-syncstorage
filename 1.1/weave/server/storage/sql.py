@@ -46,6 +46,7 @@ from weave.server.storage.sqlmappers import tables
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 
+
 class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI):

@@ -35,10 +35,7 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from sqlalchemy import create_engine
-
 from weave.server.storage import get_storage
-from weave.server.storage import sql
 
 _UID = 1
 
@@ -70,7 +67,8 @@ class TestSQLStorage(unittest.TestCase):
 
         res = self.storage.get_collection(_UID, 'My collection')
         self.assertEquals(res, (1, 1, u'My collection'))
-        res = self.storage.get_collection(_UID, 'My collection', fields=['name'])
+        res = self.storage.get_collection(_UID, 'My collection',
+                                          fields=['name'])
         self.assertEquals(res, (u'My collection',))
 
         res = self.storage.get_collections(_UID)

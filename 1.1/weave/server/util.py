@@ -42,6 +42,7 @@ import json
 from webob.exc import HTTPUnauthorized
 from webob import Response
 
+
 def _normalize(path):
     """Remove extra '/'s"""
     if path[0] == '/':
@@ -113,15 +114,16 @@ def authenticate_user(request, authtool):
             if user_id is None:
                 raise HTTPUnauthorized
 
-        # we're all clear ! setting up REMOTE_USER and user_id
+            # we're all clear ! setting up REMOTE_USER and user_id
             request.environ['REMOTE_USER'] = user_name
-            res['userid']  = user_id
+            res['userid'] = user_id
     else:
         # how do we get the user id in this case ?
         pass
 
 
     return res
+
 
 def json_response(data):
     """Returns Response containing a json string"""
