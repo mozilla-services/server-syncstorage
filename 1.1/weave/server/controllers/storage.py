@@ -39,14 +39,10 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
-from weave.server import config
 from weave.server.storage import get_storage
 from weave.server.util import authenticated, jsonify
 
 class StorageController(object):
-
-    def __init__(self):
-        self.storage = get_storage(config['storage'])
 
     @authenticated
     @jsonify
@@ -54,8 +50,9 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
+        storage = get_storage(request.config['storage'])
         user_id = request.sync_info['userid']
-        collections = self.storage.get_collection_timestamps(user_id)
+        collections = storage.get_collection_timestamps(user_id)
         # XXX see if we need more processing here
         return dict([(name, stamp) for name, stamp in collections])
 

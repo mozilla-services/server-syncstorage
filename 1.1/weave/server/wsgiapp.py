@@ -40,7 +40,6 @@ from routes import Mapper, URLGenerator
 from webob.dec import wsgify
 from webob.exc import HTTPNotFound
 
-from weave.server import config
 from weave.server import API_VERSION
 from weave.server.controllers import get_controller
 from weave.server.util import authenticate_user
@@ -58,9 +57,12 @@ class SyncServerApp(object):
     by using Routes.
     """
 
-    def __init__(self, authtool):
+    def __init__(self, global_conf, app_conf):
         self.mapper = Mapper()
-        self.authtool = authtool
+        self.config = {}
+        self.config.update(global_conf)
+        self.config.update(app_conf)
+        self.authtool = get_auth_tool(self.config['auth'])
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
@@ -84,6 +86,7 @@ class SyncServerApp(object):
         request.sync_info = authenticate_user(request, self.authtool)
         request.link = URLGenerator(self.mapper, request.environ)
         request.urlvars = ((), match)
+        request.config = self.config
 
         # XXX see if we want to build arguments with the query here
         return function(request)
@@ -99,7 +102,5 @@ class SyncServerApp(object):
 
 def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
-    config.update(global_conf)
-    config.update(app_conf)
-    app = SyncServerApp(get_auth_tool(config['auth']))
+    app = SyncServerApp(global_conf, app_conf)
     return app
