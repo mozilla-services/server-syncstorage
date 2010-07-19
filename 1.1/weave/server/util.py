@@ -79,10 +79,10 @@ def authenticate_user(request, authtool):
     # basically, any call that does not match an API
     # XXX see if we need to support thoses
     if len(path) <= 3:
-        return {}
-
-    res = {'api': paths[0], 'username': paths[1], 'function': paths[2],
-           'params': paths[3:]}
+        res = {}
+    else:
+        res = {'api': paths[0], 'username': paths[1], 'function': paths[2],
+               'params': paths[3:]}
 
     # authenticating, if REMOTE_USER is not present in the environ
     if 'REMOTE_USER' not in request.environ:
@@ -102,7 +102,8 @@ def authenticate_user(request, authtool):
             user_name, password = base64.decodestring(auth).split(':')
 
             # let's reject the call if the url is not owned by the user
-            if user_name != res['username']:
+            if (res.get('username') is not None
+                and user_name != res['username']):
                 raise HTTPUnauthorized
 
 
@@ -120,25 +121,6 @@ def authenticate_user(request, authtool):
 
 
     return res
-
-
-def authenticated(function):
-    """This decorator checks that the user was authenticated.
-
-    If not, raise an authentication error
-    """
-    def _authenticated(*args, **kwargs):
-        # we make the assumption that the request is the first arg here
-        # from a controller class
-        request = args[1]
-        if 'userid' not in request.sync_info:
-            raise HTTPUnauthorized
-        if 'REMOTE_USER' not in request.environ:
-            raise HTTPUnauthorized
-
-        # we're good
-        return function(*args, **kwargs)
-    return _authenticated
 
 
 def jsonify(function):

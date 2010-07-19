@@ -38,7 +38,7 @@ Application entry point.
 """
 from routes import Mapper, URLGenerator
 from webob.dec import wsgify
-from webob.exc import HTTPNotFound
+from webob.exc import HTTPNotFound, HTTPUnauthorized
 
 from weave.server import API_VERSION
 from weave.server.util import authenticate_user
@@ -85,6 +85,14 @@ class SyncServerApp(object):
 
     @wsgify
     def __call__(self, request):
+        # XXX All requests in the Sync APIs
+        # are authenticated
+        request.sync_info = authenticate_user(request, self.authtool)
+        if 'userid' not in request.sync_info:
+            raise HTTPUnauthorized
+        if 'REMOTE_USER' not in request.environ:
+            raise HTTPUnauthorized
+
         match = self.mapper.routematch(environ=request.environ)
         if match is None:
             return HTTPNotFound('Unkwown URL %r' % request.path_info)
@@ -97,7 +105,6 @@ class SyncServerApp(object):
         # make sure the verb matches
 
         # extracting all the info from the headers and the url
-        request.sync_info = authenticate_user(request, self.authtool)
         request.link = URLGenerator(self.mapper, request.environ)
         request.urlvars = ((), match)
         request.config = self.config

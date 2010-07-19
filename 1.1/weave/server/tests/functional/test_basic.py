@@ -42,23 +42,16 @@ from weave.server.tests.functional import support
 
 class TestBasic(support.TestWsgiApp):
 
-    def test_root_access(self):
-        res = self.app.get('/')
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
-
     def test_auth(self):
         # make sure we are able to authenticate
         # and that some APIs are protected
-        #
-        # XXX this test supposes that infos/collections is implemented
-        res = self.app.get('/1.0/tarek/info/collections', status=401)
+        res = self.app.get('/', status=401)
         self.assertEquals(res.status_int, 401)
 
         environ = {'Authorization': 'Basic %s' % \
                         base64.encodestring('tarek:tarek')}
 
-        res = self.app.get('/1.0/tarek/info/collections',
-                           extra_environ=environ)
+        res = self.app.get('/', extra_environ=environ)
         self.assertEquals(res.status, '200 OK')
+        self.assertEquals(res.body, 'Sync Server')
 

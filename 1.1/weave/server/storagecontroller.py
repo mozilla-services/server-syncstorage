@@ -40,7 +40,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
 from weave.server.storage import get_storage
-from weave.server.util import authenticated, jsonify
+from weave.server.util import jsonify
 
 class StorageController(object):
 
@@ -50,7 +50,6 @@ class StorageController(object):
     def index(self, request):
         return "Sync Server"
 
-    @authenticated
     @jsonify
     def get_collections_info(self, request):
         """Returns a hash of collections associated with the account,
