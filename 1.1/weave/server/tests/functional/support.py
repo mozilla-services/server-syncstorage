@@ -41,6 +41,7 @@ from ConfigParser import RawConfigParser
 
 from webtest import TestApp
 from weave.server.wsgiapp import make_app
+from weave.server.storage import get_storage
 import weave.server
 
 _TOPDIR = _WEAVEDIR = os.path.dirname(weave.server.__file__)
@@ -54,5 +55,13 @@ class TestWsgiApp(unittest.TestCase):
         cfg = RawConfigParser()
         cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
         config = dict(cfg.items('DEFAULT') + cfg.items('server:main'))
+        storage_params = dict([(param.split('.')[-1], value)
+                               for param, value in config.items()
+                               if param.startswith('storage.')])
+        self.storage = get_storage(config['storage'], **storage_params)
+        self.sqlfile = storage_params['sqluri'].split('sqlite:///')[-1]
         self.app = TestApp(make_app(config))
 
+    def tearDown(self):
+        if os.path.exists(self.sqlfile):
+            os.remove(self.sqlfile)

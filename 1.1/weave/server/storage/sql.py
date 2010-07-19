@@ -45,18 +45,18 @@ from weave.server.storage import register
 from weave.server.storage.sqlmappers import tables
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-engine = create_engine(_SQLURI)
-
-for table in tables:
-    table.metadata.bind = engine
-
 
 class WeaveSQLStorage(object):
 
-    def __init__(self):
-        self._conn = engine.connect()
+    def __init__(self, sqluri=_SQLURI):
+        self._engine = create_engine(sqluri)
+        for table in tables:
+            table.metadata.bind = self._engine
+            table.create(checkfirst=True)
+        self._conn = self._engine.connect()
 
-    def get_name(self):
+    @classmethod
+    def get_name(cls):
         """Returns the name of the storage"""
         return 'sql'
 
@@ -117,7 +117,7 @@ class WeaveSQLStorage(object):
         # XXX remove reset codes
 
         # removing user
-        query = 'delete from users where id = :user_id'
+        query = text('delete from users where id = :user_id')
         return self._conn.execute(query, user_id=user_id)
 
     def _get_collection_id(self, user_id, collection_name):
@@ -169,8 +169,8 @@ class WeaveSQLStorage(object):
         # getting the max collection_id
         # XXX why don't we have an autoinc here ?
         # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
-        max = ('select max(collectionid) from collections where '
-                'userid = :user_id')
+        max = text('select max(collectionid) from collections where '
+                   'userid = :user_id')
         max = self._conn.execute(max, user_id=user_id).first()
         if max[0] is None:
             next_id = 1
@@ -220,6 +220,17 @@ class WeaveSQLStorage(object):
         query = text('select name, max(modified) as timestamp '
                      'from wbo, collections where username = :user_id '
                      'group by name')
+        return self._conn.execute(query, user_id=user_id).fetchall()
+
+    def get_collection_counts(self, user_id):
+        """Return the collection counts for a given user"""
+        # XXX see if a join is faster
+        # than a second query
+        query = text('select name, count(collection) as ct '
+                     'from wbo, collections where username = :user_id and '
+                     'collections.collectionid = wbo.collection '
+                     'group by collection')
+
         return self._conn.execute(query, user_id=user_id).fetchall()
 
 

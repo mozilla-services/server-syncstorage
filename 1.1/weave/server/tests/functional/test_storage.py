@@ -51,10 +51,35 @@ class TestStorage(support.TestWsgiApp):
                         base64.encodestring('tarek:tarek')}
         self.app.extra_environ = environ
 
+        # let's create some collections for our tests
+        self.storage.set_user(1)
+        self.storage.set_collection(1, 'col1')
+        for item in range(3):
+            self.storage.set_item(1, 'col1', item)
+        self.storage.set_collection(1, 'col2')
+        for item in range(5):
+            self.storage.set_item(1, 'col2', item)
+
+    def tearDown(self):
+        # removing all data after the test
+        self.storage.delete_user(1)
+        super(TestStorage, self).tearDown()
+
     def test_get_collections_info(self):
 
         res = self.app.get('/1.0/tarek/info/collections')
         self.assertEquals(res.status, '200 OK')
-        res = json.dumps(res.body)
+        res = json.loads(res.body)
+        keys = res.keys()
+        keys.sort()
+        self.assertEquals(keys, ['col1', 'col2'])
 
         # XXX need to test collections timestamps here
+
+    def test_get_collections_count(self):
+
+        res = self.app.get('/1.0/tarek/info/collection_counts')
+        self.assertEquals(res.status, '200 OK')
+        res = json.loads(res.body)
+        self.assertEquals(res['col1'], 3)
+        self.assertEquals(res['col2'], 5)

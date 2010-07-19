@@ -39,6 +39,7 @@ from weave.server.storage import WeaveStorageBase, register, get_storage
 
 class IAmAValidStorage(object):
 
+    @classmethod
     def get_name(self):
         """Returns the name of the storage"""
         return 'valid'
@@ -78,6 +79,9 @@ class IAmAValidStorage(object):
 
     def get_collection_timestamps(self, user_name):
         """return the collection id + timestamp"""
+
+    def get_collection_counts(self, user_name):
+        """return the collection counts"""
 
     def item_exists(self, user_name, collection_name, item_id):
         """Returns user infos. user is the key"""

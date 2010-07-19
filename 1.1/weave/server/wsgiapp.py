@@ -54,7 +54,9 @@ from weave.server.storagecontroller import StorageController
 # methods / match / controller / method
 URLS = [('GET', '/', 'storage', 'index'),
         ('GET', '/%s/{username}/info/collections' % API_VERSION,
-         'storage', 'get_collections_info')]
+         'storage', 'get_collections_info'),
+        ('GET', '/%s/{username}/info/collection_counts' % API_VERSION,
+         'storage', 'get_collections_count')]
 
 
 class SyncServerApp(object):
@@ -69,8 +71,11 @@ class SyncServerApp(object):
         self.config.update(app_conf)
 
         # loading authentication and storage backends
-        self.authtool = get_auth_tool(self.config['auth'])
-        self.storage = get_storage(self.config['storage'])
+        self.authtool = get_auth_tool(self.config['auth'],
+                                      **self._get_params('auth'))
+
+        self.storage = get_storage(self.config['storage'],
+                                   **self._get_params('storage'))
 
         # loading and connecting controllers
         self.controllers= {'storage': StorageController(self.storage)}
@@ -79,6 +84,12 @@ class SyncServerApp(object):
                 verbs = [verbs]
             self.mapper.connect(None, match, controller=controller,
                                 method=method, conditions=dict(method=verbs))
+
+    def _get_params(self, prefix):
+        """Returns options filtered by names starting with 'prefix.'"""
+        return dict([(param.split('.')[-1], value)
+                      for param, value in self.config.items()
+                    if param.startswith(prefix+'.')])
 
     @wsgify
     def __call__(self, request):

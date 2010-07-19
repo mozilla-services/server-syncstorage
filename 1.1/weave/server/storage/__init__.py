@@ -123,6 +123,10 @@ class WeaveStorageBase(object):
     def get_collection_timestamps(self, user_id):
         """return the collection names"""
 
+    @abc.abstractmethod
+    def get_collection_counts(self, user_id):
+        """return the collection counts"""
+
     #
     # Items APIs
     #
@@ -157,10 +161,9 @@ def register(klass):
     if not issubclass(klass, WeaveStorageBase):
         raise TypeError('Not a storage class')
 
-    storage = klass()
-    _BACKENDS[storage.get_name()] = storage
+    _BACKENDS[klass.get_name()] = klass
 
 
-def get_storage(name):
+def get_storage(name, **kwargs):
     """Returns a storage."""
-    return _BACKENDS[name]
+    return _BACKENDS[name](**kwargs)

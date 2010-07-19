@@ -37,7 +37,7 @@ import unittest
 
 from sqlalchemy import create_engine
 
-from weave.server.storage import get_storage, _BACKENDS
+from weave.server.storage import get_storage
 from weave.server.storage import sql
 
 _UID = 1
@@ -46,107 +46,90 @@ _UID = 1
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        self.old_SQLURI = sql._SQLURI
-        sql._SQLURI = 'sqlite:///:memory:'
-        self.old_engine = sql.engine
-        sql.engine = create_engine(sql._SQLURI)
-        for table in sql.tables:
-            table.metadata.bind = sql.engine
-            table.create()
-
-        _BACKENDS['sql'] = sql.WeaveSQLStorage()
+        self.storage = get_storage('sql', sqluri='sqlite:///:memory:')
 
     def tearDown(self):
-        sql._SQLURI = self.old_SQLURI
-        sql.engine = self.old_engine
-        for table in sql.tables:
-            table.metadata.bind = sql.engine
+        self.storage.delete_user(_UID)
 
     def test_user_exists(self):
-        storage = get_storage('sql')
-        self.assertFalse(storage.user_exists(_UID))
+        self.assertFalse(self.storage.user_exists(_UID))
 
     def test_set_get_user(self):
-        storage = get_storage('sql')
-        self.assertFalse(storage.user_exists(_UID))
-        storage.set_user(_UID, username='tarek', email='tarek@ziade.org')
-        self.assertTrue(storage.user_exists(_UID))
-        storage.set_user(_UID, email='tarek2@ziade.org')
-        res = storage.get_user(_UID, fields=['email'])
+        self.assertFalse(self.storage.user_exists(_UID))
+        self.storage.set_user(_UID, username='tarek', email='tarek@ziade.org')
+        self.assertTrue(self.storage.user_exists(_UID))
+        self.storage.set_user(_UID, email='tarek2@ziade.org')
+        res = self.storage.get_user(_UID, fields=['email'])
         self.assertEquals(res, (u'tarek2@ziade.org',))
 
     def test_collections(self):
-        storage = get_storage('sql')
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.assertFalse(self.storage.collection_exists(_UID, 'My collection'))
+        self.storage.set_collection(_UID, 'My collection')
+        self.assertTrue(self.storage.collection_exists(_UID, 'My collection'))
 
-        storage.set_user(_UID, email='tarek@ziade.org')
-        self.assertFalse(storage.collection_exists(_UID, 'My collection'))
-        storage.set_collection(_UID, 'My collection')
-        self.assertTrue(storage.collection_exists(_UID, 'My collection'))
-
-        res = storage.get_collection(_UID, 'My collection')
+        res = self.storage.get_collection(_UID, 'My collection')
         self.assertEquals(res, (1, 1, u'My collection'))
-        res = storage.get_collection(_UID, 'My collection', fields=['name'])
+        res = self.storage.get_collection(_UID, 'My collection', fields=['name'])
         self.assertEquals(res, (u'My collection',))
 
-        res = storage.get_collections(_UID)
+        res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 1)
         self.assertEquals(res[0], (1, 1, u'My collection'))
-        res = storage.get_collections(_UID, fields=['name'])
+        res = self.storage.get_collections(_UID, fields=['name'])
         self.assertEquals(res[0], (u'My collection',))
 
         # adding a new collection
-        storage.set_collection(_UID, 'My collection 2')
-        res = storage.get_collections(_UID)
+        self.storage.set_collection(_UID, 'My collection 2')
+        res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 2)
 
-        names = storage.get_collection_names(_UID)
+        names = self.storage.get_collection_names(_UID)
         self.assertEquals(names, [(u'My collection',), (u'My collection 2',)])
 
         # removing a collection
-        storage.delete_collection(_UID, 'My collection 2')
-        res = storage.get_collections(_UID)
+        self.storage.delete_collection(_UID, 'My collection 2')
+        res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 1)
 
         # removing *all*
-        storage.delete_user(_UID)
-        res = storage.get_collections(_UID)
+        self.storage.delete_user(_UID)
+        res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 0)
-        self.assertFalse(storage.user_exists(_UID))
+        self.assertFalse(self.storage.user_exists(_UID))
 
     def test_items(self):
-        storage = get_storage('sql')
-        storage.set_user(_UID, email='tarek@ziade.org')
-        storage.set_collection(_UID, 'col')
-        self.assertFalse(storage.item_exists(_UID, 'col', 1))
-        self.assertEquals(storage.get_items(_UID, 'col'), [])
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col')
+        self.assertFalse(self.storage.item_exists(_UID, 'col', 1))
+        self.assertEquals(self.storage.get_items(_UID, 'col'), [])
 
-        storage.set_item(_UID, 'col', 1, payload='XXX')
-        res = storage.get_item(_UID, 'col', 1)
+        self.storage.set_item(_UID, 'col', 1, payload='XXX')
+        res = self.storage.get_item(_UID, 'col', 1)
         self.assertEquals(res.payload, 'XXX')
 
-        storage.set_item(_UID, 'col', 2, payload='XXX')
+        self.storage.set_item(_UID, 'col', 2, payload='XXX')
 
-        items = storage.get_items(_UID, 'col')
+        items = self.storage.get_items(_UID, 'col')
         self.assertEquals(len(items), 2)
 
-        storage.delete_item(_UID, 'col', 1)
-        items = storage.get_items(_UID, 'col')
+        self.storage.delete_item(_UID, 'col', 1)
+        items = self.storage.get_items(_UID, 'col')
         self.assertEquals(len(items), 1)
 
-        storage.delete_items(_UID, 'col')
-        items = storage.get_items(_UID, 'col')
+        self.storage.delete_items(_UID, 'col')
+        items = self.storage.get_items(_UID, 'col')
         self.assertEquals(len(items), 0)
 
     def test_get_collection_timestamps(self):
-        storage = get_storage('sql')
-        storage.set_user(_UID, email='tarek@ziade.org')
-        storage.set_collection(_UID, 'col1')
-        storage.set_collection(_UID, 'col2')
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col1')
+        self.storage.set_collection(_UID, 'col2')
 
-        storage.set_item(_UID, 'col1', 1, payload='XXX')
-        storage.set_item(_UID, 'col2', 1, payload='XXX')
+        self.storage.set_item(_UID, 'col1', 1, payload='XXX')
+        self.storage.set_item(_UID, 'col2', 1, payload='XXX')
 
-        timestamps = storage.get_collection_timestamps(_UID)
+        timestamps = self.storage.get_collection_timestamps(_UID)
         names = [entry[0] for entry in timestamps]
         names.sort()
         self.assertEquals(names, ['col1', 'col2'])

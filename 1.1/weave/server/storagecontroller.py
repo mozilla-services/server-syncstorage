@@ -58,3 +58,15 @@ class StorageController(object):
         # XXX see if we need more processing here
         res = dict([(name, stamp) for name, stamp in collections])
         return json_response(res)
+
+    def get_collections_count(self, request):
+        """Returns a hash of collections associated with the account,
+        Along with the total number of items for each collection.
+        """
+        user_id = request.sync_info['userid']
+        counts = self.storage.get_collection_counts(user_id)
+        res = dict([(name, count) for name, count in counts])
+
+        # XXX see if we need more processing here
+        return json_response(res)
+
