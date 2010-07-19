@@ -228,8 +228,9 @@ class WeaveSQLStorage(object):
         # XXX see if a join is faster
         # than a second query
         query = text('select name, count(collection) as ct '
-                     'from wbo, collections where username = :user_id and '
+                     'from wbo inner join collections on '
                      'collections.collectionid = wbo.collection '
+                     'where username = :user_id '
                      'group by collection')
 
         return self._conn.execute(query, user_id=user_id).fetchall()
