@@ -40,7 +40,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
 from weave.server.storage import get_storage
-from weave.server.util import jsonify
+from weave.server.util import json_response
 
 class StorageController(object):
 
@@ -50,7 +50,6 @@ class StorageController(object):
     def index(self, request):
         return "Sync Server"
 
-    @jsonify
     def get_collections_info(self, request):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
@@ -58,5 +57,5 @@ class StorageController(object):
         user_id = request.sync_info['userid']
         collections = self.storage.get_collection_timestamps(user_id)
         # XXX see if we need more processing here
-        return dict([(name, stamp) for name, stamp in collections])
-
+        res = dict([(name, stamp) for name, stamp in collections])
+        return json_response(res)

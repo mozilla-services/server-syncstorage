@@ -40,6 +40,7 @@ import base64
 import json
 
 from webob.exc import HTTPUnauthorized
+from webob import Response
 
 def _normalize(path):
     """Remove extra '/'s"""
@@ -122,9 +123,6 @@ def authenticate_user(request, authtool):
 
     return res
 
-
-def jsonify(function):
-    """This decorator will dump the result in json"""
-    def _jsonify(*args, **kw):
-        return json.dumps(function(*args, **kw))
-    return _jsonify
+def json_response(data):
+    """Returns Response containing a json string"""
+    return Response(json.dumps(data), content_type='application/json')
