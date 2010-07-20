@@ -53,10 +53,12 @@ class TestStorage(support.TestWsgiApp):
 
         # let's create some collections for our tests
         self.storage.set_user(1)
-        self.storage.set_collection(1, 'col1')
+
+        for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
+            self.storage.set_collection(1, name)
+
         for item in range(3):
             self.storage.set_item(1, 'col1', item)
-        self.storage.set_collection(1, 'col2')
         for item in range(5):
             self.storage.set_item(1, 'col2', item)
 
@@ -72,7 +74,9 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         keys = res.keys()
         keys.sort()
-        self.assertEquals(keys, ['col1', 'col2'])
+        # standard collections + custom ones
+        wanted = ['client', 'col1', 'col2', 'crypto', 'forms', 'history']
+        self.assertEquals(keys, wanted)
 
         # XXX need to test collections timestamps here
 

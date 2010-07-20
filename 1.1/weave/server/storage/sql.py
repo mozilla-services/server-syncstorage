@@ -45,6 +45,7 @@ from weave.server.storage import register
 from weave.server.storage.sqlmappers import tables
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
+_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
 
 
 class WeaveSQLStorage(object):
@@ -55,6 +56,7 @@ class WeaveSQLStorage(object):
             table.metadata.bind = self._engine
             table.create(checkfirst=True)
         self._conn = self._engine.connect()
+        self._user_collections = {}
 
     @classmethod
     def get_name(cls):
@@ -209,7 +211,7 @@ class WeaveSQLStorage(object):
 
     def get_collection_names(self, user_id):
         """return the collection names for a given user"""
-        query = text('select name from collections '
+        query = text('select collectionid, name from collections '
                      'where userid = :user_id')
         return self._conn.execute(query, user_id=user_id).fetchall()
 
@@ -223,17 +225,33 @@ class WeaveSQLStorage(object):
                      'group by name')
         return self._conn.execute(query, user_id=user_id).fetchall()
 
+    def _collid2name(self, user_id, collection_id):
+        if collection_id in _STANDARD_COLLECTIONS:
+            return _STANDARD_COLLECTIONS[collection_id]
+
+        # custom collections
+        if user_id not in self._user_collections:
+            names = dict(self.get_collection_names(user_id))
+            self._user_collections[user_id] = names
+
+        return self._user_collections[user_id][collection_id]
+
+    def _purge_user_collections(self, user_id):
+        if user_id in self._user_collections:
+            del self._user_collections[user_id]
+
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
-        # XXX see if a join is faster
-        # than a second query
-        query = text('select name, count(collection) as ct '
-                     'from wbo inner join collections on '
-                     'collections.collectionid = wbo.collection '
-                     'where username = :user_id '
+        query = text('select collection, count(collection) as ct '
+                     'from wbo where username = :user_id '
                      'group by collection')
-
-        return self._conn.execute(query, user_id=user_id).fetchall()
+        try:
+            res = [(self._collid2name(user_id, collid), count)
+                    for collid, count in
+                   self._conn.execute(query, user_id=user_id)]
+        finally:
+            self._purge_user_collections(user_id)
+        return res
 
 
     #

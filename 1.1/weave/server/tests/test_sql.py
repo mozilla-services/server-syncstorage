@@ -44,6 +44,9 @@ class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
         self.storage = get_storage('sql', sqluri='sqlite:///:memory:')
+        # make sure we have the standard collections in place
+        for name in ('client', 'crypto', 'forms', 'history'):
+            self.storage.set_collection(_UID, name)
 
     def tearDown(self):
         self.storage.delete_user(_UID)
@@ -66,29 +69,30 @@ class TestSQLStorage(unittest.TestCase):
         self.assertTrue(self.storage.collection_exists(_UID, 'My collection'))
 
         res = self.storage.get_collection(_UID, 'My collection')
-        self.assertEquals(res, (1, 1, u'My collection'))
+        self.assertEquals(res, (1, 5, u'My collection'))
         res = self.storage.get_collection(_UID, 'My collection',
                                           fields=['name'])
         self.assertEquals(res, (u'My collection',))
 
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 1)
-        self.assertEquals(res[0], (1, 1, u'My collection'))
+        self.assertEquals(len(res), 5)
+        self.assertEquals(res[-1], (1, 5, u'My collection'))
         res = self.storage.get_collections(_UID, fields=['name'])
-        self.assertEquals(res[0], (u'My collection',))
+        self.assertEquals(res[-1], (u'My collection',))
 
         # adding a new collection
         self.storage.set_collection(_UID, 'My collection 2')
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 2)
+        self.assertEquals(len(res), 6)
 
         names = self.storage.get_collection_names(_UID)
-        self.assertEquals(names, [(u'My collection',), (u'My collection 2',)])
+        self.assertEquals(names[-2:], [(5, 'My collection'),
+                                       (6, 'My collection 2')])
 
         # removing a collection
         self.storage.delete_collection(_UID, 'My collection 2')
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 1)
+        self.assertEquals(len(res), 5)
 
         # removing *all*
         self.storage.delete_user(_UID)
@@ -130,7 +134,7 @@ class TestSQLStorage(unittest.TestCase):
         timestamps = self.storage.get_collection_timestamps(_UID)
         names = [entry[0] for entry in timestamps]
         names.sort()
-        self.assertEquals(names, ['col1', 'col2'])
+        self.assertEquals(names[:3], ['client', 'col1', 'col2'])
 
 
 def test_suite():
