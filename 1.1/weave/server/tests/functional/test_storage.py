@@ -87,3 +87,10 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         self.assertEquals(res['col1'], 3)
         self.assertEquals(res['col2'], 5)
+
+    def test_get_quota(self):
+
+        # XXX implement the new quota code
+        res = self.app.get('/1.0/tarek/info/quota', status=501)
+        self.assertEquals(res.status, '501 Not Implemented')
+

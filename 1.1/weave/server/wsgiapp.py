@@ -52,11 +52,13 @@ from weave.server.storagecontroller import StorageController
 
 # URL dispatching happens here
 # methods / match / controller / method
+# _API_ is replaced by API_VERSION
 URLS = [('GET', '/', 'storage', 'index'),
-        ('GET', '/%s/{username}/info/collections' % API_VERSION,
+        ('GET', '/_API_/{username}/info/collections',
          'storage', 'get_collections_info'),
-        ('GET', '/%s/{username}/info/collection_counts' % API_VERSION,
-         'storage', 'get_collections_count')]
+        ('GET', '/_API_/{username}/info/collection_counts',
+         'storage', 'get_collections_count'),
+        ('GET', '/_API_/{username}/info/quota', 'storage', 'get_quota')]
 
 
 class SyncServerApp(object):
@@ -82,6 +84,7 @@ class SyncServerApp(object):
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
+            match = match.replace('_API_', API_VERSION)
             self.mapper.connect(None, match, controller=controller,
                                 method=method, conditions=dict(method=verbs))
 
