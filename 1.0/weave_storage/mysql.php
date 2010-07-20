@@ -100,6 +100,15 @@ class WeaveStorage implements WeaveStorageBase
 			$this->_collection_table_name = WEAVE_MYSQL_COLLECTION_TABLE_NAME;
 	}
 
+	function connection_details_string()
+	{
+		$string = "host => " . WEAVE_MYSQL_STORE_READ_HOST;
+		$string .= ", db => " . WEAVE_MYSQL_STORE_READ_DB;
+		$string .= ", table => " . $this->_db_name;
+		$string .= ", user => " . $this->_username;
+		return $string;
+	}
+
 	function open_connection() 
 	{		
 		if ($this->_dbh)
@@ -125,7 +134,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log($exception->getMessage());
+			error_log("open_connection (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 	}
@@ -145,7 +154,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("begin_transaction: " . $exception->getMessage());
+			error_log("begin_transaction (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		return true;
@@ -179,7 +188,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_id: " . $exception->getMessage());
+			error_log("get_collection_id (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -208,7 +217,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("store_collection_id: " . $exception->getMessage());
+			error_log("store_collection_id (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$result = $sth->fetchColumn();
@@ -228,7 +237,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("store_collection_id: " . $exception->getMessage());
+			error_log("store_collection_id (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -259,7 +268,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_name: " . $exception->getMessage());
+			error_log("get_collection_name (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -281,7 +290,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_users_collection_list: " . $exception->getMessage());
+			error_log("get_users_collection_list (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -318,7 +327,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_max_timestamp: " . $exception->getMessage());
+			error_log("get_max_timestamp (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -339,7 +348,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_list: " . $exception->getMessage());
+			error_log("get_collection_list (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$results = $sth->fetchAll(PDO::FETCH_NUM);
@@ -378,7 +387,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_list: " . $exception->getMessage());
+			error_log("get_collection_list (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$results = $sth->fetchAll(PDO::FETCH_NUM);
@@ -417,7 +426,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_list_with_counts: " . $exception->getMessage());
+			error_log("get_collection_list_with_counts (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$results = $sth->fetchAll(PDO::FETCH_NUM);
@@ -456,7 +465,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_collection_list_with_counts: " . $exception->getMessage());
+			error_log("get_collection_list_with_counts (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$results = $sth->fetchAll(PDO::FETCH_NUM);
@@ -517,7 +526,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("store_object: " . $exception->getMessage());
+			error_log("store_object (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 	}
@@ -601,7 +610,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("update_object: " . $exception->getMessage());
+			error_log("update_object (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 	}
@@ -626,7 +635,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("delete_object: " . $exception->getMessage());
+			error_log("delete_object (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 	}
@@ -758,7 +767,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("delete_objects: " . $exception->getMessage());
+			error_log("delete_objects (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 	}
@@ -781,7 +790,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("retrieve_object: " . $exception->getMessage());
+			error_log("retrieve_object (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -918,7 +927,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("retrieve_collection: " . $exception->getMessage());
+			error_log("retrieve_collection (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 
@@ -967,7 +976,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_storage_total: " . $exception->getMessage());
+			error_log("get_storage_total (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		
@@ -987,7 +996,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("get_storage_total: " . $exception->getMessage());
+			error_log("get_storage_total (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		$results = $sth->fetchAll(PDO::FETCH_NUM);
@@ -1037,7 +1046,7 @@ class WeaveStorage implements WeaveStorageBase
 		}
 		catch( PDOException $exception )
 		{
-			error_log("delete_user: " . $exception->getMessage());
+			error_log("delete_user (" . $this->connection_details_string() . "): " . $exception->getMessage());
 			throw new Exception("Database unavailable", 503);
 		}
 		return true;
