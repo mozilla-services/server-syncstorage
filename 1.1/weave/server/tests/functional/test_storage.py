@@ -160,3 +160,19 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [129])
+
+        # "full"
+        # If defined, returns the full WBO, rather than just the id.
+        res = self.app.get('/1.0/tarek/storage/col2?full=1')
+        res = json.loads(res.body)
+        keys = res[0].keys()
+        keys.sort()
+        wanted = ['collection', 'id', 'modified', 'parentid', 'payload',
+                  'payload_size', 'predecessorid', 'sortindex', 'username']
+        self.assertEquals(keys, wanted)
+
+        res = self.app.get('/1.0/tarek/storage/col2')
+        res = json.loads(res.body)
+        keys = res[0].keys()
+        keys.sort()
+        self.assertEquals(keys, ['id'])

@@ -277,12 +277,11 @@ class WeaveSQLStorage(object):
     def get_items(self, user_id, collection_name, fields=None, filters=None):
         """returns items from a collection
 
-        filter is a dict used to add conditions to the db query.
+        "filter" is a dict used to add conditions to the db query.
         Its keys are the field names on which the condition operates.
         Its values are the values the field should have.
         It can be a single value, or a list. For the latter the in()
         operator is used. For single values, the operator has to be provided.
-        If not provided, the default operator is '='
         """
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:

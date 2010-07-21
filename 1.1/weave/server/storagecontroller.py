@@ -77,7 +77,7 @@ class StorageController(object):
 
     # XXX see if we want to use kwargs here instead
     def get_collection(self, request, ids=None, predecessorid=None,
-                       parentid=None, older=None, newer=None):
+                       parentid=None, older=None, newer=None, full=False):
         """Returns a list of the WBO ids contained in a collection."""
         # XXX sanity check on arguments (detect incompatible params here)
         filters = {}
@@ -95,9 +95,10 @@ class StorageController(object):
 
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
-        res = self.storage.get_items(user_id, collection_name, ['id'], filters)
+        if not full:
+            fields = ['id']
+        else:
+            fields = None
 
-        results = []
-        for line in res:
-            results.append({'id': line[0]})
-        return json_response(results)
+        res = self.storage.get_items(user_id, collection_name, fields, filters)
+        return json_response([dict(line) for line in res])
