@@ -75,3 +75,9 @@ class StorageController(object):
     def get_quota(self, request):
         raise HTTPNotImplemented
 
+    def get_collection(self, request):
+        """Returns a list of the WBO ids contained in a collection."""
+        collection_name = request.sync_info['params'][0]
+        user_id = request.sync_info['userid']
+        res = self.storage.get_items(user_id, collection_name, ['id'])
+        return json_response([line[0] for line in res])

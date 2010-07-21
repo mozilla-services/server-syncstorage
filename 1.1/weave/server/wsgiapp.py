@@ -58,7 +58,9 @@ URLS = [('GET', '/', 'storage', 'index'),
          'storage', 'get_collections_info'),
         ('GET', '/_API_/{username}/info/collection_counts',
          'storage', 'get_collections_count'),
-        ('GET', '/_API_/{username}/info/quota', 'storage', 'get_quota')]
+        ('GET', '/_API_/{username}/info/quota', 'storage', 'get_quota'),
+        ('GET', '/_API_/{username}/storage/{collection}', 'storage',
+        'get_collection')]
 
 
 class SyncServerApp(object):

@@ -94,3 +94,11 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/info/quota', status=501)
         self.assertEquals(res.status, '501 Not Implemented')
 
+    def test_get_collection(self):
+        res = self.app.get('/1.0/tarek/storage/col3')
+        self.assertEquals(json.loads(res.body), [])
+
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(json.loads(res.body), [0, 1, 2, 3, 4])
+
+

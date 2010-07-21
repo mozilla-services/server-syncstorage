@@ -46,7 +46,8 @@ from weave.server.storage.sqlmappers import tables
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
-
+_STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
+                                    _STANDARD_COLLECTIONS.items()])
 
 class WeaveSQLStorage(object):
 
@@ -128,6 +129,10 @@ class WeaveSQLStorage(object):
 
         XXX We need to cache this
         """
+        if collection_name in _STANDARD_COLLECTIONS_NAMES:
+            return _STANDARD_COLLECTIONS_NAMES[collection_name]
+
+        # custome collection
         data = self.get_collection(user_id, collection_name,
                                    ['collectionid'])
         if data is None:
