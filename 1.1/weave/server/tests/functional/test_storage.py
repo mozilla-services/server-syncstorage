@@ -199,12 +199,30 @@ class TestStorage(support.TestWsgiApp):
 
         # "limit"
         # Sets the maximum number of ids that will be returned
+        self.storage.delete_items(1, 'col2')
+
         for i in range(10):
-            self.storage.set_item(1, 'col2', 140 + i)
+            self.storage.set_item(1, 'col2', i)
         res = self.app.get('/1.0/tarek/storage/col2?limit=2')
         res = json.loads(res.body)
         self.assertEquals(len(res), 2)
 
         res = self.app.get('/1.0/tarek/storage/col2')
         res = json.loads(res.body)
-        self.assertTrue(len(res) > 10)
+        self.assertTrue(len(res) > 9)
+
+        # "offset"
+        # Skips the first n ids. For use with the limit parameter (required) to
+        # paginate through a result set.
+
+        # make sure we reject it if "limit" is not provided
+        res = self.app.get('/1.0/tarek/storage/col2?offset=2', status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # let's get 2, 3 and 4
+        res = self.app.get('/1.0/tarek/storage/col2?offset=2&limit=3')
+        res = json.loads(res.body)
+        self.assertEquals(len(res), 3)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [2, 3, 4])

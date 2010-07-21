@@ -39,7 +39,7 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
-from webob.exc import HTTPNotImplemented
+from webob.exc import HTTPNotImplemented, HTTPBadRequest
 from weave.server.util import json_response
 
 
@@ -78,7 +78,8 @@ class StorageController(object):
     # XXX see if we want to use kwargs here instead
     def get_collection(self, request, ids=None, predecessorid=None,
                        parentid=None, older=None, newer=None, full=False,
-                       index_above=None, index_below=None, limit=None):
+                       index_above=None, index_below=None, limit=None,
+                       offset=None):
         """Returns a list of the WBO ids contained in a collection."""
         # XXX sanity check on arguments (detect incompatible params here)
         filters = {}
@@ -101,6 +102,12 @@ class StorageController(object):
         if limit is not None:
             limit = int(limit)
 
+        if offset is not None:
+            # we need both
+            if limit is None:
+                raise HTTPBadRequest('"offset" cannot be used without "limit"')
+            offset = int(offset)
+
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
         if not full:
@@ -109,5 +116,5 @@ class StorageController(object):
             fields = None
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
-                                     limit)
+                                     limit, offset)
         return json_response([dict(line) for line in res])
