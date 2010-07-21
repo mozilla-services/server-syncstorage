@@ -275,7 +275,7 @@ class WeaveSQLStorage(object):
         return res is not None
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
-                  limit=None, offset=None):
+                  limit=None, offset=None, sort=None):
         """returns items from a collection
 
         "filter" is a dict used to add conditions to the db query.
@@ -315,6 +315,14 @@ class WeaveSQLStorage(object):
 
         if offset is not None:
             query += ' offset %d' % offset
+
+        if sort is not None:
+            if sort == 'oldest':
+                query += ' order by modified'
+            elif sort == 'newest':
+                query += ' order by modified desc'
+            else:
+                query += ' order by sortindex desc'
 
         return self._conn.execute(text(query), user_id=user_id,
                                   collection_id=collection_id,

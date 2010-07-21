@@ -226,3 +226,27 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [2, 3, 4])
+
+        # "sort"
+        #   'oldest' - Orders by modification date (oldest first)
+        #   'newest' - Orders by modification date (newest first)
+        #   'index' - Orders by the sortindex descending (highest weight first)
+        self.storage.delete_items(1, 'col2')
+
+        for index, sortindex in ((0, 1), (1, 34), (2, 12)):
+            self.storage.set_item(1, 'col2', index, sortindex=sortindex)
+
+        res = self.app.get('/1.0/tarek/storage/col2?sort=oldest')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        self.assertEquals(ids, [0, 1, 2])
+
+        res = self.app.get('/1.0/tarek/storage/col2?sort=newest')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        self.assertEquals(ids, [2, 1, 0])
+
+        res = self.app.get('/1.0/tarek/storage/col2?sort=index')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        self.assertEquals(ids, [1, 2, 0])

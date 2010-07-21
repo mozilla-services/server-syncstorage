@@ -79,9 +79,10 @@ class StorageController(object):
     def get_collection(self, request, ids=None, predecessorid=None,
                        parentid=None, older=None, newer=None, full=False,
                        index_above=None, index_below=None, limit=None,
-                       offset=None):
+                       offset=None, sort=None):
         """Returns a list of the WBO ids contained in a collection."""
-        # XXX sanity check on arguments (detect incompatible params here)
+        # XXX sanity check on arguments (detect incompatible params here, or
+        # unknown values)
         filters = {}
         if ids is not None:
             ids = [int(id_) for id_ in ids.split(',')]
@@ -116,5 +117,5 @@ class StorageController(object):
             fields = None
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
-                                     limit, offset)
+                                     limit, offset, sort)
         return json_response([dict(line) for line in res])
