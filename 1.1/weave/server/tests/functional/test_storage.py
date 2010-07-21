@@ -176,3 +176,23 @@ class TestStorage(support.TestWsgiApp):
         keys = res[0].keys()
         keys.sort()
         self.assertEquals(keys, ['id'])
+
+        # "index_above"
+        # If defined, only returns items with a higher sortindex than the
+        # value specified.
+        self.storage.set_item(1, 'col2', 130, sortindex=11)
+        self.storage.set_item(1, 'col2', 131, sortindex=9)
+        res = self.app.get('/1.0/tarek/storage/col2?index_above=10')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [130])
+
+        # "index_below"
+        # If defined, only returns items with a lower sortindex than the value
+        # specified.
+        res = self.app.get('/1.0/tarek/storage/col2?index_below=10')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [131])
