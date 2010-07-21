@@ -106,6 +106,7 @@ class TestStorage(support.TestWsgiApp):
 
         # trying various filters
 
+        # "ids"
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
         res = self.app.get('/1.0/tarek/storage/col2?ids=1,3')
@@ -113,3 +114,14 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [1, 3])
+
+        # "predecessorid"
+        # Returns the ids for objects in the collection that
+        # are directly preceded by the id given. Usually only returns one
+        # result.
+        self.storage.set_item(1, 'col2', 125, predecessorid='XXXX')
+        res = self.app.get('/1.0/tarek/storage/col2?predecessorid=XXXX')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [125])

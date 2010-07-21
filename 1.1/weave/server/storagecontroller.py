@@ -75,12 +75,15 @@ class StorageController(object):
     def get_quota(self, request):
         raise HTTPNotImplemented
 
-    def get_collection(self, request, ids=None):
+    # XXX see if we want to use kwargs here instead
+    def get_collection(self, request, ids=None, predecessorid=None):
         """Returns a list of the WBO ids contained in a collection."""
         filters = {}
         if ids is not None:
             ids = [int(id_) for id_ in ids.split(',')]
             filters['id'] = ids
+        if predecessorid is not None:
+            filters['predecessorid'] = predecessorid
 
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
@@ -90,4 +93,3 @@ class StorageController(object):
         for line in res:
             results.append({'id': line[0]})
         return json_response(results)
-
