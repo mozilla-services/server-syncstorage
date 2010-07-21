@@ -281,7 +281,8 @@ class WeaveSQLStorage(object):
         Its keys are the field names on which the condition operates.
         Its values are the values the field should have.
         It can be a single value, or a list. For the latter the in()
-        operator is used
+        operator is used. For single values, the operator has to be provided.
+        If not provided, the default operator is '='
         """
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
@@ -293,12 +294,14 @@ class WeaveSQLStorage(object):
         extra_values = {}
         if filters is not None:
             for field, value in filters.items():
+                operator, value = value
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
-                    extra.append('%s in(%s)' % (field, ','.join(value)))
+                    extra.append('%s %s (%s)' % (field, operator,
+                                 ','.join(value)))
                 else:
                     value = str(value)
-                    extra.append('%s = :%s' % (field, field))
+                    extra.append('%s %s :%s' % (field, operator, field))
                     extra_values[field] = value
 
         query = ('select %s from wbo where username = :user_id and '

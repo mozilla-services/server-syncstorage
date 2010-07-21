@@ -77,16 +77,21 @@ class StorageController(object):
 
     # XXX see if we want to use kwargs here instead
     def get_collection(self, request, ids=None, predecessorid=None,
-                       parentid=None):
+                       parentid=None, older=None, newer=None):
         """Returns a list of the WBO ids contained in a collection."""
+        # XXX sanity check on arguments (detect incompatible params here)
         filters = {}
         if ids is not None:
             ids = [int(id_) for id_ in ids.split(',')]
-            filters['id'] = ids
+            filters['id'] = 'in', ids
         if predecessorid is not None:
-            filters['predecessorid'] = predecessorid
+            filters['predecessorid'] = '=', predecessorid
         if parentid is not None:
-            filters['parentid'] = parentid
+            filters['parentid'] = '=', parentid
+        if older is not None:
+            filters['modified'] = '<', float(older)
+        if newer is not None:
+            filters['modified'] = '>', float(newer)
 
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']

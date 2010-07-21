@@ -38,6 +38,7 @@ Basic tests to verify that the dispatching mechanism works.
 """
 import base64
 import json
+import time
 
 from weave.server.tests.functional import support
 
@@ -136,3 +137,26 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [126, 127])
+
+        # "older"
+        # Returns only ids for objects in the collection that have been last
+        # modified before the date given.
+        self.storage.delete_items(1, 'col2')
+        self.storage.set_item(1, 'col2', 128)
+        now = time.time()
+        time.sleep(0.3)
+        self.storage.set_item(1, 'col2', 129)
+        res = self.app.get('/1.0/tarek/storage/col2?older=%f' % now)
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [128])
+
+        # "newer"
+        # Returns only ids for objects in the collection that have been
+        # last modified since the date given.
+        res = self.app.get('/1.0/tarek/storage/col2?newer=%f' % now)
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [129])
