@@ -125,3 +125,14 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [125])
+
+        # "parentid"
+        # Returns the ids for objects in the collection that are the children
+        # of the parent id given.
+        self.storage.set_item(1, 'col2', 126, parentid='papa')
+        self.storage.set_item(1, 'col2', 127, parentid='papa')
+        res = self.app.get('/1.0/tarek/storage/col2?parentid=papa')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [126, 127])

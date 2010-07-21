@@ -76,7 +76,8 @@ class StorageController(object):
         raise HTTPNotImplemented
 
     # XXX see if we want to use kwargs here instead
-    def get_collection(self, request, ids=None, predecessorid=None):
+    def get_collection(self, request, ids=None, predecessorid=None,
+                       parentid=None):
         """Returns a list of the WBO ids contained in a collection."""
         filters = {}
         if ids is not None:
@@ -84,6 +85,8 @@ class StorageController(object):
             filters['id'] = ids
         if predecessorid is not None:
             filters['predecessorid'] = predecessorid
+        if parentid is not None:
+            filters['parentid'] = parentid
 
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
