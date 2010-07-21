@@ -122,8 +122,11 @@ class SyncServerApp(object):
         request.urlvars = ((), match)
         request.config = self.config
 
-        # XXX see if we want to build arguments with the query here
-        return function(request)
+        if request.method in ('GET',):
+            params = dict(request.GET)
+        else:
+            params = {}
+        return function(request, **params)
 
     def _get_function(self, controller, method):
         """Return the method of the right controller."""

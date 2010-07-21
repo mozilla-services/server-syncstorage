@@ -274,17 +274,42 @@ class WeaveSQLStorage(object):
         res = res.fetchone()
         return res is not None
 
-    def get_items(self, user_id, collection_name, fields=None):
-        """returns items from a collection"""
+    def get_items(self, user_id, collection_name, fields=None, filters=None):
+        """returns items from a collection
+
+        filter is a dict used to add conditions to the db query.
+        Its keys are the field names on which the condition operates.
+        Its values are the values the field should have.
+        It can be a single value, or a list. For the latter the in()
+        operator is used
+        """
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
             fields = ['*']
         fields = ', '.join(fields)
-        query = text('select %s from wbo where '
-                     'username = :user_id and collection = :collection_id'\
-                     % fields)
-        return self._conn.execute(query, user_id=user_id,
-                                  collection_id=collection_id).fetchall()
+
+        # preparing filters
+        extra = []
+        extra_values = {}
+        if filters is not None:
+            for field, value in filters.items():
+                if isinstance(value, (list, tuple)):
+                    value = [str(item) for item in value]
+                    extra.append('%s in(%s)' % (field, ','.join(value)))
+                else:
+                    value = str(value)
+                    extra.append('%s = :%s' % (field, field))
+                    extra_values[field] = value
+
+        query = ('select %s from wbo where username = :user_id and '
+                 'collection = :collection_id' % fields)
+
+        if extra != []:
+            query = '%s and %s' % (query, ' and '.join(extra))
+
+        return self._conn.execute(text(query), user_id=user_id,
+                                  collection_id=collection_id,
+                                  **extra_values).fetchall()
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""

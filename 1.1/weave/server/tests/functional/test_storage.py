@@ -99,6 +99,17 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(json.loads(res.body), [])
 
         res = self.app.get('/1.0/tarek/storage/col2')
-        self.assertEquals(json.loads(res.body), [0, 1, 2, 3, 4])
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [0, 1, 2, 3, 4])
 
+        # trying various filters
 
+        # Returns the ids for objects in the collection that are in the
+        # provided comma-separated list.
+        res = self.app.get('/1.0/tarek/storage/col2?ids=1,3')
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [1, 3])
