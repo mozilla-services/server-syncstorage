@@ -196,3 +196,15 @@ class TestStorage(support.TestWsgiApp):
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [131])
+
+        # "limit"
+        # Sets the maximum number of ids that will be returned
+        for i in range(10):
+            self.storage.set_item(1, 'col2', 140 + i)
+        res = self.app.get('/1.0/tarek/storage/col2?limit=2')
+        res = json.loads(res.body)
+        self.assertEquals(len(res), 2)
+
+        res = self.app.get('/1.0/tarek/storage/col2')
+        res = json.loads(res.body)
+        self.assertTrue(len(res) > 10)

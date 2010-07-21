@@ -274,7 +274,8 @@ class WeaveSQLStorage(object):
         res = res.fetchone()
         return res is not None
 
-    def get_items(self, user_id, collection_name, fields=None, filters=None):
+    def get_items(self, user_id, collection_name, fields=None, filters=None,
+                  limit=None):
         """returns items from a collection
 
         "filter" is a dict used to add conditions to the db query.
@@ -308,6 +309,9 @@ class WeaveSQLStorage(object):
 
         if extra != []:
             query = '%s and %s' % (query, ' and '.join(extra))
+
+        if limit is not None:
+            query += ' limit %d' % limit
 
         return self._conn.execute(text(query), user_id=user_id,
                                   collection_id=collection_id,
