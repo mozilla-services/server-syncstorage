@@ -38,8 +38,9 @@ Various utilities
 """
 import base64
 import json
+import struct
 
-from webob.exc import HTTPUnauthorized
+from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 
@@ -125,6 +126,38 @@ def authenticate_user(request, authtool):
     return res
 
 
-def json_response(data):
+def json_response(lines):
     """Returns Response containing a json string"""
-    return Response(json.dumps(data), content_type='application/json')
+    return Response(json.dumps(lines), content_type='application/json')
+
+def newlines_response(lines):
+    """Returns a Response object containing a newlines output."""
+    def _convert(line):
+        line = json.dumps(line).replace('\n', '\u000a')
+        return '%s\n' % line
+
+    data = [_convert(line) for line in lines]
+    return Response(''.join(data), content_type='application/newlines')
+
+def whoisi_response(lines):
+    """Returns a Response object containing a whoisi output."""
+    def _convert(line):
+        line = json.dumps(line)
+        size = struct.pack('!I', len(line))
+        return '%s%s' % (size, line)
+
+    data = [_convert(line) for line in lines]
+    return Response(''.join(data), content_type='application/whoisi')
+
+def convert_response(request, lines):
+    """Returns the response in the appropriate format, depending on the accept
+    request."""
+    accept = request.headers.get('Accept', 'application/json')
+    if accept == 'application/json':
+        return json_response(lines)
+    elif accept == 'application/newlines':
+        return newlines_response(lines)
+    elif accept == 'application/whoisi':
+        return whoisi_response(lines)
+
+    raise HTTPBadRequest('Unsupported format "%s"' % accept)

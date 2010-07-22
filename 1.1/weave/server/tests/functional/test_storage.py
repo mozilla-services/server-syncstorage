@@ -39,6 +39,7 @@ Basic tests to verify that the dispatching mechanism works.
 import base64
 import json
 import time
+import struct
 
 from weave.server.tests.functional import support
 
@@ -250,3 +251,54 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         self.assertEquals(ids, [1, 2, 0])
+
+    def test_alternative_formats(self):
+
+        # application/json
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(res.content_type, 'application/json')
+
+        res = json.loads(res.body)
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [0, 1, 2, 3, 4])
+
+        # application/newlines
+        res = self.app.get('/1.0/tarek/storage/col2',
+                           headers=[('Accept', 'application/newlines')])
+        self.assertEquals(res.content_type, 'application/newlines')
+
+        res = [json.loads(line) for line in res.body.strip().split('\n')]
+        ids = [line['id'] for line in res]
+        ids.sort()
+        self.assertEquals(ids, [0, 1, 2, 3, 4])
+
+        # application/whoisi
+        res = self.app.get('/1.0/tarek/storage/col2',
+                           headers=[('Accept', 'application/whoisi')])
+        self.assertEquals(res.content_type, 'application/whoisi')
+
+        lines = []
+        pos = current = 0
+        while pos != -1:
+            pos = res.body.find('\t', current)
+            if pos == -1:
+                break
+            # getting the 32bits value
+            size = res.body[pos-3:pos+1]
+            size = struct.unpack('!I', size)[0]
+
+            # extracting the line
+            line = res.body[pos+1:pos+size+1]
+            lines.append(json.loads(line))
+            current = pos + size + 3
+
+        ids = [line['id'] for line in lines]
+        ids.sort()
+        self.assertEquals(ids, [0, 1, 2, 3, 4])
+
+        # unkown format
+        res = self.app.get('/1.0/tarek/storage/col2',
+                        headers=[('Accept', 'application/xxx')],
+                        status=400)
+        self.assertEquals(res.status_int, 400)

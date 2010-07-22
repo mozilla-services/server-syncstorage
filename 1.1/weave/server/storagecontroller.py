@@ -40,7 +40,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
 from webob.exc import HTTPNotImplemented, HTTPBadRequest
-from weave.server.util import json_response
+from weave.server.util import convert_response
 
 
 class StorageController(object):
@@ -59,7 +59,7 @@ class StorageController(object):
         collections = self.storage.get_collection_timestamps(user_id)
         # XXX see if we need more processing here
         res = dict([(name, stamp) for name, stamp in collections])
-        return json_response(res)
+        return convert_response(request, res)
 
     def get_collections_count(self, request):
         """Returns a hash of collections associated with the account,
@@ -70,7 +70,7 @@ class StorageController(object):
         res = dict([(name, count) for name, count in counts])
 
         # XXX see if we need more processing here
-        return json_response(res)
+        return convert_response(request, res)
 
     def get_quota(self, request):
         raise HTTPNotImplemented
@@ -118,4 +118,4 @@ class StorageController(object):
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
-        return json_response([dict(line) for line in res])
+        return convert_response(request, [dict(line) for line in res])
