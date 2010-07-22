@@ -119,3 +119,10 @@ class StorageController(object):
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
         return convert_response(request, [dict(line) for line in res])
+
+    def get_item(self, request):
+        collection_name = request.sync_info['params'][0]
+        item_id  = request.sync_info['params'][1]
+        user_id = request.sync_info['userid']
+        res = self.storage.get_item(user_id, collection_name, item_id)
+        return convert_response(request, dict(res))

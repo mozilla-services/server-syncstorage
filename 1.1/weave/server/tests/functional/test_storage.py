@@ -302,3 +302,14 @@ class TestStorage(support.TestWsgiApp):
                         headers=[('Accept', 'application/xxx')],
                         status=400)
         self.assertEquals(res.status_int, 400)
+
+    def test_get_item(self):
+        # grabbing object 1 from col2
+        res = self.app.get('/1.0/tarek/storage/col2/1')
+        res = json.loads(res.body)
+        wanted = ['collection', 'id', 'modified', 'parentid', 'payload',
+                  'payload_size', 'predecessorid', 'sortindex', 'username']
+        keys = res.keys()
+        keys.sort()
+        self.assertEquals(keys, wanted)
+        self.assertEquals(res['id'], 1)
