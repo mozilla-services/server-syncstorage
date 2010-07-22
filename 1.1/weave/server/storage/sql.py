@@ -361,7 +361,8 @@ class WeaveSQLStorage(object):
             query = text('update wbo set %s where id = :id' \
                          % params)
 
-        return self._conn.execute(query, **values)
+        self._conn.execute(query, **values)
+        return values['modified']
 
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""

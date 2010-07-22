@@ -39,8 +39,10 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
+import json
+
 from webob.exc import HTTPNotImplemented, HTTPBadRequest
-from weave.server.util import convert_response
+from weave.server.util import convert_response, json_response
 
 
 class StorageController(object):
@@ -121,8 +123,18 @@ class StorageController(object):
         return convert_response(request, [dict(line) for line in res])
 
     def get_item(self, request):
+        """Returns a single WBO object."""
         collection_name = request.sync_info['params'][0]
         item_id  = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
         res = self.storage.get_item(user_id, collection_name, item_id)
-        return convert_response(request, dict(res))
+        return json_response(dict(res))
+
+    def set_item(self, request):
+        """Sets a single WBO object."""
+        collection_name = request.sync_info['params'][0]
+        item_id  = int(request.sync_info['params'][1])
+        user_id = request.sync_info['userid']
+        data = json.loads(request.body)
+        res = self.storage.set_item(user_id, collection_name, item_id, **data)
+        return json_response(res)

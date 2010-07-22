@@ -62,7 +62,10 @@ URLS = [('GET', '/', 'storage', 'index'),
         ('GET', '/_API_/{username}/storage/{collection}', 'storage',
         'get_collection'),
         ('GET', '/_API_/{username}/storage/{collection}/{item}', 'storage',
-        'get_item')]
+        'get_item'),
+        ('PUT', '/_API_/{username}/storage/{collection}/{item}', 'storage',
+        'set_item')]
+
 
 class SyncServerApp(object):
     """ SyncServerApp dispatches the request to the right controller

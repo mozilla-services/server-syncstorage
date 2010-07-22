@@ -313,3 +313,20 @@ class TestStorage(support.TestWsgiApp):
         keys.sort()
         self.assertEquals(keys, wanted)
         self.assertEquals(res['id'], 1)
+
+    def test_set_item(self):
+        # let's create an object
+        wbo = {'payload': 'XXX', 'payload_size': 3}
+        wbo = json.dumps(wbo)
+        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.get('/1.0/tarek/storage/col2/12345')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'XXX')
+
+        # now let's update it
+        wbo = {'payload': 'YYY', 'payload_size': 3}
+        wbo = json.dumps(wbo)
+        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.get('/1.0/tarek/storage/col2/12345')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'YYY')
