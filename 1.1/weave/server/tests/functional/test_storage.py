@@ -330,3 +330,32 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/storage/col2/12345')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], 'YYY')
+
+    def test_set_collection(self):
+        # sending two wbos
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        # checking what we did
+        res = self.app.get('/1.0/tarek/storage/col2/12')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'XXX')
+        res = self.app.get('/1.0/tarek/storage/col2/13')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'XXX')
+
+        # one more time, with changes
+        wbo1 = {'id': 13, 'payload': 'XyX', 'payload_size': 3}
+        wbo2 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        # checking what we did
+        res = self.app.get('/1.0/tarek/storage/col2/14')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'XXX')
+        res = self.app.get('/1.0/tarek/storage/col2/13')
+        res = json.loads(res.body)
+        self.assertEquals(res['payload'], 'XyX')

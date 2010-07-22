@@ -345,7 +345,8 @@ class WeaveSQLStorage(object):
         values['collection'] = self._get_collection_id(user_id,
                                                        collection_name)
         values['id'] = item_id
-        values['modified'] = time()
+        if 'modified' not in values:
+            values['modified'] = time()
         values['username'] = user_id
 
         if not self.item_exists(user_id, collection_name, item_id):

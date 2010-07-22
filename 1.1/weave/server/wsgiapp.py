@@ -64,7 +64,10 @@ URLS = [('GET', '/', 'storage', 'index'),
         ('GET', '/_API_/{username}/storage/{collection}/{item}', 'storage',
         'get_item'),
         ('PUT', '/_API_/{username}/storage/{collection}/{item}', 'storage',
-        'set_item')]
+        'set_item'),
+        ('POST', '/_API_/{username}/storage/{collection}', 'storage',
+        'set_collection')
+        ]
 
 
 class SyncServerApp(object):

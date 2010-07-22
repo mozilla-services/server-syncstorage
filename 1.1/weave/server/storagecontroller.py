@@ -40,6 +40,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
 import json
+from time import time
 
 from webob.exc import HTTPNotImplemented, HTTPBadRequest
 from weave.server.util import convert_response, json_response
@@ -137,4 +138,30 @@ class StorageController(object):
         user_id = request.sync_info['userid']
         data = json.loads(request.body)
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
+        return json_response(res)
+
+    def set_collection(self, request):
+        """Sets a batch of WBO objects into a collection."""
+        collection_name = request.sync_info['params'][0]
+        user_id = request.sync_info['userid']
+        wbos = json.loads(request.body)
+        modified = time()
+        res = {'modified': modified, 'success': [], 'failed': {}}
+        for wbo in wbos:
+            if 'id' not in wbo:
+                # XXX what id should we use here ?
+                res['failed']['someid'] = 'no id'
+                continue
+
+            wbo['collection'] = collection_name
+            wbo['modified'] = modified
+            item_id = wbo['id']
+            try:
+                self.storage.set_item(user_id, collection_name,
+                                      item_id, **wbo)
+            except Exception, e:
+                res['failed'][item_id] = str(e)
+            else:
+                res['success'].append(item_id)
+
         return json_response(res)
