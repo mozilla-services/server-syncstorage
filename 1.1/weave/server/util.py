@@ -44,6 +44,23 @@ from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 
+class RawResponse(Response):
+    """Adds a rawvalue attribute, that can contain the raw value of the
+    body, before it gets transformed in a specific content-type
+    """
+    def __init__(self, body=None, status=None, headerlist=None, app_iter=None,
+                 request=None, content_type=None, conditional_response=None,
+                 raw_value=None, **kw):
+        super(RawResponse, self).__init__(body, status, headerlist, app_iter,
+                                          request, content_type,
+                                          conditional_response, **kw)
+        if content_type == 'text/plain' and body is not None:
+            self.raw_value = raw_value
+        else:
+            self.raw_value = raw_value
+
+
+
 def _normalize(path):
     """Remove extra '/'s"""
     if path[0] == '/':
@@ -128,7 +145,8 @@ def authenticate_user(request, authtool):
 
 def json_response(lines):
     """Returns Response containing a json string"""
-    return Response(json.dumps(lines), content_type='application/json')
+    return RawResponse(json.dumps(lines), content_type='application/json',
+                       raw_value=lines)
 
 
 def newlines_response(lines):
@@ -139,7 +157,8 @@ def newlines_response(lines):
         return '%s\n' % line
 
     data = [_convert(line) for line in lines]
-    return Response(''.join(data), content_type='application/newlines')
+    return RawResponse(''.join(data), content_type='application/newlines',
+                       raw_value=lines)
 
 
 def whoisi_response(lines):
@@ -151,7 +170,8 @@ def whoisi_response(lines):
         return '%s%s' % (size, line)
 
     data = [_convert(line) for line in lines]
-    return Response(''.join(data), content_type='application/whoisi')
+    return RawResponse(''.join(data), content_type='application/whoisi',
+                       raw_value=lines)
 
 
 def convert_response(request, lines):
