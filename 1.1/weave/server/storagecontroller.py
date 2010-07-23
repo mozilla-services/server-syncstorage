@@ -142,6 +142,16 @@ class StorageController(object):
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
 
+    def delete_item(self, request):
+        """Deletes a single WBO object."""
+        collection_name = request.sync_info['params'][0]
+        item_id = int(request.sync_info['params'][1])
+        user_id = request.sync_info['userid']
+        res = self.storage.delete_item(user_id, collection_name, item_id)
+        if not res:
+            raise HTTPNotFound()
+        return json_response(res)
+
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
         collection_name = request.sync_info['params'][0]

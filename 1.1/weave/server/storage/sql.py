@@ -371,8 +371,12 @@ class WeaveSQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
         query = text('delete from wbo where username = :user_id and '
                      'collection = :collection_id and id = :item_id')
-        return self._conn.execute(query, user_id=user_id,
-                                  collection_id=collection_id, item_id=item_id)
+        res = self._conn.execute(query, user_id=user_id,
+                                 collection_id=collection_id, item_id=item_id)
+        if res.rowcount == 1:
+            return time()
+        else:
+            return None
 
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None):
@@ -422,6 +426,7 @@ class WeaveSQLStorage(object):
                 raise NotImplementedError
 
         # XXX see if we want to send back more details
+        # e.g. by checking the rowcount
         self._conn.execute(text(query), user_id=user_id,
                            collection_id=collection_id, **extra_values)
         return time()

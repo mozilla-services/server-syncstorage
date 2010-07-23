@@ -69,6 +69,8 @@ URLS = [('GET', '/', 'storage', 'index'),
         'set_collection'),
         ('DELETE', '/_API_/{username}/storage/{collection}', 'storage',
         'delete_collection'),
+        ('DELETE', '/_API_/{username}/storage/{collection}/{item}', 'storage',
+        'delete_item'),
         ]
 
 
