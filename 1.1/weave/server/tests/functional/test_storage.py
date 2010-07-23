@@ -60,9 +60,9 @@ class TestStorage(support.TestWsgiApp):
             self.storage.set_collection(1, name)
 
         for item in range(3):
-            self.storage.set_item(1, 'col1', item)
+            self.storage.set_item(1, 'col1', str(item))
         for item in range(5):
-            self.storage.set_item(1, 'col2', item)
+            self.storage.set_item(1, 'col2', str(item))
 
     def tearDown(self):
         # removing all data after the test
@@ -105,7 +105,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(resp.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [0, 1, 2, 3, 4])
+        self.assertEquals(ids, ['0', '1', '2', '3', '4'])
         self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
 
         # trying various filters
@@ -117,43 +117,43 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [1, 3])
+        self.assertEquals(ids, ['1', '3'])
 
         # "predecessorid"
         # Returns the ids for objects in the collection that
         # are directly preceded by the id given. Usually only returns one
         # result.
-        self.storage.set_item(1, 'col2', 125, predecessorid='XXXX')
+        self.storage.set_item(1, 'col2', '125', predecessorid='XXXX')
         res = self.app.get('/1.0/tarek/storage/col2?predecessorid=XXXX')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [125])
+        self.assertEquals(ids, ['125'])
 
         # "parentid"
         # Returns the ids for objects in the collection that are the children
         # of the parent id given.
-        self.storage.set_item(1, 'col2', 126, parentid='papa')
-        self.storage.set_item(1, 'col2', 127, parentid='papa')
+        self.storage.set_item(1, 'col2', '126', parentid='papa')
+        self.storage.set_item(1, 'col2', '127', parentid='papa')
         res = self.app.get('/1.0/tarek/storage/col2?parentid=papa')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [126, 127])
+        self.assertEquals(ids, ['126', '127'])
 
         # "older"
         # Returns only ids for objects in the collection that have been last
         # modified before the date given.
         self.storage.delete_items(1, 'col2')
-        self.storage.set_item(1, 'col2', 128)
+        self.storage.set_item(1, 'col2', '128')
         now = time.time()
         time.sleep(0.3)
-        self.storage.set_item(1, 'col2', 129)
+        self.storage.set_item(1, 'col2', '129')
         res = self.app.get('/1.0/tarek/storage/col2?older=%f' % now)
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [128])
+        self.assertEquals(ids, ['128'])
 
         # "newer"
         # Returns only ids for objects in the collection that have been
@@ -162,7 +162,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [129])
+        self.assertEquals(ids, ['129'])
 
         # "full"
         # If defined, returns the full WBO, rather than just the id.
@@ -183,13 +183,13 @@ class TestStorage(support.TestWsgiApp):
         # "index_above"
         # If defined, only returns items with a higher sortindex than the
         # value specified.
-        self.storage.set_item(1, 'col2', 130, sortindex=11)
-        self.storage.set_item(1, 'col2', 131, sortindex=9)
+        self.storage.set_item(1, 'col2', '130', sortindex=11)
+        self.storage.set_item(1, 'col2', '131', sortindex=9)
         res = self.app.get('/1.0/tarek/storage/col2?index_above=10')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [130])
+        self.assertEquals(ids, ['130'])
 
         # "index_below"
         # If defined, only returns items with a lower sortindex than the value
@@ -198,14 +198,14 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [131])
+        self.assertEquals(ids, ['131'])
 
         # "limit"
         # Sets the maximum number of ids that will be returned
         self.storage.delete_items(1, 'col2')
 
         for i in range(10):
-            self.storage.set_item(1, 'col2', i)
+            self.storage.set_item(1, 'col2', str(i))
         res = self.app.get('/1.0/tarek/storage/col2?limit=2')
         res = json.loads(res.body)
         self.assertEquals(len(res), 2)
@@ -228,7 +228,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res), 3)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [2, 3, 4])
+        self.assertEquals(ids, ['2', '3', '4'])
 
         # "sort"
         #   'oldest' - Orders by modification date (oldest first)
@@ -236,23 +236,23 @@ class TestStorage(support.TestWsgiApp):
         #   'index' - Orders by the sortindex descending (highest weight first)
         self.storage.delete_items(1, 'col2')
 
-        for index, sortindex in ((0, 1), (1, 34), (2, 12)):
+        for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
             self.storage.set_item(1, 'col2', index, sortindex=sortindex)
 
         res = self.app.get('/1.0/tarek/storage/col2?sort=oldest')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
-        self.assertEquals(ids, [0, 1, 2])
+        self.assertEquals(ids, ['0', '1', '2'])
 
         res = self.app.get('/1.0/tarek/storage/col2?sort=newest')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
-        self.assertEquals(ids, [2, 1, 0])
+        self.assertEquals(ids, ['2', '1', '0'])
 
         res = self.app.get('/1.0/tarek/storage/col2?sort=index')
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
-        self.assertEquals(ids, [1, 2, 0])
+        self.assertEquals(ids, ['1', '2', '0'])
 
     def test_alternative_formats(self):
 
@@ -263,7 +263,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [0, 1, 2, 3, 4])
+        self.assertEquals(ids, ['0', '1', '2', '3', '4'])
 
         # application/newlines
         res = self.app.get('/1.0/tarek/storage/col2',
@@ -273,7 +273,7 @@ class TestStorage(support.TestWsgiApp):
         res = [json.loads(line) for line in res.body.strip().split('\n')]
         ids = [line['id'] for line in res]
         ids.sort()
-        self.assertEquals(ids, [0, 1, 2, 3, 4])
+        self.assertEquals(ids, ['0', '1', '2', '3', '4'])
 
         # application/whoisi
         res = self.app.get('/1.0/tarek/storage/col2',
@@ -281,23 +281,20 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res.content_type, 'application/whoisi')
 
         lines = []
-        pos = current = 0
-        while pos != -1:
-            pos = res.body.find('\t', current)
-            if pos == -1:
-                break
+        pos = 0
+        while pos < len(res.body):
             # getting the 32bits value
-            size = res.body[pos - 3:pos + 1]
+            size = res.body[pos:pos + 4]
             size = struct.unpack('!I', size)[0]
 
             # extracting the line
-            line = res.body[pos + 1:pos + size + 1]
+            line = res.body[pos + 4:pos + size + 4]
             lines.append(json.loads(line))
-            current = pos + size + 3
+            pos = pos + size + 4
 
         ids = [line['id'] for line in lines]
         ids.sort()
-        self.assertEquals(ids, [0, 1, 2, 3, 4])
+        self.assertEquals(ids, ['0', '1', '2', '3', '4'])
 
         # unkown format
         res = self.app.get('/1.0/tarek/storage/col2',
@@ -314,7 +311,7 @@ class TestStorage(support.TestWsgiApp):
         keys = res.keys()
         keys.sort()
         self.assertEquals(keys, wanted)
-        self.assertEquals(res['id'], 1)
+        self.assertEquals(res['id'], '1')
 
         # unexisting object
         res = self.app.get('/1.0/tarek/storage/col2/99', status=404)

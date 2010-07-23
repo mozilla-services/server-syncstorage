@@ -142,7 +142,7 @@ class StorageController(object):
     def set_item(self, request):
         """Sets a single WBO object."""
         collection_name = request.sync_info['params'][0]
-        item_id = int(request.sync_info['params'][1])
+        item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
         data = json.loads(request.body)
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
@@ -151,7 +151,7 @@ class StorageController(object):
     def delete_item(self, request):
         """Deletes a single WBO object."""
         collection_name = request.sync_info['params'][0]
-        item_id = int(request.sync_info['params'][1])
+        item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
         res = self.storage.delete_item(user_id, collection_name, item_id)
         if not res:
@@ -194,7 +194,7 @@ class StorageController(object):
         # unknown values)
         filters = {}
         if ids is not None:
-            ids = [int(id_) for id_ in ids.split(',')]
+            ids = ['"%s"' % id_ for id_ in ids.split(',')]
         if parentid is not None:
             filters['parentid'] = '=', parentid
         if older is not None:
@@ -224,4 +224,5 @@ class StorageController(object):
         if 'X-Confirm-Delete' not in request.headers:
             raise HTTPBadRequest('Confirmation required.')
         user_id = request.sync_info['userid']
-        return self.storage.delete_storage(user_id)
+        self.storage.delete_storage(user_id)  # XXX failures ?
+        return json_response(True)

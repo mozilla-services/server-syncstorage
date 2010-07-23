@@ -82,11 +82,10 @@ tables.append(reset_code)
 class WBO(_Base):
     __tablename__ = 'wbo'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     # XXX that's user id in fact
     username = Column(Integer, primary_key=True)
     collection = Column(Integer, primary_key=True)
-
     parentid = Column(String)
     predecessorid = Column(String)
     sortindex = Column(Integer)
