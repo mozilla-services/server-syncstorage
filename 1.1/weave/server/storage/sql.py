@@ -140,6 +140,19 @@ class WeaveSQLStorage(object):
             return None
         return data[0]
 
+    def delete_storage(self, user_id):
+        """Removes all user data"""
+        # removing collections
+        query = text('delete from collections where '
+                     'userid = :user_id')
+        self._conn.execute(query, user_id=user_id)
+
+        # removing items
+        query = text('delete from wbo where '
+                     'username = :user_id')
+        self._conn.execute(query, user_id=user_id)
+        return time()
+
     #
     # Collections APIs
     #

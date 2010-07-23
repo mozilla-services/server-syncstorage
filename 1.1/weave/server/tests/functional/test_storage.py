@@ -484,3 +484,25 @@ class TestStorage(support.TestWsgiApp):
         # unexisting item
         res = self.app.delete('/1.0/tarek/storage/col2/12982', status=404)
         self.assertEquals(res.status_int, 404)
+
+    def test_delete_storage(self):
+        self.storage.delete_items(1, 'col2')
+
+        # creating a collection of three
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbos = json.dumps([wbo1, wbo2, wbo3])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 3)
+
+        # deleting all with no confirmation
+        res = self.app.delete('/1.0/tarek/storage', status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # deleting all for real now
+        res = self.app.delete('/1.0/tarek/storage/col2',
+                              headers=[('X-Confirm-Delete', '1')])
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 0)

@@ -71,7 +71,7 @@ URLS = [('GET', '/', 'storage', 'index'),
         'delete_collection'),
         ('DELETE', '/_API_/{username}/storage/{collection}/{item}', 'storage',
         'delete_item'),
-        ]
+        ('DELETE', '/_API_/{username}/storage', 'storage', 'delete_storage')]
 
 
 class SyncServerApp(object):

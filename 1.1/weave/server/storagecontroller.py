@@ -209,3 +209,14 @@ class StorageController(object):
         res = self.storage.delete_items(user_id, collection_name, ids, filters,
                                         limit=limit, offset=offset, sort=sort)
         return json_response(res)
+
+    def delete_storage(self, request):
+        """Deletes all records for the user.
+
+        Will return a precondition error unless an X-Confirm-Delete header
+        is included.
+        """
+        if 'X-Confirm-Delete' not in request.headers:
+            raise HTTPBadRequest('Confirmation required.')
+        user_id = request.sync_info['userid']
+        return self.storage.delete_storage(user_id)
