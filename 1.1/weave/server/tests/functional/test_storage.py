@@ -285,11 +285,11 @@ class TestStorage(support.TestWsgiApp):
             if pos == -1:
                 break
             # getting the 32bits value
-            size = res.body[pos-3:pos+1]
+            size = res.body[pos - 3:pos + 1]
             size = struct.unpack('!I', size)[0]
 
             # extracting the line
-            line = res.body[pos+1:pos+size+1]
+            line = res.body[pos + 1:pos + size + 1]
             lines.append(json.loads(line))
             current = pos + size + 3
 
@@ -313,6 +313,10 @@ class TestStorage(support.TestWsgiApp):
         keys.sort()
         self.assertEquals(keys, wanted)
         self.assertEquals(res['id'], 1)
+
+        # unexisting object
+        res = self.app.get('/1.0/tarek/storage/col2/99', status=404)
+        self.assertEquals(res.status_int, 404)
 
     def test_set_item(self):
         # let's create an object
@@ -359,3 +363,103 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/storage/col2/13')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], 'XyX')
+
+    def test_delete_collection(self):
+        self.storage.delete_items(1, 'col2')
+
+        # creating a collection of three
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbos = json.dumps([wbo1, wbo2, wbo3])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 3)
+
+        # deleting all items
+        self.app.delete('/1.0/tarek/storage/col2')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 0)
+
+        # now trying deletion with filters
+
+        # "ids"
+        # Deletes the ids for objects in the collection that are in the
+        # provided comma-separated list.
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.delete('/1.0/tarek/storage/col2?ids=12,14')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 1)
+        self.app.delete('/1.0/tarek/storage/col2?ids=13')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 0)
+
+        # "parentid"
+        # Only deletes objects in the collection that are the
+        # children of the parent id given.
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbos = json.dumps([wbo1, wbo2, wbo3])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.delete('/1.0/tarek/storage/col2?parentid=1')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 1)
+
+        # "older"
+        # Only deletes objects in the collection that have been last
+        # modified before the date given
+        self.app.delete('/1.0/tarek/storage/col2')
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        now = time.time()
+        time.sleep(.3)
+        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbos = json.dumps([wbo3])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        self.app.delete('/1.0/tarek/storage/col2?older=%f' % now)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 1)
+
+        # "newer"
+        # Only deletes objects in the collection that have been last modified
+        # since the date given.
+        self.app.delete('/1.0/tarek/storage/col2')
+        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        now = time.time()
+        time.sleep(.3)
+        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbos = json.dumps([wbo3])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
+        self.app.delete('/1.0/tarek/storage/col2?newer=%f' % now)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 2)
+
+        # "limit"
+        # Sets the maximum number of objects that will be deleted.
+        # xxx see how to activate this under sqlite
+
+        #self.app.delete('/1.0/tarek/storage/col2')
+        #wbos = json.dumps([wbo1, wbo2, wbo3])
+        #self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        #self.app.delete('/1.0/tarek/storage/col2?limit=2')
+        #res = self.app.get('/1.0/tarek/storage/col2')
+        #self.assertEquals(len(json.loads(res.body)), 1)
+
+        # "sort"
+        #   'oldest' - Orders by modification date (oldest first)
+        #   'newest' - Orders by modification date (newest first)
+        #   'index' - Orders by the sortindex (ordered lists)
+        #   'depthindex' - Orders by depth, then by sortindex (ordered trees)
+
+        # sort is used only if limit is used.
+        # check this with toby

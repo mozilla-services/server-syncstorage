@@ -42,7 +42,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 import json
 from time import time
 
-from webob.exc import HTTPNotImplemented, HTTPBadRequest
+from webob.exc import HTTPNotImplemented, HTTPBadRequest, HTTPNotFound
 from weave.server.util import convert_response, json_response
 
 
@@ -126,15 +126,17 @@ class StorageController(object):
     def get_item(self, request):
         """Returns a single WBO object."""
         collection_name = request.sync_info['params'][0]
-        item_id  = request.sync_info['params'][1]
+        item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
         res = self.storage.get_item(user_id, collection_name, item_id)
+        if res is None:
+            raise HTTPNotFound()
         return json_response(dict(res))
 
     def set_item(self, request):
         """Sets a single WBO object."""
         collection_name = request.sync_info['params'][0]
-        item_id  = int(request.sync_info['params'][1])
+        item_id = int(request.sync_info['params'][1])
         user_id = request.sync_info['userid']
         data = json.loads(request.body)
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
@@ -164,4 +166,36 @@ class StorageController(object):
             else:
                 res['success'].append(item_id)
 
+        return json_response(res)
+
+    def delete_collection(self, request, ids=None, parentid=None, older=None,
+                          newer=None, limit=None, offset=None, sort=None):
+        """Deletes the collection and all contents.
+
+        Additional request parameters may modify the selection of which
+        items to delete.
+        """
+        # XXX sanity check on arguments (detect incompatible params here, or
+        # unknown values)
+        filters = {}
+        if ids is not None:
+            ids = [int(id_) for id_ in ids.split(',')]
+        if parentid is not None:
+            filters['parentid'] = '=', parentid
+        if older is not None:
+            filters['modified'] = '<', float(older)
+        if newer is not None:
+            filters['modified'] = '>', float(newer)
+        if limit is not None:
+            limit = int(limit)
+        if offset is not None:
+            # we need both
+            if limit is None:
+                raise HTTPBadRequest('"offset" cannot be used without "limit"')
+            offset = int(offset)
+
+        collection_name = request.sync_info['params'][0]
+        user_id = request.sync_info['userid']
+        res = self.storage.delete_items(user_id, collection_name, ids, filters,
+                                        limit=limit, offset=offset, sort=sort)
         return json_response(res)

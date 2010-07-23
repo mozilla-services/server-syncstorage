@@ -49,6 +49,7 @@ _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
 _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
+
 class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI):
@@ -373,20 +374,56 @@ class WeaveSQLStorage(object):
         return self._conn.execute(query, user_id=user_id,
                                   collection_id=collection_id, item_id=item_id)
 
-    def delete_items(self, user_id, collection_name, item_ids=None):
+    def delete_items(self, user_id, collection_name, item_ids=None,
+                     filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
 
         if item_ids is None:
-            query = text('delete from wbo where username = :user_id and '
-                         'collection = :collection_id')
+            query = ('delete from wbo where username = :user_id and '
+                     'collection = :collection_id')
         else:
-            ids = ', '.join(item_ids)
-            query = text('delete from wbo where username = :user_id and '
-                         'collection = :collection_id and id in (%s)' % ids)
+            ids = ', '.join([str(id_) for id_ in item_ids])
+            query = ('delete from wbo where username = :user_id and '
+                     'collection = :collection_id and id in (%s)' % ids)
 
-        return self._conn.execute(query, user_id=user_id,
-                                  collection_id=collection_id)
+        # preparing filters
+        extra = []
+        extra_values = {}
+        if filters is not None:
+            for field, value in filters.items():
+                operator, value = value
+                if isinstance(value, (list, tuple)):
+                    value = [str(item) for item in value]
+                    extra.append('%s %s (%s)' % (field, operator,
+                                 ','.join(value)))
+                else:
+                    value = str(value)
+                    extra.append('%s %s :%s' % (field, operator, field))
+                    extra_values[field] = value
 
+        if extra != []:
+            query = '%s and %s' % (query, ' and '.join(extra))
+
+        if limit is not None:
+            query += ' limit %d' % limit
+
+        if offset is not None:
+            query += ' offset %d' % offset
+
+        if sort is not None:
+            if sort == 'oldest':
+                query += ' order by modified'
+            elif sort == 'newest':
+                query += ' order by modified desc'
+            elif sort == 'index':
+                query += ' order by sortindex desc'
+            elif query == 'depthindex':
+                raise NotImplementedError
+
+        # XXX see if we want to send back more details
+        self._conn.execute(text(query), user_id=user_id,
+                           collection_id=collection_id, **extra_values)
+        return time()
 
 register(WeaveSQLStorage)

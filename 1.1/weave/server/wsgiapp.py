@@ -66,7 +66,9 @@ URLS = [('GET', '/', 'storage', 'index'),
         ('PUT', '/_API_/{username}/storage/{collection}/{item}', 'storage',
         'set_item'),
         ('POST', '/_API_/{username}/storage/{collection}', 'storage',
-        'set_collection')
+        'set_collection'),
+        ('DELETE', '/_API_/{username}/storage/{collection}', 'storage',
+        'delete_collection'),
         ]
 
 
@@ -129,7 +131,8 @@ class SyncServerApp(object):
         request.urlvars = ((), match)
         request.config = self.config
 
-        if request.method in ('GET',):
+        if request.method in ('GET', 'DELETE'):
+            # XXX DELETE fills the GET dict.
             params = dict(request.GET)
         else:
             params = {}
