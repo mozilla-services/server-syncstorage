@@ -130,8 +130,10 @@ def json_response(lines):
     """Returns Response containing a json string"""
     return Response(json.dumps(lines), content_type='application/json')
 
+
 def newlines_response(lines):
     """Returns a Response object containing a newlines output."""
+
     def _convert(line):
         line = json.dumps(line).replace('\n', '\u000a')
         return '%s\n' % line
@@ -139,8 +141,10 @@ def newlines_response(lines):
     data = [_convert(line) for line in lines]
     return Response(''.join(data), content_type='application/newlines')
 
+
 def whoisi_response(lines):
     """Returns a Response object containing a whoisi output."""
+
     def _convert(line):
         line = json.dumps(line)
         size = struct.pack('!I', len(line))
@@ -148,6 +152,7 @@ def whoisi_response(lines):
 
     data = [_convert(line) for line in lines]
     return Response(''.join(data), content_type='application/whoisi')
+
 
 def convert_response(request, lines):
     """Returns the response in the appropriate format, depending on the accept
