@@ -42,9 +42,10 @@ from routes import Mapper, URLGenerator
 
 from webob.dec import wsgify
 from webob.exc import HTTPNotFound, HTTPUnauthorized
+from webob import Response
 
 from weave.server import API_VERSION
-from weave.server.util import authenticate_user, RawResponse
+from weave.server.util import authenticate_user
 from weave.server.storage import get_storage
 from weave.server.auth import get_auth_tool
 
@@ -112,9 +113,8 @@ class SyncServerApp(object):
 
     @wsgify
     def __call__(self, request):
-        server_time = time.time()
-        # XXX All requests in the Sync APIs
-        # are authenticated
+        request.server_time = time.time()
+        # XXX All requests in the Sync APIs are authenticated
         request.sync_info = authenticate_user(request, self.authtool)
         if 'userid' not in request.sync_info:
             raise HTTPUnauthorized
@@ -146,25 +146,13 @@ class SyncServerApp(object):
         result = function(request, **params)
 
         if isinstance(result, basestring):
-            response = RawResponse(result, content_type='text/plain')
+            response = Response(result)
         else:
             # result is already a Response
             response = result
 
-        # returning an X-Weave-Timestamp header when asked
-        if 'X-Weave-Timestamp' in request.headers:
-            if request.method in ('PUT', 'POST'):
-                # possible outputs are a direct timestamp, or a dict
-                # with a "modified" key
-                if isinstance(response.raw_value, dict):
-                    timestamp = str(response.raw_value['modified'])
-                else:
-                    timestamp = str(response.raw_value)
-            else:
-                timestamp = str(server_time)
-
-            response.headers['X-Weave-Timestamp'] = timestamp
-
+        # setting up the X-Weave-Timestamp
+        response.headers['X-Weave-Timestamp'] = str(request.server_time)
         return response
 
     def _get_function(self, controller, method):

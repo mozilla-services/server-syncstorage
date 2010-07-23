@@ -508,16 +508,14 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(json.loads(res.body)), 0)
 
     def test_x_weave_timestamp(self):
-        res = self.app.get('/1.0/tarek/storage/col2',
-                              headers=[('X-Weave-Timestamp', '1')])
+        res = self.app.get('/1.0/tarek/storage/col2')
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)
 
         # getting the timestamp with a PUT
         wbo = {'payload': 'XXX', 'payload_size': 3}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
-                           headers=[('X-Weave-Timestamp', '1')])
+        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)
 
@@ -525,7 +523,6 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
         wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
         wbos = json.dumps([wbo1, wbo2])
-        res = self.app.post('/1.0/tarek/storage/col2', params=wbos,
-                            headers=[('X-Weave-Timestamp', '1')])
+        res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)

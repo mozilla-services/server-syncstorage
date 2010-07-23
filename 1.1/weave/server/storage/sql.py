@@ -150,8 +150,10 @@ class WeaveSQLStorage(object):
         # removing items
         query = text('delete from wbo where '
                      'username = :user_id')
+
         self._conn.execute(query, user_id=user_id)
-        return time()
+        # XXX see if we want to check the rowcount
+        return True
 
     #
     # Collections APIs
@@ -386,10 +388,7 @@ class WeaveSQLStorage(object):
                      'collection = :collection_id and id = :item_id')
         res = self._conn.execute(query, user_id=user_id,
                                  collection_id=collection_id, item_id=item_id)
-        if res.rowcount == 1:
-            return time()
-        else:
-            return None
+        return res.rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None):
@@ -440,8 +439,8 @@ class WeaveSQLStorage(object):
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        self._conn.execute(text(query), user_id=user_id,
-                           collection_id=collection_id, **extra_values)
-        return time()
+        res = self._conn.execute(text(query), user_id=user_id,
+                                 collection_id=collection_id, **extra_values)
+        return res.rowcount > 0
 
 register(WeaveSQLStorage)

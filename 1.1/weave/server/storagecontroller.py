@@ -40,7 +40,6 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
 import json
-from time import time
 
 from webob.exc import HTTPNotImplemented, HTTPBadRequest, HTTPNotFound
 from weave.server.util import convert_response, json_response
@@ -157,8 +156,7 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
         wbos = json.loads(request.body)
-        modified = time()
-        res = {'modified': modified, 'success': [], 'failed': {}}
+        res = {'modified': request.server_time, 'success': [], 'failed': {}}
         for wbo in wbos:
             if 'id' not in wbo:
                 # XXX what id should we use here ?
@@ -166,7 +164,7 @@ class StorageController(object):
                 continue
 
             wbo['collection'] = collection_name
-            wbo['modified'] = modified
+            wbo['modified'] = request.server_time
             item_id = wbo['id']
             try:
                 self.storage.set_item(user_id, collection_name,
