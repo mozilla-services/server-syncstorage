@@ -72,6 +72,8 @@ URLS = [('GET', '/', 'storage', 'index'),
         'set_item'),
         ('POST', '/_API_/{username}/storage/{collection}', 'storage',
         'set_collection'),
+        ('PUT', '/_API_/{username}/storage/{collection}', 'storage',  # XXX FT
+        'set_collection'),
         ('DELETE', '/_API_/{username}/storage/{collection}', 'storage',
         'delete_collection'),
         ('DELETE', '/_API_/{username}/storage/{collection}/{item}', 'storage',

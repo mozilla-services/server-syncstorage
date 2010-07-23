@@ -124,12 +124,16 @@ class StorageController(object):
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
-        res = [dict(line) for line in res]
+        if full:
+            res = [dict(line) for line in res]
+        else:
+            res = [line['id'] for line in res]
+
         response = convert_response(request, res)
         response.headers['X-Weave-Records'] = str(len(res))
         return response
 
-    def get_item(self, request):
+    def get_item(self, request, full=True):  # always full
         """Returns a single WBO object."""
         collection_name = request.sync_info['params'][0]
         item_id = request.sync_info['params'][1]
@@ -163,6 +167,9 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
         wbos = json.loads(request.body)
+        if not isinstance(wbos, (tuple, list)):
+            wbos = [wbos]
+
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
         for wbo in wbos:
             if 'id' not in wbo:

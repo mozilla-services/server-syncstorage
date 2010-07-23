@@ -124,20 +124,21 @@ class WeaveSQLStorage(object):
         query = text('delete from users where id = :user_id')
         return self._engine.execute(query, user_id=user_id)
 
-    def _get_collection_id(self, user_id, collection_name):
-        """Returns a collection id, given the name
-
-        XXX We need to cache this
-        """
+    def _get_collection_id(self, user_id, collection_name, create=True):
+        """Returns a collection id, given the name."""
         if collection_name in _STANDARD_COLLECTIONS_NAMES:
             return _STANDARD_COLLECTIONS_NAMES[collection_name]
 
-        # custome collection
+        # custom collection
         data = self.get_collection(user_id, collection_name,
                                    ['collectionid'])
         if data is None:
-            return None
-        return data[0]
+            # we want to create it
+            if not create:
+                return None
+            return self.set_collection(user_id, collection_name)
+
+        return data['collectionid']
 
     def delete_storage(self, user_id):
         """Removes all user data"""
@@ -207,7 +208,8 @@ class WeaveSQLStorage(object):
         fields = ','.join(fields)
         query = text('insert into collections (%s) values (%s)' % \
                         (fields, params))
-        return self._engine.execute(query, **values)
+        self._engine.execute(query, **values)
+        return next_id
 
     def get_collection(self, user_id, collection_name, fields=None):
         """Return information about a collection."""
@@ -217,8 +219,20 @@ class WeaveSQLStorage(object):
         query = text('select %s from collections where '
                      'userid = :user_id and name = :name'\
                      % fields)
-        return self._engine.execute(query, user_id=user_id,
-                                  name=collection_name).first()
+        res = self._engine.execute(query, user_id=user_id,
+                                   name=collection_name).first()
+        # the collection is created
+        if res is None:
+            collid = self.set_collection(user_id, collection_name)
+            res = {'userid': user_id, 'collectionid': collid,
+                   'name': collection_name}
+            if fields is not None:
+                for key in res.keys():
+                    if key not in fields:
+                        del res[key]
+        else:
+            res = dict(res)
+        return res
 
     def get_collections(self, user_id, fields=None):
         """returns the collections information """
@@ -325,19 +339,19 @@ class WeaveSQLStorage(object):
         if extra != []:
             query = '%s and %s' % (query, ' and '.join(extra))
 
+        if sort is not None:
+            if sort == 'oldest':
+                query += " order by modified"
+            elif sort == 'newest':
+                query += " order by modified desc"
+            else:
+                query += " order by sortindex desc"
+
         if limit is not None:
             query += ' limit %d' % limit
 
         if offset is not None:
             query += ' offset %d' % offset
-
-        if sort is not None:
-            if sort == 'oldest':
-                query += ' order by modified'
-            elif sort == 'newest':
-                query += ' order by modified desc'
-            else:
-                query += ' order by sortindex desc'
 
         return self._engine.execute(text(query), user_id=user_id,
                                   collection_id=collection_id,
@@ -420,21 +434,22 @@ class WeaveSQLStorage(object):
         if extra != []:
             query = '%s and %s' % (query, ' and '.join(extra))
 
+
+        if sort is not None:
+            if sort == 'oldest':
+                query += " order by modified"
+            elif sort == 'newest':
+                query += " order by modified desc"
+            elif sort == 'index':
+                query += " order by sortindex desc"
+            elif query == 'depthindex':
+                raise NotImplementedError
+
         if limit is not None:
             query += ' limit %d' % limit
 
         if offset is not None:
             query += ' offset %d' % offset
-
-        if sort is not None:
-            if sort == 'oldest':
-                query += ' order by modified'
-            elif sort == 'newest':
-                query += ' order by modified desc'
-            elif sort == 'index':
-                query += ' order by sortindex desc'
-            elif query == 'depthindex':
-                raise NotImplementedError
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
