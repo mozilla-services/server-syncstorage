@@ -61,7 +61,9 @@ class StorageController(object):
         collections = self.storage.get_collection_timestamps(user_id)
         # XXX see if we need more processing here
         res = dict([(name, stamp) for name, stamp in collections])
-        return convert_response(request, res)
+        response = convert_response(request, res)
+        response.headers['X-Weave-Records'] = str(len(collections))
+        return response
 
     def get_collections_count(self, request):
         """Returns a hash of collections associated with the account,
@@ -72,7 +74,9 @@ class StorageController(object):
         res = dict([(name, count) for name, count in counts])
 
         # XXX see if we need more processing here
-        return convert_response(request, res)
+        response = convert_response(request, res)
+        response.headers['X-Weave-Records'] = str(len(res))
+        return response
 
     def get_quota(self, request):
         raise HTTPNotImplemented
@@ -120,7 +124,10 @@ class StorageController(object):
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
-        return convert_response(request, [dict(line) for line in res])
+        res = [dict(line) for line in res]
+        response = convert_response(request, res)
+        response.headers['X-Weave-Records'] = str(len(res))
+        return response
 
     def get_item(self, request):
         """Returns a single WBO object."""

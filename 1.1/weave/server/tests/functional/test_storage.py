@@ -71,24 +71,26 @@ class TestStorage(support.TestWsgiApp):
 
     def test_get_collections_info(self):
 
-        res = self.app.get('/1.0/tarek/info/collections')
-        self.assertEquals(res.status, '200 OK')
-        res = json.loads(res.body)
+        resp = self.app.get('/1.0/tarek/info/collections')
+        self.assertEquals(resp.status, '200 OK')
+        res = json.loads(resp.body)
         keys = res.keys()
         keys.sort()
         # standard collections + custom ones
         wanted = ['client', 'col1', 'col2', 'crypto', 'forms', 'history']
         self.assertEquals(keys, wanted)
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 6)
 
         # XXX need to test collections timestamps here
 
     def test_get_collections_count(self):
 
-        res = self.app.get('/1.0/tarek/info/collection_counts')
-        self.assertEquals(res.status, '200 OK')
-        res = json.loads(res.body)
+        resp = self.app.get('/1.0/tarek/info/collection_counts')
+        self.assertEquals(resp.status, '200 OK')
+        res = json.loads(resp.body)
         self.assertEquals(res['col1'], 3)
         self.assertEquals(res['col2'], 5)
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
     def test_get_quota(self):
 
@@ -99,12 +101,12 @@ class TestStorage(support.TestWsgiApp):
     def test_get_collection(self):
         res = self.app.get('/1.0/tarek/storage/col3')
         self.assertEquals(json.loads(res.body), [])
-
-        res = self.app.get('/1.0/tarek/storage/col2')
-        res = json.loads(res.body)
+        resp = self.app.get('/1.0/tarek/storage/col2')
+        res = json.loads(resp.body)
         ids = [line['id'] for line in res]
         ids.sort()
         self.assertEquals(ids, [0, 1, 2, 3, 4])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
 
         # trying various filters
 
