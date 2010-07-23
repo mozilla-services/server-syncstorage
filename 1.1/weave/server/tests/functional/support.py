@@ -55,7 +55,7 @@ class TestWsgiApp(unittest.TestCase):
         # loading tests.ini
         cfg = RawConfigParser()
         cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
-        config = dict(cfg.items('DEFAULT') + cfg.items('server:main'))
+        config = dict(cfg.items('sync'))
         storage_params = dict([(param.split('.')[-1], value)
                                for param, value in config.items()
                                if param.startswith('storage.')])

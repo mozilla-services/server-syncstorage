@@ -37,11 +37,12 @@
 Application entry point.
 """
 import time
+from ConfigParser import RawConfigParser
 
 from routes import Mapper, URLGenerator
 
 from webob.dec import wsgify
-from webob.exc import HTTPNotFound, HTTPUnauthorized
+from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 from weave.server import API_VERSION
@@ -83,11 +84,12 @@ class SyncServerApp(object):
     by using Routes.
     """
 
-    def __init__(self, global_conf, app_conf):
+    def __init__(self, config=None):
         self.mapper = Mapper()
-        self.config = {}
-        self.config.update(global_conf)
-        self.config.update(app_conf)
+        if config is not None:
+            self.config = config
+        else:
+            self.config = {}
 
         # loading authentication and storage backends
         self.authtool = get_auth_tool(self.config['auth'],
@@ -113,6 +115,9 @@ class SyncServerApp(object):
 
     @wsgify
     def __call__(self, request):
+        if request.method in ('HEAD',):
+            raise HTTPBadRequest('"%s" not supported' % request.method)
+
         request.server_time = time.time()
         # XXX All requests in the Sync APIs are authenticated
         request.sync_info = authenticate_user(request, self.authtool)
@@ -166,5 +171,11 @@ class SyncServerApp(object):
 
 def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
-    app = SyncServerApp(global_conf, app_conf)
+    if '__file__' in global_conf:
+        cfg = RawConfigParser()
+        cfg.read([global_conf['__file__']])
+        params = dict(cfg.items('sync'))
+    else:
+        params = global_conf
+    app = SyncServerApp(params)
     return app
