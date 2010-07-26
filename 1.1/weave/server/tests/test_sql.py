@@ -117,7 +117,7 @@ class TestSQLStorage(unittest.TestCase):
 
         self.storage.set_item(_UID, 'col', 1, payload='XXX')
         res = self.storage.get_item(_UID, 'col', 1)
-        self.assertEquals(res.payload, 'XXX')
+        self.assertEquals(res['payload'], 'XXX')
 
         self.storage.set_item(_UID, 'col', 2, payload='XXX')
 

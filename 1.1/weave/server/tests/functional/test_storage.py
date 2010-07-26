@@ -161,8 +161,8 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         keys = res[0].keys()
         keys.sort()
-        wanted = ['collection', 'id', 'modified', 'parentid', 'payload',
-                  'payload_size', 'predecessorid', 'sortindex', 'username']
+        wanted = ['id', 'modified', 'parentid', 'payload',
+                  'payload_size', 'predecessorid', 'sortindex']
         self.assertEquals(keys, wanted)
 
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -284,8 +284,7 @@ class TestStorage(support.TestWsgiApp):
         # grabbing object 1 from col2
         res = self.app.get('/1.0/tarek/storage/col2/1')
         res = json.loads(res.body)
-        wanted = ['collection', 'id', 'modified', 'parentid', 'payload',
-                  'payload_size', 'predecessorid', 'sortindex', 'username']
+        wanted = ['id', 'modified']
         keys = res.keys()
         keys.sort()
         self.assertEquals(keys, wanted)

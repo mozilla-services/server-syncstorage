@@ -1,9 +1,9 @@
-SCHEME = "https"
-SERVER_NAME = "stage-auth.services.mozilla.com"
+SCHEME = "http"
+SERVER_NAME = "localhost:5000"
 SERVER_BASE = "%s://%s" % (SCHEME, SERVER_NAME)
 
-STORAGE_SCHEME = "https"
-STORAGE_SERVER = "stage-node01.services.mozilla.com"
+STORAGE_SCHEME = "http"
+STORAGE_SERVER = "localhost:5000"
 
 HOST_NAME = None
 USERNAME = "zandr03"

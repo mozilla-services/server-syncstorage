@@ -58,6 +58,7 @@ class WeaveSQLStorage(object):
             table.metadata.bind = self._engine
             table.create(checkfirst=True)
         self._user_collections = {}
+        self.engine_name = self._engine.name
 
     @classmethod
     def get_name(cls):
@@ -231,7 +232,9 @@ class WeaveSQLStorage(object):
                     if key not in fields:
                         del res[key]
         else:
-            res = dict(res)
+            # make this a single step
+            res = dict([(key, value) for key, value in res.items()
+                         if value is not None])
         return res
 
     def get_collections(self, user_id, fields=None):
@@ -366,8 +369,13 @@ class WeaveSQLStorage(object):
         query = text('select %s from wbo where '
                      'username = :user_id and collection = :collection_id '
                      'and id = :item_id ' % fields)
-        return self._engine.execute(query, user_id=user_id, item_id=item_id,
+        res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                   collection_id=collection_id).first()
+        if res is None:
+            return None
+        # make this a single step
+        return dict([(key, value) for key, value in res.items()
+                     if value is not None])
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
@@ -385,10 +393,12 @@ class WeaveSQLStorage(object):
             query = text('insert into wbo (%s) values (%s)' % \
                             (fields, params))
         else:
-            fields = values.keys()
+            fields = [key for key in values.keys()
+                      if key not in ('username', 'collection', 'id')]
             params = ','.join(['%s = :%s' % (field, field)
                                for field in fields if field != ''])
-            query = text('update wbo set %s where id = :id' \
+            query = text('update wbo set %s where id = :id and '
+                         'username = :username and collection = :collection' \
                          % params)
 
         self._engine.execute(query, **values)
@@ -435,7 +445,7 @@ class WeaveSQLStorage(object):
             query = '%s and %s' % (query, ' and '.join(extra))
 
 
-        if sort is not None:
+        if sort is not None and self.engine_name != 'sqlite':
             if sort == 'oldest':
                 query += " order by modified"
             elif sort == 'newest':
@@ -445,11 +455,12 @@ class WeaveSQLStorage(object):
             elif query == 'depthindex':
                 raise NotImplementedError
 
-        if limit is not None:
-            query += ' limit %d' % limit
+        if self.engine_name != 'sqlite':
+            if limit is not None:
+                query += ' limit %d' % limit
 
-        if offset is not None:
-            query += ' offset %d' % offset
+            if offset is not None:
+                query += ' offset %d' % offset
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount

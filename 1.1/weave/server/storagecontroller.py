@@ -44,6 +44,9 @@ import json
 from webob.exc import HTTPNotImplemented, HTTPBadRequest, HTTPNotFound
 from weave.server.util import convert_response, json_response
 
+_WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
+               'payload', 'payload_size']
+
 
 class StorageController(object):
 
@@ -120,7 +123,7 @@ class StorageController(object):
         if not full:
             fields = ['id']
         else:
-            fields = None
+            fields = _WBO_FIELDS
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
@@ -138,7 +141,9 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
-        res = self.storage.get_item(user_id, collection_name, item_id)
+        fields = _WBO_FIELDS
+        res = self.storage.get_item(user_id, collection_name, item_id,
+                                    fields=fields)
         if res is None:
             raise HTTPNotFound()
         return json_response(dict(res))
@@ -148,7 +153,11 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except ValueError, e:
+            raise HTTPBadRequest('Malformed JSON body')
+
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
 
@@ -166,9 +175,17 @@ class StorageController(object):
         """Sets a batch of WBO objects into a collection."""
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
-        wbos = json.loads(request.body)
+        try:
+            wbos = json.loads(request.body)
+        except ValueError, e:
+            raise HTTPBadRequest('Malformed JSON body')
+
         if not isinstance(wbos, (tuple, list)):
-            wbos = [wbos]
+            # thats a batch of one
+            if 'id' not in wbos:
+                raise HTTPBadRequest('WBO ID not provided')
+            request.sync_info['params'].append(wbos['id'])
+            return self.set_item(request)
 
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
         for wbo in wbos:
@@ -192,7 +209,8 @@ class StorageController(object):
 
     def delete_collection(self, request, ids=None, parentid=None, older=None,
                           newer=None, index_above=None, index_below=None,
-                          limit=None, offset=None, sort=None):
+                          predecessorid=None, limit=None, offset=None,
+                          sort=None):
         """Deletes the collection and all contents.
 
         Additional request parameters may modify the selection of which
@@ -205,6 +223,8 @@ class StorageController(object):
             ids = ['"%s"' % id_ for id_ in ids.split(',')]
         if parentid is not None:
             filters['parentid'] = '=', parentid
+        if predecessorid is not None:
+            filters['predecessorid'] = '=', predecessorid
         if older is not None:
             filters['modified'] = '<', float(older)
         if newer is not None:
