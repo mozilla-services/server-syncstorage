@@ -42,7 +42,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 import json
 
 from webob.exc import HTTPNotImplemented, HTTPBadRequest, HTTPNotFound
-from weave.server.util import convert_response, json_response
+from weave.server.util import convert_response, json_response, check_wbo
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -158,6 +158,11 @@ class StorageController(object):
         except ValueError, e:
             raise HTTPBadRequest('Malformed JSON body')
 
+        consistent, msg = check_wbo(data)
+
+        if not consistent:
+            raise HTTPBadRequest(msg)
+
         data['modified'] = request.server_time
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
@@ -183,26 +188,33 @@ class StorageController(object):
             # thats a batch of one
             if 'id' not in wbos:
                 raise HTTPBadRequest('WBO ID not provided')
+            id_ = wbos['id']
+            if '/' in str(id_):
+                raise HTTPBadRequest("'/' char forbidden in ids")
             request.sync_info['params'].append(wbos['id'])
             return self.set_item(request)
 
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
         for wbo in wbos:
             if 'id' not in wbo:
-                # XXX what id should we use here ?
-                res['failed']['someid'] = 'no id'
+                res['failed'][''] = ['invalid id']
                 continue
 
             wbo['collection'] = collection_name
             wbo['modified'] = request.server_time
             item_id = wbo['id']
-            try:
-                self.storage.set_item(user_id, collection_name,
-                                      item_id, **wbo)
-            except Exception, e:
-                res['failed'][item_id] = str(e)
+            consistent, msg = check_wbo(wbo)
+
+            if not consistent:
+                res['failed'][item_id] = [msg]
             else:
-                res['success'].append(item_id)
+                try:
+                    self.storage.set_item(user_id, collection_name,
+                                        item_id, **wbo)
+                except Exception, e:
+                    res['failed'][item_id] = [str(e)]
+                else:
+                    res['success'].append(item_id)
 
         return json_response(res)
 
