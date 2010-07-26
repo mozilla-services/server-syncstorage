@@ -35,6 +35,7 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
+from weave.server.storage import sql   # forces the registration
 from weave.server.storage import get_storage
 
 _UID = 1
@@ -68,17 +69,25 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_collection(_UID, 'My collection')
         self.assertTrue(self.storage.collection_exists(_UID, 'My collection'))
 
-        res = self.storage.get_collection(_UID, 'My collection')
-        self.assertEquals(res, (1, 5, u'My collection'))
+        res = self.storage.get_collection(_UID, 'My collection').items()
+        res.sort()
+        wanted = [('collectionid', 5), ('name', u'My collection'),
+                  ('userid', 1)]
+        self.assertEquals(res, wanted)
         res = self.storage.get_collection(_UID, 'My collection',
                                           fields=['name'])
-        self.assertEquals(res, (u'My collection',))
+        self.assertEquals(res, {'name': 'My collection'})
 
         res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 5)
-        self.assertEquals(res[-1], (1, 5, u'My collection'))
+        res = res[-1].items()
+        res.sort()
+        self.assertEquals(res, wanted)
+
         res = self.storage.get_collections(_UID, fields=['name'])
-        self.assertEquals(res[-1], (u'My collection',))
+        res = res[-1].items()
+        res.sort()
+        self.assertEquals(res[-1], ('name', 'My collection'))
 
         # adding a new collection
         self.storage.set_collection(_UID, 'My collection 2')
