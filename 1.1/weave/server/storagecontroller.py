@@ -191,7 +191,8 @@ class StorageController(object):
         return json_response(res)
 
     def delete_collection(self, request, ids=None, parentid=None, older=None,
-                          newer=None, limit=None, offset=None, sort=None):
+                          newer=None, index_above=None, index_below=None,
+                          limit=None, offset=None, sort=None):
         """Deletes the collection and all contents.
 
         Additional request parameters may modify the selection of which
@@ -208,6 +209,10 @@ class StorageController(object):
             filters['modified'] = '<', float(older)
         if newer is not None:
             filters['modified'] = '>', float(newer)
+        if index_above is not None:
+            filters['sortindex'] = '>', float(index_above)
+        if index_below is not None:
+            filters['sortindex'] = '<', float(index_below)
         if limit is not None:
             limit = int(limit)
         if offset is not None:

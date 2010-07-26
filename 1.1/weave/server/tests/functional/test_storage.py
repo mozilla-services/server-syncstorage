@@ -421,6 +421,28 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 2)
 
+        # "index_above"
+        # Only delete objects with a higher sortindex than the value
+        # specified
+        self.app.delete('/1.0/tarek/storage/col2')
+        self.storage.set_item(1, 'col2', '130', sortindex=11)
+        self.storage.set_item(1, 'col2', '131', sortindex=9)
+        res = self.app.delete('/1.0/tarek/storage/col2?index_above=10')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        res = json.loads(res.body)
+        self.assertEquals(res, ['131'])
+
+        # "index_below"
+        # Only delete objects with a lower sortindex than the value
+        # specified.
+        self.app.delete('/1.0/tarek/storage/col2')
+        self.storage.set_item(1, 'col2', '130', sortindex=11)
+        self.storage.set_item(1, 'col2', '131', sortindex=9)
+        res = self.app.delete('/1.0/tarek/storage/col2?index_below=10')
+        res = self.app.get('/1.0/tarek/storage/col2')
+        res = json.loads(res.body)
+        self.assertEquals(res, ['130'])
+
         # "limit"
         # Sets the maximum number of objects that will be deleted.
         # xxx see how to activate this under sqlite
