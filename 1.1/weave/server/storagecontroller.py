@@ -158,6 +158,7 @@ class StorageController(object):
         except ValueError, e:
             raise HTTPBadRequest('Malformed JSON body')
 
+        data['modified'] = request.server_time
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
 
@@ -167,9 +168,7 @@ class StorageController(object):
         item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
         res = self.storage.delete_item(user_id, collection_name, item_id)
-        if not res:
-            raise HTTPNotFound()
-        return json_response(res)
+        return json_response(request.server_time)
 
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
