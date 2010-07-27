@@ -130,7 +130,8 @@ class WeaveSQLStorage(object):
 
     def _get_collection_id(self, user_id, collection_name, create=True):
         """Returns a collection id, given the name."""
-        if collection_name in _STANDARD_COLLECTIONS_NAMES:
+        if (self.standard_collections and
+            collection_name in _STANDARD_COLLECTIONS_NAMES):
             return _STANDARD_COLLECTIONS_NAMES[collection_name]
 
         # custom collection
@@ -294,7 +295,8 @@ class WeaveSQLStorage(object):
                    self._engine.execute(query, user_id=user_id)]
         finally:
             self._purge_user_collections(user_id)
-        return res
+
+        return dict(res)
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""

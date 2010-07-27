@@ -90,11 +90,8 @@ class StorageController(object):
         """
         user_id = request.sync_info['userid']
         counts = self.storage.get_collection_counts(user_id)
-        res = dict([(name, count) for name, count in counts])
-
-        # XXX see if we need more processing here
-        response = convert_response(request, res)
-        response.headers['X-Weave-Records'] = str(len(res))
+        response = convert_response(request, counts)
+        response.headers['X-Weave-Records'] = str(len(counts))
         return response
 
     def get_quota(self, request):

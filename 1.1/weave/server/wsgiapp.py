@@ -122,7 +122,14 @@ class SyncServerApp(object):
 
     def _get_params(self, prefix):
         """Returns options filtered by names starting with 'prefix.'"""
-        return dict([(param.split('.')[-1], value)
+        def _convert(value):
+            if value.lower() in ('1', 'true'):
+                return True
+            if value.lower() in ('0', 'false'):
+                return False
+            return value
+
+        return dict([(param.split('.')[-1], _convert(value))
                       for param, value in self.config.items()
                     if param.startswith(prefix + '.')])
 
