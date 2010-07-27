@@ -479,9 +479,9 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 2)
 
-        # unexisting item
-        res = self.app.delete('/1.0/tarek/storage/col2/12982', status=404)
-        self.assertEquals(res.status_int, 404)
+        # unexisting item should return a 200
+        res = self.app.delete('/1.0/tarek/storage/col2/12982')
+        self.assertEquals(res.status_int, 200)
 
     def test_delete_storage(self):
         self.storage.delete_items(1, 'col2')
