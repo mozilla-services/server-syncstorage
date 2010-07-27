@@ -385,6 +385,7 @@ class TestStorage(unittest.TestCase):
         "testAdd_EmptyCollection: Attempts to create an object without a collection report an error"
         userID, storageServer = self.createCaseUser()
         try:
+
             ts = weave.add_or_modify_item(storageServer, userID, self.password, '', {'id':'1234','payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
             self.fail("Should have reported error with zero-length collection")
         except weave.WeaveException, e:
@@ -668,7 +669,10 @@ class TestStorage(unittest.TestCase):
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll3', {'id':'1', 'payload':'aNewPayload'}, withHost=test_config.HOST_NAME)
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll4', {'id':'2', 'payload':'aPayload'}, withHost=test_config.HOST_NAME)
         counts = weave.get_collection_counts(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual(counts, {"coll":"1", "coll2":"1","coll3":"1","coll4":"2"})
+        counts = counts.items()
+        counts.sort()
+        self.failUnlessEqual(counts, [("coll", "1"), ("coll2", "1"),
+                                      ("coll3", "1"), ("coll4", "2")])
 
     def testCollectionTimestamps(self):
         "testCollectionTimestamps: The timestamps of objects should be returned correctly."

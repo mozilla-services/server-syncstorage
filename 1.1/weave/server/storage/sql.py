@@ -52,13 +52,14 @@ _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
 
 class WeaveSQLStorage(object):
 
-    def __init__(self, sqluri=_SQLURI):
+    def __init__(self, sqluri=_SQLURI, standard_collections=False):
         self._engine = create_engine(sqluri, pool_size=20)
         for table in tables:
             table.metadata.bind = self._engine
             table.create(checkfirst=True)
         self._user_collections = {}
         self.engine_name = self._engine.name
+        self.standard_collections = standard_collections
 
     @classmethod
     def get_name(cls):
@@ -263,7 +264,8 @@ class WeaveSQLStorage(object):
         return self._engine.execute(query, user_id=user_id).fetchall()
 
     def _collid2name(self, user_id, collection_id):
-        if collection_id in _STANDARD_COLLECTIONS:
+        if (self.standard_collections and
+            collection_id in _STANDARD_COLLECTIONS):
             return _STANDARD_COLLECTIONS[collection_id]
 
         # custom collections

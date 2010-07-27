@@ -57,28 +57,32 @@ from weave.server.storagecontroller import StorageController
 
 # URL dispatching happens here
 # methods / match / controller / method
+
 # _API_ is replaced by API_VERSION
+# _COLLECTION_ is replaced by {collection:[a-zA-Z0-9._-]+}
+# _USERNAME_ is replaced by {username:[a-zA-Z0-9._-]+}
+
 URLS = [('GET', '/', 'storage', 'index'),
-        ('GET', '/_API_/{username}/info/collections',
+        ('GET', '/_API_/_USERNAME_/info/collections',
          'storage', 'get_collections_info'),
-        ('GET', '/_API_/{username}/info/collection_counts',
+        ('GET', '/_API_/_USERNAME_/info/collection_counts',
          'storage', 'get_collections_count'),
-        ('GET', '/_API_/{username}/info/quota', 'storage', 'get_quota'),
-        ('GET', '/_API_/{username}/storage/{collection}', 'storage',
+        ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota'),
+        ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
         'get_collection'),
-        ('GET', '/_API_/{username}/storage/{collection}/{item}', 'storage',
+        ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
         'get_item'),
-        ('PUT', '/_API_/{username}/storage/{collection}/{item}', 'storage',
+        ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
         'set_item'),
-        ('POST', '/_API_/{username}/storage/{collection}', 'storage',
+        ('POST', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
         'set_collection'),
-        ('PUT', '/_API_/{username}/storage/{collection}', 'storage',  # XXX FT
+        ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',  # XXX FT
         'set_collection'),
-        ('DELETE', '/_API_/{username}/storage/{collection}', 'storage',
+        ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
         'delete_collection'),
-        ('DELETE', '/_API_/{username}/storage/{collection}/{item}', 'storage',
+        ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
         'delete_item'),
-        ('DELETE', '/_API_/{username}/storage', 'storage', 'delete_storage')]
+        ('DELETE', '/_API_/_USERNAME_/storage', 'storage', 'delete_storage')]
 
 
 class SyncServerApp(object):
@@ -105,7 +109,14 @@ class SyncServerApp(object):
         for verbs, match, controller, method in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
-            match = match.replace('_API_', API_VERSION)
+
+            for pattern, replacer in (('_API_', API_VERSION),
+                                      ('_COLLECTION_',
+                                       '{collection:[a-zA-Z0-9._-]+}'),
+                                      ('_USERNAME_',
+                                       '{username:[a-zA-Z0-9._-]+}')):
+                match = match.replace(pattern, replacer)
+
             self.mapper.connect(None, match, controller=controller,
                                 method=method, conditions=dict(method=verbs))
 

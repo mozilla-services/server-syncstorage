@@ -57,6 +57,9 @@ class StorageController(object):
     def index(self, request):
         return "Sync Server"
 
+    def _has_modifiers(self, data):
+        return 'payload' in data
+
     def _was_modified(self, request, user_id, collection_name):
         """Checks the X-If-Unmodified-Since header."""
         unmodified = request.headers.get('X-If-Unmodified-Since')
@@ -178,7 +181,8 @@ class StorageController(object):
         if not consistent:
             raise HTTPBadRequest(msg)
 
-        data['modified'] = request.server_time
+        if self._has_modifiers(data):
+            data['modified'] = request.server_time
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
 
@@ -222,7 +226,9 @@ class StorageController(object):
                 continue
 
             wbo['collection'] = collection_name
-            wbo['modified'] = request.server_time
+            if self._has_modifiers(wbo):
+                wbo['modified'] = request.server_time
+
             item_id = wbo['id']
             consistent, msg = check_wbo(wbo)
 
