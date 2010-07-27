@@ -1207,7 +1207,9 @@ class TestStorage(unittest.TestCase):
         'Helper function to set up many of the testDelete functions'
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '3'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.2)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'2', 'payload':'aPayload', 'parentid':'def', 'predecessorid': 'def', 'sortindex': '5'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.2)
         ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'3', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '1'}, withHost=test_config.HOST_NAME)
         return (userID, storageServer, [ts, ts2, ts3])
 

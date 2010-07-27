@@ -349,6 +349,9 @@ class WeaveSQLStorage(object):
         if filters is not None:
             for field, value in filters.items():
                 operator, value = value
+                if field == 'modified':
+                    value = time2bigint(value)
+
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
                     extra.append('%s %s (%s)' % (field, operator,
@@ -479,6 +482,9 @@ class WeaveSQLStorage(object):
         if filters is not None:
             for field, value in filters.items():
                 operator, value = value
+                if field == 'modified':
+                    value = time2bigint(value)
+
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
                     extra.append('%s %s (%s)' % (field, operator,
