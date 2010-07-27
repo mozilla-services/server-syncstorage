@@ -41,7 +41,8 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 """
 import json
 
-from webob.exc import HTTPNotImplemented, HTTPBadRequest, HTTPNotFound
+from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
+                       HTTPPreconditionFailed)
 from weave.server.util import convert_response, json_response, check_wbo
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
@@ -55,6 +56,17 @@ class StorageController(object):
 
     def index(self, request):
         return "Sync Server"
+
+    def _was_modified(self, request, user_id, collection_name):
+        """Checks the X-If-Unmodified-Since header."""
+        unmodified = request.headers.get('X-If-Unmodified-Since')
+        if unmodified is None:
+            return
+        max = self.storage.get_collection_max_timestamp(user_id,
+                                                        collection_name)
+        if max is None:
+            return False
+        return max > float(unmodified)
 
     def get_collections_info(self, request):
         """Returns a hash of collections associated with the account,
@@ -153,6 +165,9 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
+        if self._was_modified(request, user_id, collection_name):
+            raise HTTPPreconditionFailed(collection_name)
+
         try:
             data = json.loads(request.body)
         except ValueError, e:
@@ -172,6 +187,8 @@ class StorageController(object):
         collection_name = request.sync_info['params'][0]
         item_id = request.sync_info['params'][1]
         user_id = request.sync_info['userid']
+        if self._was_modified(request, user_id, collection_name):
+            raise HTTPPreconditionFailed(collection_name)
         res = self.storage.delete_item(user_id, collection_name, item_id)
         return json_response(request.server_time)
 
@@ -179,6 +196,9 @@ class StorageController(object):
         """Sets a batch of WBO objects into a collection."""
         collection_name = request.sync_info['params'][0]
         user_id = request.sync_info['userid']
+        if self._was_modified(request, user_id, collection_name):
+            raise HTTPPreconditionFailed(collection_name)
+
         try:
             wbos = json.loads(request.body)
         except ValueError, e:
@@ -191,6 +211,7 @@ class StorageController(object):
             id_ = wbos['id']
             if '/' in str(id_):
                 raise HTTPBadRequest("'/' char forbidden in ids")
+
             request.sync_info['params'].append(wbos['id'])
             return self.set_item(request)
 
@@ -229,6 +250,11 @@ class StorageController(object):
         """
         # XXX sanity check on arguments (detect incompatible params here, or
         # unknown values)
+        collection_name = request.sync_info['params'][0]
+        user_id = request.sync_info['userid']
+        if self._was_modified(request, user_id, collection_name):
+            raise HTTPPreconditionFailed(collection_name)
+
         filters = {}
         if ids is not None:
             ids = ['"%s"' % id_ for id_ in ids.split(',')]
@@ -252,8 +278,6 @@ class StorageController(object):
                 raise HTTPBadRequest('"offset" cannot be used without "limit"')
             offset = int(offset)
 
-        collection_name = request.sync_info['params'][0]
-        user_id = request.sync_info['userid']
         res = self.storage.delete_items(user_id, collection_name, ids, filters,
                                         limit=limit, offset=offset, sort=sort)
         return json_response(res)

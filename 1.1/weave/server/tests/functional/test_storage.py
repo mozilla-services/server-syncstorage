@@ -524,3 +524,13 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)
+
+        def test_ifunmodifiedsince(self):
+            now = time()
+            wbo = {'payload': 'XXX', 'payload_size': 3}
+            wbo = json.dumps(wbo)
+            res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+
+            res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+                    headers=[('X-If-Unmodified-Since', str(now))], status=412)
+            self.assertEquals(res.status_int, 412)

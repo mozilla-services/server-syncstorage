@@ -290,6 +290,17 @@ class WeaveSQLStorage(object):
             self._purge_user_collections(user_id)
         return res
 
+    def get_collection_max_timestamp(self, user_id, collection_name):
+        """Returns the max timestamp of a collection."""
+        collection_id = self._get_collection_id(user_id, collection_name)
+        query = text('select max(modified) '
+                     'from wbo where username = :user_id '
+                     'and collection = :collection_id')
+        res = self._engine.execute(query, user_id=user_id,
+                                   collection_id=collection_id)
+        res = res.fetchone()
+        return res[0]
+
 
     #
     # Items APIs
@@ -302,7 +313,7 @@ class WeaveSQLStorage(object):
                      'username = :user_id and collection = :collection_id '
                      'and id = :item_id')
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
-                                 collection_id=collection_id)
+                                   collection_id=collection_id)
         res = res.fetchone()
         return res is not None
 
