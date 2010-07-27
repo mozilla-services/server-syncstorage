@@ -14,6 +14,8 @@ import httplib
 import hashlib
 import unittest
 import time
+import struct
+import json
 from base64 import b64encode
 opener = urllib2.build_opener(urllib2.HTTPHandler)
 
@@ -686,7 +688,7 @@ class TestStorage(unittest.TestCase):
         ts['coll4'] = weave.add_or_modify_item(storageServer, userID, self.password, 'coll4', {'id':'2', 'payload':'aPayload'}, withHost=test_config.HOST_NAME)
         result = weave.get_collection_timestamps(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
         for i in result.keys():
-            self.failUnlessAlmostEqual(float(ts[i]), float(result[i]))
+            self.failUnlessAlmostEqual(float(ts[i]), float(result[i]), places=1)
 
     def testCollectionIDs(self):
         "testCollectionIDs: The IDs should be returned correctly."
@@ -704,8 +706,20 @@ class TestStorage(unittest.TestCase):
         result = weave.add_or_modify_items(storageServer, userID, self.password, 'coll', [{'id':"id%s" % i, 'payload':'aPayload', 'sortindex': i} for i in range(1,3)], withHost=test_config.HOST_NAME)
         # TODO use the timestamp in the header for the assertion
         result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="full=1", withHost=test_config.HOST_NAME)
-        self.failUnlessEqual(result,
-            [{'id':"id%s" % i, 'payload':'aPayload', 'sortindex': i, 'modified': float(result[0]['modified'])} for i in range(1,3)])
+
+        lines = []
+        for line in result:
+            line = line.items()
+            line.sort()
+            lines.append(line)
+
+        ts = float(result[0]['modified'])
+        expected = [[('id', 'id2'), ('modified', ts), ('payload', 'aPayload'),
+                     ('sortindex', 2)],
+                    [('id', 'id1'), ('modified', ts), ('payload', 'aPayload'),
+                     (u'sortindex', 1)]]
+
+        self.failUnlessEqual(lines, expected)
 
     def testGet_NoObject(self):
         "testGet_NoObject: Attempt to get a non-existent object should return 404."
@@ -872,12 +886,34 @@ class TestStorage(unittest.TestCase):
         # fractional digits are present, we have to calculate.
 
         # Default python conversion does what we want here - "5", "5.1", or "5.11".
-        expected1 = '{"id":"id1","modified":' + ts[0] + ',"sortindex":1,"payload":"aPayload"}'
-        expected2 = '{"id":"id2","modified":' + ts[1] + ',"sortindex":2,"payload":"aPayload"}'
+        expected1 = {"id": "id1", "modified": float(ts[0]), "sortindex": 1, "payload": "aPayload"}
+        expected2 = {"id": "id2", "modified": float(ts[1]), "sortindex": 2, "payload": "aPayload"}
+        expected1 = expected1.items()
+        expected1.sort()
+        expected2 = expected2.items()
+        expected2.sort()
+        expected = [expected1, expected2]
 
-        expectedWhoisiPayload = """\x00\x00\x00""" + chr(len(expected1)) + expected1 + """\x00\x00\x00""" + chr(len(expected2)) + expected2
+        lines = []
+        pos = 0
+        while pos < len(result):
+            # getting the 32bits value
+            size = result[pos:pos + 4]
+            size = struct.unpack('!I', size)[0]
 
-        self.failUnlessEqual(expectedWhoisiPayload, result)
+            # extracting the line
+            line = result[pos + 4:pos + size + 4]
+            line = json.loads(line)
+            id_ = line['id']
+            items = line.items()
+            items.sort()
+            lines.append((id_, items))
+            pos = pos + size + 4
+
+        lines.sort()
+        lines = [line for id_, line in lines]
+        self.failUnlessEqual(lines, expected)
+
         #'\x00\x00\x00H{"id":"id1","modified":'+ts[0]+',"sortindex":1,"payload":"aPayload"}\x00\x00\x00H{"id":"id2","modified":'+ts[1]+',"sortindex":2,"payload":"aPayload"}',  result)
 
     def testGet_newLines(self):
@@ -885,8 +921,22 @@ class TestStorage(unittest.TestCase):
         userID, storageServer = self.createCaseUser()
         ts = [weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':"id%s" % i, 'payload':'aPayload', 'sortindex': i}, withHost=test_config.HOST_NAME) for i in range(1,3)]
         result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', asJSON=False, params="full=1", outputFormat="application/newlines", withHost=test_config.HOST_NAME)
-        self.failUnlessEqual(result,
-            '{"id":"id1","modified":' + ts[0] + ',"sortindex":1,"payload":"aPayload"}\n{"id":"id2","modified":'+ ts[1] + ',"sortindex":2,"payload":"aPayload"}\n')
+
+        lines = []
+        for line in result.split('\n'):
+            line = line.strip()
+            if line == '':
+                continue
+            line = json.loads(line).items()
+            line.sort()
+            lines.append(line)
+
+        expected = [[('id', 'id2'), ('modified', float(ts[1])),
+                     ('payload', u'aPayload'), ('sortindex', 2)],
+                    [('id', 'id1'), ('modified', float(ts[0])),
+                     ('payload', 'aPayload'), ('sortindex', 1)]]
+
+        self.failUnlessEqual(lines, expected)
 
 
     def helper_testDelete(self):

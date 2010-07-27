@@ -36,7 +36,7 @@
 """ SQL Mappers
 """
 from sqlalchemy.ext.declarative import declarative_base, Column
-from sqlalchemy import Integer, String, DateTime, Text
+from sqlalchemy import Integer, String, DateTime, Text, BigInteger
 
 _Base = declarative_base()
 tables = []
@@ -46,9 +46,9 @@ class Collections(_Base):
     __tablename__ = 'collections'
 
     # XXX add indexes
-    userid = Column(Integer, primary_key=True, nullable=False)
-    collectionid = Column(Integer, primary_key=True, nullable=False)
-    name = Column(String, nullable=False)
+    userid = Column(Integer(11), primary_key=True, nullable=False)
+    collectionid = Column(Integer(6), primary_key=True, nullable=False)
+    name = Column(String(32), nullable=False)
 
 collections = Collections.__table__
 tables.append(collections)
@@ -71,8 +71,8 @@ tables.append(users)
 class ResetCodes(_Base):
     __tablename__ = 'reset_codes'
 
-    username = Column(String, primary_key=True, nullable=False)
-    reset = Column(String)
+    username = Column(String(32), primary_key=True, nullable=False)
+    reset = Column(String(128))
     expiration = Column(DateTime)
 
 reset_code = ResetCodes.__table__
@@ -82,16 +82,16 @@ tables.append(reset_code)
 class WBO(_Base):
     __tablename__ = 'wbo'
 
-    id = Column(String, primary_key=True)
+    id = Column(String(64), primary_key=True)
     # XXX that's user id in fact
-    username = Column(Integer, primary_key=True)
-    collection = Column(Integer, primary_key=True)
-    parentid = Column(String)
-    predecessorid = Column(String)
-    sortindex = Column(Integer)
-    modified = Column(Integer)
+    username = Column(Integer(11), primary_key=True)
+    collection = Column(Integer(6), primary_key=True)
+    parentid = Column(String(64))
+    predecessorid = Column(String(64))
+    sortindex = Column(Integer(11))
+    modified = Column(BigInteger(20))
     payload = Column(Text)
-    payload_size = Column(Integer)
+    payload_size = Column(Integer(11))
 
 wbo = WBO.__table__
 tables.append(wbo)

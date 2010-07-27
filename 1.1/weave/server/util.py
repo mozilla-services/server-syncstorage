@@ -191,3 +191,15 @@ def check_wbo(data):
             return False, 'invalid %s' % field
 
     return True, None
+
+def time2bigint(value):
+    """Encodes a timestamp into a big int."""
+    return int(round_time(value) * 100)
+
+def bigint2time(value):
+    """Decodes a big int into a timestamp."""
+    return round_time(float(value) / 100)
+
+def round_time(value):
+    """Rounds a timestamp to two digits"""
+    return float('%.2f' % float(value))

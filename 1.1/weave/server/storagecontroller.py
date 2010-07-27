@@ -43,7 +43,8 @@ import json
 
 from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
                        HTTPPreconditionFailed)
-from weave.server.util import convert_response, json_response, check_wbo
+from weave.server.util import (convert_response, json_response, check_wbo,
+                               round_time)
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -65,11 +66,13 @@ class StorageController(object):
         unmodified = request.headers.get('X-If-Unmodified-Since')
         if unmodified is None:
             return
+
+        unmodified = round_time(unmodified)
         max = self.storage.get_collection_max_timestamp(user_id,
                                                         collection_name)
         if max is None:
             return False
-        return max > float(unmodified)
+        return max > unmodified
 
     def get_collections_info(self, request):
         """Returns a hash of collections associated with the account,
@@ -77,9 +80,7 @@ class StorageController(object):
         """
         user_id = request.sync_info['userid']
         collections = self.storage.get_collection_timestamps(user_id)
-        # XXX see if we need more processing here
-        res = dict([(name, stamp) for name, stamp in collections])
-        response = convert_response(request, res)
+        response = convert_response(request, collections)
         response.headers['X-Weave-Records'] = str(len(collections))
         return response
 
@@ -142,9 +143,7 @@ class StorageController(object):
 
         res = self.storage.get_items(user_id, collection_name, fields, filters,
                                      limit, offset, sort)
-        if full:
-            res = [dict(line) for line in res]
-        else:
+        if not full:
             res = [line['id'] for line in res]
 
         response = convert_response(request, res)
@@ -161,7 +160,8 @@ class StorageController(object):
                                     fields=fields)
         if res is None:
             raise HTTPNotFound()
-        return json_response(dict(res))
+
+        return json_response(res)
 
     def set_item(self, request):
         """Sets a single WBO object."""
@@ -183,6 +183,7 @@ class StorageController(object):
 
         if self._has_modifiers(data):
             data['modified'] = request.server_time
+
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
 
@@ -236,6 +237,7 @@ class StorageController(object):
                 res['failed'][item_id] = [msg]
             else:
                 try:
+                    # XXX this should be one request
                     self.storage.set_item(user_id, collection_name,
                                         item_id, **wbo)
                 except Exception, e:

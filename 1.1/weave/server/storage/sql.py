@@ -43,6 +43,8 @@ from sqlalchemy.sql import text
 
 from weave.server.storage import register
 from weave.server.storage.sqlmappers import tables
+from weave.server.util import time2bigint, bigint2time, round_time
+
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
@@ -261,7 +263,9 @@ class WeaveSQLStorage(object):
         query = text('select name, max(modified) as timestamp '
                      'from wbo, collections where username = :user_id '
                      'group by name')
-        return self._engine.execute(query, user_id=user_id).fetchall()
+        res = self._engine.execute(query, user_id=user_id).fetchall()
+        return dict([(name, bigint2time(stamp))
+                     for name, stamp in res])
 
     def _collid2name(self, user_id, collection_id):
         if (self.standard_collections and
@@ -301,7 +305,10 @@ class WeaveSQLStorage(object):
         res = self._engine.execute(query, user_id=user_id,
                                    collection_id=collection_id)
         res = res.fetchone()
-        return res[0]
+        stamp = res[0]
+        if stamp is None:
+            return None
+        return bigint2time(stamp)
 
 
     #
@@ -309,15 +316,17 @@ class WeaveSQLStorage(object):
     #
 
     def item_exists(self, user_id, collection_name, item_id):
-        """Returns True if an item exists."""
+        """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)
-        query = text('select id from wbo where '
+        query = text('select modified from wbo where '
                      'username = :user_id and collection = :collection_id '
                      'and id = :item_id')
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                    collection_id=collection_id)
         res = res.fetchone()
-        return res is not None
+        if res is None:
+            return None
+        return bigint2time(res[0])
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
                   limit=None, offset=None, sort=None):
@@ -363,15 +372,27 @@ class WeaveSQLStorage(object):
             else:
                 query += " order by sortindex desc"
 
-        if limit is not None:
+        if limit is not None and int(limit) > 0:
             query += ' limit %d' % limit
 
-        if offset is not None:
+        if offset is not None and int(offset) > 0:
             query += ' offset %d' % offset
 
-        return self._engine.execute(text(query), user_id=user_id,
-                                  collection_id=collection_id,
-                                  **extra_values).fetchall()
+        res = self._engine.execute(text(query), user_id=user_id,
+                                   collection_id=collection_id,
+                                   **extra_values).fetchall()
+        final_res = []
+        for line in res:
+            final_line = {}
+            for key, value in dict(line).items():
+                if value is None:
+                    continue
+                if key == 'modified':
+                    value = bigint2time(value)
+                final_line[key] = value
+            final_res.append(final_line)
+
+        return final_res
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
@@ -386,20 +407,29 @@ class WeaveSQLStorage(object):
                                   collection_id=collection_id).first()
         if res is None:
             return None
-        # make this a single step
-        return dict([(key, value) for key, value in res.items()
-                     if value is not None])
+
+        final_res = {}
+        for key, value in res.items():
+            if value is None:
+                continue
+            if key  == 'modified':
+                value = bigint2time(value)
+            final_res[key] = value
+
+        return final_res
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
         values['collection'] = self._get_collection_id(user_id,
                                                        collection_name)
         values['id'] = item_id
-        if 'modified' not in values:
-            values['modified'] = time()
         values['username'] = user_id
+        if 'modified' in values:
+            values['modified'] = time2bigint(values['modified'])
 
-        if not self.item_exists(user_id, collection_name, item_id):
+        modified = self.item_exists(user_id, collection_name, item_id)
+
+        if modified is None:   # does not exists
             fields = values.keys()
             params = ','.join([':%s' % field for field in fields])
             fields = ','.join(fields)
@@ -415,7 +445,11 @@ class WeaveSQLStorage(object):
                          % params)
 
         self._engine.execute(query, **values)
-        return values['modified']
+
+        if 'modified' in values:
+            return bigint2time(values['modified'])
+
+        return modified
 
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
@@ -469,10 +503,10 @@ class WeaveSQLStorage(object):
                 raise NotImplementedError
 
         if self.engine_name != 'sqlite':
-            if limit is not None:
+            if limit is not None and int(limit) > 0:
                 query += ' limit %d' % limit
 
-            if offset is not None:
+            if offset is not None and int(offset) > 0:
                 query += ' offset %d' % offset
 
         # XXX see if we want to send back more details

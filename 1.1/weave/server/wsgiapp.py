@@ -131,7 +131,8 @@ class SyncServerApp(object):
         if request.method in ('HEAD',):
             raise HTTPBadRequest('"%s" not supported' % request.method)
 
-        request.server_time = time.time()
+        request.server_time = float('%.2f' % time.time())
+
         # XXX All requests in the Sync APIs are authenticated
         request.sync_info = authenticate_user(request, self.authtool)
         if 'userid' not in request.sync_info:
