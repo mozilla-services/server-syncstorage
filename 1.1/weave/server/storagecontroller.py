@@ -74,6 +74,10 @@ class StorageController(object):
             return False
         return max > unmodified
 
+    def get_storage(self, request):
+        # XXX returns a 400 if the root is called
+        raise HTTPBadRequest()
+
     def get_collections_info(self, request):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
