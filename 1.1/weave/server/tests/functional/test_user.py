@@ -33,36 +33,36 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import unittest
-from base64 import encodestring
+"""
+Basic tests to verify that the dispatching mechanism works.
+"""
+import base64
+import json
 
-from weave.server.util import authenticate_user
-
-
-class Request(object):
-
-    def __init__(self, path_info, environ):
-        self.path_info = path_info
-        self.environ = environ
+from weave.server.tests.functional import support
 
 
-class AuthTool(object):
+class TestUser(support.TestWsgiApp):
 
-    def authenticate_user(self, *args):
-        return 1
+    def setUp(self):
+        super(TestUser, self).setUp()
+        # user auth token
+        environ = {'Authorization': 'Basic %s' % \
+                        base64.encodestring('tarek:tarek')}
+        self.app.extra_environ = environ
 
+        # let's create some collections for our tests
+        self.storage.set_user(1)
 
-class TestUtil(unittest.TestCase):
+    def tearDown(self):
+        # removing all data after the test
+        self.storage.delete_user(1)
+        super(TestUser, self).tearDown()
 
-    def test_authenticate_user(self):
+    def test_user_exists(self):
+        res = self.app.get('/user/1.0/tarek')
+        self.assertTrue(json.loads(res.body))
 
-        token = 'Basic ' + encodestring('tarek:tarek')
-        req = Request('/1.0/tarek/info/collections', {})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, None)
-
-        # authenticated by auth
-        req = Request('/1.0/tarek/info/collections',
-                {'Authorization': token})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, 1)
+    def test_user_node(self):
+        res = self.app.get('/user/1.0/tarek/node/weave')
+        self.assertTrue(json.loads(res.body), 'http://localhost')

@@ -13,7 +13,7 @@
 #
 # The Original Code is Sync Server
 #
-# The Initial Developer of the Original Code is the Mozilla Foundation.
+# The Initial Developer of the Original Code is Mozilla Foundation.
 # Portions created by the Initial Developer are Copyright (C) 2010
 # the Initial Developer. All Rights Reserved.
 #
@@ -33,36 +33,22 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import unittest
-from base64 import encodestring
+"""
+User controller. Implements all APIs from:
 
-from weave.server.util import authenticate_user
+https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 
-
-class Request(object):
-
-    def __init__(self, path_info, environ):
-        self.path_info = path_info
-        self.environ = environ
+"""
+from weave.server.util import json_response
 
 
-class AuthTool(object):
+class UserController(object):
 
-    def authenticate_user(self, *args):
-        return 1
+    def user_exists(self, request):
+        # XXX this is called by the Firefox plugin to check if the
+        # sync server exists
+        return json_response(True)
 
-
-class TestUtil(unittest.TestCase):
-
-    def test_authenticate_user(self):
-
-        token = 'Basic ' + encodestring('tarek:tarek')
-        req = Request('/1.0/tarek/info/collections', {})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, None)
-
-        # authenticated by auth
-        req = Request('/1.0/tarek/info/collections',
-                {'Authorization': token})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, 1)
+    def user_node(self, request):
+        """Returns the storage node for the user"""
+        return json_response("http://localhost")

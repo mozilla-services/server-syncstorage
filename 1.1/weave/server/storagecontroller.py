@@ -82,7 +82,7 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
-        user_id = request.sync_info['userid']
+        user_id = request.sync_info['user_id']
         collections = self.storage.get_collection_timestamps(user_id)
         response = convert_response(request, collections)
         response.headers['X-Weave-Records'] = str(len(collections))
@@ -92,7 +92,7 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
-        user_id = request.sync_info['userid']
+        user_id = request.sync_info['user_id']
         counts = self.storage.get_collection_counts(user_id)
         response = convert_response(request, counts)
         response.headers['X-Weave-Records'] = str(len(counts))
@@ -135,8 +135,8 @@ class StorageController(object):
                 raise HTTPBadRequest('"offset" cannot be used without "limit"')
             offset = int(offset)
 
-        collection_name = request.sync_info['params'][0]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        user_id = request.sync_info['user_id']
         if not full:
             fields = ['id']
         else:
@@ -153,9 +153,9 @@ class StorageController(object):
 
     def get_item(self, request, full=True):  # always full
         """Returns a single WBO object."""
-        collection_name = request.sync_info['params'][0]
-        item_id = request.sync_info['params'][1]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        item_id = request.sync_info['item']
+        user_id = request.sync_info['user_id']
         fields = _WBO_FIELDS
         res = self.storage.get_item(user_id, collection_name, item_id,
                                     fields=fields)
@@ -166,9 +166,9 @@ class StorageController(object):
 
     def set_item(self, request):
         """Sets a single WBO object."""
-        collection_name = request.sync_info['params'][0]
-        item_id = request.sync_info['params'][1]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        item_id = request.sync_info['item']
+        user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -190,9 +190,9 @@ class StorageController(object):
 
     def delete_item(self, request):
         """Deletes a single WBO object."""
-        collection_name = request.sync_info['params'][0]
-        item_id = request.sync_info['params'][1]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        item_id = request.sync_info['item']
+        user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
         res = self.storage.delete_item(user_id, collection_name, item_id)
@@ -200,8 +200,8 @@ class StorageController(object):
 
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
-        collection_name = request.sync_info['params'][0]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -218,7 +218,7 @@ class StorageController(object):
             if '/' in str(id_):
                 raise HTTPBadRequest("'/' char forbidden in ids")
 
-            request.sync_info['params'].append(wbos['id'])
+            request.sync_info['item'] = wbos['id']
             return self.set_item(request)
 
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
@@ -259,8 +259,8 @@ class StorageController(object):
         """
         # XXX sanity check on arguments (detect incompatible params here, or
         # unknown values)
-        collection_name = request.sync_info['params'][0]
-        user_id = request.sync_info['userid']
+        collection_name = request.sync_info['collection']
+        user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -299,6 +299,6 @@ class StorageController(object):
         """
         if 'X-Confirm-Delete' not in request.headers:
             raise HTTPBadRequest('Confirmation required.')
-        user_id = request.sync_info['userid']
+        user_id = request.sync_info['user_id']
         self.storage.delete_storage(user_id)  # XXX failures ?
         return json_response(True)

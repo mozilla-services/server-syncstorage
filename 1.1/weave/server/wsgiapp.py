@@ -54,37 +54,47 @@ from weave.server.auth import get_auth_tool
 from weave.server.storage import sql
 from weave.server.auth import dummy
 from weave.server.storagecontroller import StorageController
+from weave.server.usercontroller import UserController
 
 # URL dispatching happens here
-# methods / match / controller / method
+# methods / match / controller / controller method / auth ?
 
 # _API_ is replaced by API_VERSION
 # _COLLECTION_ is replaced by {collection:[a-zA-Z0-9._-]+}
 # _USERNAME_ is replaced by {username:[a-zA-Z0-9._-]+}
 
-URLS = [('GET', '/', 'storage', 'index'),
+URLS = [('GET', '/', 'storage', 'index', True),
+
+        # storage API
         ('GET', '/_API_/_USERNAME_/info/collections',
-         'storage', 'get_collections_info'),
+         'storage', 'get_collections_info', True),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',
-         'storage', 'get_collections_count'),
-        ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota'),
+         'storage', 'get_collections_count', True),
+        ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota', True),
         # XXX empty collection call
-        ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage'),
+        ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage', True),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'get_collection'),
+        'get_collection', True),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
-        'get_item'),
+        'get_item', True),
         ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
-        'set_item'),
+        'set_item', True),
         ('POST', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'set_collection'),
+        'set_collection', True),
         ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',  # XXX FT
-        'set_collection'),
+        'set_collection', True),
         ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'delete_collection'),
+        'delete_collection', True),
         ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_/{item}', 'storage',
-        'delete_item'),
-        ('DELETE', '/_API_/_USERNAME_/storage', 'storage', 'delete_storage')]
+        'delete_item', True),
+        ('DELETE', '/_API_/_USERNAME_/storage', 'storage', 'delete_storage',
+         True),
+
+        # user API
+        ('GET', '/user/_API_/_USERNAME_', 'user', 'user_exists', False),
+        ('GET', '/user/_API_/_USERNAME_/node/weave', 'user', 'user_node', False),
+
+        ]
 
 
 class SyncServerApp(object):
@@ -107,8 +117,10 @@ class SyncServerApp(object):
                                    **self._get_params('storage'))
 
         # loading and connecting controllers
-        self.controllers = {'storage': StorageController(self.storage)}
-        for verbs, match, controller, method in URLS:
+        self.controllers = {'storage': StorageController(self.storage),
+                            'user': UserController()}
+
+        for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
 
@@ -120,7 +132,14 @@ class SyncServerApp(object):
                 match = match.replace(pattern, replacer)
 
             self.mapper.connect(None, match, controller=controller,
-                                method=method, conditions=dict(method=verbs))
+                                method=method, conditions=dict(method=verbs),
+                                auth=auth)
+
+    def _normalize(self, path):
+        """Remove extra '/'s"""
+        if path[0] == '/':
+            path = path[1:]
+        return path.replace('//', '/')
 
     def _get_params(self, prefix):
         """Returns options filtered by names starting with 'prefix.'"""
@@ -142,27 +161,29 @@ class SyncServerApp(object):
 
         request.server_time = float('%.2f' % time.time())
 
-        # XXX All requests in the Sync APIs are authenticated
-        request.sync_info = authenticate_user(request, self.authtool)
-        if 'userid' not in request.sync_info:
-            raise HTTPUnauthorized
-        if 'REMOTE_USER' not in request.environ:
-            raise HTTPUnauthorized
-
         match = self.mapper.routematch(environ=request.environ)
         if match is None:
-            return HTTPNotFound('Unkwown URL %r' % request.path_info)
+            return HTTPNotFound()
 
         match, __ = match
+        match['api'] = API_VERSION
+
+        if match['auth'] == 'True':
+            # needs auth
+            user_id = authenticate_user(request, self.authtool,
+                                        match.get('username'))
+            if user_id is None:
+                raise HTTPUnauthorized
+
+            match['user_id'] = user_id
+
         function = self._get_function(match['controller'], match['method'])
         if function is None:
             raise HTTPNotFound('Unkown URL %r' % request.path_info)
 
-        # make sure the verb matches
-
         # extracting all the info from the headers and the url
         request.link = URLGenerator(self.mapper, request.environ)
-        request.urlvars = ((), match)
+        request.sync_info = match
         request.config = self.config
 
         if request.method in ('GET', 'DELETE'):

@@ -55,38 +55,18 @@ _AUTH_HEADERS = ('Authorization', 'AUTHORIZATION', 'HTTP_AUTHORIZATION',
                  'REDIRECT_HTTP_AUTHORIZATION')
 
 
-def authenticate_user(request, authtool):
-    """Authenticate user and extract information from a storage request.
+def authenticate_user(request, authtool, username=None):
+    """Authenticates a user and returns his id.
 
     "request" is the request received, "authtool" is the authentication tool
     that will be used to authenticate the user from the request.
 
-    From the path:
-      - api version
-      - user name
-      - function name
-      - params
-
-    From the headers:
-      - user name
-      - password
-
     The function makes sure that the user name found in the headers
-    is compatible with the request path, then calls the authentication tool
-    that returns the user id from the database, if the password is the right
+    is compatible with the username if provided.
+
+    It returns the user id from the database, if the password is the right
     one.
     """
-    path = _normalize(request.path_info)
-    paths = path.split('/')
-
-    # basically, any call that does not match an API
-    # XXX see if we need to support thoses
-    if len(path) <= 3:
-        res = {}
-    else:
-        res = {'api': paths[0], 'username': paths[1], 'function': paths[2],
-               'params': paths[3:]}
-
     # authenticating, if REMOTE_USER is not present in the environ
     if 'REMOTE_USER' not in request.environ:
         auth = None
@@ -105,8 +85,7 @@ def authenticate_user(request, authtool):
             user_name, password = base64.decodestring(auth).split(':')
 
             # let's reject the call if the url is not owned by the user
-            if (res.get('username') is not None
-                and user_name != res['username']):
+            if (username is not None and user_name != username):
                 raise HTTPUnauthorized
 
 
@@ -117,12 +96,7 @@ def authenticate_user(request, authtool):
 
             # we're all clear ! setting up REMOTE_USER and user_id
             request.environ['REMOTE_USER'] = user_name
-            res['userid'] = user_id
-    else:
-        # how do we get the user id in this case ?
-        pass
-
-    return res
+            return user_id
 
 
 def json_response(lines):
