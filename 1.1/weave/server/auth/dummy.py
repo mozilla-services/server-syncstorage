@@ -39,6 +39,12 @@ from weave.server.auth import WeaveAuthBase, register
 
 
 class DummyAuth(WeaveAuthBase):
+    """Dummy authentication.
+
+    Will store the user ids in memory"""
+
+    def __init__(self):
+        self._users = {}
 
     def get_name(self):
         """Returns the name of the authentication backend"""
@@ -48,6 +54,14 @@ class DummyAuth(WeaveAuthBase):
         """Authenticates a user given a username and password.
 
         Returns the user id in case of success. Returns None otherwise."""
-        return 1
+
+        if username in self._users:
+            return self._users[username]
+        id_ = 1
+        ids = self._users.keys()
+        while id_ in ids:
+            id_ += 1
+        self._users[username] = id_
+        return id_
 
 register(DummyAuth)
