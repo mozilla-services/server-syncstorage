@@ -118,9 +118,9 @@ class StorageController(object):
         if parentid is not None:
             filters['parentid'] = '=', parentid
         if older is not None:
-            filters['modified'] = '<', float(older)
+            filters['modified'] = '<', older
         if newer is not None:
-            filters['modified'] = '>', float(newer)
+            filters['modified'] = '>', newer
         if index_above is not None:
             filters['sortindex'] = '>', float(index_above)
         if index_below is not None:

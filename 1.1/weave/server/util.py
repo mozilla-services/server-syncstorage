@@ -198,8 +198,12 @@ def time2bigint(value):
 
 def bigint2time(value):
     """Decodes a big int into a timestamp."""
+    if value is None:   # unexistant
+        return None
     return round_time(float(value) / 100)
 
 def round_time(value):
     """Rounds a timestamp to two digits"""
-    return float('%.2f' % float(value))
+    if not isinstance(value, float):
+        value = float(value)
+    return float('%.2f' % value)

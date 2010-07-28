@@ -359,7 +359,7 @@ class WeaveSQLStorage(object):
                     extra.append('%s %s (%s)' % (field, operator,
                                  ','.join(value)))
                 else:
-                    value = str(value)
+                    #value = str(value)
                     extra.append('%s %s :%s' % (field, operator, field))
                     extra_values[field] = value
 
@@ -371,7 +371,7 @@ class WeaveSQLStorage(object):
 
         if sort is not None:
             if sort == 'oldest':
-                query += " order by modified"
+                query += " order by modified asc"
             elif sort == 'newest':
                 query += " order by modified desc"
             else:
@@ -431,6 +431,10 @@ class WeaveSQLStorage(object):
         values['username'] = user_id
         if 'modified' in values:
             values['modified'] = time2bigint(values['modified'])
+        elif 'payload' in values:
+            # XXX to be replaced by a wbo object here, so
+            # this is not duplicated in the controller etc
+            values['modified'] = time2bigint(time())
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
@@ -492,7 +496,7 @@ class WeaveSQLStorage(object):
                     extra.append('%s %s (%s)' % (field, operator,
                                  ','.join(value)))
                 else:
-                    value = str(value)
+                    #value = str(value)
                     extra.append('%s %s :%s' % (field, operator, field))
                     extra_values[field] = value
 
@@ -507,8 +511,6 @@ class WeaveSQLStorage(object):
                 query += " order by modified desc"
             elif sort == 'index':
                 query += " order by sortindex desc"
-            elif query == 'depthindex':
-                raise NotImplementedError
 
         if self.engine_name != 'sqlite':
             if limit is not None and int(limit) > 0:

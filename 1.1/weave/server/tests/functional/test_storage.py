@@ -129,8 +129,8 @@ class TestStorage(support.TestWsgiApp):
         # "parentid"
         # Returns the ids for objects in the collection that are the children
         # of the parent id given.
-        self.storage.set_item(1, 'col2', '126', parentid='papa')
-        self.storage.set_item(1, 'col2', '127', parentid='papa')
+        self.storage.set_item(1, 'col2', '126', parentid='papa', payload='x')
+        self.storage.set_item(1, 'col2', '127', parentid='papa', payload='x')
         res = self.app.get('/1.0/tarek/storage/col2?parentid=papa')
         res = json.loads(res.body)
         res.sort()
@@ -140,18 +140,22 @@ class TestStorage(support.TestWsgiApp):
         # Returns only ids for objects in the collection that have been last
         # modified before the date given.
         self.storage.delete_items(1, 'col2')
-        self.storage.set_item(1, 'col2', '128')
-        now = time.time()
-        time.sleep(0.3)
-        self.storage.set_item(1, 'col2', '129')
-        res = self.app.get('/1.0/tarek/storage/col2?older=%f' % now)
+        ts = self.storage.set_item(1, 'col2', '128', payload='x')
+        fts = json.dumps(ts)
+        time.sleep(0.2)
+        ts2 = self.storage.set_item(1, 'col2', '129', payload='x')
+        fts2 = json.dumps(ts2)
+
+        self.assertTrue(fts < fts2)
+
+        res = self.app.get('/1.0/tarek/storage/col2?older=%s' % ts2)
         res = json.loads(res.body)
         self.assertEquals(res, ['128'])
 
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
-        res = self.app.get('/1.0/tarek/storage/col2?newer=%f' % now)
+        res = self.app.get('/1.0/tarek/storage/col2?newer=%s' % ts)
         res = json.loads(res.body)
         self.assertEquals(res, ['129'])
 
@@ -161,8 +165,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         keys = res[0].keys()
         keys.sort()
-        wanted = ['id', 'modified', 'parentid', 'payload',
-                  'payload_size', 'predecessorid', 'sortindex']
+        wanted = ['id', 'modified', 'payload']
         self.assertEquals(keys, wanted)
 
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -221,7 +224,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(1, 'col2')
 
         for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
-            self.storage.set_item(1, 'col2', index, sortindex=sortindex)
+            self.storage.set_item(1, 'col2', index, sortindex=sortindex,
+                                  payload='x')
+            time.sleep(0.1)
 
         res = self.app.get('/1.0/tarek/storage/col2?sort=oldest')
         res = json.loads(res.body)
@@ -284,10 +289,7 @@ class TestStorage(support.TestWsgiApp):
         # grabbing object 1 from col2
         res = self.app.get('/1.0/tarek/storage/col2/1')
         res = json.loads(res.body)
-        wanted = ['id', 'modified']
-        keys = res.keys()
-        keys.sort()
-        self.assertEquals(keys, wanted)
+        self.assertEquals(res.keys(), ['id'])
         self.assertEquals(res['id'], '1')
 
         # unexisting object

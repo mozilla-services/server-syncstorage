@@ -141,7 +141,7 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_item(_UID, 'col2', 1, payload='XXX')
 
         timestamps = self.storage.get_collection_timestamps(_UID)
-        names = [entry[0] for entry in timestamps]
+        names = timestamps.keys()
         names.sort()
         self.assertEquals(names[:3], ['client', 'col1', 'col2'])
 
