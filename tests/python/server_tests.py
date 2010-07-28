@@ -358,7 +358,9 @@ class TestStorage(unittest.TestCase):
         "testAdd_IfUnmodifiedSince_Modified: If an IfUnmodifiedSince header is provided, and the collection has changed, the attempt fails."
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         try:
             ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
             self.fail("Attempt to add an item when the collection had changed after the ifModifiedSince time should have failed")
@@ -387,7 +389,6 @@ class TestStorage(unittest.TestCase):
         "testAdd_EmptyCollection: Attempts to create an object without a collection report an error"
         userID, storageServer = self.createCaseUser()
         try:
-
             ts = weave.add_or_modify_item(storageServer, userID, self.password, '', {'id':'1234','payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
             self.fail("Should have reported error with zero-length collection")
         except weave.WeaveException, e:
@@ -673,8 +674,8 @@ class TestStorage(unittest.TestCase):
         counts = weave.get_collection_counts(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
         counts = counts.items()
         counts.sort()
-        self.failUnlessEqual(counts, [("coll", "1"), ("coll2", "1"),
-                                      ("coll3", "1"), ("coll4", "2")])
+        self.failUnlessEqual(counts, [("coll", 1), ("coll2", 1),
+                                      ("coll3", 1), ("coll4", 2)])
 
     def testCollectionTimestamps(self):
         "testCollectionTimestamps: The timestamps of objects should be returned correctly."
@@ -943,7 +944,9 @@ class TestStorage(unittest.TestCase):
         'Helper function to set up many of the testDelete functions'
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '3'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'2', 'payload':'aPayload', 'parentid':'def', 'predecessorid': 'def', 'sortindex': '5'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'3', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '1'}, withHost=test_config.HOST_NAME)
         return (userID, storageServer, [ts, ts2, ts3])
 
@@ -1090,7 +1093,9 @@ class TestStorage(unittest.TestCase):
         "testDelete_IfUnmodifiedSince_Modified: If an IfUnmodifiedSince header is provided, and the collection has changed, the attempt fails."
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'1234', 'payload':'ThisIsThePayload2'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         try:
             result = weave.delete_item(storageServer, userID, self.password, 'coll', '1234', ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
             self.fail("Attempt to delete an item that hasn't modified, with an ifModifiedSince header, should have failed")
@@ -1120,7 +1125,9 @@ class TestStorage(unittest.TestCase):
         "testAddTab_IfUnmodifiedSince_Modified: If an IfUnmodifiedSince header is provided, and the collection has changed, the attempt fails."
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload2'}, withHost=test_config.HOST_NAME)
+        time.sleep(0.1)
         try:
             ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1234', 'payload':'ThisIsThePayload'}, ifUnmodifiedSince=ts, withHost=test_config.HOST_NAME)
             self.fail("Attempt to add an item when the collection had changed after the ifModifiedSince time should have failed")
@@ -1207,9 +1214,9 @@ class TestStorage(unittest.TestCase):
         'Helper function to set up many of the testDelete functions'
         userID, storageServer = self.createCaseUser()
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'1', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '3'}, withHost=test_config.HOST_NAME)
-        time.sleep(0.2)
+        time.sleep(0.1)
         ts2 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'2', 'payload':'aPayload', 'parentid':'def', 'predecessorid': 'def', 'sortindex': '5'}, withHost=test_config.HOST_NAME)
-        time.sleep(0.2)
+        time.sleep(0.1)
         ts3 = weave.add_or_modify_item(storageServer, userID, self.password, 'tabs', {'id':'3', 'payload':'aPayload', 'parentid':'ABC', 'predecessorid': 'abc', 'sortindex': '1'}, withHost=test_config.HOST_NAME)
         return (userID, storageServer, [ts, ts2, ts3])
 
@@ -1275,7 +1282,7 @@ class TestStorageLarge(unittest.TestCase):
         timestamp2 = weave.add_or_modify_item(self.storageServer, self.userID, self.password, 'foo', item2, withHost=test_config.HOST_NAME);
 
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history':'1', 'foo':'1'}, counts)
+        self.failUnlessEqual({'history': 1, 'foo': 1}, counts)
 
         timestamps = weave.get_collection_timestamps(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
         self.failUnlessEqual({'history':float(timestamp1), 'foo':float(timestamp2)}, timestamps)
@@ -1297,6 +1304,9 @@ class TestStorageLarge(unittest.TestCase):
 
         result = weave.add_or_modify_items(self.storageServer, self.userID, self.password, 'foo',
             "[%s,%s,%s]" % (item3, item4, item5), withHost=test_config.HOST_NAME)
+
+
+        # xxxwhy this is not returning the 'modified' timestamp ? Tarek
         self.failUnlessEqual({'failed':{'':['invalid id']},'success':['3', '4']}, result)
 
         result = weave.get_collection_ids(self.storageServer, self.userID, self.password, 'foo', "sort=index", withHost=test_config.HOST_NAME)
@@ -1310,7 +1320,7 @@ class TestStorageLarge(unittest.TestCase):
         self.failUnlessEqual(['4', '2'], result, "ID 3 should have been deleted")
 
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history':'1', 'foo':'2'}, counts)
+        self.failUnlessEqual({'history': 1, 'foo': 2}, counts)
 
         timestamp4 = weave.add_or_modify_item(self.storageServer, self.userID, self.password, 'foo', item4_update, withHost=test_config.HOST_NAME) # bump sortindex up; parentid is also updated
         result = weave.get_item(self.storageServer, self.userID, self.password, 'foo', '4', withHost=test_config.HOST_NAME)
@@ -1321,7 +1331,7 @@ class TestStorageLarge(unittest.TestCase):
         # delete updates the timestamp
         timestamp5 = weave.delete_items_older_than(self.storageServer, self.userID, self.password, 'foo', float(timestamp2) + .01, withHost=test_config.HOST_NAME)
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history':'1', 'foo':'1'}, counts)
+        self.failUnlessEqual({'history': 1, 'foo': 1}, counts)
 
         timestamps = weave.get_collection_timestamps(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
         if test_config.memcache:
