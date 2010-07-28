@@ -135,12 +135,6 @@ class SyncServerApp(object):
                                 method=method, conditions=dict(method=verbs),
                                 auth=auth)
 
-    def _normalize(self, path):
-        """Remove extra '/'s"""
-        if path[0] == '/':
-            path = path[1:]
-        return path.replace('//', '/')
-
     def _get_params(self, prefix):
         """Returns options filtered by names starting with 'prefix.'"""
         def _convert(value):

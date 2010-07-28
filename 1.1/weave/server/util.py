@@ -44,12 +44,6 @@ from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 
-def _normalize(path):
-    """Remove extra '/'s"""
-    if path[0] == '/':
-        path = path[1:]
-    return path.replace('//', '/')
-
 # various authorization header names, depending on the setup
 _AUTH_HEADERS = ('Authorization', 'AUTHORIZATION', 'HTTP_AUTHORIZATION',
                  'REDIRECT_HTTP_AUTHORIZATION')
