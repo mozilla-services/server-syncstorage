@@ -221,7 +221,11 @@ class StorageController(object):
             request.sync_info['item'] = wbos['id']
             return self.set_item(request)
 
+
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
+
+        # sanity chech
+        kept_wbos = []
         for wbo in wbos:
             if 'id' not in wbo:
                 res['failed'][''] = ['invalid id']
@@ -236,16 +240,13 @@ class StorageController(object):
 
             if not consistent:
                 res['failed'][item_id] = [msg]
-            else:
-                try:
-                    # XXX this should be one request
-                    self.storage.set_item(user_id, collection_name,
-                                        item_id, **wbo)
-                except Exception, e:
-                    res['failed'][item_id] = [str(e)]
-                else:
-                    res['success'].append(item_id)
 
+            kept_wbos.append(wbo)
+
+        count = self.storage.set_items(user_id, collection_name, kept_wbos)
+
+        # XXX how to get back the real successes w/o an extra query
+        res['success'] = [wbo['id'] for wbo in kept_wbos]
         return json_response(res)
 
     def delete_collection(self, request, ids=None, parentid=None, older=None,

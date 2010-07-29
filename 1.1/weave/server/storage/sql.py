@@ -442,6 +442,62 @@ class WeaveSQLStorage(object):
 
         return modified
 
+    def set_items(self, user_id, collection_name, items):
+        """Adds or update a batch of items.
+
+        Returns a list of success or failures.
+        """
+        if self.engine_name == 'sqlite':
+            count = 0
+            for item in items:
+                if 'id' not in item:
+                    continue
+                item_id = item['id']
+                self.set_item(user_id, collection_name, item_id, **item)
+                count += 1
+            return count
+
+
+        fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
+                  'payload', 'payload_size')
+
+        query = 'insert into wbo (username, collection, %s) values ' \
+                    % ','.join(fields)
+
+        values = {}
+        values['collection'] = self._get_collection_id(user_id,
+                                                       collection_name)
+        values['user_id'] = user_id
+
+        # building the values batch
+        binds = [':%s%%(num)d' % field for field in fields]
+        pattern = '(:user_id,:collection,%s) ' % ','.join(binds)
+
+        lines = []
+        for num, item in enumerate(items):
+            lines.append(pattern % {'num': num})
+            for field in fields:
+                value = item.get(field)
+                if field == 'modified':
+                    value = time2bigint(value)
+                values['%s%d' % (field, num)] = value
+
+            if ('payload%d' % num in values and
+                'modified%d' % num not in values):
+                values['modified%d' % num] = time2bigint(time())
+
+        query += ','.join(lines)
+
+        # allowing updates as well
+        query += (' on duplicate key update parentid = values(parentid),'
+                  'predecessorid = values(predecessorid),'
+                  'sortindex = values(sortindex),'
+                  'modified = values(modified), payload = values(payload),'
+                  'payload_size = values(payload_size)')
+
+        res = self._engine.execute(text(query), **values)
+        return res.rowcount
+
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
