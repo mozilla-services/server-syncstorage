@@ -40,6 +40,7 @@ _FIELDS = ('id', 'username', 'collection', 'parentid',
            'predecessorid', 'sortindex', 'modified',
            'payload', 'payload_size')
 
+
 class WBO(dict):
     """Holds WBO info"""
 
@@ -59,3 +60,28 @@ class WBO(dict):
 
             self[name] = value
 
+    def validate(self):
+        """Validates the values the WBO has."""
+        for field in ('parentid', 'id', 'predecessorid'):
+            if field not in self:
+                continue
+            if len(str(self[field])) > 64:
+                return False, 'invalid %s' % field
+
+        for field in ('sortindex',):
+            if field not in self:
+                continue
+            try:
+                data[field] = int(self[field])
+            except ValueError:
+                try:
+                    new = float(self[field])
+                except ValueError:
+                    return False, 'invalid %s' % field
+                else:
+                    self[field] = int(new)
+
+            if self[field] > 999999999 or self[field] < -999999999:
+                return False, 'invalid %s' % field
+
+        return True, None

@@ -43,8 +43,9 @@ import json
 
 from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
                        HTTPPreconditionFailed)
-from weave.server.util import (convert_response, json_response, check_wbo,
-                               round_time)
+
+from weave.server.util import convert_response, json_response, round_time
+from weave.server.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -177,13 +178,14 @@ class StorageController(object):
         except ValueError, e:
             raise HTTPBadRequest('Malformed JSON body')
 
-        consistent, msg = check_wbo(data)
+        wbo = WBO(data)
+        consistent, msg = wbo.validate()
 
         if not consistent:
             raise HTTPBadRequest(msg)
 
-        if self._has_modifiers(data):
-            data['modified'] = request.server_time
+        if self._has_modifiers(wbo):
+            wbo['modified'] = request.server_time
 
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
         return json_response(res)
@@ -227,6 +229,8 @@ class StorageController(object):
         # sanity chech
         kept_wbos = []
         for wbo in wbos:
+            wbo = WBO(wbo)
+
             if 'id' not in wbo:
                 res['failed'][''] = ['invalid id']
                 continue
@@ -236,7 +240,7 @@ class StorageController(object):
                 wbo['modified'] = request.server_time
 
             item_id = wbo['id']
-            consistent, msg = check_wbo(wbo)
+            consistent, msg = wbo.validate()
 
             if not consistent:
                 res['failed'][item_id] = [msg]

@@ -135,40 +135,17 @@ def convert_response(request, lines):
     raise HTTPBadRequest('Unsupported format "%s"' % accept)
 
 
-def check_wbo(data):
-    for field in ('parentid', 'id', 'predecessorid'):
-        if field not in data:
-            continue
-        if len(str(data[field])) > 64:
-            return False, 'invalid %s' % field
-
-    for field in ('sortindex',):
-        if field not in data:
-            continue
-        try:
-            data[field] = int(data[field])
-        except ValueError:
-            try:
-                new = float(data[field])
-            except ValueError:
-                return False, 'invalid %s' % field
-            else:
-                data[field] = int(new)
-
-        if data[field] > 999999999 or data[field] < -999999999:
-            return False, 'invalid %s' % field
-
-    return True, None
-
 def time2bigint(value):
     """Encodes a timestamp into a big int."""
     return int(round_time(value) * 100)
+
 
 def bigint2time(value):
     """Decodes a big int into a timestamp."""
     if value is None:   # unexistant
         return None
     return round_time(float(value) / 100)
+
 
 def round_time(value):
     """Rounds a timestamp to two digits"""

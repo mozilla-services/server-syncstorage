@@ -1,9 +1,9 @@
 SCHEME = "http"
-SERVER_NAME = "localhost:5000"
+SERVER_NAME = "sync.ziade.org"
 SERVER_BASE = "%s://%s" % (SCHEME, SERVER_NAME)
 
 STORAGE_SCHEME = "http"
-STORAGE_SERVER = "localhost:5000"
+STORAGE_SERVER = "sync.ziade.org"
 
 HOST_NAME = None
 USERNAME = "zandr03"
