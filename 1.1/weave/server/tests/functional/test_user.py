@@ -65,4 +65,4 @@ class TestUser(support.TestWsgiApp):
 
     def test_user_node(self):
         res = self.app.get('/user/1.0/tarek/node/weave')
-        self.assertTrue(json.loads(res.body), 'http://localhost')
+        self.assertTrue(res.body, 'http://localhost')

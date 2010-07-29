@@ -50,5 +50,9 @@ class UserController(object):
         return json_response(True)
 
     def user_node(self, request):
-        """Returns the storage node for the user"""
-        return json_response("http://localhost")
+        """Returns the storage node root for the user"""
+        # XXX the PHP Server does not send a json back here
+        # but a plain text expected by the client
+        #
+        # return json_response(request.host_url)
+        return request.host_url
