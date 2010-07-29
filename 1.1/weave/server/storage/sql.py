@@ -44,7 +44,7 @@ from sqlalchemy.sql import text
 from weave.server.storage import register
 from weave.server.storage.sqlmappers import tables
 from weave.server.util import time2bigint, bigint2time, round_time
-
+from weave.server.wbo import WBO
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
@@ -386,18 +386,8 @@ class WeaveSQLStorage(object):
         res = self._engine.execute(text(query), user_id=user_id,
                                    collection_id=collection_id,
                                    **extra_values).fetchall()
-        final_res = []
-        for line in res:
-            final_line = {}
-            for key, value in dict(line).items():
-                if value is None:
-                    continue
-                if key == 'modified':
-                    value = bigint2time(value)
-                final_line[key] = value
-            final_res.append(final_line)
 
-        return final_res
+        return [WBO(line, {'modified': bigint2time}) for line in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
@@ -413,15 +403,7 @@ class WeaveSQLStorage(object):
         if res is None:
             return None
 
-        final_res = {}
-        for key, value in res.items():
-            if value is None:
-                continue
-            if key  == 'modified':
-                value = bigint2time(value)
-            final_res[key] = value
-
-        return final_res
+        return WBO(res, {'modified': bigint2time})
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
