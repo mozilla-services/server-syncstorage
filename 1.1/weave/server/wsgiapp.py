@@ -52,7 +52,7 @@ from weave.server.auth import get_auth_tool
 
 # XXX see if we want to load these dynamically
 from weave.server.storage import sql
-from weave.server.auth import dummy
+from weave.server.auth import dummy, sql
 from weave.server.storagecontroller import StorageController
 from weave.server.usercontroller import UserController
 

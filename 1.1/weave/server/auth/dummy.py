@@ -46,6 +46,7 @@ class DummyAuth(WeaveAuthBase):
     def __init__(self):
         self._users = {}
 
+    @classmethod
     def get_name(self):
         """Returns the name of the authentication backend"""
         return 'dummy'

@@ -33,48 +33,34 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Authentication tool
-"""
-import abc
+import unittest
+from hashlib import sha1
 
-_BACKENDS = {}
+from sqlalchemy.sql import text
 
-
-class WeaveAuthBase(object):
-    """Abstract Base Class for the authentication APIs."""
-    __metaclass__ = abc.ABCMeta
-
-    @classmethod
-    def __subclasshook__(cls, klass):
-        if cls is WeaveAuthBase:
-            for method in cls.__abstractmethods__:
-                if any(method in base.__dict__ for base in klass.__mro__):
-                    continue
-                return NotImplemented
-            return True
-        return NotImplemented
-
-    @abc.abstractmethod
-    def get_name(self):
-        """Returns the name of the authentication backend"""
-
-    @abc.abstractmethod
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
-
-        Returns the user id in case of success. Returns None otherwise."""
+from weave.server.auth import sql   # forces the registration
+from weave.server.auth import get_auth_tool
 
 
-def register(klass):
-    """Registers a new storage."""
-    if not issubclass(klass, WeaveAuthBase):
-        raise TypeError('Not an authentication class')
+class TestSQLAuth(unittest.TestCase):
 
-    _BACKENDS[klass.get_name()] = klass
+    def setUp(self):
+        self.auth = get_auth_tool('sql', sqluri='sqlite:///:memory:')
+        # lets add a user tarek/tarek
+        password = sha1('tarek').hexdigest()
+        query = text('insert into user (username, password) '
+                     'values (:username, :password)')
+        self.auth._engine.execute(query, username='tarek', password=password)
+
+    def test_authenticate_user(self):
+        self.assertEquals(self.auth.authenticate_user('tarek', 'xxx'), None)
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
 
 
-def get_auth_tool(name, **kw):
-    """Returns an authentication tool."""
-    # hard-load existing tools
-    # XXX see if we want to load them dynamically
-    return _BACKENDS[name](**kw)
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestSQLAuth))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

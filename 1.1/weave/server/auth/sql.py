@@ -33,48 +33,65 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Authentication tool
+""" SQL Authentication
+
+Users are stored with digest password (sha1)
+
+XXX cost of server-side sha1
+XXX cache sha1 + sql
 """
-import abc
+from hashlib import sha1
 
-_BACKENDS = {}
+from sqlalchemy.ext.declarative import declarative_base, Column
+from sqlalchemy import Integer, String, create_engine
+from sqlalchemy.sql import text
+
+from weave.server.auth import WeaveAuthBase, register
+
+_SQLURI = 'mysql://sync:sync@localhost/sync'
+_Base = declarative_base()
 
 
-class WeaveAuthBase(object):
-    """Abstract Base Class for the authentication APIs."""
-    __metaclass__ = abc.ABCMeta
+class User(_Base):
+    """Holds username/sha1-ed password
+    """
+    __tablename__ = 'user'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(32), nullable=False)
+    password = Column(Integer(40), nullable=False)
+
+
+users = User.__table__
+
+
+class SQLAuth(WeaveAuthBase):
+    """SQL authentication."""
+
+    def __init__(self, sqluri=_SQLURI):
+        self._engine = create_engine(sqluri, pool_size=20)
+        users.metadata.bind = self._engine
+        users.create(checkfirst=True)
 
     @classmethod
-    def __subclasshook__(cls, klass):
-        if cls is WeaveAuthBase:
-            for method in cls.__abstractmethods__:
-                if any(method in base.__dict__ for base in klass.__mro__):
-                    continue
-                return NotImplemented
-            return True
-        return NotImplemented
-
-    @abc.abstractmethod
     def get_name(self):
         """Returns the name of the authentication backend"""
+        return 'sql'
 
-    @abc.abstractmethod
     def authenticate_user(self, username, password):
         """Authenticates a user given a username and password.
 
         Returns the user id in case of success. Returns None otherwise."""
+        query = ('select id, password from user '
+                 'where username = :username')
+
+        user = self._engine.execute(text(query), username=username).fetchone()
+        if user is None:
+            return None
+
+        sha1_password = sha1(password).hexdigest()
+        if user.password == sha1_password:
+            return user.id
 
 
-def register(klass):
-    """Registers a new storage."""
-    if not issubclass(klass, WeaveAuthBase):
-        raise TypeError('Not an authentication class')
-
-    _BACKENDS[klass.get_name()] = klass
-
-
-def get_auth_tool(name, **kw):
-    """Returns an authentication tool."""
-    # hard-load existing tools
-    # XXX see if we want to load them dynamically
-    return _BACKENDS[name](**kw)
+register(SQLAuth)
