@@ -37,11 +37,13 @@
 """
 import os
 import unittest
+from hashlib import sha1
 from ConfigParser import RawConfigParser
 
 from webtest import TestApp
 from weave.server.wsgiapp import make_app
 from weave.server.storage import get_storage
+from weave.server.auth import get_auth_tool
 import weave.server
 
 _TOPDIR = _WEAVEDIR = os.path.dirname(weave.server.__file__)
@@ -62,6 +64,17 @@ class TestWsgiApp(unittest.TestCase):
         self.storage = get_storage(config['storage'], **storage_params)
         self.sqlfile = storage_params['sqluri'].split('sqlite:///')[-1]
         self.app = TestApp(make_app(config))
+
+        # adding a user (sql)
+        auth_params = dict([(param.split('.')[-1], value)
+                             for param, value in config.items()
+                            if param.startswith('auth.')])
+        self.auth = get_auth_tool(config['auth'], **auth_params)
+        password = sha1('tarek').hexdigest()
+        from sqlalchemy.sql import text
+        query = text('insert into user (username, password) '
+                     'values (:username, :password)')
+        self.auth._engine.execute(query, username='tarek', password=password)
 
     def tearDown(self):
         if os.path.exists(self.sqlfile):
