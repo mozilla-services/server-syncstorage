@@ -33,36 +33,44 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Dummy Authentication
-"""
-from weave.server.auth import WeaveAuthBase, register
+import unittest
+
+from weave.server.wbo import WBO
 
 
-class DummyAuth(WeaveAuthBase):
-    """Dummy authentication.
+class TestWBO(unittest.TestCase):
 
-    Will store the user ids in memory"""
+    def test_basic(self):
+        wbo = WBO()
+        wbo = WBO({'boooo': ''})
+        self.assertTrue('boooo' not in wbo)
 
-    def __init__(self):
-        self._users = {}
+    def test_validation(self):
+        data = {'parentid': 'bigid' * 30}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
 
-    @classmethod
-    def get_name(self):
-        """Returns the name of the authentication backend"""
-        return 'dummy'
+        data = {'parentid': 'id', 'sortindex': 9999999999}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
 
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
+        data = {'parentid': 'id', 'sortindex': '9999.1'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+        self.assertTrue(wbo['sortindex'], 9999)
 
-        Returns the user id in case of success. Returns None otherwise."""
+        data = {'parentid': 'id', 'sortindex': 'ok'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
 
-        if username in self._users:
-            return self._users[username]
-        id_ = 1
-        ids = self._users.values()
-        while id_ in ids:
-            id_ += 1
-        self._users[username] = id_
-        return id_
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWBO))
+    return suite
 
-register(DummyAuth)
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

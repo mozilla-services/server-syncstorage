@@ -72,7 +72,7 @@ class WBO(dict):
             if field not in self:
                 continue
             try:
-                data[field] = int(self[field])
+                self[field] = int(self[field])
             except ValueError:
                 try:
                     new = float(self[field])

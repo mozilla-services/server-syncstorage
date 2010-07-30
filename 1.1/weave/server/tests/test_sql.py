@@ -62,6 +62,9 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_user(_UID, email='tarek2@ziade.org')
         res = self.storage.get_user(_UID, fields=['email'])
         self.assertEquals(res, (u'tarek2@ziade.org',))
+        res = self.storage.get_user(_UID)
+        self.assertEquals(res, (1, u'tarek', None, u'tarek2@ziade.org', None,
+                                None))
 
     def test_collections(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')
@@ -104,9 +107,10 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(len(res), 5)
 
         # removing *all*
-        self.storage.delete_user(_UID)
+        self.storage.delete_storage(_UID)
         res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 0)
+        self.storage.delete_user(_UID)
         self.assertFalse(self.storage.user_exists(_UID))
 
     def test_items(self):
@@ -144,6 +148,9 @@ class TestSQLStorage(unittest.TestCase):
         names = timestamps.keys()
         names.sort()
         self.assertEquals(names[:3], ['client', 'col1', 'col2'])
+
+        col1 = self.storage.get_collection_max_timestamp(_UID, 'col1')
+        self.assertEquals(col1, timestamps['col1'])
 
 
 def test_suite():
