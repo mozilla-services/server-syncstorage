@@ -40,29 +40,17 @@ Users are stored with digest password (sha1)
 XXX cost of server-side sha1
 XXX cache sha1 + sql
 """
-from hashlib import sha1
-
 from sqlalchemy.ext.declarative import declarative_base, Column
 from sqlalchemy import Integer, String, create_engine
 from sqlalchemy.sql import text
 
 from weave.server.auth import WeaveAuthBase, register
+from weave.server.util import validate_password
+
+# sharing the same table than the sql storage
+from weave.server.storage.sqlmappers import users
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-_Base = declarative_base()
-
-
-class User(_Base):
-    """Holds username/sha1-ed password
-    """
-    __tablename__ = 'user'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(32), nullable=False)
-    password = Column(Integer(40), nullable=False)
-
-
-users = User.__table__
 
 
 class SQLAuth(WeaveAuthBase):
@@ -82,15 +70,14 @@ class SQLAuth(WeaveAuthBase):
         """Authenticates a user given a username and password.
 
         Returns the user id in case of success. Returns None otherwise."""
-        query = ('select id, password from user '
+        query = ('select id, password_hash from users '
                  'where username = :username')
 
         user = self._engine.execute(text(query), username=username).fetchone()
         if user is None:
             return None
 
-        sha1_password = sha1(password).hexdigest()
-        if user.password == sha1_password:
+        if validate_password(password, user.password_hash):
             return user.id
 
 

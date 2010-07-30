@@ -43,7 +43,8 @@ from sqlalchemy.sql import text
 
 from weave.server.storage import register
 from weave.server.storage.sqlmappers import tables
-from weave.server.util import time2bigint, bigint2time, round_time
+from weave.server.util import (time2bigint, bigint2time, round_time,
+                               validate_password)
 from weave.server.wbo import WBO
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'

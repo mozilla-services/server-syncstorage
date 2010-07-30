@@ -34,21 +34,20 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from hashlib import sha1
 
 from sqlalchemy.sql import text
 
 from weave.server.auth import sql   # forces the registration
 from weave.server.auth import get_auth_tool
-
+from weave.server.util import ssha
 
 class TestSQLAuth(unittest.TestCase):
 
     def setUp(self):
         self.auth = get_auth_tool('sql', sqluri='sqlite:///:memory:')
         # lets add a user tarek/tarek
-        password = sha1('tarek').hexdigest()
-        query = text('insert into user (username, password) '
+        password = ssha('tarek')
+        query = text('insert into users (username, password_hash) '
                      'values (:username, :password)')
         self.auth._engine.execute(query, username='tarek', password=password)
 

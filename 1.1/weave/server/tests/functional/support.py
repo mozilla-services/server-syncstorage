@@ -37,13 +37,13 @@
 """
 import os
 import unittest
-from hashlib import sha1
 from ConfigParser import RawConfigParser
 
 from webtest import TestApp
 from weave.server.wsgiapp import make_app
 from weave.server.storage import get_storage
 from weave.server.auth import get_auth_tool
+from weave.server.util import ssha
 import weave.server
 
 _TOPDIR = _WEAVEDIR = os.path.dirname(weave.server.__file__)
@@ -70,9 +70,9 @@ class TestWsgiApp(unittest.TestCase):
                              for param, value in config.items()
                             if param.startswith('auth.')])
         self.auth = get_auth_tool(config['auth'], **auth_params)
-        password = sha1('tarek').hexdigest()
+        password = ssha('tarek')
         from sqlalchemy.sql import text
-        query = text('insert into user (username, password) '
+        query = text('insert into users (username, password_hash) '
                      'values (:username, :password)')
         self.auth._engine.execute(query, username='tarek', password=password)
 
