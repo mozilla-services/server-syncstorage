@@ -60,9 +60,10 @@ class TestStorage(support.TestWsgiApp):
             self.storage.set_collection(1, name)
 
         for item in range(3):
-            self.storage.set_item(1, 'col1', str(item))
+            self.storage.set_item(1, 'col1', str(item), payload='xxx')
+
         for item in range(5):
-            self.storage.set_item(1, 'col2', str(item))
+            self.storage.set_item(1, 'col2', str(item), payload='xxx')
 
     def tearDown(self):
         # removing all data after the test
@@ -289,7 +290,9 @@ class TestStorage(support.TestWsgiApp):
         # grabbing object 1 from col2
         res = self.app.get('/1.0/tarek/storage/col2/1')
         res = json.loads(res.body)
-        self.assertEquals(res.keys(), ['id'])
+        keys = res.keys()
+        keys.sort()
+        self.assertEquals(keys, ['id', 'modified', 'payload'])
         self.assertEquals(res['id'], '1')
 
         # unexisting object
