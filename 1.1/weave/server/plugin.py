@@ -39,35 +39,41 @@ Base plugin class with registration mechanism and configuration reading.
 import abc
 
 
+def filter_params(namespace, data, replace_dot='_', splitchar='.'):
+    """Keeps only params that starts with the namespace.
+
+    Will also convert booleans representation
+    """
+    master_value = None
+    params = {}
+    for key, value in data.items():
+        if key == namespace:
+            master_value = value
+            continue
+        if splitchar not in key:
+            continue
+        skey = key.split(splitchar)
+        if skey[0] != namespace:
+            continue
+        if value.lower() in ('1', 'true'):
+            value = True
+        if value.lower() in ('0', 'false'):
+            value = False
+        params[replace_dot.join(skey[1:])] = value
+    return master_value, params
+
+
 class Plugin(object):
     """Abstract Base Class for plugins."""
     __metaclass__ = abc.ABCMeta
     name = ''
 
-
     @classmethod
     def get_from_config(cls, config):
         """Get a plugin from a config file."""
-        storage_name = None
-        params = {}
-        for key, value in config.items():
-            if key == cls.name:
-                storage_name = value
-                continue
-
-            skey = key.split('.')
-            if skey[0] != cls.name:
-                continue
-
-            if value.lower() in ('1', 'true'):
-                value = True
-            if value.lower() in ('0', 'false'):
-                value = False
-            params[skey[1]] = value
-
+        storage_name, params = filter_params(cls.name, config)
         if storage_name is None:
             raise KeyError(cls.name)
-
         return cls.get(storage_name, **params)
 
     @classmethod
@@ -84,7 +90,7 @@ class Plugin(object):
         for method in cls.__abstractmethods__:
             if any(method in base.__dict__ for base in klass.__mro__):
                 continue
-            raise TypeError(klass)
+            raise TypeError('Missing "%s" in "%s"' % (method, klass))
         if klass not in cls._abc_registry:
             cls._abc_registry.add(klass)
         return True
