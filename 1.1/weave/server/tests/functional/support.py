@@ -41,8 +41,8 @@ from ConfigParser import RawConfigParser
 
 from webtest import TestApp
 from weave.server.wsgiapp import make_app
-from weave.server.storage import get_storage
-from weave.server.auth import get_auth_tool
+from weave.server.storage import WeaveStorage
+from weave.server.auth import WeaveAuth
 from weave.server.util import ssha
 import weave.server
 
@@ -58,18 +58,12 @@ class TestWsgiApp(unittest.TestCase):
         cfg = RawConfigParser()
         cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
         config = dict(cfg.items('sync'))
-        storage_params = dict([(param.split('.')[-1], value)
-                               for param, value in config.items()
-                               if param.startswith('storage.')])
-        self.storage = get_storage(config['storage'], **storage_params)
-        self.sqlfile = storage_params['sqluri'].split('sqlite:///')[-1]
+        self.storage = WeaveStorage.get_from_config(config)
+        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         self.app = TestApp(make_app(config))
 
         # adding a user (sql)
-        auth_params = dict([(param.split('.')[-1], value)
-                             for param, value in config.items()
-                            if param.startswith('auth.')])
-        self.auth = get_auth_tool(config['auth'], **auth_params)
+        self.auth = WeaveAuth.get_from_config(config)
         password = ssha('tarek')
         from sqlalchemy.sql import text
         query = text('insert into users (username, password_hash) '

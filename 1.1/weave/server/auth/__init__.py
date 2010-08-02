@@ -36,45 +36,15 @@
 """ Authentication tool
 """
 import abc
+from weave.server.plugin import Plugin
 
-_BACKENDS = {}
 
-
-class WeaveAuthBase(object):
+class WeaveAuth(Plugin):
     """Abstract Base Class for the authentication APIs."""
-    __metaclass__ = abc.ABCMeta
-
-    @classmethod
-    def __subclasshook__(cls, klass):
-        if cls is WeaveAuthBase:
-            for method in cls.__abstractmethods__:
-                if any(method in base.__dict__ for base in klass.__mro__):
-                    continue
-                return NotImplemented
-            return True
-        return NotImplemented
-
-    @abc.abstractmethod
-    def get_name(self):
-        """Returns the name of the authentication backend"""
+    name = 'auth'
 
     @abc.abstractmethod
     def authenticate_user(self, username, password):
         """Authenticates a user given a username and password.
 
         Returns the user id in case of success. Returns None otherwise."""
-
-
-def register(klass):
-    """Registers a new storage."""
-    if not issubclass(klass, WeaveAuthBase):
-        raise TypeError('Not an authentication class')
-
-    _BACKENDS[klass.get_name()] = klass
-
-
-def get_auth_tool(name, **kw):
-    """Returns an authentication tool."""
-    # hard-load existing tools
-    # XXX see if we want to load them dynamically
-    return _BACKENDS[name](**kw)

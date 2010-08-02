@@ -34,7 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from weave.server.storage import register, get_storage
+from weave.server.storage import WeaveStorage
 
 
 class IAmAValidStorage(object):
@@ -109,9 +109,9 @@ class TestWeaveStorageBase(unittest.TestCase):
         class NotAStorage(object):
             pass
 
-        self.assertRaises(TypeError, register, NotAStorage)
-        register(IAmAValidStorage)
-        self.assert_(isinstance(get_storage('valid'), IAmAValidStorage))
+        self.assertRaises(TypeError, WeaveStorage.register, NotAStorage)
+        WeaveStorage.register(IAmAValidStorage)
+        self.assert_(isinstance(WeaveStorage.get('valid'), IAmAValidStorage))
 
 
 def test_suite():

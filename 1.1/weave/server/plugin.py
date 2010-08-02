@@ -33,33 +33,62 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import unittest
-
-from sqlalchemy.sql import text
-
-from weave.server.auth import sql   # forces the registration
-from weave.server.auth import WeaveAuth
-from weave.server.util import ssha
-
-class TestSQLAuth(unittest.TestCase):
-
-    def setUp(self):
-        self.auth = WeaveAuth.get('sql', sqluri='sqlite:///:memory:')
-        # lets add a user tarek/tarek
-        password = ssha('tarek')
-        query = text('insert into users (username, password_hash) '
-                     'values (:username, :password)')
-        self.auth._engine.execute(query, username='tarek', password=password)
-
-    def test_authenticate_user(self):
-        self.assertEquals(self.auth.authenticate_user('tarek', 'xxx'), None)
-        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
+"""
+Base plugin class with registration mechanism and configuration reading.
+"""
+import abc
 
 
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestSQLAuth))
-    return suite
+class Plugin(object):
+    """Abstract Base Class for plugins."""
+    __metaclass__ = abc.ABCMeta
+    name = ''
 
-if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+
+    @classmethod
+    def get_from_config(cls, config):
+        """Get a plugin from a config file."""
+        storage_name = None
+        params = {}
+        for key, value in config.items():
+            if key == cls.name:
+                storage_name = value
+                continue
+
+            skey = key.split('.')
+            if skey[0] != cls.name:
+                continue
+
+            if value.lower() in ('1', 'true'):
+                value = True
+            if value.lower() in ('0', 'false'):
+                value = False
+            params[skey[1]] = value
+
+        if storage_name is None:
+            raise KeyError(cls.name)
+
+        return cls.get(storage_name, **params)
+
+    @classmethod
+    def get(cls, name, **params):
+        """Instanciates a plugin given its name"""
+        for entry in cls._abc_registry:
+            if entry.get_name() != name:
+                continue
+            return entry(**params)
+        raise KeyError(name)
+
+    @classmethod
+    def __subclasshook__(cls, klass):
+        for method in cls.__abstractmethods__:
+            if any(method in base.__dict__ for base in klass.__mro__):
+                continue
+            raise TypeError(klass)
+        if klass not in cls._abc_registry:
+            cls._abc_registry.add(klass)
+        return True
+
+    @abc.abstractmethod
+    def get_name(self):
+        """Returns the name of the plugin"""

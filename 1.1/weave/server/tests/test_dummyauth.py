@@ -39,13 +39,13 @@ from hashlib import sha1
 from sqlalchemy.sql import text
 
 from weave.server.auth import dummy   # forces the registration
-from weave.server.auth import get_auth_tool
+from weave.server.auth import WeaveAuth
 
 
 class TestDummyAuth(unittest.TestCase):
 
     def setUp(self):
-        self.auth = get_auth_tool('dummy')
+        self.auth = WeaveAuth.get('dummy')
 
     def test_authenticate_user(self):
         self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)

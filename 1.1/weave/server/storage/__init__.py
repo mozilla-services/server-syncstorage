@@ -44,28 +44,11 @@
 
 """
 import abc
+from weave.server.plugin import Plugin
 
-_BACKENDS = {}
-
-
-class WeaveStorageBase(object):
+class WeaveStorage(Plugin):
     """Abstract Base Class for the storage."""
-    __metaclass__ = abc.ABCMeta
-
-    @classmethod
-    def __subclasshook__(cls, klass):
-        if cls is WeaveStorageBase:
-            for method in cls.__abstractmethods__:
-                if any(method in base.__dict__ for base in klass.__mro__):
-                    continue
-                return NotImplemented
-            return True
-        return NotImplemented
-
-    @abc.abstractmethod
-    def get_name(self):
-        """Returns the name of the storage"""
-
+    name = 'storage'
 
     #
     # Users APIs -- the user id is the email
@@ -154,16 +137,3 @@ class WeaveStorageBase(object):
     @abc.abstractmethod
     def delete_items(self, user_id, collection_name, item_ids=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-
-
-def register(klass):
-    """Registers a new storage."""
-    if not issubclass(klass, WeaveStorageBase):
-        raise TypeError('Not a storage class')
-
-    _BACKENDS[klass.get_name()] = klass
-
-
-def get_storage(name, **kwargs):
-    """Returns a storage."""
-    return _BACKENDS[name](**kwargs)

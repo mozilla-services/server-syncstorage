@@ -41,7 +41,7 @@ from time import time
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 
-from weave.server.storage import register
+from weave.server.storage import WeaveStorage
 from weave.server.storage.sqlmappers import tables
 from weave.server.util import (time2bigint, bigint2time, round_time,
                                validate_password)
@@ -56,6 +56,7 @@ _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
 class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False):
+        self.sqluri = sqluri
         self._engine = create_engine(sqluri, pool_size=20)
         for table in tables:
             table.metadata.bind = self._engine
@@ -564,4 +565,5 @@ class WeaveSQLStorage(object):
                                  collection_id=collection_id, **extra_values)
         return res.rowcount > 0
 
-register(WeaveSQLStorage)
+
+WeaveStorage.register(WeaveSQLStorage)

@@ -36,7 +36,7 @@
 import unittest
 
 from weave.server.storage import sql   # forces the registration
-from weave.server.storage import get_storage
+from weave.server.storage import WeaveStorage
 
 _UID = 1
 
@@ -44,7 +44,7 @@ _UID = 1
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        self.storage = get_storage('sql', sqluri='sqlite:///:memory:')
+        self.storage = WeaveStorage.get('sql', sqluri='sqlite:///:memory:')
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history'):
             self.storage.set_collection(_UID, name)

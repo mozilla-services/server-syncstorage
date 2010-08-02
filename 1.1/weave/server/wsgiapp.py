@@ -47,8 +47,8 @@ from webob import Response
 
 from weave.server import API_VERSION
 from weave.server.util import authenticate_user
-from weave.server.storage import get_storage
-from weave.server.auth import get_auth_tool
+from weave.server.storage import WeaveStorage
+from weave.server.auth import WeaveAuth
 
 # XXX see if we want to load these dynamically
 from weave.server.storage import sql
@@ -110,11 +110,8 @@ class SyncServerApp(object):
             self.config = {}
 
         # loading authentication and storage backends
-        self.authtool = get_auth_tool(self.config['auth'],
-                                      **self._get_params('auth'))
-
-        self.storage = get_storage(self.config['storage'],
-                                   **self._get_params('storage'))
+        self.authtool = WeaveAuth.get_from_config(self.config)
+        self.storage = WeaveStorage.get_from_config(self.config)
 
         # loading and connecting controllers
         self.controllers = {'storage': StorageController(self.storage),

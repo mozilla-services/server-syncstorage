@@ -35,10 +35,10 @@
 # ***** END LICENSE BLOCK *****
 """ Dummy Authentication
 """
-from weave.server.auth import WeaveAuthBase, register
+from weave.server.auth import WeaveAuth
 
 
-class DummyAuth(WeaveAuthBase):
+class DummyAuth(object):
     """Dummy authentication.
 
     Will store the user ids in memory"""
@@ -65,4 +65,4 @@ class DummyAuth(WeaveAuthBase):
         self._users[username] = id_
         return id_
 
-register(DummyAuth)
+WeaveAuth.register(DummyAuth)

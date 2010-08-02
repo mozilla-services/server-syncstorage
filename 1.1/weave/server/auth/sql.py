@@ -44,7 +44,7 @@ from sqlalchemy.ext.declarative import declarative_base, Column
 from sqlalchemy import Integer, String, create_engine
 from sqlalchemy.sql import text
 
-from weave.server.auth import WeaveAuthBase, register
+from weave.server.auth import WeaveAuth
 from weave.server.util import validate_password
 
 # sharing the same table than the sql storage
@@ -53,7 +53,7 @@ from weave.server.storage.sqlmappers import users
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 
 
-class SQLAuth(WeaveAuthBase):
+class SQLAuth(object):
     """SQL authentication."""
 
     def __init__(self, sqluri=_SQLURI):
@@ -81,4 +81,4 @@ class SQLAuth(WeaveAuthBase):
             return user.id
 
 
-register(SQLAuth)
+WeaveAuth.register(SQLAuth)
