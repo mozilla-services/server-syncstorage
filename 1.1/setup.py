@@ -41,7 +41,7 @@ setup(name='WeaveServer', version=0.1,
                         'PasteScript', 'Routes', 'WebOb', 'WebTest'],
       entry_points="""
       [paste.app_factory]
-      main = weave.server.wsgiapp:make_app
+      main = weaveserver.wsgiapp:make_app
       """
       )
 
