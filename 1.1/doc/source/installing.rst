@@ -3,10 +3,10 @@ Installing Sync
 ===============
 
 To install Sync, make sure you have Python 2.6 installed and in your path,
-the run the :file:`tests.sh` script. It will collect all the required bits
+the run the :file:`bootstrap.sh` script. It will collect all the required bits
 and create a local environment, then run the tests::
 
-    $ ./tests.sh
+    $ ./bootstrap.sh
     New python executable in ./bin/python2.6
     Also creating executable in ./bin/python
     Installing setuptools............done.
