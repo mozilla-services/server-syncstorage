@@ -82,7 +82,11 @@ class Plugin(object):
         for entry in cls._abc_registry:
             if entry.get_name() != name:
                 continue
-            return entry(**params)
+            try:
+                return entry(**params)
+            except Exception, e:
+                msg = 'could not load "%s" %s' % (name, str(e))
+                raise TypeError(msg)
         raise KeyError(name)
 
     @classmethod
