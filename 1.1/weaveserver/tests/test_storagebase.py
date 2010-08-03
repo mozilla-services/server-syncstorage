@@ -95,6 +95,9 @@ class IAmAValidStorage(object):
     def set_item(self, user_name, collection_name, item_id, **values):
         """Sets an item"""
 
+    def set_items(self, user_name, collection_name, item_id, items):
+        """Sets items"""
+
     def delete_item(self, user_name, collection_name, item_id):
         """Deletes an item"""
 

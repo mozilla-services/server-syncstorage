@@ -101,6 +101,9 @@ class Storage(object):
         ''
         self.items[item_id] = values
 
+    def set_items(self, user_name, collection_name, items):
+        ''
+
     def delete_item(self, user_name, collection_name, item_id):
         ''
 

@@ -71,7 +71,7 @@ class WeaveSQLStorage(object):
         return 'sql'
 
     #
-    # Users APIs -- the user identifier is the 'username' field
+    # Users APIs
     #
 
     def user_exists(self, user_id):
@@ -98,7 +98,7 @@ class WeaveSQLStorage(object):
             query = text('update users set %s where id = :id' \
                          % params)
 
-        return self._engine.execute(query, **values)
+        self._engine.execute(query, **values)
 
     def get_user(self, user_id, fields=None):
         """Returns user information.
