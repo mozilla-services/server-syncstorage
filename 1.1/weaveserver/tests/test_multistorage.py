@@ -35,8 +35,8 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from weave.server.storage import multi  # registers the multi storage
-from weave.server.storage import WeaveStorage
+from weaveserver.storage import multi  # registers the multi storage
+from weaveserver.storage import WeaveStorage
 
 
 class Storage(object):

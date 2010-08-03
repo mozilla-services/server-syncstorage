@@ -37,8 +37,8 @@
 Multiple backend -- read to a master storage,
 writes to a collection of slave storages
 """
-from weave.server.storage import WeaveStorage
-from weave.server.plugin import filter_params
+from weaveserver.storage import WeaveStorage
+from weaveserver.plugin import filter_params
 
 
 def _prepare_apis(name, bases, attrs):

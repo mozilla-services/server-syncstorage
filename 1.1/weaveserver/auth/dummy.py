@@ -13,7 +13,7 @@
 #
 # The Original Code is Sync Server
 #
-# The Initial Developer of the Original Code is Mozilla Foundation.
+# The Initial Developer of the Original Code is the Mozilla Foundation.
 # Portions created by the Initial Developer are Copyright (C) 2010
 # the Initial Developer. All Rights Reserved.
 #
@@ -33,26 +33,36 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Dummy Authentication
 """
-User controller. Implements all APIs from:
-
-https://wiki.mozilla.org/Labs/Weave/User/1.0/API
-
-"""
-from weave.server.util import json_response
+from weaveserver.auth import WeaveAuth
 
 
-class UserController(object):
+class DummyAuth(object):
+    """Dummy authentication.
 
-    def user_exists(self, request):
-        # XXX this is called by the Firefox plugin to check if the
-        # sync server exists
-        return json_response(True)
+    Will store the user ids in memory"""
 
-    def user_node(self, request):
-        """Returns the storage node root for the user"""
-        # XXX the PHP Server does not send a json back here
-        # but a plain text expected by the client
-        #
-        # return json_response(request.host_url)
-        return request.host_url
+    def __init__(self):
+        self._users = {}
+
+    @classmethod
+    def get_name(self):
+        """Returns the name of the authentication backend"""
+        return 'dummy'
+
+    def authenticate_user(self, username, password):
+        """Authenticates a user given a username and password.
+
+        Returns the user id in case of success. Returns None otherwise."""
+
+        if username in self._users:
+            return self._users[username]
+        id_ = 1
+        ids = self._users.values()
+        while id_ in ids:
+            id_ += 1
+        self._users[username] = id_
+        return id_
+
+WeaveAuth.register(DummyAuth)

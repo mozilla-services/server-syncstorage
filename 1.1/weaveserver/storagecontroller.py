@@ -44,8 +44,8 @@ import json
 from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
                        HTTPPreconditionFailed)
 
-from weave.server.util import convert_response, json_response, round_time
-from weave.server.wbo import WBO
+from weaveserver.util import convert_response, json_response, round_time
+from weaveserver.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']

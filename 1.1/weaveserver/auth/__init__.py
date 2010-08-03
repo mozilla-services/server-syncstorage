@@ -33,36 +33,18 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Authentication tool
 """
-Basic tests to verify that the dispatching mechanism works.
-"""
-import base64
-import json
-
-from weave.server.tests.functional import support
+import abc
+from weaveserver.plugin import Plugin
 
 
-class TestUser(support.TestWsgiApp):
+class WeaveAuth(Plugin):
+    """Abstract Base Class for the authentication APIs."""
+    name = 'auth'
 
-    def setUp(self):
-        super(TestUser, self).setUp()
-        # user auth token
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
-        self.app.extra_environ = environ
+    @abc.abstractmethod
+    def authenticate_user(self, username, password):
+        """Authenticates a user given a username and password.
 
-        # let's create some collections for our tests
-        self.storage.set_user(1)
-
-    def tearDown(self):
-        # removing all data after the test
-        self.storage.delete_user(1)
-        super(TestUser, self).tearDown()
-
-    def test_user_exists(self):
-        res = self.app.get('/user/1.0/tarek')
-        self.assertTrue(json.loads(res.body))
-
-    def test_user_node(self):
-        res = self.app.get('/user/1.0/tarek/node/weave')
-        self.assertTrue(res.body, 'http://localhost')
+        Returns the user id in case of success. Returns None otherwise."""

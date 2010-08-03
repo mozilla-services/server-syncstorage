@@ -33,36 +33,24 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import unittest
-from base64 import encodestring
-
-from weave.server.util import authenticate_user
-
-
-class Request(object):
-
-    def __init__(self, path_info, environ):
-        self.path_info = path_info
-        self.environ = environ
+"""
+Basic tests to verify that the dispatching mechanism works.
+"""
+import base64
+from weaveserver.tests.functional import support
 
 
-class AuthTool(object):
+class TestBasic(support.TestWsgiApp):
 
-    def authenticate_user(self, *args):
-        return 1
+    def test_auth(self):
+        # make sure we are able to authenticate
+        # and that some APIs are protected
+        res = self.app.get('/', status=401)
+        self.assertEquals(res.status_int, 401)
 
+        environ = {'Authorization': 'Basic %s' % \
+                        base64.encodestring('tarek:tarek')}
 
-class TestUtil(unittest.TestCase):
-
-    def test_authenticate_user(self):
-
-        token = 'Basic ' + encodestring('tarek:tarek')
-        req = Request('/1.0/tarek/info/collections', {})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, None)
-
-        # authenticated by auth
-        req = Request('/1.0/tarek/info/collections',
-                {'Authorization': token})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, 1)
+        res = self.app.get('/', extra_environ=environ)
+        self.assertEquals(res.status, '200 OK')
+        self.assertEquals(res.body, 'Sync Server')

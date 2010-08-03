@@ -13,7 +13,7 @@
 #
 # The Original Code is Sync Server
 #
-# The Initial Developer of the Original Code is the Mozilla Foundation.
+# The Initial Developer of the Original Code is Mozilla Foundation.
 # Portions created by the Initial Developer are Copyright (C) 2010
 # the Initial Developer. All Rights Reserved.
 #
@@ -33,30 +33,26 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import unittest
-from hashlib import sha1
+"""
+User controller. Implements all APIs from:
 
-from sqlalchemy.sql import text
+https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 
-from weave.server.auth import dummy   # forces the registration
-from weave.server.auth import WeaveAuth
-
-
-class TestDummyAuth(unittest.TestCase):
-
-    def setUp(self):
-        self.auth = WeaveAuth.get('dummy')
-
-    def test_authenticate_user(self):
-        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
-        self.assertEquals(self.auth.authenticate_user('tarek2', 'tarek'), 2)
-        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
+"""
+from weaveserver.util import json_response
 
 
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestDummyAuth))
-    return suite
+class UserController(object):
 
-if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    def user_exists(self, request):
+        # XXX this is called by the Firefox plugin to check if the
+        # sync server exists
+        return json_response(True)
+
+    def user_node(self, request):
+        """Returns the storage node root for the user"""
+        # XXX the PHP Server does not send a json back here
+        # but a plain text expected by the client
+        #
+        # return json_response(request.host_url)
+        return request.host_url

@@ -37,20 +37,32 @@
 Basic tests to verify that the dispatching mechanism works.
 """
 import base64
-from weave.server.tests.functional import support
+import json
+
+from weaveserver.tests.functional import support
 
 
-class TestBasic(support.TestWsgiApp):
+class TestUser(support.TestWsgiApp):
 
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        res = self.app.get('/', status=401)
-        self.assertEquals(res.status_int, 401)
-
+    def setUp(self):
+        super(TestUser, self).setUp()
+        # user auth token
         environ = {'Authorization': 'Basic %s' % \
                         base64.encodestring('tarek:tarek')}
+        self.app.extra_environ = environ
 
-        res = self.app.get('/', extra_environ=environ)
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')
+        # let's create some collections for our tests
+        self.storage.set_user(1)
+
+    def tearDown(self):
+        # removing all data after the test
+        self.storage.delete_user(1)
+        super(TestUser, self).tearDown()
+
+    def test_user_exists(self):
+        res = self.app.get('/user/1.0/tarek')
+        self.assertTrue(json.loads(res.body))
+
+    def test_user_node(self):
+        res = self.app.get('/user/1.0/tarek/node/weave')
+        self.assertTrue(res.body, 'http://localhost')

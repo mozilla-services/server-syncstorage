@@ -33,107 +33,91 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-"""
+import unittest
+from weaveserver.storage import WeaveStorage
 
- users
-   |
-   -- collections
-           |
-           |
-           ---- items
 
-"""
-import abc
-from weave.server.plugin import Plugin
+class IAmAValidStorage(object):
 
-class WeaveStorage(Plugin):
-    """Abstract Base Class for the storage."""
-    name = 'storage'
+    @classmethod
+    def get_name(self):
+        """Returns the name of the storage"""
+        return 'valid'
 
-    #
-    # Users APIs -- the user id is the email
-    #
-
-    @abc.abstractmethod
-    def user_exists(self, user_id):
+    def user_exists(self, user_name):
         """Returns user infos. user is the key"""
 
-    @abc.abstractmethod
     def set_user(self, user_email, **values):
         """set a users information."""
 
-    @abc.abstractmethod
-    def get_user(self, user_id, fields=None):
+    def get_user(self, user_name, fields=None):
         """Returns user information.
 
         If fields is provided, its a list of fields to return
         """
 
-    @abc.abstractmethod
-    def delete_user(self, user_id):
+    def delete_user(self, user_name):
         """Deletes all data from a user"""
 
-
-    #
-    # Collections APIs
-    #
-
-    @abc.abstractmethod
-    def delete_collection(self, user_id, collection_name):
+    def delete_collection(self, user_name, collection_name):
         """deletes a collection"""
 
-    @abc.abstractmethod
-    def collection_exists(self, user_id, collection_name):
+    def collection_exists(self, user_name, collection_name):
         """Returns True if the collection exists"""
 
-    @abc.abstractmethod
-    def set_collection(self, user_id, collection_name, **values):
+    def set_collection(self, user_name, collection_name, **values):
         """Creates a new collection."""
 
-    @abc.abstractmethod
-    def get_collection(self, user_id, collection_name, fields=None):
+    def get_collection(self, user_name, collection_name, fields=None):
         """Return information about a collection."""
 
-    @abc.abstractmethod
-    def get_collections(self, user_id, fields=None):
+    def get_collections(self, user_name, fields=None):
         """returns the collections information """
 
-    @abc.abstractmethod
-    def get_collection_names(self, user_id):
-        """return the collection names"""
+    def get_collection_names(self, user_name):
+        """return the collection id"""
 
-    @abc.abstractmethod
-    def get_collection_timestamps(self, user_id):
-        """return the collection names"""
+    def get_collection_timestamps(self, user_name):
+        """return the collection id + timestamp"""
 
-    @abc.abstractmethod
-    def get_collection_counts(self, user_id):
+    def get_collection_counts(self, user_name):
         """return the collection counts"""
 
-    #
-    # Items APIs
-    #
-
-    @abc.abstractmethod
-    def item_exists(self, user_id, collection_name, item_id):
+    def item_exists(self, user_name, collection_name, item_id):
         """Returns user infos. user is the key"""
 
-    @abc.abstractmethod
-    def get_items(self, user_id, collection_name, fields=None):
+    def get_items(self, user_name, collection_name, fields=None):
         """returns items from a collection"""
 
-    @abc.abstractmethod
-    def get_item(self, user_id, collection_name, item_id, fields=None):
+    def get_item(self, user_name, collection_name, item_id, fields=None):
         """returns one item"""
 
-    @abc.abstractmethod
-    def set_item(self, user_id, collection_name, item_id, **values):
+    def set_item(self, user_name, collection_name, item_id, **values):
         """Sets an item"""
 
-    @abc.abstractmethod
-    def delete_item(self, user_id, collection_name, item_id):
+    def delete_item(self, user_name, collection_name, item_id):
         """Deletes an item"""
 
-    @abc.abstractmethod
-    def delete_items(self, user_id, collection_name, item_ids=None):
+    def delete_items(self, user_name, collection_name, item_ids=None):
         """Deletes items. All items are removed unless item_ids is provided"""
+
+
+class TestWeaveStorageBase(unittest.TestCase):
+
+    def test_register(self):
+
+        class NotAStorage(object):
+            pass
+
+        self.assertRaises(TypeError, WeaveStorage.register, NotAStorage)
+        WeaveStorage.register(IAmAValidStorage)
+        self.assert_(isinstance(WeaveStorage.get('valid'), IAmAValidStorage))
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWeaveStorageBase))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

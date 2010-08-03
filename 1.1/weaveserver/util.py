@@ -162,8 +162,8 @@ def ssha(password, salt=None):
     if salt is None:
         salt = ''.join([random.choice(string.letters+string.digits)
                         for i in range(32)])
-
-    return "{SSHA}%s" % base64.encodestring(sha1(password+salt).digest() + salt)
+    ssha = base64.encodestring(sha1(password+salt).digest() + salt).strip()
+    return "{SSHA}%s" % ssha
 
 def validate_password(clear, hash):
     """Returns a Salted-SHA1 password"""

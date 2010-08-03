@@ -35,8 +35,8 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from weave.server.storage import sql   # forces the registration
-from weave.server.storage import WeaveStorage
+from weaveserver.storage import sql   # forces the registration
+from weaveserver.storage import WeaveStorage
 
 _UID = 1
 

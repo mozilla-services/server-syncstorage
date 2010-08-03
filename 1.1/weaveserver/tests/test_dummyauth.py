@@ -33,36 +33,30 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Dummy Authentication
-"""
-from weave.server.auth import WeaveAuth
+import unittest
+from hashlib import sha1
+
+from sqlalchemy.sql import text
+
+from weaveserver.auth import dummy   # forces the registration
+from weaveserver.auth import WeaveAuth
 
 
-class DummyAuth(object):
-    """Dummy authentication.
+class TestDummyAuth(unittest.TestCase):
 
-    Will store the user ids in memory"""
+    def setUp(self):
+        self.auth = WeaveAuth.get('dummy')
 
-    def __init__(self):
-        self._users = {}
+    def test_authenticate_user(self):
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
+        self.assertEquals(self.auth.authenticate_user('tarek2', 'tarek'), 2)
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
 
-    @classmethod
-    def get_name(self):
-        """Returns the name of the authentication backend"""
-        return 'dummy'
 
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestDummyAuth))
+    return suite
 
-        Returns the user id in case of success. Returns None otherwise."""
-
-        if username in self._users:
-            return self._users[username]
-        id_ = 1
-        ids = self._users.values()
-        while id_ in ids:
-            id_ += 1
-        self._users[username] = id_
-        return id_
-
-WeaveAuth.register(DummyAuth)
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

@@ -14,5 +14,5 @@ if [ ! -d 'bin' ]; then
   bin/python setup.py develop
 fi
 
-bin/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weave weave
+bin/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weaveserver weaveserver
 

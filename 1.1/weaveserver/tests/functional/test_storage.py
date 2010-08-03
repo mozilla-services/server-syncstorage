@@ -41,7 +41,7 @@ import json
 import time
 import struct
 
-from weave.server.tests.functional import support
+from weaveserver.tests.functional import support
 
 
 class TestStorage(support.TestWsgiApp):

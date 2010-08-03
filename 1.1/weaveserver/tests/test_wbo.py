@@ -33,18 +33,44 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Authentication tool
-"""
-import abc
-from weave.server.plugin import Plugin
+import unittest
+
+from weaveserver.wbo import WBO
 
 
-class WeaveAuth(Plugin):
-    """Abstract Base Class for the authentication APIs."""
-    name = 'auth'
+class TestWBO(unittest.TestCase):
 
-    @abc.abstractmethod
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
+    def test_basic(self):
+        wbo = WBO()
+        wbo = WBO({'boooo': ''})
+        self.assertTrue('boooo' not in wbo)
 
-        Returns the user id in case of success. Returns None otherwise."""
+    def test_validation(self):
+        data = {'parentid': 'bigid' * 30}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+        data = {'parentid': 'id', 'sortindex': 9999999999}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+        data = {'parentid': 'id', 'sortindex': '9999.1'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+        self.assertTrue(wbo['sortindex'], 9999)
+
+        data = {'parentid': 'id', 'sortindex': 'ok'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWBO))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

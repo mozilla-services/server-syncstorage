@@ -41,11 +41,11 @@ from time import time
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 
-from weave.server.storage import WeaveStorage
-from weave.server.storage.sqlmappers import tables
-from weave.server.util import (time2bigint, bigint2time, round_time,
-                               validate_password)
-from weave.server.wbo import WBO
+from weaveserver.storage import WeaveStorage
+from weaveserver.storage.sqlmappers import tables
+from weaveserver.util import (time2bigint, bigint2time, round_time,
+                              validate_password)
+from weaveserver.wbo import WBO
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}

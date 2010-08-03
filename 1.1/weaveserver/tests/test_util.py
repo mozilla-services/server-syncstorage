@@ -34,43 +34,35 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+from base64 import encodestring
 
-from weave.server.wbo import WBO
+from weaveserver.util import authenticate_user
 
 
-class TestWBO(unittest.TestCase):
+class Request(object):
 
-    def test_basic(self):
-        wbo = WBO()
-        wbo = WBO({'boooo': ''})
-        self.assertTrue('boooo' not in wbo)
+    def __init__(self, path_info, environ):
+        self.path_info = path_info
+        self.environ = environ
 
-    def test_validation(self):
-        data = {'parentid': 'bigid' * 30}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
-        self.assertFalse(result)
 
-        data = {'parentid': 'id', 'sortindex': 9999999999}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
-        self.assertFalse(result)
+class AuthTool(object):
 
-        data = {'parentid': 'id', 'sortindex': '9999.1'}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
-        self.assertTrue(result)
-        self.assertTrue(wbo['sortindex'], 9999)
+    def authenticate_user(self, *args):
+        return 1
 
-        data = {'parentid': 'id', 'sortindex': 'ok'}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
-        self.assertFalse(result)
 
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestWBO))
-    return suite
+class TestUtil(unittest.TestCase):
 
-if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    def test_authenticate_user(self):
+
+        token = 'Basic ' + encodestring('tarek:tarek')
+        req = Request('/1.0/tarek/info/collections', {})
+        res = authenticate_user(req, AuthTool())
+        self.assertEquals(res, None)
+
+        # authenticated by auth
+        req = Request('/1.0/tarek/info/collections',
+                {'Authorization': token})
+        res = authenticate_user(req, AuthTool())
+        self.assertEquals(res, 1)

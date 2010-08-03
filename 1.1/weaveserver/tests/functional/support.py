@@ -33,52 +33,43 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" SQL Authentication
-
-Users are stored with digest password (sha1)
-
-XXX cost of server-side sha1
-XXX cache sha1 + sql
+""" Base test class, with an instanciated app.
 """
-from sqlalchemy.ext.declarative import declarative_base, Column
-from sqlalchemy import Integer, String, create_engine
-from sqlalchemy.sql import text
+import os
+import unittest
+from ConfigParser import RawConfigParser
 
-from weave.server.auth import WeaveAuth
-from weave.server.util import validate_password
+from webtest import TestApp
 
-# sharing the same table than the sql storage
-from weave.server.storage.sqlmappers import users
+from weaveserver.wsgiapp import make_app
+from weaveserver.storage import WeaveStorage
+from weaveserver.auth import WeaveAuth
+from weaveserver.util import ssha
+import weaveserver
 
-_SQLURI = 'mysql://sync:sync@localhost/sync'
-
-
-class SQLAuth(object):
-    """SQL authentication."""
-
-    def __init__(self, sqluri=_SQLURI):
-        self._engine = create_engine(sqluri, pool_size=20)
-        users.metadata.bind = self._engine
-        users.create(checkfirst=True)
-
-    @classmethod
-    def get_name(self):
-        """Returns the name of the authentication backend"""
-        return 'sql'
-
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
-
-        Returns the user id in case of success. Returns None otherwise."""
-        query = ('select id, password_hash from users '
-                 'where username = :username')
-
-        user = self._engine.execute(text(query), username=username).fetchone()
-        if user is None:
-            return None
-
-        if validate_password(password, user.password_hash):
-            return user.id
+_WEAVEDIR = os.path.dirname(weaveserver.__file__)
+_TOPDIR = os.path.split(_WEAVEDIR)[0]
 
 
-WeaveAuth.register(SQLAuth)
+class TestWsgiApp(unittest.TestCase):
+
+    def setUp(self):
+        # loading tests.ini
+        cfg = RawConfigParser()
+        cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
+        config = dict(cfg.items('sync'))
+        self.storage = WeaveStorage.get_from_config(config)
+        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
+        self.app = TestApp(make_app(config))
+
+        # adding a user (sql)
+        self.auth = WeaveAuth.get_from_config(config)
+        password = ssha('tarek')
+        from sqlalchemy.sql import text
+        query = text('insert into users (username, password_hash) '
+                     'values (:username, :password)')
+        self.auth._engine.execute(query, username='tarek', password=password)
+
+    def tearDown(self):
+        if os.path.exists(self.sqlfile):
+            os.remove(self.sqlfile)

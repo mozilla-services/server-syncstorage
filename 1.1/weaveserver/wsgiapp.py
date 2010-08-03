@@ -45,16 +45,16 @@ from webob.dec import wsgify
 from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
-from weave.server import API_VERSION
-from weave.server.util import authenticate_user
-from weave.server.storage import WeaveStorage
-from weave.server.auth import WeaveAuth
+from weaveserver import API_VERSION
+from weaveserver.util import authenticate_user
+from weaveserver.storage import WeaveStorage
+from weaveserver.auth import WeaveAuth
 
 # XXX see if we want to load these dynamically
-from weave.server.storage import sql
-from weave.server.auth import dummy, sql
-from weave.server.storagecontroller import StorageController
-from weave.server.usercontroller import UserController
+from weaveserver.storage import sql
+from weaveserver.auth import dummy, sql
+from weaveserver.storagecontroller import StorageController
+from weaveserver.usercontroller import UserController
 
 # URL dispatching happens here
 # methods / match / controller / controller method / auth ?

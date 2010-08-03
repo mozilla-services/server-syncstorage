@@ -37,9 +37,9 @@ import unittest
 
 from sqlalchemy.sql import text
 
-from weave.server.auth import sql   # forces the registration
-from weave.server.auth import WeaveAuth
-from weave.server.util import ssha
+from weaveserver.auth import sql   # forces the registration
+from weaveserver.auth import WeaveAuth
+from weaveserver.util import ssha
 
 class TestSQLAuth(unittest.TestCase):
 
