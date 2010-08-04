@@ -46,6 +46,7 @@ from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
 
 from weaveserver.util import convert_response, json_response, round_time
 from weaveserver.wbo import WBO
+from weaveserver.respcodes import WEAVE_MALFORMED_JSON
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -176,7 +177,7 @@ class StorageController(object):
         try:
             data = json.loads(request.body)
         except ValueError, e:
-            raise HTTPBadRequest('Malformed JSON body')
+            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         wbo = WBO(data)
         consistent, msg = wbo.validate()
