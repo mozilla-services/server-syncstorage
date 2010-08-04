@@ -165,5 +165,21 @@ class SQLAuth(object):
         self._engine.execute(text(query), user_id=user_id, code=code,
                              expiration=expiration)
 
+    def get_user_info(self, user_id):
+        """Returns user info
+
+        Args:
+            user_id: user id
+
+        Returns:
+            tuple: username, email
+        """
+        query = ('select username, email from users '
+                 'where id = :user_id')
+        res = self._engine.execute(text(query), user_id=user_id).fetchone()
+        if res is None:
+            return None, None
+
+        return res.username, res.email
 
 WeaveAuth.register(SQLAuth)

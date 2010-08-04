@@ -66,9 +66,11 @@ class TestWsgiApp(unittest.TestCase):
         self.auth = WeaveAuth.get_from_config(config)
         password = ssha('tarek')
         from sqlalchemy.sql import text
-        query = text('insert into users (username, password_hash) '
-                     'values (:username, :password)')
-        self.auth._engine.execute(query, username='tarek', password=password)
+        query = text('insert into users (username, password_hash, email) '
+                'values (:username, :password, :email)')
+        self.auth._engine.execute(query, username='tarek',
+                                  password=password,
+                                  email='tarek@mozilla.com')
 
     def tearDown(self):
         if os.path.exists(self.sqlfile):

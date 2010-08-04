@@ -88,3 +88,14 @@ class WeaveAuth(Plugin):
         Returns:
             None
         """
+
+    @abc.abstractmethod
+    def get_user_info(self, user_id):
+        """Returns user info
+
+        Args:
+            user_id: user id
+
+        Returns:
+            tuple: username, email
+        """

@@ -42,6 +42,10 @@ from hashlib import sha1
 import base64
 import json
 import struct
+from email.mime.text import MIMEText
+from email.header import Header
+import smtplib
+import socket
 
 from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
@@ -165,9 +169,56 @@ def ssha(password, salt=None):
     ssha = base64.encodestring(sha1(password+salt).digest() + salt).strip()
     return "{SSHA}%s" % ssha
 
+
 def validate_password(clear, hash):
     """Returns a Salted-SHA1 password"""
     real_hash = hash.split('{SSHA}')[-1]
     salt = base64.decodestring(real_hash)[-32:]
     password = ssha(clear, salt)
     return password == hash
+
+
+def send_email(sender, rcpt, subject, body, smtp_host='localhost',
+               smtp_port=25, smtp_user=None, smtp_password=None):
+    """Sends a text/plain email synchronously.
+
+    Args:
+        sender: sender address - unicode + utf8
+        rcpt: recipient address - unicode + utf8
+        subject: subject - unicode + utf8
+        body: email body - unicode + utf8
+        smtp_host: smtp server -- defaults to localhost
+        smtp_port: smtp port -- defaults to 25
+        smtp_user: smtp user if the smtp server requires it
+        smtp_password: smtp password if the smtp server requires it
+
+    Returns:
+        tuple: (True or False, Error Message)
+    """
+    # preparing the message
+    msg = MIMEText(body.encode('utf8'), 'plain', 'utf8')
+    msg['From'] = Header(sender, 'utf8')
+    msg['To'] = Header(rcpt, 'utf8')
+    msg['Subject'] = Header(subject, 'utf8')
+
+    try:
+        server = smtplib.SMTP(smtp_host, smtp_port, timeout=5)
+    except (smtplib.SMTPConnectError, socket.error), e:
+        return False, str(e)
+
+    # auth
+    if smtp_user is not None and smtp_password is not None:
+        try:
+            server.login(smtp_user, smtp_password)
+        except (smtplib.SMTPHeloError,
+                smtplib.SMTPAuthenticationError,
+                smtplib.SMTPException), e:
+            return False, str(e)
+
+    # the actual sending
+    try:
+        server.sendmail(sender, [rcpt], msg.as_string())
+    finally:
+        server.quit()
+
+    return True, None

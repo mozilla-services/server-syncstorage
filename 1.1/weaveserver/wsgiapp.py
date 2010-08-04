@@ -92,8 +92,10 @@ URLS = [('GET', '/', 'storage', 'index', True),
 
         # user API
         ('GET', '/user/_API_/_USERNAME_', 'user', 'user_exists', False),
-        ('GET', '/user/_API_/_USERNAME_/node/weave', 'user', 'user_node', False),
-
+        ('GET', '/user/_API_/_USERNAME_/node/weave', 'user', 'user_node',
+         False),
+        ('GET', '/user/_API_/_USERNAME_/password_reset', 'user',
+         'password_reset', True),
         ]
 
 
@@ -115,7 +117,7 @@ class SyncServerApp(object):
 
         # loading and connecting controllers
         self.controllers = {'storage': StorageController(self.storage),
-                            'user': UserController()}
+                            'user': UserController(self.authtool)}
 
         for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):
@@ -138,6 +140,7 @@ class SyncServerApp(object):
             raise HTTPBadRequest('"%s" not supported' % request.method)
 
         request.server_time = float('%.2f' % time.time())
+        request.config = self.config
 
         match = self.mapper.routematch(environ=request.environ)
         if match is None:

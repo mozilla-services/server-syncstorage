@@ -39,10 +39,16 @@ User controller. Implements all APIs from:
 https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 
 """
-from weaveserver.util import json_response
+import os
+from webob.exc import HTTPServiceUnavailable
+from weaveserver.util import json_response, send_email
 
+_TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 class UserController(object):
+
+    def __init__(self, auth):
+        self.auth = auth
 
     def user_exists(self, request):
         # XXX this is called by the Firefox plugin to check if the
@@ -56,3 +62,31 @@ class UserController(object):
         #
         # return json_response(request.host_url)
         return request.host_url
+
+    def password_reset(self, request):
+        """Sends an e-mail for a password reset request."""
+        user_id = request.sync_info['user_id']
+        code = self.auth.generate_reset_code(user_id)
+
+        # getting the email template
+        with open(os.path.join(_TPL_DIR, 'password_reset.tpl')) as f:
+            template = f.read()
+
+        user_name, user_email = self.auth.get_user_info(user_id)
+        body = template % {'host': request.host_url,
+                           'user_name': user_name, 'code': code}
+
+        sender = request.config['smtp.sender']
+        host = request.config['smtp.host']
+        port = int(request.config['smtp.port'])
+        user = request.config.get('smtp.user')
+        password = request.config.get('smtp.password')
+
+        subject = 'Resetting your Weave password'
+        res, msg = send_email(sender, user_email, subject, body, host, port,
+                              user, password)
+
+        if not res:
+            raise HTTPServiceUnavailable(msg)
+
+        return 'success'

@@ -77,5 +77,8 @@ class DummyAuth(object):
         """Clears the reset code"""
         return
 
+    def get_user_info(self, user_id):
+        """Returns user info"""
+        return None, None
 
 WeaveAuth.register(DummyAuth)

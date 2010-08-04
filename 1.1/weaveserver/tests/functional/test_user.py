@@ -38,9 +38,23 @@ Basic tests to verify that the dispatching mechanism works.
 """
 import base64
 import json
+import smtplib
 
 from weaveserver.tests.functional import support
 
+
+class FakeSMTP(object):
+
+    msgs = []
+
+    def __init__(self, *args, **kw):
+        pass
+
+    def quit(self):
+        pass
+
+    def sendmail(self, sender, rcpts, msg):
+        self.msgs.append((sender, rcpts, msg))
 
 class TestUser(support.TestWsgiApp):
 
@@ -54,10 +68,17 @@ class TestUser(support.TestWsgiApp):
         # let's create some collections for our tests
         self.storage.set_user(1)
 
+        # we don't want to send emails for real
+        self.old = smtplib.SMTP
+        smtplib.SMTP = FakeSMTP
+
     def tearDown(self):
         # removing all data after the test
         self.storage.delete_user(1)
         super(TestUser, self).tearDown()
+
+        # setting back smtp
+        smtplib.SMTP = self.old
 
     def test_user_exists(self):
         res = self.app.get('/user/1.0/tarek')
@@ -66,3 +87,9 @@ class TestUser(support.TestWsgiApp):
     def test_user_node(self):
         res = self.app.get('/user/1.0/tarek/node/weave')
         self.assertTrue(res.body, 'http://localhost')
+
+    def test_password_reset(self):
+        # making sure a mail is sent
+        res = self.app.get('/user/1.0/tarek/password_reset')
+        self.assertEquals(res.body, 'success')
+        self.assertEquals(len(FakeSMTP.msgs), 1)
