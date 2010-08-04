@@ -64,7 +64,7 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(res, (u'tarek2@ziade.org',))
         res = self.storage.get_user(_UID)
         self.assertEquals(res, (1, u'tarek', None, u'tarek2@ziade.org', None,
-                                None))
+                                None, None, None))
 
     def test_collections(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')

@@ -45,6 +45,46 @@ class WeaveAuth(Plugin):
 
     @abc.abstractmethod
     def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
+        """Authenticates a user.
 
-        Returns the user id in case of success. Returns None otherwise."""
+        Args:
+            username: string
+            password: password hash
+
+        Returns:
+            The user id in case of success. None otherwise.
+        """
+
+    @abc.abstractmethod
+    def generate_reset_code(self, user_id):
+        """Generates a reset code
+
+        Args:
+            user_id: user id
+
+        Returns:
+            a reset code
+        """
+
+    @abc.abstractmethod
+    def verify_reset_code(self, user_id, code):
+        """Generates a reset code
+
+        Args:
+            user_id: user id
+            code: reset code
+
+        Returns:
+            True or False
+        """
+
+    @abc.abstractmethod
+    def clear_reset_code(self, user_id):
+        """Clears the reset code
+
+        Args:
+            user_id: user id
+
+        Returns:
+            None
+        """

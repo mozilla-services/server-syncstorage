@@ -40,6 +40,11 @@ Users are stored with digest password (sha1)
 XXX cost of server-side sha1
 XXX cache sha1 + sql
 """
+import string
+import random
+import datetime
+import re
+
 from sqlalchemy.ext.declarative import declarative_base, Column
 from sqlalchemy import Integer, String, create_engine
 from sqlalchemy.sql import text
@@ -51,7 +56,7 @@ from weaveserver.util import validate_password
 from weaveserver.storage.sqlmappers import users
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-
+_RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
 
 class SQLAuth(object):
     """SQL authentication."""
@@ -79,6 +84,86 @@ class SQLAuth(object):
 
         if validate_password(password, user.password_hash):
             return user.id
+
+    def generate_reset_code(self, user_id):
+        """Generates a reset code
+
+        Args:
+            user_id: user id
+            password: password hash
+
+        Returns:
+            a reset code, or None if the generation failed
+        """
+        chars = string.ascii_uppercase + string.digits
+        def _4chars():
+            return ''.join([random.choice(chars) for i in range(4)])
+
+        code = '-'.join([_4chars() for i in range(4)])
+        expiration = datetime.datetime.now() + datetime.timedelta(hours=6)
+
+        query = ('update users set reset = :code, '
+                 'reset_expiration = :expiration '
+                 'where id = :user_id')
+
+        res = self._engine.execute(text(query), user_id=user_id, code=code,
+                                   expiration=expiration)
+        if res.rowcount != 1:
+            return None  # XXX see if appropriate
+
+        return code
+
+    def verify_reset_code(self, user_id, code):
+        """Verify a reset code
+
+        Args:
+            user_id: user id
+            code: reset code
+
+        Returns:
+            True or False
+        """
+        if _RE_CODE.match(code) is None:
+            return False
+
+        query = ('select reset_expiration, reset from users '
+                 'where id = :user_id')
+        res = self._engine.execute(text(query), user_id=user_id)
+        user = res.fetchone()
+
+        if user.reset is None or user.reset_expiration is None:
+            return False
+
+        # XXX SQLALchemy should turn it into a datetime for us
+        exp = datetime.datetime.strptime(user.reset_expiration,
+                                         '%Y-%m-%d %H:%M:%S.%f')
+
+        if exp < datetime.datetime.now():
+            # expired
+            return False
+
+        if user.reset != code:
+            # wrong code
+            return False
+
+        return True
+
+    def clear_reset_code(self, user_id):
+        """Clears the reset code
+
+        Args:
+            user_id: user id
+
+        Returns:
+            None
+        """
+        query = ('update users set reset = :code, '
+                 'reset_expiration = :expiration '
+                 'where id = :user_id')
+
+        code = expiration = None
+        self._engine.execute(text(query), user_id=user_id, code=code,
+                             expiration=expiration)
 
 
 WeaveAuth.register(SQLAuth)

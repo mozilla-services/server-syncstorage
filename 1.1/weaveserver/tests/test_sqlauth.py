@@ -34,6 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+import datetime
 
 from sqlalchemy.sql import text
 
@@ -54,6 +55,27 @@ class TestSQLAuth(unittest.TestCase):
     def test_authenticate_user(self):
         self.assertEquals(self.auth.authenticate_user('tarek', 'xxx'), None)
         self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
+
+    def test_reset_code(self):
+        self.assertFalse(self.auth.verify_reset_code(1, 'x'))
+
+        # normal behavior
+        code = self.auth.generate_reset_code(1)
+        self.assertTrue(self.auth.verify_reset_code(1, code))
+
+        # reseted
+        code = self.auth.generate_reset_code(1)
+        self.auth.clear_reset_code(1)
+        self.assertFalse(self.auth.verify_reset_code(1, code))
+
+        # expired
+        code = self.auth.generate_reset_code(1)
+        expiration = datetime.datetime.now() + datetime.timedelta(hours=-7)
+
+        query = ('update users set reset_expiration = :expiration '
+                 'where id = 1')
+        self.auth._engine.execute(text(query), expiration=expiration)
+        self.assertFalse(self.auth.verify_reset_code(1, code))
 
 
 def test_suite():

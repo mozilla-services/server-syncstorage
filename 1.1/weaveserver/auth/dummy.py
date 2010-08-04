@@ -65,4 +65,17 @@ class DummyAuth(object):
         self._users[username] = id_
         return id_
 
+    def generate_reset_code(self, user_id):
+        """Generates a reset code"""
+        return 'XXXX-XXXX-XXXX-XXXX'
+
+    def verify_reset_code(self, user_id, code):
+        """Verify a reset code"""
+        return True
+
+    def clear_reset_code(self, user_id):
+        """Clears the reset code"""
+        return
+
+
 WeaveAuth.register(DummyAuth)

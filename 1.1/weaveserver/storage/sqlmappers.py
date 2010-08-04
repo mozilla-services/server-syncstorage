@@ -63,6 +63,9 @@ class Users(_Base):
     email = Column(String(64))
     status = Column(Integer)
     alert = Column(Text)
+    reset = Column(String(32))
+    reset_expiration = Column(DateTime())
+
 
 users = Users.__table__
 tables.append(users)
