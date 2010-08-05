@@ -46,6 +46,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 import smtplib
 import socket
+import re
 
 from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
@@ -222,3 +223,33 @@ def send_email(sender, rcpt, subject, body, smtp_host='localhost',
         server.quit()
 
     return True, None
+
+
+_RE_EMAIL = re.compile(r"(?:^|\s)[-a-z0-9_.]+@"
+                        "(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)", re.I)
+
+def valid_email(email):
+    """Checks if the email is well-formed
+
+    Args:
+        email: e-mail to check
+
+    Returns:
+        True or False
+    """
+    return _RE_EMAIL.match(email) is not None
+
+
+def valid_password(user_name, password):
+    """Checks a password strength.
+
+    Args:
+        user_name: user name associated with the password
+        password: password
+
+    Returns:
+        True or False
+    """
+    if len(password) < 8:
+        return False
+    return user_name.lower().strip() != password.lower().strip()

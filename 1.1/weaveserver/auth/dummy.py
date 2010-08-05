@@ -35,6 +35,7 @@
 # ***** END LICENSE BLOCK *****
 """ Dummy Authentication
 """
+import random
 from weaveserver.auth import WeaveAuth
 
 
@@ -51,19 +52,32 @@ class DummyAuth(object):
         """Returns the name of the authentication backend"""
         return 'dummy'
 
-    def authenticate_user(self, username, password):
+    def create_user(self, user_name, password, email):
+        """creates a user"""
+        if user_name in self._users:
+            return False
+        id_ = random.randint(1, 2000)
+        ids = self._users.values()
+        while id_ in ids:
+            id_ = random.randint(2000)
+        self._users[user_name] = id_
+        return True
+
+    def get_user_id(self, user_name):
+        """Returns user id"""
+        if username in self._users:
+            return self._users[username]
+        return None
+
+    def authenticate_user(self, user_name, password):
         """Authenticates a user given a username and password.
 
         Returns the user id in case of success. Returns None otherwise."""
 
-        if username in self._users:
-            return self._users[username]
-        id_ = 1
-        ids = self._users.values()
-        while id_ in ids:
-            id_ += 1
-        self._users[username] = id_
-        return id_
+        if user_name not in self._users:
+            self.create_user(user_name, password, '')
+
+        return self._users[user_name]
 
     def generate_reset_code(self, user_id):
         """Generates a reset code"""

@@ -48,9 +48,11 @@ class TestDummyAuth(unittest.TestCase):
         self.auth = WeaveAuth.get('dummy')
 
     def test_authenticate_user(self):
-        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
-        self.assertEquals(self.auth.authenticate_user('tarek2', 'tarek'), 2)
-        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
+        tarek_id = self.auth.authenticate_user('tarek', 'tarek')
+        self.assertNotEquals(self.auth.authenticate_user('tarek2', 'tarek'),
+                             tarek_id)
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'),
+                          tarek_id)
 
 
 def test_suite():

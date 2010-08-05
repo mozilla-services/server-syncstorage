@@ -44,11 +44,35 @@ class WeaveAuth(Plugin):
     name = 'auth'
 
     @abc.abstractmethod
-    def authenticate_user(self, username, password):
+    def get_user_id(self, user_name):
+        """Returns the id for a user name.
+
+        Args:
+            user_name: user name
+
+        Returns:
+            user id. None if not found.
+        """
+
+    @abc.abstractmethod
+    def create_user(self, user_name, password, email):
+        """Creates a user
+
+        Args:
+            user_name: the user name
+            passwors: the password associated with the user
+            email: the email associated with the user
+
+        Returns:
+            True or False, depending if the creation was successfull
+        """
+
+    @abc.abstractmethod
+    def authenticate_user(self, user_name, password):
         """Authenticates a user.
 
         Args:
-            username: string
+            user_name: string
             password: password hash
 
         Returns:

@@ -40,8 +40,17 @@ https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 
 """
 import os
-from webob.exc import HTTPServiceUnavailable
-from weaveserver.util import json_response, send_email
+import json
+from webob.exc import (HTTPServiceUnavailable, HTTPBadRequest,
+                       HTTPInternalServerError)
+
+from weaveserver.util import (json_response, send_email, valid_email,
+                              valid_password)
+from weaveserver.respcodes import (WEAVE_MISSING_PASSWORD,
+                                   WEAVE_NO_EMAIL_ADRESS,
+                                   WEAVE_INVALID_WRITE,
+                                   WEAVE_MALFORMED_JSON,
+                                   WEAVE_WEAK_PASSWORD)
 
 _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
@@ -51,9 +60,9 @@ class UserController(object):
         self.auth = auth
 
     def user_exists(self, request):
-        # XXX this is called by the Firefox plugin to check if the
-        # sync server exists
-        return json_response(True)
+        exists = (self.auth.get_user_id(request.sync_info['username'])
+                  is not None)
+        return json_response(exists)
 
     def user_node(self, request):
         """Returns the storage node root for the user"""
@@ -90,3 +99,34 @@ class UserController(object):
             raise HTTPServiceUnavailable(msg)
 
         return 'success'
+
+    def create_user(self, request):
+        """Creates a user."""
+        user_name = request.sync_info['username']
+
+        if self.auth.get_user_id(user_name) is not None:
+            raise HTTPBadRequest(WEAVE_INVALID_WRITE)
+
+        try:
+            data = json.loads(request.body)
+        except ValueError, e:
+            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
+
+        # getting the e-mail
+        email = data.get('email')
+        if not valid_email(email):
+            raise HTTPBadRequest(WEAVE_NO_EMAIL_ADRESS)
+
+        # getting the password
+        password = data.get('password')
+        if password is None:
+            raise HTTPBadRequest(WEAVE_MISSING_PASSWORD)
+
+        if not valid_password(user_name, password):
+            raise HTTPBadRequest(WEAVE_WEAK_PASSWORD)
+
+        # all looks good, let's create the user
+        if not self.auth.create_user(user_name, password, email):
+            raise HTTPInternalServerError('User creation failed.')
+
+        return user_name

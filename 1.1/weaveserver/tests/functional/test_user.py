@@ -93,3 +93,48 @@ class TestUser(support.TestWsgiApp):
         res = self.app.get('/user/1.0/tarek/password_reset')
         self.assertEquals(res.body, 'success')
         self.assertEquals(len(FakeSMTP.msgs), 1)
+
+    def test_create_user(self):
+        # creating a user
+
+        # the user already exists
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek', params=payload, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # missing the password
+        payload = {'email': 'tarek@ziade.org'}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # malformed e-mail
+        payload = {'email': 'tarekziadeorg', 'password': 'x'*9}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # weak password
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # weak password #2
+        payload = {'email': 'tarek@ziade.org', 'password': 'tarek2'}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # everything is there
+        res = self.app.get('/user/1.0/tarek2')
+        self.assertFalse(json.loads(res.body))
+
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = json.dumps(payload)
+        res = self.app.put('/user/1.0/tarek2', params=payload)
+        self.assertEquals(res.body, 'tarek2')
+
+        res = self.app.get('/user/1.0/tarek2')
+        self.assertTrue(json.loads(res.body))

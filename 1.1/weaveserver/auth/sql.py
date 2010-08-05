@@ -50,7 +50,7 @@ from sqlalchemy import Integer, String, create_engine
 from sqlalchemy.sql import text
 
 from weaveserver.auth import WeaveAuth
-from weaveserver.util import validate_password
+from weaveserver.util import validate_password, ssha
 
 # sharing the same table than the sql storage
 from weaveserver.storage.sqlmappers import users
@@ -71,14 +71,32 @@ class SQLAuth(object):
         """Returns the name of the authentication backend"""
         return 'sql'
 
-    def authenticate_user(self, username, password):
-        """Authenticates a user given a username and password.
+    def get_user_id(self, user_name):
+        """Returns the id for a user name"""
+        query = text('select id from users where username = :user_name')
+        user = self._engine.execute(query, user_name=user_name).fetchone()
+        if user is None:
+            return None
+        return user.id
+
+    def create_user(self, user_name, password, email):
+        """Creates a user. Returns True on success."""
+        query = ('insert into users (username, password_hash, email, status) '
+                 ' values (:user_name, :password_hash, :email, 1)')
+
+        password_hash = ssha(password)
+        res = self._engine.execute(query, user_name=user_name, email=email,
+                                   password_hash=password_hash)
+        return res.rowcount == 1
+
+    def authenticate_user(self, user_name, password):
+        """Authenticates a user given a user_name and password.
 
         Returns the user id in case of success. Returns None otherwise."""
         query = ('select id, password_hash from users '
-                 'where username = :username')
+                 'where username = :user_name')
 
-        user = self._engine.execute(text(query), username=username).fetchone()
+        user = self._engine.execute(text(query), user_name=user_name).fetchone()
         if user is None:
             return None
 
