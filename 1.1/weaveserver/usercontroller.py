@@ -76,14 +76,10 @@ class UserController(object):
         """Sends an e-mail for a password reset request."""
         user_id = request.sync_info['user_id']
         code = self.auth.generate_reset_code(user_id)
-
-        # getting the email template
-        with open(os.path.join(_TPL_DIR, 'password_reset.tpl')) as f:
-            template = f.read()
-
         user_name, user_email = self.auth.get_user_info(user_id)
-        body = template % {'host': request.host_url,
-                           'user_name': user_name, 'code': code}
+        data = {'host': request.host_url, 'user_name': user_name,
+                'code': code}
+        body = render_mako('password_reset_mail.mako', **data)
 
         sender = request.config['smtp.sender']
         host = request.config['smtp.host']
