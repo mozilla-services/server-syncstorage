@@ -149,7 +149,19 @@ class UserController(object):
 
     def password_reset_form(self, request, **kw):
         """Returns a form for resetting the password"""
-        return render_mako('password_reset_form.mako', **kw)
+        if 'key' in request.POST or 'key' in kw:
+            # we have a key, let's display the key controlling form
+            return render_mako('password_reset_form.mako', **kw)
+        elif 'username' in request.POST:
+            # setting up a password reset
+            user_name = request.POST['username']
+            user_id = self.auth.get_user_id(user_name)
+            request.sync_info['user_id'] = user_id
+            self.password_reset(request)
+            return render_mako('password_key_sent.mako')
+        elif not request.POST and not request.GET:
+            # asking for the first time
+            return render_mako('password_ask_reset_form.mako')
 
     def _repost(self, request, error):
         request.POST['error'] = error

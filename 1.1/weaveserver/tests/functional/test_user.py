@@ -95,16 +95,23 @@ class TestUser(support.TestWsgiApp):
         self.assertEquals(res.body, 'success')
         self.assertEquals(len(FakeSMTP.msgs), 1)
 
+        # let's ask via the web form now
+        res = self.app.get('/weave-password-reset')
+        res.form['username'].value = 'tarek'
+        res = res.form.submit()
+        self.assertTrue('next 6 hours' in res)
+        self.assertEquals(len(FakeSMTP.msgs), 2)
+
         # let's visit the link in the email
-        msg = message_from_string(FakeSMTP.msgs[0][2]).get_payload()
+        msg = message_from_string(FakeSMTP.msgs[1][2]).get_payload()
         msg = base64.decodestring(msg)
         link = msg.split('\n')[2].strip()
 
-        res = self.app.get(link)
-
         # it's a form we can fill
+
         # let's try bad values
         # mismatch
+        res = self.app.get(link)
         res.form['password'].value = 'mynewpassword'
         res.form['confirm'].value = 'badconfirmation'
         res = res.form.submit()
