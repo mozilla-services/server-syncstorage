@@ -100,6 +100,8 @@ URLS = [('GET', '/', 'storage', 'index', True),
          'password_reset', True),
         ('POST', '/user/_API_/_USERNAME_/email', 'user', 'change_email',
          True),
+        ('GET', '/weave-password-reset', 'user', 'password_reset_form', False),
+        ('POST', '/weave-password-reset', 'user', 'do_password_reset', False),
 
         # media   XXX served by Apache in real production
         ('GET', '/media/{filename}', 'static', 'get_file', False)

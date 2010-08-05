@@ -216,5 +216,22 @@ class SQLAuth(object):
         res = self._engine.execute(text(query), user_id=user_id, email=email)
         return res.rowcount == 1
 
+    def update_password(self, user_id, password):
+        """Change the user password
+
+        Args:
+            user_id: user id
+            password: new password
+
+        Returns:
+            True if the change was successful, False otherwise
+        """
+        password_hash = ssha(password)
+        query = ('update users set password_hash = :password_hash '
+                 'where id = :user_id')
+        res = self._engine.execute(text(query), user_id=user_id,
+                                   password_hash=password_hash)
+        return res.rowcount == 1
+
 
 WeaveAuth.register(SQLAuth)

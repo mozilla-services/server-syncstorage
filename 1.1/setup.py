@@ -38,7 +38,8 @@ from setuptools import setup, find_packages
 setup(name='WeaveServer', version=0.1,
       packages=find_packages(),
       install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                        'PasteScript', 'Routes', 'WebOb', 'WebTest'],
+                        'PasteScript', 'Routes', 'WebOb', 'WebTest',
+                        'Mako'],
       entry_points="""
       [paste.app_factory]
       main = weaveserver.wsgiapp:make_app

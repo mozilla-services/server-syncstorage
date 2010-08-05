@@ -39,6 +39,7 @@ Basic tests to verify that the dispatching mechanism works.
 import base64
 import json
 import smtplib
+from email import message_from_string
 
 from weaveserver.tests.functional import support
 
@@ -93,6 +94,34 @@ class TestUser(support.TestWsgiApp):
         res = self.app.get('/user/1.0/tarek/password_reset')
         self.assertEquals(res.body, 'success')
         self.assertEquals(len(FakeSMTP.msgs), 1)
+
+        # let's visit the link in the email
+        msg = message_from_string(FakeSMTP.msgs[0][2]).get_payload()
+        msg = base64.decodestring(msg)
+        link = msg.split('\n')[2].strip()
+
+        res = self.app.get(link)
+
+        # it's a form we can fill
+        # let's try bad values
+        # mismatch
+        res.form['password'].value = 'mynewpassword'
+        res.form['confirm'].value = 'badconfirmation'
+        res = res.form.submit()
+        self.assertTrue('do not match' in res)
+
+        # weak password
+        res = self.app.get(link)
+        res.form['password'].value = 'my'
+        res.form['confirm'].value = 'my'
+        res = res.form.submit()
+        self.assertTrue('at least 8' in res)
+
+        res = self.app.get(link)
+        res.form['password'].value = 'mynewpassword'
+        res.form['confirm'].value = 'mynewpassword'
+        res = res.form.submit()
+        self.assertTrue('Password successfully changed' in res)
 
     def test_create_user(self):
         # creating a user

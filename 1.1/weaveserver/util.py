@@ -47,6 +47,9 @@ from email.header import Header
 import smtplib
 import socket
 import re
+import os
+
+from mako.lookup import TemplateLookup
 
 from webob.exc import HTTPUnauthorized, HTTPBadRequest
 from webob import Response
@@ -253,3 +256,22 @@ def valid_password(user_name, password):
     if len(password) < 8:
         return False
     return user_name.lower().strip() != password.lower().strip()
+
+
+_TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
+_lookup = TemplateLookup(directories=[_TPL_DIR],
+                        module_directory=_TPL_DIR) # XXX to be defined in prod
+
+
+def render_mako(template, **data):
+    """Renders a mako template located in '/templates'
+
+    Args:
+        template: template name, so /templates/template exists
+        data: dict passed to the template engine
+
+    Requests:
+        returns the rendered template
+    """
+    template = _lookup.get_template(template)
+    return template.render(**data)

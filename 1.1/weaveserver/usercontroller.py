@@ -45,7 +45,7 @@ from webob.exc import (HTTPServiceUnavailable, HTTPBadRequest,
                        HTTPInternalServerError)
 
 from weaveserver.util import (json_response, send_email, valid_email,
-                              valid_password)
+                              valid_password, render_mako)
 from weaveserver.respcodes import (WEAVE_MISSING_PASSWORD,
                                    WEAVE_NO_EMAIL_ADRESS,
                                    WEAVE_INVALID_WRITE,
@@ -146,3 +146,53 @@ class UserController(object):
             raise HTTPInternalServerError('User update failed.')
 
         return email
+
+    def password_reset_form(self, request, **kw):
+        """Returns a form for resetting the password"""
+        return render_mako('password_reset_form.mako', **kw)
+
+    def _repost(self, request, error):
+        request.POST['error'] = error
+        return self.password_reset_form(request, **dict(request.POST))
+
+    def do_password_reset(self, request):
+        """Do a password reset."""
+        user_name = request.POST.get('username')
+        password = request.POST.get('password')
+        confirm = request.POST.get('confirm')
+        key = request.POST.get('key')
+
+        if user_name is None:
+            return self._repost(request,
+                                'Username not provided. Please check '
+                                'the link you used.')
+
+        user_id = self.auth.get_user_id(user_name)
+        if user_id is None:
+            return self._repost(request, 'We are unable to locate your '
+                                'account')
+
+        if password is None:
+            return self._repost(request, 'Password not provided. '
+                                'Please check the link you used.')
+
+        if password != confirm:
+            return self._repost(request, 'Password and confirmation do '
+                                'not match')
+
+        if not valid_password(user_name, password):
+            return self._repost(request, 'Password should be at least 8 '
+                                'characters and not the same as your '
+                                'username')
+
+        if not self.auth.verify_reset_code(user_id, key):
+            return self._repost(request, 'Key does not match with username. '
+                                'Please request a new key.')
+
+        # everything looks fine
+        if not self.auth.update_password(user_id, password):
+            return self._repost(request, 'Password change failed '
+                                'unexpectedly.')
+
+        self.auth.clear_reset_code(user_id)
+        return render_mako('password_changed.mako')
