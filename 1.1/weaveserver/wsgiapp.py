@@ -55,6 +55,7 @@ from weaveserver.storage import sql
 from weaveserver.auth import dummy, sql
 from weaveserver.storagecontroller import StorageController
 from weaveserver.usercontroller import UserController
+from weaveserver.staticcontroller import StaticController
 
 # URL dispatching happens here
 # methods / match / controller / controller method / auth ?
@@ -99,6 +100,9 @@ URLS = [('GET', '/', 'storage', 'index', True),
          'password_reset', True),
         ('POST', '/user/_API_/_USERNAME_/email', 'user', 'change_email',
          True),
+
+        # media   XXX served by Apache in real production
+        ('GET', '/media/{filename}', 'static', 'get_file', False)
         ]
 
 
@@ -120,7 +124,8 @@ class SyncServerApp(object):
 
         # loading and connecting controllers
         self.controllers = {'storage': StorageController(self.storage),
-                            'user': UserController(self.authtool)}
+                            'user': UserController(self.authtool),
+                            'static': StaticController()}
 
         for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):
