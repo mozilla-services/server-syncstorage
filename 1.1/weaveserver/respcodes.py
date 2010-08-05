@@ -33,12 +33,12 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" 404 error codes
+""" 400 error codes
     See: https://wiki.mozilla.org/Labs/Weave/1.0/ResponseCodes
 """
 WEAVE_ILLEGAL_METH = 1          # Illegal method/protocol
 WEAVE_INVALID_CAPTCHA = 2       # Incorrect/missing captcha
-WEAVE_INVALID_USER =_3          # Invalid/missing username
+WEAVE_INVALID_USER = 3          # Invalid/missing username
 WEAVE_INVALID_WRITE = 4         # Attempt to overwrite data that can't be
 WEAVE_WRONG_USERID = 5          # Userid does not match account in path
 WEAVE_MALFORMED_JSON = 6        # Json parse failure
