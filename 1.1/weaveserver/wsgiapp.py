@@ -97,6 +97,8 @@ URLS = [('GET', '/', 'storage', 'index', True),
          False),
         ('GET', '/user/_API_/_USERNAME_/password_reset', 'user',
          'password_reset', True),
+        ('POST', '/user/_API_/_USERNAME_/email', 'user', 'change_email',
+         True),
         ]
 
 

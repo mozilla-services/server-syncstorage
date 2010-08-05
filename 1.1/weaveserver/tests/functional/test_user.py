@@ -138,3 +138,15 @@ class TestUser(support.TestWsgiApp):
 
         res = self.app.get('/user/1.0/tarek2')
         self.assertTrue(json.loads(res.body))
+
+    def test_change_email(self):
+
+        # bad email
+        body = json.dumps('newemail.com')
+        res = self.app.post('/user/1.0/tarek/email', params=body, status=400)
+        self.assertEquals(res.status_int, 400)
+
+        # good one
+        body = json.dumps('new@email.com')
+        res = self.app.post('/user/1.0/tarek/email', params=body)
+        self.assertEquals(res.body, 'new@email.com')

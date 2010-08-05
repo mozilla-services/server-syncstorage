@@ -173,15 +173,16 @@ class SQLAuth(object):
             user_id: user id
 
         Returns:
-            None
+            True if the change was successful, False otherwise
         """
         query = ('update users set reset = :code, '
                  'reset_expiration = :expiration '
                  'where id = :user_id')
 
         code = expiration = None
-        self._engine.execute(text(query), user_id=user_id, code=code,
-                             expiration=expiration)
+        res = self._engine.execute(text(query), user_id=user_id, code=code,
+                                   expiration=expiration)
+        return res.rowcount == 1
 
     def get_user_info(self, user_id):
         """Returns user info
@@ -199,5 +200,21 @@ class SQLAuth(object):
             return None, None
 
         return res.username, res.email
+
+    def update_email(self, user_id, email):
+        """Change the user e-mail
+
+        Args:
+            user_id: user id
+            email: new email
+
+        Returns:
+            True if the change was successful, False otherwise
+        """
+        query = ('update users set email = :email '
+                 'where id = :user_id')
+        res = self._engine.execute(text(query), user_id=user_id, email=email)
+        return res.rowcount == 1
+
 
 WeaveAuth.register(SQLAuth)

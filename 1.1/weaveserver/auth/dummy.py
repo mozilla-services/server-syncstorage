@@ -53,7 +53,7 @@ class DummyAuth(object):
         return 'dummy'
 
     def create_user(self, user_name, password, email):
-        """creates a user"""
+        """Creates a user"""
         if user_name in self._users:
             return False
         id_ = random.randint(1, 2000)
@@ -94,5 +94,10 @@ class DummyAuth(object):
     def get_user_info(self, user_id):
         """Returns user info"""
         return None, None
+
+    def update_email(self, user_id, email):
+        """Updates the e-mail"""
+        return True
+
 
 WeaveAuth.register(DummyAuth)

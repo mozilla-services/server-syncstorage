@@ -123,3 +123,15 @@ class WeaveAuth(Plugin):
         Returns:
             tuple: username, email
         """
+
+    @abc.abstractmethod
+    def update_email(self, user_id, email):
+        """Change the user e-mail
+
+        Args:
+            user_id: user id
+            email: new email
+
+        Returns:
+            True if the change was successful, False otherwise
+        """

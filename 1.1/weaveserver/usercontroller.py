@@ -130,3 +130,19 @@ class UserController(object):
             raise HTTPInternalServerError('User creation failed.')
 
         return user_name
+
+    def change_email(self, request):
+        """Changes the user e-mail"""
+        user_id = request.sync_info['user_id']
+        try:
+            email = json.loads(request.body)
+        except ValueError, e:
+            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
+
+        if not valid_email(email):
+            raise HTTPBadRequest(WEAVE_NO_EMAIL_ADRESS)
+
+        if not self.auth.update_email(user_id, email):
+            raise HTTPInternalServerError('User update failed.')
+
+        return email
