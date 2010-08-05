@@ -858,17 +858,6 @@ class TestStorage(unittest.TestCase):
         result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&limit=2&offset=-5", withHost=test_config.HOST_NAME)
         self.failUnlessEqual(['1'], result)
 
-    def testGet_Offset_NoLimit(self):
-        "testGet_Offset_NoLimit: Attempt to get objects with an 'offset' parameter without a 'limit' parameter should report an error"
-        userID, storageServer = self.createCaseUser()
-        [weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':i, 'payload':'aPayload', 'sortindex': i}, withHost=test_config.HOST_NAME) for i in range(1,5)]
-        try:
-            result = weave.get_collection_ids(storageServer, userID, self.password, 'coll', params="sort=index&offset=2", withHost=test_config.HOST_NAME)
-            self.fail("Attempt to use offset without a limit should have raised an error; got %s" % result)
-        except weave.WeaveException, e:
-            self.failUnless(str(e).find("HTTP Error 400: Bad Request") > 0, "Should have been an HTTP 400 error, was %s" % str(e))
-
-
     def testGet_whoisi(self):
         "testGet_whoisi: Attempt to get multiple objects, specifying whoisi output format, without 'full'."
         userID, storageServer = self.createCaseUser()

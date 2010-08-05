@@ -207,10 +207,6 @@ class TestStorage(support.TestWsgiApp):
         # Skips the first n ids. For use with the limit parameter (required) to
         # paginate through a result set.
 
-        # make sure we reject it if "limit" is not provided
-        res = self.app.get('/1.0/tarek/storage/col2?offset=2', status=400)
-        self.assertEquals(res.status_int, 400)
-
         # let's get 2, 3 and 4
         res = self.app.get('/1.0/tarek/storage/col2?offset=2&limit=3')
         res = json.loads(res.body)

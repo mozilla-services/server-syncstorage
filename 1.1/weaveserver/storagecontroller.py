@@ -46,7 +46,8 @@ from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
 
 from weaveserver.util import convert_response, json_response, round_time
 from weaveserver.wbo import WBO
-from weaveserver.respcodes import WEAVE_MALFORMED_JSON
+from weaveserver.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
+                                   WEAVE_INVALID_WRITE)
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -134,8 +135,9 @@ class StorageController(object):
         if offset is not None:
             # we need both
             if limit is None:
-                raise HTTPBadRequest('"offset" cannot be used without "limit"')
-            offset = int(offset)
+                offset = None
+            else:
+                offset = int(offset)
 
         collection_name = request.sync_info['collection']
         user_id = request.sync_info['user_id']
@@ -211,15 +213,15 @@ class StorageController(object):
         try:
             wbos = json.loads(request.body)
         except ValueError, e:
-            raise HTTPBadRequest('Malformed JSON body')
+            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         if not isinstance(wbos, (tuple, list)):
             # thats a batch of one
             if 'id' not in wbos:
-                raise HTTPBadRequest('WBO ID not provided')
+                raise HTTPBadRequest(WEAVE_INVALID_WBO)
             id_ = wbos['id']
             if '/' in str(id_):
-                raise HTTPBadRequest("'/' char forbidden in ids")
+                raise HTTPBadRequest(WEAVE_INVALID_WBO)
 
             request.sync_info['item'] = wbos['id']
             return self.set_item(request)
@@ -290,8 +292,9 @@ class StorageController(object):
         if offset is not None:
             # we need both
             if limit is None:
-                raise HTTPBadRequest('"offset" cannot be used without "limit"')
-            offset = int(offset)
+                offset = None
+            else:
+                offset = int(offset)
 
         res = self.storage.delete_items(user_id, collection_name, ids, filters,
                                         limit=limit, offset=offset, sort=sort)
@@ -304,7 +307,7 @@ class StorageController(object):
         is included.
         """
         if 'X-Confirm-Delete' not in request.headers:
-            raise HTTPBadRequest('Confirmation required.')
+            raise HTTPBadRequest(WEAVE_INVALID_WRITE)
         user_id = request.sync_info['user_id']
         self.storage.delete_storage(user_id)  # XXX failures ?
         return json_response(True)
