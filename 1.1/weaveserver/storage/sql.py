@@ -407,18 +407,10 @@ class WeaveSQLStorage(object):
 
         return WBO(res, {'modified': bigint2time})
 
-    def set_item(self, user_id, collection_name, item_id, **values):
+    def _set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        values['collection'] = self._get_collection_id(user_id,
-                                                       collection_name)
-        values['id'] = item_id
-        values['username'] = user_id
         if 'modified' in values:
             values['modified'] = time2bigint(values['modified'])
-        elif 'payload' in values:
-            # XXX to be replaced by a wbo object here, so
-            # this is not duplicated in the controller etc
-            values['modified'] = time2bigint(time())
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
@@ -443,6 +435,17 @@ class WeaveSQLStorage(object):
             return bigint2time(values['modified'])
 
         return modified
+
+    def set_item(self, user_id, collection_name, item_id, **values):
+        """Adds or update an item"""
+        values['collection'] = self._get_collection_id(user_id,
+                                                       collection_name)
+        values['id'] = item_id
+        values['username'] = user_id
+        if 'payload' in values and 'modified' not in values:
+            values['modified'] = time()
+
+        return self._set_item(user_id, collection_name, item_id, **values)
 
     def set_items(self, user_id, collection_name, items):
         """Adds or update a batch of items.

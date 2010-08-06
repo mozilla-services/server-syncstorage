@@ -53,7 +53,7 @@ from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
 
 # XXX see if we want to load these dynamically
-from weaveserver.storage import sql
+from weaveserver.storage import sql, redisql
 from weaveserver.auth import dummy, sql
 from weaveserver.storagecontroller import StorageController
 from weaveserver.usercontroller import UserController
@@ -185,7 +185,11 @@ class SyncServerApp(object):
         else:
             params = {}
 
-        result = function(request, **params)
+        try:
+            result = function(request, **params)
+        except TypeError, e:
+            msg = '%s %s' % (request.path_info, str(e))
+            raise TypeError(msg)
 
         if isinstance(result, basestring):
             response = Response(result)
