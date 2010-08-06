@@ -70,7 +70,7 @@ class UserController(object):
         # but a plain text expected by the client
         #
         # return json_response(request.host_url)
-        return request.host_url
+        return request.host_url + '/'
 
     def password_reset(self, request):
         """Sends an e-mail for a password reset request."""
