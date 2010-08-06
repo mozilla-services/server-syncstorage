@@ -276,11 +276,10 @@ class TestStorage(support.TestWsgiApp):
         lines.sort()
         self.assertEquals(lines, ['0', '1', '2', '3', '4'])
 
-        # unkown format
+        # unkown format defaults to json
         res = self.app.get('/1.0/tarek/storage/col2',
-                        headers=[('Accept', 'application/xxx')],
-                        status=400)
-        self.assertEquals(res.status_int, 400)
+                        headers=[('Accept', 'application/xxx')])
+        self.assertEquals(res.content_type, 'application/json')
 
     def test_get_item(self):
         # grabbing object 1 from col2

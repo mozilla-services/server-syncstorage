@@ -136,15 +136,15 @@ def convert_response(request, lines):
     """Returns the response in the appropriate format, depending on the accept
     request."""
     accept = request.headers.get('Accept', 'application/json')
-    if accept == 'application/json':
-        return json_response(lines)
-    elif accept == 'application/newlines':
+    accepts = accept.split(';')[0].split(',')
+
+    if 'application/newlines' in accepts:
         return newlines_response(lines)
-    elif accept == 'application/whoisi':
+    elif 'application/whoisi' in accepts:
         return whoisi_response(lines)
 
-    raise HTTPBadRequest('Unsupported format "%s"' % accept)
-
+    # default response format is json
+    return json_response(lines)
 
 def time2bigint(value):
     """Encodes a timestamp into a big int."""
