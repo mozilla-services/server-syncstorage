@@ -55,10 +55,6 @@ def filter_params(namespace, data, replace_dot='_', splitchar='.'):
         skey = key.split(splitchar)
         if skey[0] != namespace:
             continue
-        if value.lower() in ('1', 'true'):
-            value = True
-        if value.lower() in ('0', 'false'):
-            value = False
         params[replace_dot.join(skey[1:])] = value
     return master_value, params
 

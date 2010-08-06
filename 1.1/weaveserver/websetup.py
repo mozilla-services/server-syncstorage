@@ -41,6 +41,7 @@ Function called by :
 Used to initialize the DB and create some data.
 """
 import sys
+import logging
 from ConfigParser import RawConfigParser
 
 from weaveserver import logger

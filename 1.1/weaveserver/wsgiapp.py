@@ -37,15 +37,17 @@
 Application entry point.
 """
 import time
+import logging
 from ConfigParser import RawConfigParser
 
+from paste.translogger import TransLogger
 from routes import Mapper, URLGenerator
 
 from webob.dec import wsgify
 from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
-from weaveserver import API_VERSION
+from weaveserver import API_VERSION, logger
 from weaveserver.util import authenticate_user
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
@@ -207,10 +209,16 @@ class SyncServerApp(object):
 def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
     if '__file__' in global_conf:
+        ini_file = global_conf['__file__']
         cfg = RawConfigParser()
-        cfg.read([global_conf['__file__']])
+        cfg.read([ini_file])
         params = dict(cfg.items('sync'))
     else:
         params = global_conf
+
     app = SyncServerApp(params)
+
+    if params.get('translogger'):
+        app = TransLogger(app, logger_name='weaveserver')
+
     return app
