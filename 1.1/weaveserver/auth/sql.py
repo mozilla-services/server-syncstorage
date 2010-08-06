@@ -85,8 +85,8 @@ class SQLAuth(object):
                  ' values (:user_name, :password_hash, :email, 1)')
 
         password_hash = ssha(password)
-        res = self._engine.execute(query, user_name=user_name, email=email,
-                                   password_hash=password_hash)
+        res = self._engine.execute(text(query), user_name=user_name,
+                                   email=email, password_hash=password_hash)
         return res.rowcount == 1
 
     def authenticate_user(self, user_name, password):

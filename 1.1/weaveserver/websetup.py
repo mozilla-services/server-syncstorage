@@ -33,19 +33,35 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+"""
+Function called by :
 
-setup(name='WeaveServer', version=0.1,
-      packages=find_packages(),
-      install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                        'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                        'Mako'],
-      entry_points="""
-      [paste.app_factory]
-      main = weaveserver.wsgiapp:make_app
+    $ paster setup-app development.ini
 
-      [paste.app_install]
-      main = paste.script.appinstall:Installer
-      """
-      )
+Used to initialize the DB and create some data.
+"""
+import sys
+from ConfigParser import RawConfigParser
 
+from weaveserver import logger
+from weaveserver.storage import WeaveStorage, sql, multi
+from weaveserver.auth import WeaveAuth, sql, dummy
+
+
+def setup_app(command, filename, section):
+    """Called by setup-app"""
+    if '__file__' in filename:
+        cfg = RawConfigParser()
+        cfg.read([filename['__file__']])
+        config = dict(cfg.items('sync'))
+    else:
+        config = dict()
+
+    # automatically creates the table if they don't exist yet
+    logger.info('Creating the DB tables if needed')
+    auth = WeaveAuth.get_from_config(config)
+    storage = WeaveStorage.get_from_config(config)
+
+    # create a tarek/tarek profile
+    logger.info('Adding a user')
+    auth.create_user('tarek', 'tarek', 'tarek@mozilla.com')

@@ -33,5 +33,7 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import logging
 
 API_VERSION = '1.0'
+logger = logging.getLogger('weaveserver')
