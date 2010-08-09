@@ -20,7 +20,7 @@ work::
 Once this is done, you should be able to run Sync locally with the
 built-in server::
 
-    $ bin/paste serve development.ini
+    $ bin/paster serve development.ini
     Starting server in PID 23027.
     serving on 0.0.0.0:5000 view at http://127.0.0.1:5000
 
