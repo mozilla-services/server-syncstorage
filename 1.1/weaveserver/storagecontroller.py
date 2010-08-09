@@ -247,8 +247,8 @@ class StorageController(object):
 
             if not consistent:
                 res['failed'][item_id] = [msg]
-
-            kept_wbos.append(wbo)
+            else:
+                kept_wbos.append(wbo)
 
         count = self.storage.set_items(user_id, collection_name, kept_wbos)
 

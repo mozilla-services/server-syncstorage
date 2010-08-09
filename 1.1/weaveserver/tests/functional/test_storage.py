@@ -340,6 +340,15 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         self.assertEquals(res['payload'], 'XyX')
 
+        # sending two wbos with one bad sortindex
+        wbo1 = {'id': 'one', 'payload': 'XXX', 'payload_size': 3}
+        wbo2 = {'id': 'two', 'payload': 'XXX', 'payload_size': 3,
+                'sortindex': 'FAIL'}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = self.app.get('/1.0/tarek/storage/col2/two', status=404)
+        self.assertEquals(res.status_int, 404)
+
     def test_delete_collection(self):
         self.storage.delete_items(1, 'col2')
 
