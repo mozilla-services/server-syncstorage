@@ -483,7 +483,7 @@ class WeaveSQLStorage(object):
             lines.append(pattern % {'num': num})
             for field in fields:
                 value = item.get(field)
-                if field == 'modified':
+                if field == 'modified' and value is not None:
                     value = time2bigint(value)
                 values['%s%d' % (field, num)] = value
 
