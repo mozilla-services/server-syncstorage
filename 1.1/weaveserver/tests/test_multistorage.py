@@ -35,9 +35,10 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from weaveserver.storage import multi  # registers the multi storage
+from weaveserver.storage.multi import WeaveMultiStorage
 from weaveserver.storage import WeaveStorage
 
+WeaveStorage.register(WeaveMultiStorage)
 
 class Storage(object):
 
@@ -117,7 +118,7 @@ class TestMultiStorage(unittest.TestCase):
         WeaveStorage.register(Storage)
 
         # Defining a master with two slaves, with the same backend
-        config = {'storage': 'multi',
+        config = {'storage': 'weaveserver.storage.multi.WeaveMultiStorage',
                   'storage.master': 'storage',
                   'storage.master.param1': 'one',
                   'storage.master.param2': 'two',

@@ -93,5 +93,3 @@ class WeaveMultiStorage(object):
     def get_name(cls):
         """Returns the name of the storage"""
         return 'multi'
-
-WeaveStorage.register(WeaveMultiStorage)

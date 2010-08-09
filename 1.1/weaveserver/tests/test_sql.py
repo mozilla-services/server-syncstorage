@@ -35,11 +35,13 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from weaveserver.storage import sql   # forces the registration
+from weaveserver.storage.sql import WeaveSQLStorage
 from weaveserver.storage import WeaveStorage
 
 _UID = 1
 
+# manual registration
+WeaveStorage.register(WeaveSQLStorage)
 
 class TestSQLStorage(unittest.TestCase):
 

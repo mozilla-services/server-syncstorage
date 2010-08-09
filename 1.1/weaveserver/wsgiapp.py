@@ -50,10 +50,6 @@ from weaveserver import API_VERSION, logger
 from weaveserver.util import authenticate_user, read_config
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
-
-# XXX see if we want to load these dynamically
-from weaveserver.storage import sql, redisql
-from weaveserver.auth import dummy, sql
 from weaveserver.storagecontroller import StorageController
 from weaveserver.usercontroller import UserController
 from weaveserver.staticcontroller import StaticController

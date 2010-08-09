@@ -98,6 +98,3 @@ class DummyAuth(object):
     def update_email(self, user_id, email):
         """Updates the e-mail"""
         return True
-
-
-WeaveAuth.register(DummyAuth)

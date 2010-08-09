@@ -59,6 +59,36 @@ def filter_params(namespace, data, replace_dot='_', splitchar='.'):
     return master_value, params
 
 
+def _resolve_name(name):
+    """Resolves the name and returns the corresponding object."""
+    ret = None
+    parts = name.split('.')
+    cursor = len(parts)
+    module_name, rest = parts[:cursor], parts[cursor:]
+
+    while cursor > 0:
+        try:
+            ret = __import__('.'.join(module_name))
+            break
+        except ImportError:
+            if cursor == 0:
+                raise
+            cursor -= 1
+            module_name = parts[:cursor]
+            rest = parts[cursor:]
+
+    for part in parts[1:]:
+        try:
+            ret = getattr(ret, part)
+        except AttributeError:
+            raise ImportError(name)
+
+    if ret is None:
+        raise ImportError(name)
+
+    return ret
+
+
 class Plugin(object):
     """Abstract Base Class for plugins."""
     __metaclass__ = abc.ABCMeta
@@ -67,10 +97,18 @@ class Plugin(object):
     @classmethod
     def get_from_config(cls, config):
         """Get a plugin from a config file."""
-        storage_name, params = filter_params(cls.name, config)
-        if storage_name is None:
+        storage_location, params = filter_params(cls.name, config)
+        if storage_location is None:
             raise KeyError(cls.name)
-        return cls.get(storage_name, **params)
+
+        # let's load the location
+        klass = _resolve_name(storage_location)
+
+        # let's register it on-the-fly
+        cls.register(klass)
+
+        # now returning an instance
+        return cls.get(klass.get_name(), **params)
 
     @classmethod
     def get(cls, name, **params):

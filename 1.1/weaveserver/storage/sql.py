@@ -567,6 +567,3 @@ class WeaveSQLStorage(object):
         res = self._engine.execute(text(query), user_id=user_id,
                                  collection_id=collection_id, **extra_values)
         return res.rowcount > 0
-
-
-WeaveStorage.register(WeaveSQLStorage)

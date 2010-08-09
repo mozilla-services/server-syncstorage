@@ -138,6 +138,3 @@ class RediSQLStorage(WeaveSQLStorage):
                                                         collection_name,
                                                         item_ids, filters,
                                                         limit, offset, sort)
-
-
-WeaveStorage.register(RediSQLStorage)

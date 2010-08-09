@@ -38,9 +38,11 @@ import datetime
 
 from sqlalchemy.sql import text
 
-from weaveserver.auth import sql   # forces the registration
+from weaveserver.auth.sql import SQLAuth
 from weaveserver.auth import WeaveAuth
 from weaveserver.util import ssha
+
+WeaveAuth.register(SQLAuth)
 
 class TestSQLAuth(unittest.TestCase):
 

@@ -36,10 +36,13 @@
 import unittest
 import redis
 
-from weaveserver.storage import redisql   # forces the registration
+from weaveserver.storage.redisql import RediSQLStorage
 from weaveserver.storage import WeaveStorage
 
 _UID = 1
+
+# manual registration
+WeaveStorage.register(RediSQLStorage)
 
 class FakeRedis(dict):
     def __init__(self, host, port):

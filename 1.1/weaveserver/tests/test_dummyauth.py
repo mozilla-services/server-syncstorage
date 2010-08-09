@@ -38,9 +38,10 @@ from hashlib import sha1
 
 from sqlalchemy.sql import text
 
-from weaveserver.auth import dummy   # forces the registration
+from weaveserver.auth.dummy import DummyAuth
 from weaveserver.auth import WeaveAuth
 
+WeaveAuth.register(DummyAuth)
 
 class TestDummyAuth(unittest.TestCase):
 

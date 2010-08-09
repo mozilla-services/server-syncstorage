@@ -232,6 +232,3 @@ class SQLAuth(object):
         res = self._engine.execute(text(query), user_id=user_id,
                                    password_hash=password_hash)
         return res.rowcount == 1
-
-
-WeaveAuth.register(SQLAuth)
