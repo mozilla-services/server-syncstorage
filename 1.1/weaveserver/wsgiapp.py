@@ -184,11 +184,7 @@ class SyncServerApp(object):
         else:
             params = {}
 
-        try:
-            result = function(request, **params)
-        except TypeError, e:
-            msg = '%s %s' % (request.path_info, str(e))
-            raise TypeError(msg)
+        result = function(request, **params)
 
         if isinstance(result, basestring):
             response = Response(result)
