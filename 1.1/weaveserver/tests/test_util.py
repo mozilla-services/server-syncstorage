@@ -34,9 +34,11 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+import os
+from tempfile import mkstemp
 from base64 import encodestring
 
-from weaveserver.util import authenticate_user
+from weaveserver.util import authenticate_user, read_config
 
 
 class Request(object):
@@ -52,6 +54,16 @@ class AuthTool(object):
         return 1
 
 
+_CONF = """\
+[some]
+stuff = 1
+
+[sync]
+one = 1
+two = bla
+three = false
+"""
+
 class TestUtil(unittest.TestCase):
 
     def test_authenticate_user(self):
@@ -66,3 +78,16 @@ class TestUtil(unittest.TestCase):
                 {'Authorization': token})
         res = authenticate_user(req, AuthTool())
         self.assertEquals(res, 1)
+
+    def test_read_config(self):
+        __, filename = mkstemp()
+        try:
+            with open(filename, 'w') as f:
+                f.write(_CONF)
+            config = read_config(filename)
+        finally:
+            os.remove(filename)
+
+        self.assertTrue(config['one'])
+        self.assertEqual(config['two'], 'bla')
+        self.assertFalse(config['three'])

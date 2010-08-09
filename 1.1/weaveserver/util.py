@@ -283,7 +283,7 @@ def read_config(filename):
     Convert boolean options when detected.
     """
     cfg = RawConfigParser()
-    cfg.read([ini_file])
+    cfg.read([filename])
     config = {}
     for key, value in cfg.items('sync'):
         if value.lower() in ('1', 'yes', 'true', 'on'):
