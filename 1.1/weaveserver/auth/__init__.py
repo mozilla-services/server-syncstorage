@@ -44,6 +44,19 @@ class WeaveAuth(Plugin):
     name = 'auth'
 
     @abc.abstractmethod
+    def get_name(self):
+        """Returns the name of the plugin.
+
+        Must be a class method.
+
+        Args:
+            None
+
+        Returns:
+            The plugin name
+        """
+
+    @abc.abstractmethod
     def get_user_id(self, user_name):
         """Returns the id for a user name.
 

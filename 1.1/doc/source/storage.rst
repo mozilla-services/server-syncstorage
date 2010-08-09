@@ -11,14 +11,14 @@ To write a new back-end, you just have to implement a class that contains
 all the methods described in the abstract class :class:`WeaveStorage`::
 
 
-    from weaveserver.storage import WeaveStorage
-
     class MySuperStorage(object):
         """Fine implementation"""
 
         @classmethod
         def get_name(cls):
             return 'superstorage'
+
+        ... more code ...
 
 .. _plugin-registration:
 

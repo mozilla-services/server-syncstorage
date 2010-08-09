@@ -50,6 +50,20 @@ class WeaveStorage(Plugin):
     """Abstract Base Class for the storage."""
     name = 'storage'
 
+    @abc.abstractmethod
+    def get_name(self):
+        """Returns the name of the plugin.
+
+        Must be a class method.
+
+        Args:
+            None
+
+        Returns:
+            The plugin name
+        """
+
+
     #
     # Users APIs -- the user id is the email
     #
