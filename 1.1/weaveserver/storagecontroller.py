@@ -68,7 +68,7 @@ class StorageController(object):
         """Checks the X-If-Unmodified-Since header."""
         unmodified = request.headers.get('X-If-Unmodified-Since')
         if unmodified is None:
-            return
+            return False
 
         unmodified = round_time(unmodified)
         max = self.storage.get_collection_max_timestamp(user_id,
