@@ -48,6 +48,7 @@ import smtplib
 import socket
 import re
 import os
+from ConfigParser import RawConfigParser
 
 from mako.lookup import TemplateLookup
 
@@ -275,3 +276,20 @@ def render_mako(template, **data):
     """
     template = _lookup.get_template(template)
     return template.render(**data)
+
+def read_config(filename):
+    """Extracts the sync section from a config file.
+
+    Convert boolean options when detected.
+    """
+    cfg = RawConfigParser()
+    cfg.read([ini_file])
+    config = {}
+    for key, value in cfg.items('sync'):
+        if value.lower() in ('1', 'yes', 'true', 'on'):
+            value = True
+        elif value.lower() in ('0', 'no', 'false', 'off'):
+            value = False
+        config[key] = value
+
+    return config

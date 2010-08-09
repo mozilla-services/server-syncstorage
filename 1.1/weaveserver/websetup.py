@@ -42,19 +42,16 @@ Used to initialize the DB and create some data.
 """
 import sys
 import logging
-from ConfigParser import RawConfigParser
 
 from weaveserver import logger
 from weaveserver.storage import WeaveStorage, sql, multi
 from weaveserver.auth import WeaveAuth, sql, dummy
-
+from weaveserver.util import read_config
 
 def setup_app(command, filename, section):
     """Called by setup-app"""
     if '__file__' in filename:
-        cfg = RawConfigParser()
-        cfg.read([filename['__file__']])
-        config = dict(cfg.items('sync'))
+        config = read_config(filename['__file__'])
     else:
         config = dict()
 
