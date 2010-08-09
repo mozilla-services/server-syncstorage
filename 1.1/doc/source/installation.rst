@@ -3,8 +3,9 @@ Installation
 ============
 
 To install Sync, make sure you have Python 2.6 installed and in your path,
-the run the :file:`bootstrap.sh` script. It will collect all the required bits
-and create a local environment, then run the tests::
+then run the :file:`bootstrap.sh` script. It will collect all the required bits,
+create a local environment and run the tests to make sure everything will 
+work::
 
     $ ./bootstrap.sh
     New python executable in ./bin/python2.6
@@ -17,9 +18,12 @@ and create a local environment, then run the tests::
     OK
 
 Once this is done, you should be able to run Sync locally with the
-builtin server::
+built-in server::
 
     $ bin/paste serve development.ini
     Starting server in PID 23027.
     serving on 0.0.0.0:5000 view at http://127.0.0.1:5000
+
+The next steps are to :ref:`configure <configuration>` your server and decide
+:ref:`how to run it <production-setup>`.
 

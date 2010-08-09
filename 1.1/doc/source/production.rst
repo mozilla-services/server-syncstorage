@@ -1,3 +1,5 @@
+.. _production-setup:
+
 ================
 Production setup
 ================
