@@ -20,7 +20,7 @@ General Options
    - redisql
 
 - **storage.***: every value prefixed with the **storage** namespace will be
-  used to instanciate the plugin.
+  used to instantiate the plugin.
 
 - **auth**: name of the plugin used to autenticate users.
 
@@ -30,7 +30,7 @@ General Options
    - sql
 
 - **auth.***: every value prefixed with the **auth** namespace will be used
-  to instanciate the plugin.
+  to instantiate the plugin.
 
 - **smtp.host**: SMTP server used to send emails. Defaults to *localhost*.
 
