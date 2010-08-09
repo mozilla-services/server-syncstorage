@@ -11,8 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   installing 
-   storage
+   architecture
+   installation
+   configuration
+   plugins
+
 
 
 Indices and tables

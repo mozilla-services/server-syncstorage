@@ -1,6 +1,6 @@
-===============
-Installing Sync
-===============
+============
+Installation
+============
 
 To install Sync, make sure you have Python 2.6 installed and in your path,
 the run the :file:`bootstrap.sh` script. It will collect all the required bits

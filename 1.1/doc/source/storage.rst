@@ -1,11 +1,13 @@
-=======
-Storage
-=======
+.. _storage-plugins:
+
+==================================
+Creating your own storage back-end
+==================================
 
 Firefox Sync Server can store user data in a SQL Database or in any kind of
-backend, as long as you provide an implementation 
+back-end, as long as you provide an implementation
 
-To write a new backend, you just have to implement a class that contains
+To write a new back-end, you just have to implement a class that contains
 all the methods described in the abstract class :class:`WeaveStorage`,
 and register it::
 
@@ -28,7 +30,7 @@ be configured to use it in its ini sync section, via the 'storage' option::
     storage = superstorage
 
 Sync will automatically instanciate the storage. If you need to pass some
-options, use the storage namespace. Sync will pass it to the class 
+options, use the storage namespace. Sync will pass it to the class
 constructor::
 
     [sync]
@@ -40,4 +42,3 @@ Here are the methods to implement:
 
 .. autoclass:: weaveserver.storage.WeaveStorage
     :members:
-
