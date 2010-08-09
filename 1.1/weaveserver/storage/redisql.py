@@ -112,12 +112,11 @@ class RediSQLStorage(WeaveSQLStorage):
         """
         if self._is_meta_global(collection_name, items[0]['id']):
             values = items[0]
-            values['id'] = item_id
             values['username'] = user_id
             self._conn.set(_key('meta', 'global', user_id),
                            json.dumps(values))
-        return super(RediSQLStorage, self).set_item(user_id, collection_name,
-                                                    items)
+        return super(RediSQLStorage, self).set_items(user_id, collection_name,
+                                                     items)
 
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
@@ -132,7 +131,7 @@ class RediSQLStorage(WeaveSQLStorage):
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         if (collection_name == 'meta' and (item_ids is None
-            or item_ids is None)):
+            or 'global' in item_ids)):
              self._conn.set(_key('meta', 'global', user_id), None)
 
         return super(RediSQLStorage, self).delete_items(user_id,

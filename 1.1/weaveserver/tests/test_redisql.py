@@ -74,6 +74,21 @@ class TestRediSQLStorage(unittest.TestCase):
         self.storage.delete_user(_UID)
         redis.Redis = self.old
 
+    def test_basic(self):
+        # just make sure calls goes through
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col1')
+        self.storage.set_item(_UID, 'col1', '1', payload='XXX')
+
+        # these calls should be cached
+        res = self.storage.get_item(_UID, 'col1', '1')
+        self.assertEquals(res['payload'], 'XXX')
+
+        # this should remove the cache
+        self.storage.delete_items(_UID, 'col1')
+        items = self.storage.get_items(_UID, 'col1')
+        self.assertEquals(len(items), 0)
+
     def test_meta_global(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'meta')
@@ -90,7 +105,10 @@ class TestRediSQLStorage(unittest.TestCase):
         self.storage.delete_item(_UID, 'meta', 'global')
         self.assertEquals(self.storage._conn.keys(), [])
 
-        self.storage.set_item(_UID, 'meta', 'global', payload='XXX')
+        items = [{'id': 'global', 'payload': 'xxx'},
+                 {'id': 'other', 'payload': 'xxx'},
+                ]
+        self.storage.set_items(_UID, 'meta', items)
         self.assertEquals(self.storage._conn.keys(), ['meta:global:1'])
 
         # this should remove the cache
