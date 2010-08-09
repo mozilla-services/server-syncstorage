@@ -61,6 +61,7 @@ class TestSQLAuth(unittest.TestCase):
 
         # normal behavior
         code = self.auth.generate_reset_code(1)
+        self.assertFalse(self.auth.verify_reset_code(1, 'BADCODE'))
         self.assertTrue(self.auth.verify_reset_code(1, code))
 
         # reseted
