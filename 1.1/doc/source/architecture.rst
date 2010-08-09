@@ -44,7 +44,7 @@ storage.
  - *redisql*: a SQL plugin that stores everything in a SQL database and
    uses Redis to cache some values to speed up the reads.
 
- - *multi*: a plugin that can be used to store data in several backends.
+ - *multi*: a plugin that can be used to store data in several back-ends.
 
 
 You can create your own back-ends see :ref:`storage-plugins` and
