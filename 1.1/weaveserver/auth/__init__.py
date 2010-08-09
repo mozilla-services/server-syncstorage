@@ -81,7 +81,7 @@ class WeaveAuth(Plugin):
 
     @abc.abstractmethod
     def generate_reset_code(self, user_id):
-        """Generates a reset code
+        """Generates a password reset code
 
         Args:
             user_id: user id
@@ -92,7 +92,7 @@ class WeaveAuth(Plugin):
 
     @abc.abstractmethod
     def verify_reset_code(self, user_id, code):
-        """Generates a reset code
+        """Verifies a password reset code
 
         Args:
             user_id: user id
@@ -104,7 +104,7 @@ class WeaveAuth(Plugin):
 
     @abc.abstractmethod
     def clear_reset_code(self, user_id):
-        """Clears the reset code
+        """Clears the password reset code
 
         Args:
             user_id: user id
