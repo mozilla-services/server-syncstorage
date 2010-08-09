@@ -91,6 +91,7 @@ URLS = [('GET', '/', 'storage', 'index', True),
         # user API
         ('GET', '/user/_API_/_USERNAME_', 'user', 'user_exists', False),
         ('PUT', '/user/_API_/_USERNAME_', 'user', 'create_user', False),
+        ('DELETE', '/user/_API_/_USERNAME_', 'user', 'delete_user', True),
         ('GET', '/user/_API_/_USERNAME_/node/weave', 'user', 'user_node',
          False),
         ('GET', '/user/_API_/_USERNAME_/password_reset', 'user',

@@ -98,3 +98,11 @@ class DummyAuth(object):
     def update_email(self, user_id, email):
         """Updates the e-mail"""
         return True
+
+    def delete_user(self, user_id):
+        """Removes a user"""
+        for name, id_ in tuple(self._users.items()):
+            if id_ == user_id:
+                del self._users[name]
+                return True
+        return False

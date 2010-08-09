@@ -204,3 +204,9 @@ class UserController(object):
 
         self.auth.clear_reset_code(user_id)
         return render_mako('password_changed.mako')
+
+    def delete_user(self, request):
+        """Deletes the user."""
+        user_id = request.sync_info['user_id']
+        res = self.auth.delete_user(user_id)
+        return json_response(res)

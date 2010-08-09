@@ -186,3 +186,28 @@ class TestUser(support.TestWsgiApp):
         body = json.dumps('new@email.com')
         res = self.app.post('/user/1.0/tarek/email', params=body)
         self.assertEquals(res.body, 'new@email.com')
+
+    def test_delete_user(self):
+        # creating another user
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = json.dumps(payload)
+        self.app.put('/user/1.0/tarek2', params=payload)
+
+        # trying to suppress 'tarek' with 'tarek2'
+        # this should generate a 401
+        environ = {'Authorization': 'Basic %s' % \
+                       base64.encodestring('tarek2:xxxxxxxxx')}
+        self.app.extra_environ = environ
+        res = self.app.delete('/user/1.0/tarek', status=401)
+        self.assertEquals(res.status_int, 401)
+
+        # now using the right credentials
+        environ = {'Authorization': 'Basic %s' % \
+                       base64.encodestring('tarek:tarek')}
+        self.app.extra_environ = environ
+        res = self.app.delete('/user/1.0/tarek')
+        self.assertTrue(json.loads(res.body))
+
+        # tarek should be gone
+        res = self.app.get('/user/1.0/tarek')
+        self.assertFalse(json.loads(res.body))

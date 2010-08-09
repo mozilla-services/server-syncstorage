@@ -135,3 +135,14 @@ class WeaveAuth(Plugin):
         Returns:
             True if the change was successful, False otherwise
         """
+
+    @abc.abstractmethod
+    def delete_user(self, user_id):
+        """Deletes a user
+
+        Args:
+            user_id: user id
+
+        Returns:
+            True if the deletion was successful, False otherwise
+        """
