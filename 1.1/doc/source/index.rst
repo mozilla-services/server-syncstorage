@@ -15,7 +15,7 @@ Contents:
    installation
    configuration
    plugins
-
+   production
 
 
 Indices and tables
