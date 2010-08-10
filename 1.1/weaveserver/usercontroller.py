@@ -62,7 +62,7 @@ class UserController(object):
     def user_exists(self, request):
         exists = (self.auth.get_user_id(request.sync_info['username'])
                   is not None)
-        return json_response(exists)
+        return json_response(int(exists))
 
     def user_node(self, request):
         """Returns the storage node root for the user"""
