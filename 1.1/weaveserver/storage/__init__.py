@@ -86,8 +86,8 @@ class WeaveStorage(Plugin):
         If the user doesn't exists, it will be created.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            values: mapping containing the values.
+            - user_id: integer identifying the user in the storage.
+            - values: mapping containing the values.
 
         Returns:
             None
@@ -98,9 +98,9 @@ class WeaveStorage(Plugin):
         """Returns user information.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            fields: if provided, its a list of fields to return,
-            all fields are returns by default.
+            - user_id: integer identifying the user in the storage.
+            - fields: if provided, its a list of fields to return,
+              all fields are returns by default.
 
         Returns:
             A dict containing the values for the user.
@@ -127,8 +127,8 @@ class WeaveStorage(Plugin):
         """Deletes a collection.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection
 
         Returns:
             None
@@ -139,8 +139,8 @@ class WeaveStorage(Plugin):
         """Returns True if the collection exists.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection
 
         Returns:
             True or False
@@ -151,9 +151,9 @@ class WeaveStorage(Plugin):
         """Creates a new collection.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            values: mapping containing the values.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - values: mapping containing the values.
 
         Returns:
             integer identifying the collection in the storage.
@@ -164,10 +164,10 @@ class WeaveStorage(Plugin):
         """Return information about a collection.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            fields: if provided, its a list of fields to return,
-            all fields are returns by default.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - fields: if provided, its a list of fields to return,
+              all fields are returns by default.
 
         Returns:
             A dict containing the information for the collection
@@ -178,9 +178,9 @@ class WeaveStorage(Plugin):
         """Returns the collections information.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            fields: if provided, its a list of fields to return,
-            all fields are returns by default.
+            - user_id: integer identifying the user in the storage.
+            - fields: if provided, its a list of fields to return,
+              all fields are returns by default.
 
         Returns:
             A list of dict containing the information for the collection
@@ -230,9 +230,9 @@ class WeaveStorage(Plugin):
         """Returns True if an item exists.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_id: string identifying the item
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_id: string identifying the item
 
         Returns:
             True or False
@@ -243,11 +243,11 @@ class WeaveStorage(Plugin):
         """returns items from a collection
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_id: string identifying the item
-            fields: if provided, its a list of fields to return,
-            all fields are returns by default.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_id: string identifying the item
+            - fields: if provided, its a list of fields to return,
+              all fields are returns by default.
 
         Returns:
             A list of dict containing the information for the items
@@ -258,11 +258,11 @@ class WeaveStorage(Plugin):
         """Returns one item.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_id: string identifying the item
-            fields: if provided, its a list of fields to return,
-            all fields are returns by default.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_id: string identifying the item
+            - fields: if provided, its a list of fields to return,
+              all fields are returns by default.
 
         Returns:
             A dict containing the information for the item
@@ -273,10 +273,10 @@ class WeaveStorage(Plugin):
         """Sets an item.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_id: string identifying the item
-            values: mapping containing the values.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_id: string identifying the item
+            - values: mapping containing the values.
 
         Returns:
             A dict containing the information for the item
@@ -287,9 +287,9 @@ class WeaveStorage(Plugin):
         """Adds or update a batch of items.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            items: a list of dict
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - items: a list of dict
 
         Returns:
             Integer: number of inserts/updates
@@ -300,10 +300,10 @@ class WeaveStorage(Plugin):
         """Deletes an item
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_id: string identifying the item
-            values: mapping containing the values.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_id: string identifying the item
+            - values: mapping containing the values.
 
         Returns:
             None
@@ -314,10 +314,10 @@ class WeaveStorage(Plugin):
         """Deletes items. All items are removed unless item_ids is provided.
 
         Args:
-            user_id: integer identifying the user in the storage.
-            collection_name: name of the collection.
-            item_ids: if provided, its the ids of the items to be removed.
-            all items will be removed if not provided.
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+            - item_ids: if provided, its the ids of the items to be removed.
+              all items will be removed if not provided.
 
         Returns:
             None

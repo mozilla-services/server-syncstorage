@@ -72,9 +72,9 @@ class WeaveAuth(Plugin):
         """Creates a user
 
         Args:
-            user_name: the user name
-            passwors: the password associated with the user
-            email: the email associated with the user
+            - user_name: the user name
+            - password: the password associated with the user
+            - email: the email associated with the user
 
         Returns:
             True or False, depending if the creation was successfull
@@ -85,8 +85,8 @@ class WeaveAuth(Plugin):
         """Authenticates a user.
 
         Args:
-            user_name: string
-            password: password hash
+            - user_name: string
+            - password: password
 
         Returns:
             The user id in case of success. None otherwise.
@@ -108,8 +108,8 @@ class WeaveAuth(Plugin):
         """Verifies a password reset code
 
         Args:
-            user_id: user id
-            code: reset code
+            - user_id: user id
+            - code: reset code
 
         Returns:
             True or False
@@ -142,8 +142,8 @@ class WeaveAuth(Plugin):
         """Change the user e-mail
 
         Args:
-            user_id: user id
-            email: new email
+            - user_id: user id
+            - email: new email
 
         Returns:
             True if the change was successful, False otherwise
