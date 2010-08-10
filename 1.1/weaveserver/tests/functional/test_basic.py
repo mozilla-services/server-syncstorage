@@ -45,8 +45,7 @@ class TestBasic(support.TestWsgiApp):
     def test_auth(self):
         # make sure we are able to authenticate
         # and that some APIs are protected
-        res = self.app.get('/', status=401)
-        self.assertEquals(res.status_int, 401)
+        self.app.get('/', status=401)
 
         environ = {'Authorization': 'Basic %s' % \
                         base64.encodestring('tarek:tarek')}

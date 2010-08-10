@@ -43,8 +43,7 @@ class TestUser(support.TestWsgiApp):
 
     def test_file(self):
         # make sure we can get files
-        res = self.app.get('/media/nothere', status=404)
-        self.assertTrue(res.status_int, 404)
+        self.app.get('/media/nothere', status=404)
 
         res = self.app.get('/media/forgot_password.css')
         self.assertEquals(res.headers['Content-Type'],

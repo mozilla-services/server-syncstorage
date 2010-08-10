@@ -73,7 +73,6 @@ class TestStorage(support.TestWsgiApp):
     def test_get_collections_info(self):
 
         resp = self.app.get('/1.0/tarek/info/collections')
-        self.assertEquals(resp.status, '200 OK')
         res = json.loads(resp.body)
         keys = res.keys()
         keys.sort()
@@ -87,7 +86,6 @@ class TestStorage(support.TestWsgiApp):
     def test_get_collections_count(self):
 
         resp = self.app.get('/1.0/tarek/info/collection_counts')
-        self.assertEquals(resp.status, '200 OK')
         res = json.loads(resp.body)
         self.assertEquals(res['col1'], 3)
         self.assertEquals(res['col2'], 5)
@@ -96,8 +94,7 @@ class TestStorage(support.TestWsgiApp):
     def test_get_quota(self):
 
         # XXX implement the new quota code
-        res = self.app.get('/1.0/tarek/info/quota', status=501)
-        self.assertEquals(res.status, '501 Not Implemented')
+        self.app.get('/1.0/tarek/info/quota', status=501)
 
     def test_get_collection(self):
         res = self.app.get('/1.0/tarek/storage/col3')
@@ -291,8 +288,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['id'], '1')
 
         # unexisting object
-        res = self.app.get('/1.0/tarek/storage/col2/99', status=404)
-        self.assertEquals(res.status_int, 404)
+        self.app.get('/1.0/tarek/storage/col2/99', status=404)
 
     def test_set_item(self):
         # let's create an object
@@ -346,8 +342,7 @@ class TestStorage(support.TestWsgiApp):
                 'sortindex': 'FAIL'}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        res = self.app.get('/1.0/tarek/storage/col2/two', status=404)
-        self.assertEquals(res.status_int, 404)
+        self.app.get('/1.0/tarek/storage/col2/two', status=404)
 
     def test_delete_collection(self):
         self.storage.delete_items(1, 'col2')
@@ -489,8 +484,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(json.loads(res.body)), 2)
 
         # unexisting item should return a 200
-        res = self.app.delete('/1.0/tarek/storage/col2/12982')
-        self.assertEquals(res.status_int, 200)
+        self.app.delete('/1.0/tarek/storage/col2/12982')
 
     def test_delete_storage(self):
         self.storage.delete_items(1, 'col2')
@@ -505,8 +499,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(json.loads(res.body)), 3)
 
         # deleting all with no confirmation
-        res = self.app.delete('/1.0/tarek/storage', status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.delete('/1.0/tarek/storage', status=400)
 
         # deleting all for real now
         res = self.app.delete('/1.0/tarek/storage/col2',
@@ -540,6 +533,6 @@ class TestStorage(support.TestWsgiApp):
             wbo = json.dumps(wbo)
             res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
 
-            res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
-                    headers=[('X-If-Unmodified-Since', str(now))], status=412)
-            self.assertEquals(res.status_int, 412)
+            self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+                         headers=[('X-If-Unmodified-Since', str(now))],
+                         status=412)

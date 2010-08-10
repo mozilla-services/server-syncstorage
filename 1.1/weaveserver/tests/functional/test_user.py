@@ -136,32 +136,27 @@ class TestUser(support.TestWsgiApp):
         # the user already exists
         payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
         payload = json.dumps(payload)
-        res = self.app.put('/user/1.0/tarek', params=payload, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.put('/user/1.0/tarek', params=payload, status=400)
 
         # missing the password
         payload = {'email': 'tarek@ziade.org'}
         payload = json.dumps(payload)
-        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
         # malformed e-mail
         payload = {'email': 'tarekziadeorg', 'password': 'x'*9}
         payload = json.dumps(payload)
-        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
         # weak password
         payload = {'email': 'tarek@ziade.org', 'password': 'x'}
         payload = json.dumps(payload)
-        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
         # weak password #2
         payload = {'email': 'tarek@ziade.org', 'password': 'tarek2'}
         payload = json.dumps(payload)
-        res = self.app.put('/user/1.0/tarek2', params=payload, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
         # everything is there
         res = self.app.get('/user/1.0/tarek2')
@@ -179,8 +174,7 @@ class TestUser(support.TestWsgiApp):
 
         # bad email
         body = json.dumps('newemail.com')
-        res = self.app.post('/user/1.0/tarek/email', params=body, status=400)
-        self.assertEquals(res.status_int, 400)
+        self.app.post('/user/1.0/tarek/email', params=body, status=400)
 
         # good one
         body = json.dumps('new@email.com')
@@ -198,8 +192,7 @@ class TestUser(support.TestWsgiApp):
         environ = {'Authorization': 'Basic %s' % \
                        base64.encodestring('tarek2:xxxxxxxxx')}
         self.app.extra_environ = environ
-        res = self.app.delete('/user/1.0/tarek', status=401)
-        self.assertEquals(res.status_int, 401)
+        self.app.delete('/user/1.0/tarek', status=401)
 
         # now using the right credentials
         environ = {'Authorization': 'Basic %s' % \
