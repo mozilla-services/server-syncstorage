@@ -39,10 +39,11 @@ SQL backend
 from time import time
 
 from sqlalchemy import create_engine
-from sqlalchemy.sql import text
+from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
+                            func, and_)
 
 from weaveserver.storage import WeaveStorage
-from weaveserver.storage.sqlmappers import tables
+from weaveserver.storage.sqlmappers import tables, users, collections, wbo
 from weaveserver.util import (time2bigint, bigint2time, round_time,
                               validate_password)
 from weaveserver.wbo import WBO
@@ -51,6 +52,27 @@ _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
 _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
+
+# SQL Queries
+_USER_EXISTS = select([users.c.id], users.c.id==bindparam('user_id'))
+_DELETE_USER_COLLECTIONS = delete(collections).where(
+                                  collections.c.userid==bindparam('user_id'))
+_DELETE_USER_COLLECTION = delete(collections).where(
+                       and_(collections.c.userid==bindparam('user_id'),
+                            collections.c.name==bindparam('collection_name')))
+_DELETE_USER_WBOS = delete(wbo, wbo.c.username==bindparam('user_id'))
+_DELETE_USER = delete(users, users.c.id==bindparam('user_id'))
+_COLLECTION_EXISTS = select([collections.c.collectionid],
+                        and_(collections.c.name==bindparam('collection_name'),
+                             collections.c.userid==bindparam('user_id')))
+_COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
+                            collections.c.userid==bindparam('user_id'))
+_COLLECTION_STAMPS = select([collections.c.name, func.max(wbo.c.modified)],
+                            collections.c.userid==bindparam('user_id')
+                           ).group_by(collections.c.name)
+_COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
+                             wbo.c.username==bindparam('user_id')
+                            ).group_by(wbo.c.collection)
 
 
 class WeaveSQLStorage(object):
@@ -76,8 +98,7 @@ class WeaveSQLStorage(object):
 
     def user_exists(self, user_id):
         """Returns true if the user exists."""
-        query = text('select id from users where id = :user_id')
-        res = self._engine.execute(query, user_id=user_id).fetchone()
+        res = self._engine.execute(_USER_EXISTS, user_id=user_id).fetchone()
         return res is not None
 
     def set_user(self, user_id, **values):
@@ -85,20 +106,14 @@ class WeaveSQLStorage(object):
 
         If the user doesn't exists, it will be created."""
         values['id'] = user_id
-        if not self.user_exists(user_id):
-            fields = values.keys()
-            params = ','.join([':%s' % field for field in fields])
-            fields = ','.join(fields)
-            query = text('insert into users (%s) values (%s)' % \
-                            (fields, params))
-        else:
-            fields = values.keys()
-            params = ','.join(['%s = :%s' % (field, field)
-                               for field in fields])
-            query = text('update users set %s where id = :id' \
-                         % params)
+        fields = [getattr(users.c, field) for field in values.keys()]
 
-        self._engine.execute(query, **values)
+        if not self.user_exists(user_id):
+            query = insert(users).values(**values)
+        else:
+            query = update(users).where(users.c.id==user_id).values(**values)
+
+        self._engine.execute(query)
 
     def get_user(self, user_id, fields=None):
         """Returns user information.
@@ -106,29 +121,18 @@ class WeaveSQLStorage(object):
         If fields is provided, its a list of fields to return
         """
         if fields is None:
-            fields = ['*']
-        fields = ', '.join(fields)
-        query = text('select %s from users where id = :user_id' \
-                     % fields)
-        return self._engine.execute(query, user_id=user_id).first()
+            fields = [users]
+        else:
+            fields = [getattr(users.c, field) for field in fields]
+
+        query = select(fields, users.c.id == user_id)
+        return self._engine.execute(query).first()
 
     def delete_user(self, user_id):
         """Removes a user (and all its data)"""
-        # removing collections
-        query = text('delete from collections where '
-                     'userid = :user_id')
-        self._engine.execute(query, user_id=user_id)
-
-        # removing items
-        query = text('delete from wbo where '
-                     'username = :user_id')
-        self._engine.execute(query, user_id=user_id)
-
-        # XXX remove reset codes
-
-        # removing user
-        query = text('delete from users where id = :user_id')
-        return self._engine.execute(query, user_id=user_id)
+        for query in (_DELETE_USER_COLLECTIONS, _DELETE_USER_WBOS,
+                      _DELETE_USER):
+            self._engine.execute(query, user_id=user_id)
 
     def _get_collection_id(self, user_id, collection_name, create=True):
         """Returns a collection id, given the name."""
@@ -149,16 +153,8 @@ class WeaveSQLStorage(object):
 
     def delete_storage(self, user_id):
         """Removes all user data"""
-        # removing collections
-        query = text('delete from collections where '
-                     'userid = :user_id')
-        self._engine.execute(query, user_id=user_id)
-
-        # removing items
-        query = text('delete from wbo where '
-                     'username = :user_id')
-
-        self._engine.execute(query, user_id=user_id)
+        for query in (_DELETE_USER_COLLECTIONS, _DELETE_USER_WBOS):
+            self._engine.execute(query, user_id=user_id)
         # XXX see if we want to check the rowcount
         return True
 
@@ -173,17 +169,15 @@ class WeaveSQLStorage(object):
 
         # removing items first
         self.delete_items(user_id, collection_name)
-        query = text('delete from collections where '
-                     'userid = :user_id and name = :name')
 
-        return self._engine.execute(query, user_id=user_id, name=collection_name)
+        # then the collection
+        return self._engine.execute(_DELETE_USER_COLLECTION, user_id=user_id,
+                                    collection_name=collection_name)
 
     def collection_exists(self, user_id, collection_name):
         """Returns True if the collection exists"""
-        query = text('select collectionid from collections where '
-                     'userid = :user_id and name = :name')
-        res = self._engine.execute(query, user_id=user_id,
-                                 name=collection_name)
+        res = self._engine.execute(_COLLECTION_EXISTS, user_id=user_id,
+                                   collection_name=collection_name)
         res = res.fetchone()
         return res is not None
 
@@ -200,9 +194,8 @@ class WeaveSQLStorage(object):
         # getting the max collection_id
         # XXX why don't we have an autoinc here ?
         # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
-        max = text('select max(collectionid) from collections where '
-                   'userid = :user_id')
-        max = self._engine.execute(max, user_id=user_id).first()
+        max = self._engine.execute(_COLLECTION_NEXTID,
+                                   user_id=user_id).first()
         if max[0] is None:
             next_id = 1
         else:
@@ -210,24 +203,23 @@ class WeaveSQLStorage(object):
 
         # insertion
         values['collectionid'] = next_id
-        fields = values.keys()
-        params = ','.join([':%s' % field for field in fields])
-        fields = ','.join(fields)
-        query = text('insert into collections (%s) values (%s)' % \
-                        (fields, params))
+        query = insert(collections).values(**values)
         self._engine.execute(query, **values)
         return next_id
 
     def get_collection(self, user_id, collection_name, fields=None):
         """Return information about a collection."""
         if fields is None:
-            fields = ['*']
-        fields = ', '.join(fields)
-        query = text('select %s from collections where '
-                     'userid = :user_id and name = :name'\
-                     % fields)
-        res = self._engine.execute(query, user_id=user_id,
-                                   name=collection_name).first()
+            fields = [collections]
+            field_names = collections.columns.keys()
+        else:
+            field_names = fields
+            fields = [getattr(collections.c, field) for field in fields]
+
+        query = select(fields, and_(collections.c.userid==user_id,
+                                    collections.c.name==collection_name))
+        res = self._engine.execute(query).first()
+
         # the collection is created
         if res is None:
             collid = self.set_collection(user_id, collection_name)
@@ -235,7 +227,7 @@ class WeaveSQLStorage(object):
                    'name': collection_name}
             if fields is not None:
                 for key in res.keys():
-                    if key not in fields:
+                    if key not in field_names:
                         del res[key]
         else:
             # make this a single step
@@ -246,11 +238,12 @@ class WeaveSQLStorage(object):
     def get_collections(self, user_id, fields=None):
         """returns the collections information """
         if fields is None:
-            fields = ['*']
-        fields = ', '.join(fields)
-        query = text('select %s from collections where userid = :user_id'
-                     % fields)
-        return self._engine.execute(query, user_id=user_id).fetchall()
+            fields = [collections]
+        else:
+            fields = [getattr(collections.c, field) for field in fields]
+
+        query = select(fields, collections.c.userid==user_id)
+        return self._engine.execute(query).fetchall()
 
     def get_collection_names(self, user_id):
         """return the collection names for a given user"""
@@ -263,10 +256,8 @@ class WeaveSQLStorage(object):
         # XXX doing a call on two tables to get the collection name
         # see if a client-side (eg this code) list of collections
         # makes things faster but I doubt it
-        query = text('select name, max(modified) as timestamp '
-                     'from wbo, collections where username = :user_id '
-                     'group by name')
-        res = self._engine.execute(query, user_id=user_id).fetchall()
+        res = self._engine.execute(_COLLECTION_STAMPS,
+                                   user_id=user_id).fetchall()
         return dict([(name, bigint2time(stamp))
                      for name, stamp in res])
 
@@ -288,13 +279,10 @@ class WeaveSQLStorage(object):
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
-        query = text('select collection, count(collection) as ct '
-                     'from wbo where username = :user_id '
-                     'group by collection')
         try:
             res = [(self._collid2name(user_id, collid), count)
                     for collid, count in
-                   self._engine.execute(query, user_id=user_id)]
+                   self._engine.execute(_COLLECTION_COUNTS, user_id=user_id)]
         finally:
             self._purge_user_collections(user_id)
 
