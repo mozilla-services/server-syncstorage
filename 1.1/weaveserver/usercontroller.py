@@ -148,13 +148,6 @@ class UserController(object):
         if 'key' in request.POST or 'key' in kw:
             # we have a key, let's display the key controlling form
             return render_mako('password_reset_form.mako', **kw)
-        elif 'username' in request.POST:
-            # setting up a password reset
-            user_name = request.POST['username']
-            user_id = self.auth.get_user_id(user_name)
-            request.sync_info['user_id'] = user_id
-            self.password_reset(request)
-            return render_mako('password_key_sent.mako')
         elif not request.POST and not request.GET:
             # asking for the first time
             return render_mako('password_ask_reset_form.mako')
@@ -166,6 +159,19 @@ class UserController(object):
     def do_password_reset(self, request):
         """Do a password reset."""
         user_name = request.POST.get('username')
+        if request.POST.keys() == ['username']:
+            # setting up a password reset
+            user_name = request.POST['username']
+            user_id = self.auth.get_user_id(user_name)
+            request.sync_info['user_id'] = user_id
+            try:
+                self.password_reset(request)
+            except HTTPServiceUnavailable, e:
+                return render_mako('password_failure.mako', error=e.detail)
+            else:
+                return render_mako('password_key_sent.mako')
+
+        # full form, the actual password reset
         password = request.POST.get('password')
         confirm = request.POST.get('confirm')
         key = request.POST.get('key')
