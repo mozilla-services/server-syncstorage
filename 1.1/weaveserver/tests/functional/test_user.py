@@ -124,6 +124,14 @@ class TestUser(support.TestWsgiApp):
         res = res.form.submit()
         self.assertTrue('at least 8' in res)
 
+        # wrong key
+        res = self.app.get(link[:-1]+'X')
+        res.form['password'].value = 'mynewpassword'
+        res.form['confirm'].value = 'mynewpassword'
+        res = res.form.submit()
+        self.assertTrue('Key does not match with username' in res)
+
+        # all good
         res = self.app.get(link)
         res.form['password'].value = 'mynewpassword'
         res.form['confirm'].value = 'mynewpassword'
