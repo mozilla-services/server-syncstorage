@@ -54,26 +54,41 @@ _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
 # SQL Queries
+_USER_N_COLL = and_(collections.c.userid==bindparam('user_id'),
+                    collections.c.name==bindparam('collection_name'))
+
 _USER_EXISTS = select([users.c.id], users.c.id==bindparam('user_id'))
 _DELETE_USER_COLLECTIONS = delete(collections).where(
                                   collections.c.userid==bindparam('user_id'))
-_DELETE_USER_COLLECTION = delete(collections).where(
-                       and_(collections.c.userid==bindparam('user_id'),
-                            collections.c.name==bindparam('collection_name')))
+_DELETE_USER_COLLECTION = delete(collections).where(_USER_N_COLL)
 _DELETE_USER_WBOS = delete(wbo, wbo.c.username==bindparam('user_id'))
 _DELETE_USER = delete(users, users.c.id==bindparam('user_id'))
-_COLLECTION_EXISTS = select([collections.c.collectionid],
-                        and_(collections.c.name==bindparam('collection_name'),
-                             collections.c.userid==bindparam('user_id')))
+
+_COLLECTION_EXISTS = select([collections.c.collectionid], _USER_N_COLL)
+
 _COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
                             collections.c.userid==bindparam('user_id'))
+
 _COLLECTION_STAMPS = select([collections.c.name, func.max(wbo.c.modified)],
                             collections.c.userid==bindparam('user_id')
                            ).group_by(collections.c.name)
+
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
                              wbo.c.username==bindparam('user_id')
                             ).group_by(wbo.c.collection)
 
+_COLLECTIONS_MAX_STAMPS = select([func.max(wbo.c.modified)],
+                         and_(wbo.c.collection==bindparam('collection_id'),
+                              wbo.c.username==bindparam('user_id')))
+
+_ITEM_ID_COL_USER = and_(wbo.c.collection==bindparam('collection_id'),
+                         wbo.c.username==bindparam('user_id'),
+                         wbo.c.id==bindparam('item_id'))
+
+_ITEM_EXISTS = select([wbo.c.modified], _ITEM_ID_COL_USER)
+
+_DELETE_ITEMS = delete(wbo, and_(wbo.c.collection==bindparam('collection_id'),
+                                 wbo.c.username==bindparam('user_id')))
 
 class WeaveSQLStorage(object):
 
@@ -291,10 +306,7 @@ class WeaveSQLStorage(object):
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
         collection_id = self._get_collection_id(user_id, collection_name)
-        query = text('select max(modified) '
-                     'from wbo where username = :user_id '
-                     'and collection = :collection_id')
-        res = self._engine.execute(query, user_id=user_id,
+        res = self._engine.execute(_COLLECTIONS_MAX_STAMPS, user_id=user_id,
                                    collection_id=collection_id)
         res = res.fetchone()
         stamp = res[0]
@@ -310,10 +322,8 @@ class WeaveSQLStorage(object):
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)
-        query = text('select modified from wbo where '
-                     'username = :user_id and collection = :collection_id '
-                     'and id = :item_id')
-        res = self._engine.execute(query, user_id=user_id, item_id=item_id,
+        res = self._engine.execute(_ITEM_EXISTS, user_id=user_id,
+                                   item_id=item_id,
                                    collection_id=collection_id)
         res = res.fetchone()
         if res is None:
@@ -332,50 +342,51 @@ class WeaveSQLStorage(object):
         """
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
-            fields = ['*']
-        fields = ', '.join(fields)
+            fields = [wbo]
+        else:
+            fields = [getattr(wbo.c, field) for field in fields]
 
-        # preparing filters
-        extra = []
-        extra_values = {}
+        # preparing the where statement
+        where = [wbo.c.username == user_id,
+                 wbo.c.collection == collection_id]
+
         if filters is not None:
             for field, value in filters.items():
+                field = getattr(wbo.c, field)
+
                 operator, value = value
-                if field == 'modified':
+                if field.name == 'modified':
                     value = time2bigint(value)
 
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
-                    extra.append('%s %s (%s)' % (field, operator,
-                                 ','.join(value)))
+                    where.append(field.in_(value))
                 else:
-                    #value = str(value)
-                    extra.append('%s %s :%s' % (field, operator, field))
-                    extra_values[field] = value
+                    if operator == '=':
+                        where.append(field == value)
+                    elif operator == '<':
+                        where.append(field < value)
+                    elif operator == '>':
+                        where.append(field > value)
 
-        query = ('select %s from wbo where username = :user_id and '
-                 'collection = :collection_id' % fields)
-
-        if extra != []:
-            query = '%s and %s' % (query, ' and '.join(extra))
+        where = and_(*where)
+        query = select(fields, where)
 
         if sort is not None:
             if sort == 'oldest':
-                query += " order by modified asc"
+                query = query.order_by(wbo.c.modified.asc())
             elif sort == 'newest':
-                query += " order by modified desc"
+                query = query.order_by(wbo.c.modified.desc())
             else:
-                query += " order by sortindex desc"
+                query = query.order_by(wbo.c.sortindex.desc())
 
         if limit is not None and int(limit) > 0:
-            query += ' limit %d' % limit
+            query = query.limit(int(limit))
 
         if offset is not None and int(offset) > 0:
-            query += ' offset %d' % offset
+            query = query.offset(int(offset))
 
-        res = self._engine.execute(text(query), user_id=user_id,
-                                   collection_id=collection_id,
-                                   **extra_values).fetchall()
+        res = self._engine.execute(query).fetchall()
 
         return [WBO(line, {'modified': bigint2time}) for line in res]
 
@@ -383,11 +394,12 @@ class WeaveSQLStorage(object):
         """returns one item"""
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
-            fields = ['*']
-        fields = ', '.join(fields)
-        query = text('select %s from wbo where '
-                     'username = :user_id and collection = :collection_id '
-                     'and id = :item_id ' % fields)
+            fields = [wbo]
+        else:
+            fields = [getattr(wbo.c, field) for field in fields]
+
+        where = _ITEM_ID_COL_USER
+        query = select(fields, _ITEM_ID_COL_USER)
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                   collection_id=collection_id).first()
         if res is None:
@@ -403,21 +415,11 @@ class WeaveSQLStorage(object):
         modified = self.item_exists(user_id, collection_name, item_id)
 
         if modified is None:   # does not exists
-            fields = values.keys()
-            params = ','.join([':%s' % field for field in fields])
-            fields = ','.join(fields)
-            query = text('insert into wbo (%s) values (%s)' % \
-                            (fields, params))
+            query = insert(wbo).values(**values)
         else:
-            fields = [key for key in values.keys()
-                      if key not in ('username', 'collection', 'id')]
-            params = ','.join(['%s = :%s' % (field, field)
-                               for field in fields if field != ''])
-            query = text('update wbo set %s where id = :id and '
-                         'username = :username and collection = :collection' \
-                         % params)
+            query = update(wbo).where(wbo.c.id==item_id).values(**values)
 
-        self._engine.execute(query, **values)
+        self._engine.execute(query)
 
         if 'modified' in values:
             return bigint2time(values['modified'])
@@ -450,7 +452,8 @@ class WeaveSQLStorage(object):
                 count += 1
             return count
 
-
+        # XXX See if SQLAlchemy knows how to do batch inserts
+        # that's quite specific to mysql
         fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                   'payload', 'payload_size')
 
@@ -506,52 +509,51 @@ class WeaveSQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
 
         if item_ids is None:
-            query = ('delete from wbo where username = :user_id and '
-                     'collection = :collection_id')
+            where = [wbo.c.collection==collection_id,
+                     wbo.c.username==user_id]
         else:
-            ids = ', '.join([str(id_) for id_ in item_ids])
-            query = ('delete from wbo where username = :user_id and '
-                     'collection = :collection_id and id in (%s)' % ids)
+            where = [wbo.c.collection==collection_id,
+                     wbo.c.username==user_id,
+                     wbo.c.id.in_(item_ids)]
 
         # preparing filters
-        extra = []
-        extra_values = {}
         if filters is not None:
             for field, value in filters.items():
+                field = getattr(wbo.c, field)
+
                 operator, value = value
-                if field == 'modified':
+                if field.name == 'modified':
                     value = time2bigint(value)
 
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
-                    extra.append('%s %s (%s)' % (field, operator,
-                                 ','.join(value)))
+                    where.append(field.in_(value))
                 else:
-                    #value = str(value)
-                    extra.append('%s %s :%s' % (field, operator, field))
-                    extra_values[field] = value
+                    if operator == '=':
+                        where.append(field == value)
+                    elif operator == '<':
+                        where.append(field < value)
+                    elif operator == '>':
+                        where.append(field > value)
 
-        if extra != []:
-            query = '%s and %s' % (query, ' and '.join(extra))
-
+        query = delete(wbo).where(and_(*where))
 
         if sort is not None and self.engine_name != 'sqlite':
             if sort == 'oldest':
-                query += " order by modified"
+                query = query.order_by(wbo.c.modified.asc())
             elif sort == 'newest':
-                query += " order by modified desc"
-            elif sort == 'index':
-                query += " order by sortindex desc"
+                query = query.order_by(wbo.c.modified.desc())
+            else:
+                query = query.order_by(wbo.c.sortindex.desc())
 
         if self.engine_name != 'sqlite':
             if limit is not None and int(limit) > 0:
-                query += ' limit %d' % limit
+                query = query.limit(int(limit))
 
             if offset is not None and int(offset) > 0:
-                query += ' offset %d' % offset
+                query = query.offset(int(offset))
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        res = self._engine.execute(text(query), user_id=user_id,
-                                 collection_id=collection_id, **extra_values)
+        res = self._engine.execute(query)
         return res.rowcount > 0
