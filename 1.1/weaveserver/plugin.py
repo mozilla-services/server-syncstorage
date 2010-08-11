@@ -45,7 +45,7 @@ def _resolve_name(name):
     ret = None
     parts = name.split('.')
     cursor = len(parts)
-    module_name, rest = parts[:cursor], parts[cursor:]
+    module_name = parts[:cursor]
 
     while cursor > 0:
         try:
@@ -56,7 +56,6 @@ def _resolve_name(name):
                 raise
             cursor -= 1
             module_name = parts[:cursor]
-            rest = parts[cursor:]
 
     for part in parts[1:]:
         try:

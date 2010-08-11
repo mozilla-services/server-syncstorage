@@ -38,8 +38,8 @@ Basic tests to verify that the dispatching mechanism works.
 """
 from weaveserver.tests.functional import support
 
-class TestUser(support.TestWsgiApp):
 
+class TestUser(support.TestWsgiApp):
 
     def test_file(self):
         # make sure we can get files

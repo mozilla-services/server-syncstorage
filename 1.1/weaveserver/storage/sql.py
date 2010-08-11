@@ -42,10 +42,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
                             func, and_)
 
-from weaveserver.storage import WeaveStorage
 from weaveserver.storage.sqlmappers import tables, users, collections, wbo
-from weaveserver.util import (time2bigint, bigint2time, round_time,
-                              validate_password)
+from weaveserver.util import time2bigint, bigint2time
 from weaveserver.wbo import WBO
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
@@ -54,41 +52,41 @@ _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
 # SQL Queries
-_USER_N_COLL = and_(collections.c.userid==bindparam('user_id'),
-                    collections.c.name==bindparam('collection_name'))
+_USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
+                    collections.c.name == bindparam('collection_name'))
 
-_USER_EXISTS = select([users.c.id], users.c.id==bindparam('user_id'))
-_DELETE_USER_COLLECTIONS = delete(collections).where(
-                                  collections.c.userid==bindparam('user_id'))
+_USER_EXISTS = select([users.c.id], users.c.id == bindparam('user_id'))
+_DELETE_USER_COLLECTIONS = delete(collections).where( \
+                                 collections.c.userid == bindparam('user_id'))
 _DELETE_USER_COLLECTION = delete(collections).where(_USER_N_COLL)
-_DELETE_USER_WBOS = delete(wbo, wbo.c.username==bindparam('user_id'))
-_DELETE_USER = delete(users, users.c.id==bindparam('user_id'))
+_DELETE_USER_WBOS = delete(wbo, wbo.c.username == bindparam('user_id'))
+_DELETE_USER = delete(users, users.c.id == bindparam('user_id'))
 
 _COLLECTION_EXISTS = select([collections.c.collectionid], _USER_N_COLL)
 
 _COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
-                            collections.c.userid==bindparam('user_id'))
+                            collections.c.userid == bindparam('user_id'))
 
 _COLLECTION_STAMPS = select([collections.c.name, func.max(wbo.c.modified)],
-                            collections.c.userid==bindparam('user_id')
-                           ).group_by(collections.c.name)
+    collections.c.userid == bindparam('user_id')).group_by(collections.c.name)
 
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
-                             wbo.c.username==bindparam('user_id')
-                            ).group_by(wbo.c.collection)
+           wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
 
 _COLLECTIONS_MAX_STAMPS = select([func.max(wbo.c.modified)],
-                         and_(wbo.c.collection==bindparam('collection_id'),
-                              wbo.c.username==bindparam('user_id')))
+            and_(wbo.c.collection == bindparam('collection_id'),
+                 wbo.c.username == bindparam('user_id')))
 
-_ITEM_ID_COL_USER = and_(wbo.c.collection==bindparam('collection_id'),
-                         wbo.c.username==bindparam('user_id'),
-                         wbo.c.id==bindparam('item_id'))
+_ITEM_ID_COL_USER = and_(wbo.c.collection == bindparam('collection_id'),
+                         wbo.c.username == bindparam('user_id'),
+                         wbo.c.id == bindparam('item_id'))
 
 _ITEM_EXISTS = select([wbo.c.modified], _ITEM_ID_COL_USER)
 
-_DELETE_ITEMS = delete(wbo, and_(wbo.c.collection==bindparam('collection_id'),
-                                 wbo.c.username==bindparam('user_id')))
+_DELETE_ITEMS = delete(wbo,
+                       and_(wbo.c.collection == bindparam('collection_id'),
+                            wbo.c.username == bindparam('user_id')))
+
 
 class WeaveSQLStorage(object):
 
@@ -121,12 +119,11 @@ class WeaveSQLStorage(object):
 
         If the user doesn't exists, it will be created."""
         values['id'] = user_id
-        fields = [getattr(users.c, field) for field in values.keys()]
-
         if not self.user_exists(user_id):
             query = insert(users).values(**values)
         else:
-            query = update(users).where(users.c.id==user_id).values(**values)
+            query = update(users).where(users.c.id == user_id)
+            query = query.values(**values)
 
         self._engine.execute(query)
 
@@ -231,8 +228,8 @@ class WeaveSQLStorage(object):
             field_names = fields
             fields = [getattr(collections.c, field) for field in fields]
 
-        query = select(fields, and_(collections.c.userid==user_id,
-                                    collections.c.name==collection_name))
+        query = select(fields, and_(collections.c.userid == user_id,
+                                    collections.c.name == collection_name))
         res = self._engine.execute(query).first()
 
         # the collection is created
@@ -257,7 +254,7 @@ class WeaveSQLStorage(object):
         else:
             fields = [getattr(collections.c, field) for field in fields]
 
-        query = select(fields, collections.c.userid==user_id)
+        query = select(fields, collections.c.userid == user_id)
         return self._engine.execute(query).fetchall()
 
     def get_collection_names(self, user_id):
@@ -398,7 +395,6 @@ class WeaveSQLStorage(object):
         else:
             fields = [getattr(wbo.c, field) for field in fields]
 
-        where = _ITEM_ID_COL_USER
         query = select(fields, _ITEM_ID_COL_USER)
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                   collection_id=collection_id).first()
@@ -417,7 +413,7 @@ class WeaveSQLStorage(object):
         if modified is None:   # does not exists
             query = insert(wbo).values(**values)
         else:
-            query = update(wbo).where(wbo.c.id==item_id).values(**values)
+            query = update(wbo).where(wbo.c.id == item_id).values(**values)
 
         self._engine.execute(query)
 
@@ -509,11 +505,11 @@ class WeaveSQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
 
         if item_ids is None:
-            where = [wbo.c.collection==collection_id,
-                     wbo.c.username==user_id]
+            where = [wbo.c.collection == collection_id,
+                     wbo.c.username == user_id]
         else:
-            where = [wbo.c.collection==collection_id,
-                     wbo.c.username==user_id,
+            where = [wbo.c.collection == collection_id,
+                     wbo.c.username == user_id,
                      wbo.c.id.in_(item_ids)]
 
         # preparing filters

@@ -531,7 +531,7 @@ class TestStorage(support.TestWsgiApp):
             now = time()
             wbo = {'payload': 'XXX', 'payload_size': 3}
             wbo = json.dumps(wbo)
-            res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+            self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
 
             self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
                          headers=[('X-If-Unmodified-Since', str(now))],

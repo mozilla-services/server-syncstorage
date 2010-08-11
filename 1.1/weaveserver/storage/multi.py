@@ -53,6 +53,7 @@ def _prepare_apis(name, bases, attrs):
              'delete_item')
 
     def _write(func):
+
         def __write(self, *args, **kwargs):
             res = getattr(self.master, func)(*args, **kwargs)
             # XXX see if we want to perform it asynced
@@ -62,6 +63,7 @@ def _prepare_apis(name, bases, attrs):
         return __write
 
     def _read(func):
+
         def __read(self, *args, **kwargs):
             return getattr(self.master, func)(*args, **kwargs)
         return __read

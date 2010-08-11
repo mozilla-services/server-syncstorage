@@ -48,9 +48,11 @@ from webob import Response
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'static')
 
+
 class StaticController(object):
     """Used to return static files
     """
+
     def get_file(self, request):
         """Returns a file located in the static/ directory."""
         filename = request.sync_info['filename']

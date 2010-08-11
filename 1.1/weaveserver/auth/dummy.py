@@ -36,7 +36,6 @@
 """ Dummy Authentication
 """
 import random
-from weaveserver.auth import WeaveAuth
 
 
 class DummyAuth(object):
@@ -65,8 +64,8 @@ class DummyAuth(object):
 
     def get_user_id(self, user_name):
         """Returns user id"""
-        if username in self._users:
-            return self._users[username]
+        if user_name in self._users:
+            return self._users[user_name]
         return None
 
     def authenticate_user(self, user_name, password):

@@ -58,7 +58,6 @@ from weaveserver.respcodes import (WEAVE_MISSING_PASSWORD,
 _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 
-
 class UserController(object):
 
     def __init__(self, auth):
@@ -110,7 +109,7 @@ class UserController(object):
 
         try:
             data = json.loads(request.body)
-        except ValueError, e:
+        except ValueError:
             raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         # getting the e-mail
@@ -150,7 +149,7 @@ class UserController(object):
         user_id = request.sync_info['user_id']
         try:
             email = json.loads(request.body)
-        except ValueError, e:
+        except ValueError:
             raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         if not valid_email(email):
@@ -244,21 +243,5 @@ class UserController(object):
         """Renders the captcha form"""
         if not self.auth.captcha:
             raise HTTPNotFound('No captcha configured')
-
-        error = None
-        if request.POST:
-            # we have something to check
-            # XXX the form is used by fx-sync directly
-            #challenge = request.POST.get('recaptcha_challenge_field')
-            #response = request.POST.get('recaptcha_response_field')
-            #resp = captcha.submit(challenge, response, self.private_key,
-            #                      remoteip=request.remote_addr)
-            #if not resp.is_valid:
-            #    error = 'Wrong answer'
-            #else:
-            #    # valid, do something
-            #    # XXX this is done by the client
-            #   return 'success'
-            raise NotImplementedError()
 
         return render_mako('captcha.mako', captcha=self._captcha())

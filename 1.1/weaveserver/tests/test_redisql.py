@@ -44,7 +44,9 @@ _UID = 1
 # manual registration
 WeaveStorage.register(RediSQLStorage)
 
+
 class FakeRedis(dict):
+
     def __init__(self, host, port):
         self.set_called = self.get_called = 0
 
@@ -61,6 +63,7 @@ class FakeRedis(dict):
     def get(self, name):
         self.get_called += 1
         return self[name]
+
 
 class TestRediSQLStorage(unittest.TestCase):
 

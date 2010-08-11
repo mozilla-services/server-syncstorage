@@ -43,6 +43,7 @@ _UID = 1
 # manual registration
 WeaveStorage.register(WeaveSQLStorage)
 
+
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
@@ -142,7 +143,6 @@ class TestSQLStorage(unittest.TestCase):
                                items=[{'id': 'o', 'payload': 'XXX'}])
         res = self.storage.get_item(_UID, 'col', 'o')
         self.assertEquals(res['payload'], 'XXX')
-
 
     def test_get_collection_timestamps(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')

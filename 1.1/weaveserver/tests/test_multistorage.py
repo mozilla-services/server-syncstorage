@@ -40,6 +40,7 @@ from weaveserver.storage import WeaveStorage
 
 WeaveStorage.register(WeaveMultiStorage)
 
+
 class Storage(object):
 
     def __init__(self, param1, param2):
@@ -137,6 +138,7 @@ class TestMultiStorage(unittest.TestCase):
         multi.set_item('xx', 'xx', '1', ok=1)
         for storage in [multi.master] + multi.slaves:
             self.assertEquals(storage.items, {'1': {'ok': 1}})
+
 
 def test_suite():
     suite = unittest.TestSuite()

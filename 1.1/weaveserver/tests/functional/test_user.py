@@ -141,7 +141,7 @@ class TestUser(support.TestWsgiApp):
         self.assertTrue('at least 8' in res)
 
         # wrong key
-        res = self.app.get(link[:-1]+'X')
+        res = self.app.get(link[:-1] + 'X')
         res.form['password'].value = 'mynewpassword'
         res.form['confirm'].value = 'mynewpassword'
         res = res.form.submit()
@@ -158,7 +158,7 @@ class TestUser(support.TestWsgiApp):
         # creating a user
 
         # the user already exists
-        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = {'email': 'tarek@ziade.org', 'password': 'x' * 9}
         payload = json.dumps(payload)
         self.app.put('/user/1.0/tarek', params=payload, status=400)
 
@@ -168,7 +168,7 @@ class TestUser(support.TestWsgiApp):
         self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
         # malformed e-mail
-        payload = {'email': 'tarekziadeorg', 'password': 'x'*9}
+        payload = {'email': 'tarekziadeorg', 'password': 'x' * 9}
         payload = json.dumps(payload)
         self.app.put('/user/1.0/tarek2', params=payload, status=400)
 
@@ -186,7 +186,7 @@ class TestUser(support.TestWsgiApp):
         res = self.app.get('/user/1.0/tarek2')
         self.assertFalse(json.loads(res.body))
 
-        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9,
+        payload = {'email': 'tarek@ziade.org', 'password': 'x' * 9,
                    'captcha-challenge': 'xxx',
                    'captcha-response': 'xxx'}
         payload = json.dumps(payload)
@@ -209,7 +209,7 @@ class TestUser(support.TestWsgiApp):
 
     def test_delete_user(self):
         # creating another user
-        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9,
+        payload = {'email': 'tarek@ziade.org', 'password': 'x' * 9,
                    'captcha-challenge': 'xxx',
                    'captcha-response': 'xxx'}
         payload = json.dumps(payload)

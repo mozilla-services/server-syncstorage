@@ -179,7 +179,7 @@ class StorageController(object):
 
         try:
             data = json.loads(request.body)
-        except ValueError, e:
+        except ValueError:
             raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         wbo = WBO(data)
@@ -201,7 +201,7 @@ class StorageController(object):
         user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
-        res = self.storage.delete_item(user_id, collection_name, item_id)
+        self.storage.delete_item(user_id, collection_name, item_id)
         return json_response(request.server_time)
 
     def set_collection(self, request):
@@ -213,7 +213,7 @@ class StorageController(object):
 
         try:
             wbos = json.loads(request.body)
-        except ValueError, e:
+        except ValueError:
             raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
 
         if not isinstance(wbos, (tuple, list)):
@@ -251,7 +251,7 @@ class StorageController(object):
             else:
                 kept_wbos.append(wbo)
 
-        count = self.storage.set_items(user_id, collection_name, kept_wbos)
+        self.storage.set_items(user_id, collection_name, kept_wbos)
 
         # XXX how to get back the real successes w/o an extra query
         res['success'] = [wbo['id'] for wbo in kept_wbos]

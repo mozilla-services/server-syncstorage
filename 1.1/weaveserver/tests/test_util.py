@@ -64,6 +64,7 @@ two = bla
 three = false
 """
 
+
 class TestUtil(unittest.TestCase):
 
     def test_authenticate_user(self):

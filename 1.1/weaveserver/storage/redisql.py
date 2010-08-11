@@ -38,12 +38,12 @@ Redis + SQL backend
 """
 import json
 from time import time
-import redis
 
-from weaveserver.storage import WeaveStorage
+import redis
 from weaveserver.storage.sql import WeaveSQLStorage
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
+
 
 def _key(*args):
     return ':'.join([str(arg) for arg in args])
@@ -52,6 +52,7 @@ def _key(*args):
 class RediSQLStorage(WeaveSQLStorage):
     """Uses Redis when possible/useful, SQL otherwise.
     """
+
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  redis_host='localhost', redis_port=6379):
         super(RediSQLStorage, self).__init__(sqluri, standard_collections)
@@ -121,7 +122,7 @@ class RediSQLStorage(WeaveSQLStorage):
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
         if self._is_meta_global(collection_name, item_id):
-             self._conn.set(_key('meta', 'global', user_id), None)
+            self._conn.set(_key('meta', 'global', user_id), None)
 
         return super(RediSQLStorage, self).delete_item(user_id,
                                                        collection_name,
@@ -132,7 +133,7 @@ class RediSQLStorage(WeaveSQLStorage):
         """Deletes items. All items are removed unless item_ids is provided"""
         if (collection_name == 'meta' and (item_ids is None
             or 'global' in item_ids)):
-             self._conn.set(_key('meta', 'global', user_id), None)
+            self._conn.set(_key('meta', 'global', user_id), None)
 
         return super(RediSQLStorage, self).delete_items(user_id,
                                                         collection_name,

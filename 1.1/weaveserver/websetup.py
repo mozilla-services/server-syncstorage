@@ -40,13 +40,10 @@ Function called by :
 
 Used to initialize the DB and create some data.
 """
-import sys
-import logging
-
 from weaveserver import logger
-from weaveserver.storage import WeaveStorage, sql, multi
-from weaveserver.auth import WeaveAuth, sql, dummy
+from weaveserver.auth import WeaveAuth
 from weaveserver.util import read_config
+
 
 def setup_app(command, filename, section):
     """Called by setup-app"""
@@ -58,7 +55,6 @@ def setup_app(command, filename, section):
     # automatically creates the table if they don't exist yet
     logger.info('Creating the DB tables if needed')
     auth = WeaveAuth.get_from_config(config)
-    storage = WeaveStorage.get_from_config(config)
 
     # create a tarek/tarek profile
     logger.info('Adding a user')

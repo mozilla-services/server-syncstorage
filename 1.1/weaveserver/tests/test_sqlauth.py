@@ -44,6 +44,7 @@ from weaveserver.util import ssha
 
 WeaveAuth.register(SQLAuth)
 
+
 class TestSQLAuth(unittest.TestCase):
 
     def setUp(self):

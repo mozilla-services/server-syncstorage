@@ -67,6 +67,7 @@ class TestWBO(unittest.TestCase):
         result, failure = wbo.validate()
         self.assertFalse(result)
 
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestWBO))

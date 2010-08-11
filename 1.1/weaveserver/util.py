@@ -52,7 +52,7 @@ from ConfigParser import RawConfigParser
 
 from mako.lookup import TemplateLookup
 
-from webob.exc import HTTPUnauthorized, HTTPBadRequest
+from webob.exc import HTTPUnauthorized
 from webob import Response
 
 
@@ -147,6 +147,7 @@ def convert_response(request, lines):
     # default response format is json
     return json_response(lines)
 
+
 def time2bigint(value):
     """Encodes a timestamp into a big int."""
     return int(round_time(value) * 100)
@@ -169,9 +170,9 @@ def round_time(value):
 def ssha(password, salt=None):
     """Returns a Salted-SHA1 password"""
     if salt is None:
-        salt = ''.join([random.choice(string.letters+string.digits)
+        salt = ''.join([random.choice(string.letters + string.digits)
                         for i in range(32)])
-    ssha = base64.encodestring(sha1(password+salt).digest() + salt).strip()
+    ssha = base64.encodestring(sha1(password + salt).digest() + salt).strip()
     return "{SSHA}%s" % ssha
 
 
@@ -232,6 +233,7 @@ def send_email(sender, rcpt, subject, body, smtp_host='localhost',
 _RE_EMAIL = re.compile(r"(?:^|\s)[-a-z0-9_.]+@"
                         "(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)", re.I)
 
+
 def valid_email(email):
     """Checks if the email is well-formed
 
@@ -277,6 +279,7 @@ def render_mako(template, **data):
     template = _lookup.get_template(template)
     return template.render(**data)
 
+
 def read_config(filename):
     """Extracts the sync section from a config file.
 
@@ -313,4 +316,3 @@ def filter_params(namespace, data, replace_dot='_', splitchar='.'):
             continue
         params[replace_dot.join(skey[1:])] = value
     return master_value, params
-

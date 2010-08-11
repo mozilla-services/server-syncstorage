@@ -45,18 +45,16 @@ import random
 import datetime
 import re
 
-from sqlalchemy.ext.declarative import declarative_base, Column
-from sqlalchemy import Integer, String, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 
-from weaveserver.auth import WeaveAuth
 from weaveserver.util import validate_password, ssha
-
 # sharing the same table than the sql storage
 from weaveserver.storage.sqlmappers import users
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
+
 
 class SQLAuth(object):
     """SQL authentication."""
@@ -102,7 +100,8 @@ class SQLAuth(object):
         query = ('select id, password_hash from users '
                  'where username = :user_name')
 
-        user = self._engine.execute(text(query), user_name=user_name).fetchone()
+        user = self._engine.execute(text(query),
+                                    user_name=user_name).fetchone()
         if user is None:
             return None
 
@@ -120,6 +119,7 @@ class SQLAuth(object):
             a reset code, or None if the generation failed
         """
         chars = string.ascii_uppercase + string.digits
+
         def _4chars():
             return ''.join([random.choice(chars) for i in range(4)])
 

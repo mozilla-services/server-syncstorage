@@ -46,6 +46,7 @@
 import abc
 from weaveserver.plugin import Plugin
 
+
 class WeaveStorage(Plugin):
     """Abstract Base Class for the storage."""
     name = 'storage'
