@@ -74,9 +74,6 @@ class TestUser(support.TestWsgiApp):
                         base64.encodestring('tarek:tarek')}
         self.app.extra_environ = environ
 
-        # let's create some collections for our tests
-        self.storage.set_user(1)
-
         # we don't want to send emails for real
         self.old = smtplib.SMTP
         smtplib.SMTP = FakeSMTP
@@ -86,8 +83,6 @@ class TestUser(support.TestWsgiApp):
         captcha.submit = self._submit
 
     def tearDown(self):
-        # removing all data after the test
-        self.storage.delete_user(1)
         super(TestUser, self).tearDown()
 
         # setting back smtp and recaptcha

@@ -159,8 +159,12 @@ class SQLAuth(object):
             return False
 
         # XXX SQLALchemy should turn it into a datetime for us
-        exp = datetime.datetime.strptime(user.reset_expiration,
-                                         '%Y-%m-%d %H:%M:%S.%f')
+        # but that does not occur with sqlite
+        if isinstance(user.reset_expiration, basestring):
+            exp = datetime.datetime.strptime(user.reset_expiration,
+                                             '%Y-%m-%d %H:%M:%S.%f')
+        else:
+            exp = user.reset_expiration
 
         if exp < datetime.datetime.now():
             # expired

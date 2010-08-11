@@ -54,21 +54,17 @@ class TestStorage(support.TestWsgiApp):
         self.app.extra_environ = environ
 
         # let's create some collections for our tests
-        self.storage.set_user(1)
-
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.storage.set_collection(1, name)
+            self.storage.set_collection(self.user_id, name)
 
         for item in range(3):
-            self.storage.set_item(1, 'col1', str(item), payload='xxx')
+            self.storage.set_item(self.user_id, 'col1', str(item),
+                                  payload='xxx')
 
         for item in range(5):
-            self.storage.set_item(1, 'col2', str(item), payload='xxx')
+            self.storage.set_item(self.user_id, 'col2', str(item),
+                                  payload='xxx')
 
-    def tearDown(self):
-        # removing all data after the test
-        self.storage.delete_user(1)
-        super(TestStorage, self).tearDown()
 
     def test_get_collections_info(self):
 
@@ -395,8 +391,9 @@ class TestStorage(support.TestWsgiApp):
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
+        time.sleep(.1)
         now = time.time()
-        time.sleep(.3)
+        time.sleep(.1)
         wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
         wbos = json.dumps([wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)

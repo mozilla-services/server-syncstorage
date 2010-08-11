@@ -49,14 +49,18 @@ import weaveserver
 
 _WEAVEDIR = os.path.dirname(weaveserver.__file__)
 _TOPDIR = os.path.split(_WEAVEDIR)[0]
-
+if 'WEAVE_MYSQL_TESTS' in os.environ:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
+                             os.environ['WEAVE_TESTFILE'])
+else:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
 
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
         # loading tests.ini
         cfg = RawConfigParser()
-        cfg.read(os.path.join(_TOPDIR, 'tests.ini'))
+        cfg.read(_INI_FILE)
         config = dict(cfg.items('sync'))
         self.storage = WeaveStorage.get_from_config(config)
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
@@ -66,12 +70,18 @@ class TestWsgiApp(unittest.TestCase):
         self.auth = WeaveAuth.get_from_config(config)
         password = ssha('tarek')
         from sqlalchemy.sql import text
-        query = text('insert into users (username, password_hash, email) '
-                'values (:username, :password, :email)')
+        query = text('insert into users (username, password_hash, email, id) '
+                'values (:username, :password, :email, :id)')
         self.auth._engine.execute(query, username='tarek',
                                   password=password,
-                                  email='tarek@mozilla.com')
+                                  email='tarek@mozilla.com',
+                                  id=1)
+        self.user_id = 1
 
     def tearDown(self):
         if os.path.exists(self.sqlfile):
             os.remove(self.sqlfile)
+        else:
+            self.auth._engine.execute('truncate users')
+            self.auth._engine.execute('truncate collections')
+            self.auth._engine.execute('truncate wbo')

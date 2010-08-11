@@ -33,27 +33,3 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-"""
-Basic tests to verify that the dispatching mechanism works.
-"""
-import base64
-from weaveserver.tests.functional import support
-
-
-class TestBasic(support.TestWsgiApp):
-
-    def test_404(self):
-        # make sure an unkown url returns a 404
-        self.app.get('/blabla', status=404)
-
-    def test_auth(self):
-        # make sure we are able to authenticate
-        # and that some APIs are protected
-        self.app.get('/', status=401)
-
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
-
-        res = self.app.get('/', extra_environ=environ)
-        self.assertEquals(res.status, '200 OK')
-        self.assertEquals(res.body, 'Sync Server')

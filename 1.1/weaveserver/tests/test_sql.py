@@ -34,7 +34,10 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+import os
+from ConfigParser import RawConfigParser
 
+import weaveserver
 from weaveserver.storage.sql import WeaveSQLStorage
 from weaveserver.storage import WeaveStorage
 
@@ -43,17 +46,34 @@ _UID = 1
 # manual registration
 WeaveStorage.register(WeaveSQLStorage)
 
+_WEAVEDIR = os.path.dirname(weaveserver.__file__)
+_TOPDIR = os.path.split(_WEAVEDIR)[0]
+if 'WEAVE_TESTFILE' in os.environ:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
+                             os.environ['WEAVE_TESTFILE'])
+else:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
+
 
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        self.storage = WeaveStorage.get('sql', sqluri='sqlite:///:memory:')
+        cfg = RawConfigParser()
+        cfg.read(_INI_FILE)
+        config = dict(cfg.items('sync'))
+        self.storage = WeaveStorage.get_from_config(config)
+        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history'):
             self.storage.set_collection(_UID, name)
 
     def tearDown(self):
-        self.storage.delete_user(_UID)
+        if os.path.exists(self.sqlfile):
+            os.remove(self.sqlfile)
+        else:
+            self.storage._engine.execute('truncate users')
+            self.storage._engine.execute('truncate collections')
+            self.storage._engine.execute('truncate wbo')
 
     def test_user_exists(self):
         self.assertFalse(self.storage.user_exists(_UID))
@@ -156,9 +176,8 @@ class TestSQLStorage(unittest.TestCase):
         names = timestamps.keys()
         names.sort()
         self.assertEquals(names[:3], ['client', 'col1', 'col2'])
-
-        col1 = self.storage.get_collection_max_timestamp(_UID, 'col1')
-        self.assertEquals(col1, timestamps['col1'])
+        col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
+        self.assertAlmostEquals(col1, timestamps['col2'])
 
 
 def test_suite():
