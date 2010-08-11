@@ -47,7 +47,7 @@ from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 from weaveserver import API_VERSION, logger
-from weaveserver.util import authenticate_user, read_config
+from weaveserver.util import authenticate_user, read_config, filter_params
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
 from weaveserver.storagecontroller import StorageController
@@ -100,6 +100,8 @@ URLS = [('GET', '/', 'storage', 'index', True),
          True),
         ('GET', '/weave-password-reset', 'user', 'password_reset_form', False),
         ('POST', '/weave-password-reset', 'user', 'do_password_reset', False),
+        (('GET', 'POST'), '/misc/_API_/captcha_html', 'user', 'captcha_form',
+         False),
 
         # media   XXX served by Apache in real production
         ('GET', '/media/{filename}', 'static', 'get_file', False)
@@ -125,7 +127,8 @@ class SyncServerApp(object):
         # loading and connecting controllers
         self.controllers = {'storage': StorageController(self.storage),
                             'user': UserController(self.authtool),
-                            'static': StaticController()}
+                            'static': StaticController()
+                            }
 
         for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):

@@ -293,3 +293,24 @@ def read_config(filename):
         config[key] = value
 
     return config
+
+
+def filter_params(namespace, data, replace_dot='_', splitchar='.'):
+    """Keeps only params that starts with the namespace.
+
+    Will also convert booleans representation
+    """
+    master_value = None
+    params = {}
+    for key, value in data.items():
+        if key == namespace:
+            master_value = value
+            continue
+        if splitchar not in key:
+            continue
+        skey = key.split(splitchar)
+        if skey[0] != namespace:
+            continue
+        params[replace_dot.join(skey[1:])] = value
+    return master_value, params
+

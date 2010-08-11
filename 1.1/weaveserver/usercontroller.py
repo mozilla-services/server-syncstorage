@@ -41,8 +41,10 @@ https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 """
 import os
 import json
+
 from webob.exc import (HTTPServiceUnavailable, HTTPBadRequest,
-                       HTTPInternalServerError)
+                       HTTPInternalServerError, HTTPNotFound)
+from recaptcha.client import captcha
 
 from weaveserver.util import (json_response, send_email, valid_email,
                               valid_password, render_mako)
@@ -50,9 +52,12 @@ from weaveserver.respcodes import (WEAVE_MISSING_PASSWORD,
                                    WEAVE_NO_EMAIL_ADRESS,
                                    WEAVE_INVALID_WRITE,
                                    WEAVE_MALFORMED_JSON,
-                                   WEAVE_WEAK_PASSWORD)
+                                   WEAVE_WEAK_PASSWORD,
+                                   WEAVE_INVALID_CAPTCHA)
 
 _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
+
+
 
 class UserController(object):
 
@@ -120,6 +125,19 @@ class UserController(object):
 
         if not valid_password(user_name, password):
             raise HTTPBadRequest(WEAVE_WEAK_PASSWORD)
+
+        # check if captcha info are provided
+        challenge = data.get('captcha-challenge')
+        response = data.get('captcha-response')
+        if challenge is not None and response is not None:
+            resp = captcha.submit(challenge, response,
+                                  self.auth.captcha_private_key,
+                                  remoteip=request.remote_addr)
+            if not resp.is_valid:
+                raise HTTPBadRequest(WEAVE_INVALID_CAPTCHA)
+        else:
+            if self.auth.captcha:
+                raise HTTPBadRequest(WEAVE_INVALID_CAPTCHA)
 
         # all looks good, let's create the user
         if not self.auth.create_user(user_name, password, email):
@@ -216,3 +234,31 @@ class UserController(object):
         user_id = request.sync_info['user_id']
         res = self.auth.delete_user(user_id)
         return json_response(res)
+
+    def _captcha(self):
+        """Return HTML string for inserting recaptcha into a form."""
+        return captcha.displayhtml(self.auth.captcha_public_key,
+                                   use_ssl=self.auth.captcha_use_ssl)
+
+    def captcha_form(self, request):
+        """Renders the captcha form"""
+        if not self.auth.captcha:
+            raise HTTPNotFound('No captcha configured')
+
+        error = None
+        if request.POST:
+            # we have something to check
+            # XXX the form is used by fx-sync directly
+            #challenge = request.POST.get('recaptcha_challenge_field')
+            #response = request.POST.get('recaptcha_response_field')
+            #resp = captcha.submit(challenge, response, self.private_key,
+            #                      remoteip=request.remote_addr)
+            #if not resp.is_valid:
+            #    error = 'Wrong answer'
+            #else:
+            #    # valid, do something
+            #    # XXX this is done by the client
+            #   return 'success'
+            raise NotImplementedError()
+
+        return render_mako('captcha.mako', captcha=self._captcha())

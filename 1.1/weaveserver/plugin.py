@@ -37,26 +37,7 @@
 Base plugin class with registration mechanism and configuration reading.
 """
 import abc
-
-
-def filter_params(namespace, data, replace_dot='_', splitchar='.'):
-    """Keeps only params that starts with the namespace.
-
-    Will also convert booleans representation
-    """
-    master_value = None
-    params = {}
-    for key, value in data.items():
-        if key == namespace:
-            master_value = value
-            continue
-        if splitchar not in key:
-            continue
-        skey = key.split(splitchar)
-        if skey[0] != namespace:
-            continue
-        params[replace_dot.join(skey[1:])] = value
-    return master_value, params
+from weaveserver.util import filter_params
 
 
 def _resolve_name(name):

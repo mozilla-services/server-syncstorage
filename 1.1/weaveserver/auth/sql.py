@@ -61,10 +61,16 @@ _RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
 class SQLAuth(object):
     """SQL authentication."""
 
-    def __init__(self, sqluri=_SQLURI):
+    def __init__(self, sqluri=_SQLURI, captcha=False,
+                 captcha_public_key=None, captcha_private_key=None,
+                 captcha_use_ssl=False):
         self._engine = create_engine(sqluri, pool_size=20)
         users.metadata.bind = self._engine
         users.create(checkfirst=True)
+        self.captcha_public_key = captcha_public_key
+        self.captcha_private_key = captcha_private_key
+        self.captcha_use_ssl = captcha_use_ssl
+        self.captcha = captcha
 
     @classmethod
     def get_name(self):

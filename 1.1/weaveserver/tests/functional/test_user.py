@@ -41,6 +41,8 @@ import json
 import smtplib
 from email import message_from_string
 
+from recaptcha.client import captcha
+
 from weaveserver.tests.functional import support
 
 
@@ -56,6 +58,12 @@ class FakeSMTP(object):
 
     def sendmail(self, sender, rcpts, msg):
         self.msgs.append((sender, rcpts, msg))
+
+
+class FakeCaptchaResponse(object):
+
+    is_valid = True
+
 
 class TestUser(support.TestWsgiApp):
 
@@ -73,13 +81,21 @@ class TestUser(support.TestWsgiApp):
         self.old = smtplib.SMTP
         smtplib.SMTP = FakeSMTP
 
+        # we don't want to call recaptcha either
+        self.old_submit = captcha.submit
+        captcha.submit = self._submit
+
     def tearDown(self):
         # removing all data after the test
         self.storage.delete_user(1)
         super(TestUser, self).tearDown()
 
-        # setting back smtp
+        # setting back smtp and recaptcha
         smtplib.SMTP = self.old
+        captcha.submit = self.old_submit
+
+    def _submit(self, *args, **kw):
+        return FakeCaptchaResponse()
 
     def test_user_exists(self):
         res = self.app.get('/user/1.0/tarek')
@@ -170,7 +186,9 @@ class TestUser(support.TestWsgiApp):
         res = self.app.get('/user/1.0/tarek2')
         self.assertFalse(json.loads(res.body))
 
-        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9,
+                   'captcha-challenge': 'xxx',
+                   'captcha-response': 'xxx'}
         payload = json.dumps(payload)
         res = self.app.put('/user/1.0/tarek2', params=payload)
         self.assertEquals(res.body, 'tarek2')
@@ -191,7 +209,9 @@ class TestUser(support.TestWsgiApp):
 
     def test_delete_user(self):
         # creating another user
-        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9}
+        payload = {'email': 'tarek@ziade.org', 'password': 'x'*9,
+                   'captcha-challenge': 'xxx',
+                   'captcha-response': 'xxx'}
         payload = json.dumps(payload)
         self.app.put('/user/1.0/tarek2', params=payload)
 
