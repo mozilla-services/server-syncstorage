@@ -81,10 +81,11 @@ class StorageController(object):
         # XXX returns a 400 if the root is called
         raise HTTPBadRequest()
 
-    def get_collections_info(self, request):
+    def get_collections_info(self, request, v=None):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
+        # 'v' is the version of the client, given the first time
         user_id = request.sync_info['user_id']
         collections = self.storage.get_collection_timestamps(user_id)
         response = convert_response(request, collections)
