@@ -46,7 +46,7 @@ from mimetypes import guess_type
 from webob.exc import HTTPNotFound
 from webob import Response
 
-_STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'static')
 
 class StaticController(object):
     """Used to return static files

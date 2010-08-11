@@ -50,9 +50,9 @@ from weaveserver import API_VERSION, logger
 from weaveserver.util import authenticate_user, read_config, filter_params
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
-from weaveserver.storagecontroller import StorageController
-from weaveserver.usercontroller import UserController
-from weaveserver.staticcontroller import StaticController
+from weaveserver.controllers.storage import StorageController
+from weaveserver.controllers.user import UserController
+from weaveserver.controllers.static import StaticController
 
 # URL dispatching happens here
 # methods / match / controller / controller method / auth ?
