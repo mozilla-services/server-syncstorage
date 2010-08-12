@@ -40,13 +40,34 @@ import json
 from time import time
 
 import redis
+
 from weaveserver.storage.sql import WeaveSQLStorage
+from weaveserver import logger
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 
 
 def _key(*args):
     return ':'.join([str(arg) for arg in args])
+
+
+class GracefulRedisServer(redis.Redis):
+    """If the Redis server gets down, we emit log.errors but
+    make sure the app does not break"""
+
+    def get(self, key):
+        try:
+            return super(GracefulRedisServer, self).get(key)
+        except redis.client.ConnectionError, e:
+            logger.error(str(e))
+            return None
+
+    def set(self, key, value):
+        try:
+            return super(GracefulRedisServer, self).set(key, value)
+        except redis.client.ConnectionError, e:
+            logger.error(str(e))
+            return None
 
 
 class RediSQLStorage(WeaveSQLStorage):
@@ -56,7 +77,7 @@ class RediSQLStorage(WeaveSQLStorage):
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  redis_host='localhost', redis_port=6379):
         super(RediSQLStorage, self).__init__(sqluri, standard_collections)
-        self._conn = redis.Redis(host=redis_host, port=redis_port)
+        self._conn = GracefulRedisServer(host=redis_host, port=redis_port)
         self._conn.ping()  # will generate a connection error if down
 
     @classmethod

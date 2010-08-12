@@ -37,6 +37,7 @@ import unittest
 import redis
 
 from weaveserver.storage.redisql import RediSQLStorage
+from weaveserver.storage import redisql
 from weaveserver.storage import WeaveStorage
 
 _UID = 1
@@ -68,8 +69,8 @@ class FakeRedis(dict):
 class TestRediSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        self.old = redis.Redis
-        redis.Redis = FakeRedis
+        self.old = redisql.GracefulRedisServer
+        redisql.GracefulRedisServer = FakeRedis
         self.storage = WeaveStorage.get('redisql',
                                         sqluri='sqlite:///:memory:')
         # make sure we have the standard collections in place
@@ -78,7 +79,7 @@ class TestRediSQLStorage(unittest.TestCase):
 
     def tearDown(self):
         self.storage.delete_user(_UID)
-        redis.Redis = self.old
+        redisql.GracefulRedisServer = self.old
 
     def test_basic(self):
         # just make sure calls goes through
