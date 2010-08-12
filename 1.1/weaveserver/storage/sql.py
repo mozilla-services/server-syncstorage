@@ -311,11 +311,9 @@ class WeaveSQLStorage(object):
             return None
         return bigint2time(stamp)
 
-
     #
     # Items APIs
     #
-
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)

@@ -97,7 +97,6 @@ def authenticate_user(request, authtool, username=None):
                                         request)
                 raise HTTPUnauthorized
 
-
             # let's try an authentication
             user_id = authtool.authenticate_user(user_name, password)
             if user_id is None:
@@ -267,7 +266,7 @@ def valid_password(user_name, password):
 
 _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 _lookup = TemplateLookup(directories=[_TPL_DIR],
-                        module_directory=_TPL_DIR) # XXX to be defined in prod
+                         module_directory=_TPL_DIR)  # XXX defined in prod
 
 
 def render_mako(template, **data):

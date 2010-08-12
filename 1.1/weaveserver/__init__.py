@@ -35,7 +35,7 @@
 # ***** END LICENSE BLOCK *****
 
 # this call ensure that the logger is initialized
-from weaveserver.log import logger
+from weaveserver.log import logger  # noqa
 
 
 API_VERSION = '1.0'

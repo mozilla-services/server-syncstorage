@@ -64,11 +64,9 @@ class WeaveStorage(Plugin):
             The plugin name
         """
 
-
     #
     # Users APIs -- the user id is the email
     #
-
     @abc.abstractmethod
     def user_exists(self, user_id):
         """Returns True if the user exists.
@@ -118,11 +116,9 @@ class WeaveStorage(Plugin):
             None
         """
 
-
     #
     # Collections APIs
     #
-
     @abc.abstractmethod
     def delete_collection(self, user_id, collection_name):
         """Deletes a collection.
@@ -225,7 +221,6 @@ class WeaveStorage(Plugin):
     #
     # Items APIs
     #
-
     @abc.abstractmethod
     def item_exists(self, user_id, collection_name, item_id):
         """Returns True if an item exists.

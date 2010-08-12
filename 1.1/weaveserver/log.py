@@ -85,7 +85,7 @@ class WeaveLogger(logging.getLoggerClass()):
         for key, value in data.items():
             value = str(value)
             pos = value.find('|')
-            if pos == 0 or (pos > 0 and value[pos-1] != '\\'):
+            if pos == 0 or (pos > 0 and value[pos - 1] != '\\'):
                 msg = '"%s" cannot contain a "|" char: "%s"' % (key, value)
                 raise ValueError(msg)
 

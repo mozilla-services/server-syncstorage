@@ -227,7 +227,6 @@ class StorageController(object):
             request.sync_info['item'] = wbos['id']
             return self.set_item(request)
 
-
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
 
         # sanity chech
