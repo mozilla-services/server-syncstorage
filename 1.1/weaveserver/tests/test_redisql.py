@@ -34,7 +34,6 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-import redis
 
 from weaveserver.storage.redisql import RediSQLStorage
 from weaveserver.storage import redisql

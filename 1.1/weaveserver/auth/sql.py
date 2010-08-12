@@ -46,7 +46,7 @@ import datetime
 import re
 
 from sqlalchemy import create_engine
-from sqlalchemy.sql import text, bindparam, select, insert, update, delete
+from sqlalchemy.sql import bindparam, select, insert, update, delete
 
 from weaveserver.util import validate_password, ssha
 # sharing the same table than the sql storage
