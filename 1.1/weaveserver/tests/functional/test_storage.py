@@ -65,7 +65,6 @@ class TestStorage(support.TestWsgiApp):
             self.storage.set_item(self.user_id, 'col2', str(item),
                                   payload='xxx')
 
-
     def test_get_collections_info(self):
 
         resp = self.app.get('/1.0/tarek/info/collections')

@@ -55,6 +55,7 @@ from mako.lookup import TemplateLookup
 from webob.exc import HTTPUnauthorized
 from webob import Response
 
+from weaveserver.log import logger
 
 # various authorization header names, depending on the setup
 _AUTH_HEADERS = ('Authorization', 'AUTHORIZATION', 'HTTP_AUTHORIZATION',
@@ -92,12 +93,15 @@ def authenticate_user(request, authtool, username=None):
 
             # let's reject the call if the url is not owned by the user
             if (username is not None and user_name != username):
+                logger.cef_auth_failure('Username Does Not Match URL', 7,
+                                        request)
                 raise HTTPUnauthorized
 
 
             # let's try an authentication
             user_id = authtool.authenticate_user(user_name, password)
             if user_id is None:
+                logger.cef_auth_failure('Authentication Failed', 5, request)
                 raise HTTPUnauthorized
 
             # we're all clear ! setting up REMOTE_USER and user_id

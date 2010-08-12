@@ -38,14 +38,13 @@
 import os
 import unittest
 from ConfigParser import RawConfigParser
+from logging.config import fileConfig
 
-from sqlalchemy import insert
 from webtest import TestApp
 
 from weaveserver.wsgiapp import make_app
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
-from weaveserver.util import ssha
 import weaveserver
 
 _WEAVEDIR = os.path.dirname(weaveserver.__file__)
@@ -56,12 +55,19 @@ if 'WEAVE_MYSQL_TESTS' in os.environ:
 else:
     _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
 
+
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
         # loading tests.ini
         cfg = RawConfigParser()
         cfg.read(_INI_FILE)
+
+        # loading loggers
+        if cfg.has_section('loggers'):
+            fileConfig(_INI_FILE)
+
+        # loading the app
         config = dict(cfg.items('sync'))
         self.storage = WeaveStorage.get_from_config(config)
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
@@ -73,6 +79,10 @@ class TestWsgiApp(unittest.TestCase):
         self.user_id = self.auth.get_user_id('tarek')
 
     def tearDown(self):
+        cef_logs = os.path.join(_TOPDIR, 'test_cef.log')
+        if os.path.exists(cef_logs):
+            os.remove(cef_logs)
+
         if os.path.exists(self.sqlfile):
             os.remove(self.sqlfile)
         else:
