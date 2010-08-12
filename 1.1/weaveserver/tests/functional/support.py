@@ -39,6 +39,7 @@ import os
 import unittest
 from ConfigParser import RawConfigParser
 
+from sqlalchemy import insert
 from webtest import TestApp
 
 from weaveserver.wsgiapp import make_app
@@ -68,15 +69,8 @@ class TestWsgiApp(unittest.TestCase):
 
         # adding a user (sql)
         self.auth = WeaveAuth.get_from_config(config)
-        password = ssha('tarek')
-        from sqlalchemy.sql import text
-        query = text('insert into users (username, password_hash, email, id) '
-                'values (:username, :password, :email, :id)')
-        self.auth._engine.execute(query, username='tarek',
-                                  password=password,
-                                  email='tarek@mozilla.com',
-                                  id=1)
-        self.user_id = 1
+        self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
+        self.user_id = self.auth.get_user_id('tarek')
 
     def tearDown(self):
         if os.path.exists(self.sqlfile):
