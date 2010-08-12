@@ -46,7 +46,7 @@ import datetime
 import re
 
 from sqlalchemy import create_engine
-from sqlalchemy.sql import text
+from sqlalchemy.sql import text, bindparam, select, insert, update, delete
 
 from weaveserver.util import validate_password, ssha
 # sharing the same table than the sql storage
@@ -54,6 +54,17 @@ from weaveserver.storage.sqlmappers import users
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
+
+_USER_ID = select([users.c.id], users.c.username == bindparam('user_name'))
+
+_USER_INFO = select([users.c.username, users.c.email],
+                    users.c.id == bindparam('user_id'))
+
+_USER_AUTH = select([users.c.id, users.c.password_hash],
+                    users.c.username == bindparam('user_name'))
+
+_USER_RESET_CODE = select([users.c.reset_expiration, users.c.reset],
+                          users.c.id == bindparam('user_id'))
 
 
 class SQLAuth(object):
@@ -77,30 +88,24 @@ class SQLAuth(object):
 
     def get_user_id(self, user_name):
         """Returns the id for a user name"""
-        query = text('select id from users where username = :user_name')
-        user = self._engine.execute(query, user_name=user_name).fetchone()
+        user = self._engine.execute(_USER_ID, user_name=user_name).fetchone()
         if user is None:
             return None
         return user.id
 
     def create_user(self, user_name, password, email):
         """Creates a user. Returns True on success."""
-        query = ('insert into users (username, password_hash, email, status) '
-                 ' values (:user_name, :password_hash, :email, 1)')
-
         password_hash = ssha(password)
-        res = self._engine.execute(text(query), user_name=user_name,
-                                   email=email, password_hash=password_hash)
+        query = insert(users).values(username=user_name, email=email,
+                                     password_hash=password_hash, status=1)
+        res = self._engine.execute(query)
         return res.rowcount == 1
 
     def authenticate_user(self, user_name, password):
         """Authenticates a user given a user_name and password.
 
         Returns the user id in case of success. Returns None otherwise."""
-        query = ('select id, password_hash from users '
-                 'where username = :user_name')
-
-        user = self._engine.execute(text(query),
+        user = self._engine.execute(_USER_AUTH,
                                     user_name=user_name).fetchone()
         if user is None:
             return None
@@ -126,12 +131,10 @@ class SQLAuth(object):
         code = '-'.join([_4chars() for i in range(4)])
         expiration = datetime.datetime.now() + datetime.timedelta(hours=6)
 
-        query = ('update users set reset = :code, '
-                 'reset_expiration = :expiration '
-                 'where id = :user_id')
+        query = update(users).values(id=user_id, reset=code,
+                                     reset_expiration=expiration)
+        res = self._engine.execute(query.where(users.c.id == user_id))
 
-        res = self._engine.execute(text(query), user_id=user_id, code=code,
-                                   expiration=expiration)
         if res.rowcount != 1:
             return None  # XXX see if appropriate
 
@@ -150,9 +153,7 @@ class SQLAuth(object):
         if _RE_CODE.match(code) is None:
             return False
 
-        query = ('select reset_expiration, reset from users '
-                 'where id = :user_id')
-        res = self._engine.execute(text(query), user_id=user_id)
+        res = self._engine.execute(_USER_RESET_CODE, user_id=user_id)
         user = res.fetchone()
 
         if user.reset is None or user.reset_expiration is None:
@@ -185,13 +186,10 @@ class SQLAuth(object):
         Returns:
             True if the change was successful, False otherwise
         """
-        query = ('update users set reset = :code, '
-                 'reset_expiration = :expiration '
-                 'where id = :user_id')
-
+        query = update(users).where(users.c.id == user_id)
         code = expiration = None
-        res = self._engine.execute(text(query), user_id=user_id, code=code,
-                                   expiration=expiration)
+        res = self._engine.execute(query.values(id=user_id, reset=code,
+                                                reset_expiration=expiration))
         return res.rowcount == 1
 
     def get_user_info(self, user_id):
@@ -203,9 +201,7 @@ class SQLAuth(object):
         Returns:
             tuple: username, email
         """
-        query = ('select username, email from users '
-                 'where id = :user_id')
-        res = self._engine.execute(text(query), user_id=user_id).fetchone()
+        res = self._engine.execute(_USER_INFO, user_id=user_id).fetchone()
         if res is None:
             return None, None
 
@@ -221,9 +217,8 @@ class SQLAuth(object):
         Returns:
             True if the change was successful, False otherwise
         """
-        query = ('update users set email = :email '
-                 'where id = :user_id')
-        res = self._engine.execute(text(query), user_id=user_id, email=email)
+        query = update(users).where(users.c.id == user_id)
+        res = self._engine.execute(query.values(email=email))
         return res.rowcount == 1
 
     def update_password(self, user_id, password):
@@ -237,10 +232,8 @@ class SQLAuth(object):
             True if the change was successful, False otherwise
         """
         password_hash = ssha(password)
-        query = ('update users set password_hash = :password_hash '
-                 'where id = :user_id')
-        res = self._engine.execute(text(query), user_id=user_id,
-                                   password_hash=password_hash)
+        query = update(users).where(users.c.id == user_id)
+        res = self._engine.execute(query.values(password_hash=password_hash))
         return res.rowcount == 1
 
     def delete_user(self, user_id):
@@ -252,6 +245,6 @@ class SQLAuth(object):
         Returns:
             True if the deletion was successful, False otherwise
         """
-        query = text('delete from users where id = :user_id')
-        res = self._engine.execute(query, user_id=user_id)
+        query = delete(users).where(users.c.id == user_id)
+        res = self._engine.execute(query)
         return res.rowcount == 1
