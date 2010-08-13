@@ -34,7 +34,10 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from weaveserver.log import WeaveLogger
+import os
+from tempfile import mkstemp
+
+from weaveserver.cef import auth_failure
 
 
 class FakeRequest(object):
@@ -43,24 +46,32 @@ class FakeRequest(object):
     url = 'http://example.com'
     method = 'GET'
     headers = {'User-Agent': 'MySuperBrowser'}
-
+    config = {'cef.version': '0', 'cef.vendor': 'mozilla',
+              'cef.device_version': '3', 'cef.product': 'weave',
+              'cef': True}
 
 class TestWeaveLogger(unittest.TestCase):
 
     def test_cef_logging(self):
         # just make sure we escape "|" when appropriate
-        logger = WeaveLogger(None)
-        logger.log = lambda level, msg, data: None
-
         request = FakeRequest()
+        filename = request.config['cef.file'] = mkstemp()[1]
 
-        # should not fail
-        logger.cef_auth_failure('xx|x', 5, request)
+        try:
+            # should not fail
+            auth_failure('xx|x', 5, request)
+            with open(filename) as f:
+                content = f.read()
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
+
+        self.assertEquals(len(content.split('|')), 9)
 
         # should fail
         request.headers['User-Agent'] = "|"
         self.assertRaises(ValueError,
-                          logger.cef_auth_failure, 'xxx', 5, request)
+                          auth_failure, 'xxx', 5, request)
 
 
 def test_suite():

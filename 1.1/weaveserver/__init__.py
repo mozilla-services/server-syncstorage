@@ -33,9 +33,7 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import logging
 
-# this call ensure that the logger is initialized
-from weaveserver.log import logger  # noqa
-
-
+logger = logging.getLogger('weaveserver')
 API_VERSION = '1.0'
