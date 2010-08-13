@@ -206,12 +206,14 @@ class SyncServerApp(object):
 def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
     global_conf.update(app_conf)
-    app = SyncServerApp(convert_config(global_conf))
 
-    if global_conf.get('translogger', False):
+    params = convert_config(global_conf)
+    app = SyncServerApp(params)
+
+    if params.get('translogger', False):
         app = TransLogger(app, logger_name='weaveserver')
 
-    if global_conf.get('profile', False):
+    if params.get('profile', False):
         app = AccumulatingProfileMiddleware(app,
                                          log_filename='profile.log',
                                          cachegrind_filename='cachegrind.out',
