@@ -39,6 +39,7 @@ Application entry point.
 import time
 
 from paste.translogger import TransLogger
+from repoze.profile.profiler import AccumulatingProfileMiddleware
 from routes import Mapper, URLGenerator
 
 from webob.dec import wsgify
@@ -209,5 +210,13 @@ def make_app(global_conf, **app_conf):
 
     if global_conf.get('translogger', False):
         app = TransLogger(app, logger_name='weaveserver')
+
+    if global_conf.get('profile', False):
+        app = AccumulatingProfileMiddleware(app,
+                                         log_filename='profile.log',
+                                         cachegrind_filename='cachegrind.out',
+                                         discard_first_request=True,
+                                         flush_at_shutdown=True,
+                                         path='/__profile__')
 
     return app
