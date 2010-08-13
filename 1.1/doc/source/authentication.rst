@@ -18,9 +18,9 @@ that contains all the methods described in the abstract class
         ... more code ...
 
 Once this class is created and fully implements all methods, Sync can
-be configured to use it in its ini sync section, via the *auth* option::
+be configured to use it in its *app:main* section, via the *auth* option::
 
-    [sync]
+    [app:main]
     auth = superauth.MySuperAuthenticator
     auth.param1 = one
 

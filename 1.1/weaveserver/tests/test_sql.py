@@ -60,7 +60,7 @@ class TestSQLStorage(unittest.TestCase):
     def setUp(self):
         cfg = RawConfigParser()
         cfg.read(_INI_FILE)
-        config = dict(cfg.items('sync'))
+        config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
         self.storage = WeaveStorage.get_from_config(config)
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         # make sure we have the standard collections in place

@@ -68,7 +68,7 @@ class TestWsgiApp(unittest.TestCase):
             fileConfig(_INI_FILE)
 
         # loading the app
-        config = dict(cfg.items('sync'))
+        config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
         self.storage = WeaveStorage.get_from_config(config)
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         self.app = TestApp(make_app(config))

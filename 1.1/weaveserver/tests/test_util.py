@@ -34,11 +34,9 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-import os
-from tempfile import mkstemp
 from base64 import encodestring
 
-from weaveserver.util import authenticate_user, read_config
+from weaveserver.util import authenticate_user, convert_config
 
 
 class Request(object):
@@ -52,17 +50,6 @@ class AuthTool(object):
 
     def authenticate_user(self, *args):
         return 1
-
-
-_CONF = """\
-[some]
-stuff = 1
-
-[sync]
-one = 1
-two = bla
-three = false
-"""
 
 
 class TestUtil(unittest.TestCase):
@@ -80,14 +67,9 @@ class TestUtil(unittest.TestCase):
         res = authenticate_user(req, AuthTool())
         self.assertEquals(res, 1)
 
-    def test_read_config(self):
-        __, filename = mkstemp()
-        try:
-            with open(filename, 'w') as f:
-                f.write(_CONF)
-            config = read_config(filename)
-        finally:
-            os.remove(filename)
+    def test_convert_config(self):
+        config = {'one': '1', 'two': 'bla', 'three': 'false'}
+        config = convert_config(config)
 
         self.assertTrue(config['one'])
         self.assertEqual(config['two'], 'bla')

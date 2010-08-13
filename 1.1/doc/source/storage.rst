@@ -24,9 +24,9 @@ all the methods described in the abstract class :class:`WeaveStorage`::
 
 Once this class is created and fully implements all methods, Sync can
 be configured to use it. Just point the fully qualified class name 
-in the *storage* option of the *sync* section in the ini file::
+in the *storage* option of the *app:main* section in the ini file::
 
-    [sync]
+    [app:main]
     storage = foo.storage.SuperStorage
 
 The fully qualified name will be used to import your class and instanciate 
@@ -37,7 +37,7 @@ If you need to pass some options, use the storage namespace. Sync
 will pass it to the class
 constructor::
 
-    [sync]
+    [app:main]
     storage = superstorage
     storage.option1 = foo
 

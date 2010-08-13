@@ -46,7 +46,7 @@ from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from webob import Response
 
 from weaveserver import API_VERSION
-from weaveserver.util import authenticate_user, read_config
+from weaveserver.util import authenticate_user, convert_config
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
 from weaveserver.controllers.storage import StorageController
@@ -204,14 +204,10 @@ class SyncServerApp(object):
 
 def make_app(global_conf, **app_conf):
     """Returns a Sync Server Application."""
-    if '__file__' in global_conf:
-        params = read_config(global_conf['__file__'])
-    else:
-        params = global_conf
+    global_conf.update(app_conf)
+    app = SyncServerApp(convert_config(global_conf))
 
-    app = SyncServerApp(params)
-
-    if params.get('translogger'):
+    if global_conf.get('translogger', False):
         app = TransLogger(app, logger_name='weaveserver')
 
     return app
