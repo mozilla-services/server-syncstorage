@@ -34,6 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+from collections import defaultdict
 
 from weaveserver.storage.redisql import RediSQLStorage
 from weaveserver.storage import redisql
@@ -49,6 +50,7 @@ class FakeRedis(dict):
 
     def __init__(self, host, port):
         self.set_called = self.get_called = 0
+        self.sets = defaultdict(list)
 
     def ping(self):
         pass
@@ -63,6 +65,18 @@ class FakeRedis(dict):
     def get(self, name):
         self.get_called += 1
         return self[name]
+
+    def sadd(self, key, name):
+        self.sets[key].append(name)
+
+    def sismember(self, key, name):
+        return name in self.sets[key]
+
+    def srem(self, key, name):
+        self.sets[key].remove(name)
+
+    def smembers(self, key):
+        return [id_ for id_ in self.sets[key]]
 
 
 class TestRediSQLStorage(unittest.TestCase):
@@ -120,6 +134,34 @@ class TestRediSQLStorage(unittest.TestCase):
         # this should remove the cache
         self.storage.delete_items(_UID, 'meta')
         items = self.storage.get_items(_UID, 'col')
+        self.assertEquals(len(items), 0)
+        self.assertEquals(self.storage._conn.keys(), [])
+
+    def test_tabs(self):
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'tabs')
+        self.storage.set_item(_UID, 'tabs', '1', payload='XXX')
+
+        # these calls should be cached
+        res = self.storage.get_item(_UID, 'tabs', '1')
+        self.assertEquals(res['payload'], 'XXX')
+        self.assertEquals(self.storage._conn.get_called, 1)
+        self.assertEquals(self.storage._conn.set_called, 1)
+        self.assertEquals(self.storage._conn.keys(), ['tabs:1:1'])
+
+        # this should remove the cache
+        self.storage.delete_item(_UID, 'tabs', '1')
+        self.assertEquals(self.storage._conn.keys(), [])
+
+        items = [{'id': '1', 'payload': 'xxx'},
+                 {'id': '2', 'payload': 'xxx'},
+                ]
+        self.storage.set_items(_UID, 'tabs', items)
+        self.assertEquals(self.storage._conn.keys(), ['tabs:1:1', 'tabs:1:2'])
+
+        # this should remove the cache
+        self.storage.delete_items(_UID, 'tabs')
+        items = self.storage.get_items(_UID, 'tabs')
         self.assertEquals(len(items), 0)
         self.assertEquals(self.storage._conn.keys(), [])
 

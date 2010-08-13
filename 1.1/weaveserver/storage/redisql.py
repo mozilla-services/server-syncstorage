@@ -94,6 +94,9 @@ class RediSQLStorage(WeaveSQLStorage):
             if value is not None:
                 wbo = json.loads(value)
                 return wbo['modified']
+        elif collection_name == 'tabs':
+            if self._conn.sismember(_key('tabs', user_id), item_id):
+                return True
 
         return super(RediSQLStorage, self).item_exists(user_id,
                                                        collection_name,
@@ -106,6 +109,10 @@ class RediSQLStorage(WeaveSQLStorage):
         """
         if self._is_meta_global(collection_name, item_id):
             value = self._conn.get(_key('meta', 'global', user_id))
+            if value is not None:
+                return json.loads(value)
+        elif collection_name == 'tabs':
+            value = self._conn.get(_key('tabs', user_id, item_id))
             if value is not None:
                 return json.loads(value)
 
@@ -124,6 +131,12 @@ class RediSQLStorage(WeaveSQLStorage):
         if self._is_meta_global(collection_name, item_id):
             self._conn.set(_key('meta', 'global', user_id),
                            json.dumps(values))
+        elif collection_name == 'tabs':
+            self._conn.sadd(_key('tabs', user_id), item_id)
+            self._conn.set(_key('tabs', user_id, item_id),
+                            json.dumps(values))
+            # we don't store tabs in SQL
+            return
 
         return self._set_item(user_id, collection_name, item_id, **values)
 
@@ -137,6 +150,15 @@ class RediSQLStorage(WeaveSQLStorage):
             values['username'] = user_id
             self._conn.set(_key('meta', 'global', user_id),
                            json.dumps(values))
+        elif collection_name == 'tabs':
+            for item in items:
+                item_id = item['id']
+                self._conn.sadd(_key('tabs', user_id), item_id)
+                self._conn.set(_key('tabs', user_id, item_id),
+                                json.dumps(item))
+            # we don't store tabs in SQL
+            return
+
         return super(RediSQLStorage, self).set_items(user_id, collection_name,
                                                      items)
 
@@ -144,6 +166,11 @@ class RediSQLStorage(WeaveSQLStorage):
         """Deletes an item"""
         if self._is_meta_global(collection_name, item_id):
             self._conn.set(_key('meta', 'global', user_id), None)
+        elif collection_name == 'tabs':
+            self._conn.srem(_key('tabs', user_id), item_id)
+            self._conn.set(_key('tabs', user_id, item_id), None)
+            # we don't store tabs in SQL
+            return
 
         return super(RediSQLStorage, self).delete_item(user_id,
                                                        collection_name,
@@ -155,6 +182,17 @@ class RediSQLStorage(WeaveSQLStorage):
         if (collection_name == 'meta' and (item_ids is None
             or 'global' in item_ids)):
             self._conn.set(_key('meta', 'global', user_id), None)
+        elif collection_name == 'tabs':
+            # getting all members
+            if item_ids is None:
+                item_ids = self._conn.smembers(_key('tabs', user_id))
+
+            for item_id in item_ids:
+                self._conn.srem(_key('tabs', user_id), item_id)
+                self._conn.set(_key('tabs', user_id, item_id), None)
+
+            # we don't store tabs in SQL
+            return
 
         return super(RediSQLStorage, self).delete_items(user_id,
                                                         collection_name,
