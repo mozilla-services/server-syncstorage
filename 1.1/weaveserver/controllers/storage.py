@@ -39,7 +39,7 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
-import json
+import simplejson as json
 
 from webob.exc import (HTTPNotImplemented, HTTPBadRequest, HTTPNotFound,
                        HTTPPreconditionFailed)

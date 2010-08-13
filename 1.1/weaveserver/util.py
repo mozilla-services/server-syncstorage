@@ -40,7 +40,8 @@ import random
 import string
 from hashlib import sha1
 import base64
-import json
+import simplejson as json
+
 import struct
 from email.mime.text import MIMEText
 from email.header import Header

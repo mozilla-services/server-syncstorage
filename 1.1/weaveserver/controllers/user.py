@@ -40,7 +40,7 @@ https://wiki.mozilla.org/Labs/Weave/User/1.0/API
 
 """
 import os
-import json
+import simplejson as json
 
 from webob.exc import (HTTPServiceUnavailable, HTTPBadRequest,
                        HTTPInternalServerError, HTTPNotFound)
