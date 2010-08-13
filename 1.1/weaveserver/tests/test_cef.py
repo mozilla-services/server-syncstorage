@@ -50,6 +50,7 @@ class FakeRequest(object):
               'cef.device_version': '3', 'cef.product': 'weave',
               'cef': True}
 
+
 class TestWeaveLogger(unittest.TestCase):
 
     def test_cef_logging(self):

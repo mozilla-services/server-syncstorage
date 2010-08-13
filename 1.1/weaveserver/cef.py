@@ -78,6 +78,8 @@ def auth_failure(message, severity, request, **kw):
         request: the request object
         extra keywords: extra keys used in the CEF extension
     """
+    # XXX might want to remove the request dependency here
+    # so this module is standalone
     from weaveserver.util import filter_params
 
     signature = _convert(_CEF_AUTH_FAILURE)
