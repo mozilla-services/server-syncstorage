@@ -166,7 +166,7 @@ def round_time(value):
     """Rounds a timestamp to two digits"""
     if not isinstance(value, float):
         value = float(value)
-    return float('%.2f' % value)
+    return round(value, 2)
 
 
 def ssha(password, salt=None):
