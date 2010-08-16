@@ -328,7 +328,6 @@ class WeaveSQLStorage(object):
 
         The size is the sum of stored payloads.
         """
-        # XXX returning in KB -- ask Toby (PHP returns bytes)
         if not self.use_quota:
             return dict()
         res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id)
