@@ -112,6 +112,8 @@ class Storage(object):
     def delete_items(self, user_name, collection_name, item_ids=None):
         ''
 
+    def get_total_size(self, user_id):
+        ''
 
 class TestMultiStorage(unittest.TestCase):
 

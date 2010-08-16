@@ -86,11 +86,6 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['col2'], 5)
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
-    def test_get_quota(self):
-
-        # XXX implement the new quota code
-        self.app.get('/1.0/tarek/info/quota', status=501)
-
     def test_get_collection(self):
         res = self.app.get('/1.0/tarek/storage/col3')
         self.assertEquals(json.loads(res.body), [])
@@ -158,7 +153,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         keys = res[0].keys()
         keys.sort()
-        wanted = ['id', 'modified', 'payload']
+        wanted = ['id', 'modified', 'payload', 'payload_size']
         self.assertEquals(keys, wanted)
 
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -279,7 +274,7 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         keys = res.keys()
         keys.sort()
-        self.assertEquals(keys, ['id', 'modified', 'payload'])
+        self.assertEquals(keys, ['id', 'modified', 'payload', 'payload_size'])
         self.assertEquals(res['id'], '1')
 
         # unexisting object
@@ -287,7 +282,7 @@ class TestStorage(support.TestWsgiApp):
 
     def test_set_item(self):
         # let's create an object
-        wbo = {'payload': 'XXX', 'payload_size': 3}
+        wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
         self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
         res = self.app.get('/1.0/tarek/storage/col2/12345')
@@ -295,7 +290,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['payload'], 'XXX')
 
         # now let's update it
-        wbo = {'payload': 'YYY', 'payload_size': 3}
+        wbo = {'payload': 'YYY'}
         wbo = json.dumps(wbo)
         self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
         res = self.app.get('/1.0/tarek/storage/col2/12345')
@@ -304,8 +299,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_set_collection(self):
         # sending two wbos
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 12, 'payload': 'XXX'}
+        wbo2 = {'id': 13, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
@@ -318,8 +313,8 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['payload'], 'XXX')
 
         # one more time, with changes
-        wbo1 = {'id': 13, 'payload': 'XyX', 'payload_size': 3}
-        wbo2 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 13, 'payload': 'XyX'}
+        wbo2 = {'id': 14, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
@@ -332,8 +327,8 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['payload'], 'XyX')
 
         # sending two wbos with one bad sortindex
-        wbo1 = {'id': 'one', 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 'two', 'payload': 'XXX', 'payload_size': 3,
+        wbo1 = {'id': 'one', 'payload': 'XXX'}
+        wbo2 = {'id': 'two', 'payload': 'XXX',
                 'sortindex': 'FAIL'}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
@@ -343,9 +338,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(1, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 12, 'payload': 'XXX'}
+        wbo2 = {'id': 13, 'payload': 'XXX'}
+        wbo3 = {'id': 14, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -372,9 +367,9 @@ class TestStorage(support.TestWsgiApp):
         # "parentid"
         # Only deletes objects in the collection that are the
         # children of the parent id given.
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbo1 = {'id': 12, 'payload': 'XXX', 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'parentid': 1}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'parentid': 2}
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.app.delete('/1.0/tarek/storage/col2?parentid=1')
@@ -385,15 +380,15 @@ class TestStorage(support.TestWsgiApp):
         # Only deletes objects in the collection that have been last
         # modified before the date given
         self.app.delete('/1.0/tarek/storage/col2')
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo1 = {'id': 12, 'payload': 'XXX', 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'parentid': 1}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
         time.sleep(.1)
         now = time.time()
         time.sleep(.1)
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'parentid': 2}
         wbos = json.dumps([wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
@@ -405,14 +400,14 @@ class TestStorage(support.TestWsgiApp):
         # Only deletes objects in the collection that have been last modified
         # since the date given.
         self.app.delete('/1.0/tarek/storage/col2')
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3, 'parentid': 1}
+        wbo1 = {'id': 12, 'payload': 'XXX', 'parentid': 1}
+        wbo2 = {'id': 13, 'payload': 'XXX', 'parentid': 1}
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
         now = time.time()
         time.sleep(.3)
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3, 'parentid': 2}
+        wbo3 = {'id': 14, 'payload': 'XXX', 'parentid': 2}
         wbos = json.dumps([wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
@@ -466,9 +461,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(1, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 12, 'payload': 'XXX'}
+        wbo2 = {'id': 13, 'payload': 'XXX'}
+        wbo3 = {'id': 14, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -486,9 +481,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(1, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
-        wbo3 = {'id': 14, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 12, 'payload': 'XXX'}
+        wbo2 = {'id': 13, 'payload': 'XXX'}
+        wbo3 = {'id': 14, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         res = self.app.get('/1.0/tarek/storage/col2')
@@ -509,26 +504,35 @@ class TestStorage(support.TestWsgiApp):
                         float(res.headers['X-Weave-Timestamp']) > 0)
 
         # getting the timestamp with a PUT
-        wbo = {'payload': 'XXX', 'payload_size': 3}
+        wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)
 
         # getting the timestamp with a POST
-        wbo1 = {'id': 12, 'payload': 'XXX', 'payload_size': 3}
-        wbo2 = {'id': 13, 'payload': 'XXX', 'payload_size': 3}
+        wbo1 = {'id': 12, 'payload': 'XXX'}
+        wbo2 = {'id': 13, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2])
         res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.assertTrue(time.time() -
                         float(res.headers['X-Weave-Timestamp']) > 0)
 
-        def test_ifunmodifiedsince(self):
-            now = time()
-            wbo = {'payload': 'XXX', 'payload_size': 3}
-            wbo = json.dumps(wbo)
-            self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+    def test_ifunmodifiedsince(self):
+        now = time.time()
+        wbo = {'payload': 'XXX'}
+        wbo = json.dumps(wbo)
+        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
 
-            self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
-                         headers=[('X-If-Unmodified-Since', str(now))],
-                         status=412)
+        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+                        headers=[('X-If-Unmodified-Since', str(now))],
+                        status=412)
+
+    def test_quota(self):
+        wbo = {'payload': 'XXX'}
+        wbo = json.dumps(wbo)
+        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+
+        res = self.app.get('/1.0/tarek/info/quota')
+        used, quota = json.loads(res.body)
+        self.assertEquals(used, 0.03)

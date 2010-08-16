@@ -36,9 +36,6 @@
 """ SQL Authentication
 
 Users are stored with digest password (sha1)
-
-XXX cost of server-side sha1
-XXX cache sha1 + sql
 """
 import string
 import random

@@ -179,6 +179,14 @@ class TestSQLStorage(unittest.TestCase):
         col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
         self.assertAlmostEquals(col1, timestamps['col2'])
 
+    def test_storage_size(self):
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col1')
+
+        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
+        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 876)
+        self.assertEquals(self.storage.get_total_size(_UID), 2.57)
+
 
 def test_suite():
     suite = unittest.TestSuite()

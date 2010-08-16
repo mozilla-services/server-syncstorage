@@ -105,3 +105,7 @@ class DummyAuth(object):
                 del self._users[name]
                 return True
         return False
+
+    def get_total_size(self, user_id):
+        """Returns the total size in KB of a user storage"""
+        return 0   # unlimited

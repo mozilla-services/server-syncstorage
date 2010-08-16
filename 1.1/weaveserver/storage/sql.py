@@ -87,10 +87,14 @@ _DELETE_ITEMS = delete(wbo,
                        and_(wbo.c.collection == bindparam('collection_id'),
                             wbo.c.username == bindparam('user_id')))
 
+_USER_STORAGE_SIZE = select([func.sum(wbo.c.payload_size)],
+                            wbo.c.username == bindparam('user_id'))
+
+_KB = float(1024)
 
 class WeaveSQLStorage(object):
 
-    def __init__(self, sqluri=_SQLURI, standard_collections=False):
+    def __init__(self, sqluri=_SQLURI, standard_collections=False, quota=0):
         self.sqluri = sqluri
         self._engine = create_engine(sqluri, pool_size=20)
         for table in tables:
@@ -99,6 +103,7 @@ class WeaveSQLStorage(object):
         self._user_collections = {}
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
+        self.quota = long(quota)
 
     @classmethod
     def get_name(cls):
@@ -408,6 +413,9 @@ class WeaveSQLStorage(object):
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
+        if 'payload' in values and 'payload_size' not in values:
+            values['payload_size'] = len(values['payload'])
+
         if modified is None:   # does not exists
             query = insert(wbo).values(**values)
         else:
@@ -475,6 +483,11 @@ class WeaveSQLStorage(object):
             if ('payload%d' % num in values and
                 'modified%d' % num not in values):
                 values['modified%d' % num] = time2bigint(time())
+
+            if ('payload%d' % num in values and
+                'payload_size%d' % num not in values):
+                size = len(values['payload%d' % num])
+                values['payload_size%d' % num] = size
 
         query += ','.join(lines)
 
@@ -551,3 +564,14 @@ class WeaveSQLStorage(object):
         # e.g. by checking the rowcount
         res = self._engine.execute(query)
         return res.rowcount > 0
+
+    def get_total_size(self, user_id):
+        """Returns the total size in KB of a user storage.
+
+        The size is the sum of stored payloads.
+        """
+        res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id)
+        res = res.fetchone()
+        if res is None:
+            return 0.0
+        return round(res[0] / _KB, 2)

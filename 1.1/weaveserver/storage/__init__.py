@@ -318,3 +318,16 @@ class WeaveStorage(Plugin):
         Returns:
             None
         """
+
+    @abc.abstractmethod
+    def get_total_size(self, user_id):
+        """Returns the total size in KB of a user storage.
+
+        The size is the sum of stored payloads.
+
+        Args:
+            user_id: integer identifying the user in the storage.
+
+        Returns:
+            The size in Kbytes (float)
+        """

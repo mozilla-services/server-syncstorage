@@ -104,6 +104,8 @@ class IAmAValidStorage(object):
     def delete_items(self, user_name, collection_name, item_ids=None):
         """Deletes items. All items are removed unless item_ids is provided"""
 
+    def get_total_size(self, user_id):
+        """Returns total size"""
 
 class TestWeaveStorageBase(unittest.TestCase):
 
