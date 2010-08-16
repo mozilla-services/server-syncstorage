@@ -269,7 +269,7 @@ class WeaveSQLStorage(object):
         # see if a client-side (eg this code) list of collections
         # makes things faster but I doubt it
         res = self._engine.execute(_COLLECTION_STAMPS,
-                                   user_id=user_id).fetchall()
+                                   user_id=user_id)
         return dict([(name, bigint2time(stamp))
                      for name, stamp in res])
 
@@ -381,9 +381,9 @@ class WeaveSQLStorage(object):
         if offset is not None and int(offset) > 0:
             query = query.offset(int(offset))
 
-        res = self._engine.execute(query).fetchall()
-
-        return [WBO(line, {'modified': bigint2time}) for line in res]
+        res = self._engine.execute(query)
+        converters = {'modified': bigint2time}
+        return [WBO(line, converters) for line in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
