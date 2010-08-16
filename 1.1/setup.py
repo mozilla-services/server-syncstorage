@@ -35,18 +35,19 @@
 # ***** END LICENSE BLOCK *****
 from setuptools import setup, find_packages
 
-setup(name='WeaveServer', version=0.1,
-      packages=find_packages(),
-      install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                        'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                        'Mako', 'redis', 'recaptcha-client',
-                        'repoze.profile', 'simplejson'],
-      entry_points="""
-      [paste.app_factory]
-      main = weaveserver.wsgiapp:make_app
+install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
+                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
+                  'Mako', 'redis', 'recaptcha-client',
+                  'repoze.profile', 'simplejson',
+                  'distribute']
 
-      [paste.app_install]
-      main = paste.script.appinstall:Installer
-      """
-      )
+entry_points="""
+[paste.app_factory]
+main = weaveserver.wsgiapp:make_app
 
+[paste.app_install]
+main = paste.script.appinstall:Installer
+"""
+
+setup(name='WeaveServer', version=0.1, packages=find_packages(),
+      install_requires=install_requires, entry_points=entry_points)
