@@ -1,7 +1,7 @@
 #!/bin/sh
 if [ ! -d 'bin' ]; then
   virtualenv > /dev/null
-  if [ $? -eq 0 ]; then
+  if [ $? -ne 0 ]; then
     wget http://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.4.9.tar.gz
     tar -xzvf virtualenv-1.4.9.tar.gz
     cd virtualenv-1.4.9
