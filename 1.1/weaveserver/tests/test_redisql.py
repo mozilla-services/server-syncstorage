@@ -85,7 +85,9 @@ class TestRediSQLStorage(unittest.TestCase):
         self.old = redisql.GracefulRedisServer
         redisql.GracefulRedisServer = FakeRedis
         self.storage = WeaveStorage.get('redisql',
-                                        sqluri='sqlite:///:memory:')
+                                        sqluri='sqlite:///:memory:',
+                                        use_quota=True,
+                                        quota_size=5120)
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history'):
             self.storage.set_collection(_UID, name)
@@ -146,8 +148,9 @@ class TestRediSQLStorage(unittest.TestCase):
         res = self.storage.get_item(_UID, 'tabs', '1')
         self.assertEquals(res['payload'], 'XXX')
         self.assertEquals(self.storage._conn.get_called, 1)
-        self.assertEquals(self.storage._conn.set_called, 1)
-        self.assertEquals(self.storage._conn.keys(), ['tabs:1:1'])
+        self.assertEquals(self.storage._conn.set_called, 2)
+        self.assertEquals(self.storage._conn.keys(), ['tabs:1:1',
+                                                      'tabs:size:1:1'])
 
         # this should remove the cache
         self.storage.delete_item(_UID, 'tabs', '1')
@@ -157,13 +160,27 @@ class TestRediSQLStorage(unittest.TestCase):
                  {'id': '2', 'payload': 'xxx'},
                 ]
         self.storage.set_items(_UID, 'tabs', items)
-        self.assertEquals(self.storage._conn.keys(), ['tabs:1:1', 'tabs:1:2'])
+        keys = self.storage._conn.keys()
+        keys.sort()
+        self.assertEquals(keys, ['tabs:1:1', 'tabs:1:2',
+                                 'tabs:size:1:1', 'tabs:size:1:2'])
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'tabs')
         items = self.storage.get_items(_UID, 'tabs')
         self.assertEquals(len(items), 0)
         self.assertEquals(self.storage._conn.keys(), [])
+
+    def test_size(self):
+        # make sure we get the right size
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'tabs')
+        self.storage.set_collection(_UID, 'foo')
+        self.storage.set_item(_UID, 'tabs', '1', payload='XXX' * 200)
+        self.storage.set_item(_UID, 'foo', '1', payload='XXX' * 200)
+
+        wanted = (len('XXX' * 200) * 2) / 1024.
+        self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
 
 def test_suite():

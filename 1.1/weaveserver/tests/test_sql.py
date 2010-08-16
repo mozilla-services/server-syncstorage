@@ -185,7 +185,7 @@ class TestSQLStorage(unittest.TestCase):
 
         self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
         self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 876)
-        self.assertEquals(self.storage.get_total_size(_UID), 2.57)
+        self.assertAlmostEquals(self.storage.get_total_size(_UID), 2.566, 3)
 
 
 def test_suite():

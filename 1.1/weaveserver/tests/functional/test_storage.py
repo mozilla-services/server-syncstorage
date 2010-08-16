@@ -522,6 +522,7 @@ class TestStorage(support.TestWsgiApp):
         now = time.time()
         wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
+        time.sleep(0.1)
         self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
 
         self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
@@ -535,4 +536,4 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get('/1.0/tarek/info/quota')
         used, quota = json.loads(res.body)
-        self.assertEquals(used, 0.03)
+        self.assertAlmostEquals(used, 0.026, 3)

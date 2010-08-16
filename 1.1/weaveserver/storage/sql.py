@@ -92,6 +92,7 @@ _USER_STORAGE_SIZE = select([func.sum(wbo.c.payload_size)],
 
 _KB = float(1024)
 
+
 class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
@@ -579,4 +580,5 @@ class WeaveSQLStorage(object):
         res = res.fetchone()
         if res is None:
             return 0.0
-        return round(res[0] / _KB, 2)
+
+        return res[0] / _KB

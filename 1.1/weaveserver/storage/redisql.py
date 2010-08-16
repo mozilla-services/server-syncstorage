@@ -45,6 +45,7 @@ from weaveserver.storage.sql import WeaveSQLStorage
 from weaveserver import logger
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
+_KB = float(1024)
 
 
 def _key(*args):
@@ -75,8 +76,10 @@ class RediSQLStorage(WeaveSQLStorage):
     """
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
-                 redis_host='localhost', redis_port=6379):
-        super(RediSQLStorage, self).__init__(sqluri, standard_collections)
+                 use_quota=False, quota_size=0, redis_host='localhost',
+                 redis_port=6379):
+        super(RediSQLStorage, self).__init__(sqluri, standard_collections,
+                                             use_quota, quota_size)
         self._conn = GracefulRedisServer(host=redis_host, port=redis_port)
         self._conn.ping()  # will generate a connection error if down
 
@@ -135,6 +138,8 @@ class RediSQLStorage(WeaveSQLStorage):
             self._conn.sadd(_key('tabs', user_id), item_id)
             self._conn.set(_key('tabs', user_id, item_id),
                             json.dumps(values))
+            self._conn.set(_key('tabs', 'size', user_id, item_id),
+                            len(values.get('payload', '')))
             # we don't store tabs in SQL
             return
 
@@ -156,6 +161,8 @@ class RediSQLStorage(WeaveSQLStorage):
                 self._conn.sadd(_key('tabs', user_id), item_id)
                 self._conn.set(_key('tabs', user_id, item_id),
                                 json.dumps(item))
+                self._conn.set(_key('tabs', 'size', user_id, item_id),
+                               len(item.get('payload', '')))
             # we don't store tabs in SQL
             return
 
@@ -169,6 +176,7 @@ class RediSQLStorage(WeaveSQLStorage):
         elif collection_name == 'tabs':
             self._conn.srem(_key('tabs', user_id), item_id)
             self._conn.set(_key('tabs', user_id, item_id), None)
+            self._conn.set(_key('tabs', 'size', user_id, item_id), None)
             # we don't store tabs in SQL
             return
 
@@ -190,6 +198,7 @@ class RediSQLStorage(WeaveSQLStorage):
             for item_id in item_ids:
                 self._conn.srem(_key('tabs', user_id), item_id)
                 self._conn.set(_key('tabs', user_id, item_id), None)
+                self._conn.set(_key('tabs', 'size', user_id, item_id), None)
 
             # we don't store tabs in SQL
             return
@@ -198,3 +207,14 @@ class RediSQLStorage(WeaveSQLStorage):
                                                         collection_name,
                                                         item_ids, filters,
                                                         limit, offset, sort)
+
+    def get_total_size(self, user_id):
+        """Returns the total size in KB of a user storage"""
+        size = super(RediSQLStorage, self).get_total_size(user_id)
+
+        # add the tabs sizes, if any
+        tabs = 0
+        for item_id in self._conn.smembers(_key('tabs', user_id)):
+            tabs += self._conn.get(_key('tabs', 'size', user_id, item_id))
+
+        return size + tabs / _KB
