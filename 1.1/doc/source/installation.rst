@@ -2,12 +2,12 @@
 Installation
 ============
 
-To install Sync, make sure you have Python 2.6 installed and in your path,
-then run the :file:`bootstrap.sh` script. It will collect all the required bits,
-create a local environment and run the tests to make sure everything will 
-work::
+To install Sync, make sure you have Python 2.6 and Virtualenv installed on
+your system, then run the *make all* command. It will collect all the
+required bits, create a local environment and run the tests to make sure
+everything will work::
 
-    $ ./bootstrap.sh
+    $ make all
     New python executable in ./bin/python2.6
     Also creating executable in ./bin/python
     Installing setuptools............done.
