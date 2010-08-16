@@ -110,7 +110,7 @@ class WeaveSQLStorage(object):
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
         self.use_quota = use_quota
-        self.quota_size = quota_size
+        self.quota_size = long(quota_size)
 
     @classmethod
     def get_name(cls):
@@ -598,3 +598,7 @@ class WeaveSQLStorage(object):
             return 0.0
 
         return res[0] / _KB
+
+    def get_size_left(self, user_id):
+        """Returns the storage left for a user"""
+        return self.quota_size - self.get_total_size(user_id)

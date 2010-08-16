@@ -45,70 +45,70 @@ class IAmAValidStorage(object):
         return 'valid'
 
     def user_exists(self, user_name):
-        """Returns user infos. user is the key"""
+        ''
 
     def set_user(self, user_email, **values):
-        """set a users information."""
+        ''
 
     def get_user(self, user_name, fields=None):
-        """Returns user information.
-
-        If fields is provided, its a list of fields to return
-        """
+        ''
 
     def delete_user(self, user_name):
-        """Deletes all data from a user"""
+        ''
 
     def delete_collection(self, user_name, collection_name):
-        """deletes a collection"""
+        ''
 
     def collection_exists(self, user_name, collection_name):
-        """Returns True if the collection exists"""
+        ''
 
     def set_collection(self, user_name, collection_name, **values):
-        """Creates a new collection."""
+        ''
 
     def get_collection(self, user_name, collection_name, fields=None):
-        """Return information about a collection."""
+        ''
 
     def get_collections(self, user_name, fields=None):
-        """returns the collections information """
+        ''
 
     def get_collection_names(self, user_name):
-        """return the collection id"""
+        ''
 
     def get_collection_timestamps(self, user_name):
-        """return the collection id + timestamp"""
+        ''
 
     def get_collection_counts(self, user_name):
-        """return the collection counts"""
+        ''
 
     def item_exists(self, user_name, collection_name, item_id):
-        """Returns user infos. user is the key"""
+        ''
 
     def get_items(self, user_name, collection_name, fields=None):
-        """returns items from a collection"""
+        ''
 
     def get_item(self, user_name, collection_name, item_id, fields=None):
-        """returns one item"""
+        ''
 
     def set_item(self, user_name, collection_name, item_id, **values):
-        """Sets an item"""
+        ''
 
     def set_items(self, user_name, collection_name, item_id, items):
-        """Sets items"""
+        ''
 
     def delete_item(self, user_name, collection_name, item_id):
-        """Deletes an item"""
+        ''
 
     def delete_items(self, user_name, collection_name, item_ids=None):
-        """Deletes items. All items are removed unless item_ids is provided"""
+        ''
 
     def get_total_size(self, user_id):
-        """Returns total size"""
+        ''
 
     def get_collection_sizes(self, user_id):
-        """Returns total size"""
+        ''
+
+    def get_size_left(user_id):
+        ''
 
 
 class TestWeaveStorageBase(unittest.TestCase):

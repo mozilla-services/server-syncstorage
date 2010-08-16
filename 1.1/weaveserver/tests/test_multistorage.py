@@ -115,7 +115,10 @@ class Storage(object):
     def get_total_size(self, user_id):
         ''
 
-    def get_collection_sizes(self, request):
+    def get_collection_sizes(self, user_id):
+        ''
+
+    def get_size_left(self, user_id):
         ''
 
 

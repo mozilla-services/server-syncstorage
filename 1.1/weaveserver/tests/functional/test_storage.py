@@ -546,3 +546,15 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get('/1.0/tarek/info/quota')
         used, quota = json.loads(res.body)
         self.assertAlmostEquals(used, 0.026, 3)
+
+    def test_overquota(self):
+        self.app.app.storage.quota_size = 0.1
+        wbo = {'payload': 'XXX'}
+        wbo = json.dumps(wbo)
+        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        self.assertEquals(res.headers['X-Weave-Quota-Remaining'], '0.0765625')
+        self.app.app.storage.quota_size = 0
+        wbo = {'payload': 'XXX'}
+        wbo = json.dumps(wbo)
+        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+                           status=400)

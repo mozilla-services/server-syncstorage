@@ -46,7 +46,7 @@ from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 from weaveserver.util import convert_response, json_response, round_time
 from weaveserver.wbo import WBO
 from weaveserver.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
-                                   WEAVE_INVALID_WRITE)
+                                   WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
@@ -176,11 +176,24 @@ class StorageController(object):
 
         return json_response(res)
 
+    def _check_quota(self, request):
+        """Checks the quota.
+
+        If under the treshold, adds a header
+        If the quota is reached, issues a 400
+        """
+        user_id = request.sync_info['user_id']
+        left = self.storage.get_size_left(user_id)
+        if left <= 0.:  # no space left
+            raise HTTPBadRequest(WEAVE_OVER_QUOTA)
+        return left
+
     def set_item(self, request):
         """Sets a single WBO object."""
+        left = self._check_quota(request)
+        user_id = request.sync_info['user_id']
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
-        user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -199,7 +212,10 @@ class StorageController(object):
             wbo['modified'] = request.server_time
 
         res = self.storage.set_item(user_id, collection_name, item_id, **data)
-        return json_response(res)
+        response = json_response(res)
+        if left <= 1024:
+            response.headers['X-Weave-Quota-Remaining'] = str(left)
+        return response
 
     def delete_item(self, request):
         """Deletes a single WBO object."""
@@ -213,8 +229,9 @@ class StorageController(object):
 
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
-        collection_name = request.sync_info['collection']
         user_id = request.sync_info['user_id']
+        collection_name = request.sync_info['collection']
+
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -257,11 +274,15 @@ class StorageController(object):
             else:
                 kept_wbos.append(wbo)
 
+        left = self._check_quota(request)
         self.storage.set_items(user_id, collection_name, kept_wbos)
 
         # XXX how to get back the real successes w/o an extra query
         res['success'] = [wbo['id'] for wbo in kept_wbos]
-        return json_response(res)
+        response = json_response(res)
+        if left <= 1024:
+            response.headers['X-Weave-Quota-Remaining'] = str(left)
+        return response
 
     def delete_collection(self, request, ids=None, parentid=None, older=None,
                           newer=None, index_above=None, index_below=None,

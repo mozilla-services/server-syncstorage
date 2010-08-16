@@ -342,3 +342,17 @@ class WeaveStorage(Plugin):
         Returns:
             The size in Kbytes (float)
         """
+
+    @abc.abstractmethod
+    def get_size_left(self, user_id):
+        """Returns the remaining size in KB of a user storage.
+
+        The remaining size is calculated by substracting the
+        max size and the used size.
+
+        Args:
+            user_id: integer identifying the user in the storage.
+
+        Returns:
+            The remaining size in Kbytes (float)
+        """
