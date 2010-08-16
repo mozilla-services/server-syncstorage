@@ -115,6 +115,9 @@ class Storage(object):
     def get_total_size(self, user_id):
         ''
 
+    def get_collection_sizes(self, request):
+        ''
+
 
 class TestMultiStorage(unittest.TestCase):
 

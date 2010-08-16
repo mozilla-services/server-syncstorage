@@ -107,6 +107,9 @@ class IAmAValidStorage(object):
     def get_total_size(self, user_id):
         """Returns total size"""
 
+    def get_collection_sizes(self, user_id):
+        """Returns total size"""
+
 
 class TestWeaveStorageBase(unittest.TestCase):
 

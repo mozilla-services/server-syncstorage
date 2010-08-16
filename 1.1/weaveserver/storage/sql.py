@@ -90,6 +90,10 @@ _DELETE_ITEMS = delete(wbo,
 _USER_STORAGE_SIZE = select([func.sum(wbo.c.payload_size)],
                             wbo.c.username == bindparam('user_id'))
 
+_COLLECTIONS_STORAGE_SIZE = select([wbo.c.collection,
+            func.sum(wbo.c.payload_size)],
+            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
+
 _KB = float(1024)
 
 
@@ -318,6 +322,18 @@ class WeaveSQLStorage(object):
         if stamp is None:
             return None
         return bigint2time(stamp)
+
+    def get_collection_sizes(self, user_id):
+        """Returns the total size in KB for each collection of a user storage.
+
+        The size is the sum of stored payloads.
+        """
+        # XXX returning in KB -- ask Toby (PHP returns bytes)
+        if not self.use_quota:
+            return dict()
+        res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id)
+        return dict([(self._collid2name(user_id, col[0]), col[1] / _KB)
+                     for col in res])
 
     #
     # Items APIs

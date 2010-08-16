@@ -69,6 +69,8 @@ URLS = [('GET', '/', 'storage', 'index', True),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',
          'storage', 'get_collections_count', True),
         ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota', True),
+        ('GET', '/_API_/_USERNAME_/info/collections_usage', 'storage',
+         'get_collection_sizes', True),
         # XXX empty collection call
         ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage', True),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',

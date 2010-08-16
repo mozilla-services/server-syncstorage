@@ -47,7 +47,7 @@ def _prepare_apis(name, bases, attrs):
             'get_collections', 'get_collection_names', 'get_item',
             'get_collection_timestamps', 'get_collection_counts',
             'get_collection_max_timestamp', 'item_exists', 'get_items',
-            'get_total_size')
+            'get_total_size', 'get_collection_sizes')
 
     write = ('set_user', 'delete_user', 'delete_storage', 'delete_collection',
              'set_collection', 'set_item', 'set_items', 'delete_items',

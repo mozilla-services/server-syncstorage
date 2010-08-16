@@ -108,6 +108,10 @@ class StorageController(object):
         used = self.storage.get_total_size(user_id)
         return json_response((used, self.storage.quota_size))
 
+    def get_collection_sizes(self, request):
+        user_id = request.sync_info['user_id']
+        return json_response(self.storage.get_collection_sizes(user_id))
+
     # XXX see if we want to use kwargs here instead
     def get_collection(self, request, ids=None, predecessorid=None,
                        parentid=None, older=None, newer=None, full=False,

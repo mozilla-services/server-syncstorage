@@ -218,6 +218,17 @@ class WeaveStorage(Plugin):
             collection.
         """
 
+    @abc.abstractmethod
+    def get_collection_sizes(self, user_id):
+        """Returns the total size in KB for each collection of a user storage.
+
+        Args:
+            user_id: integer identifying the user in the storage.
+
+        Returns:
+            A dict containing the name and size for each collection.
+        """
+
     #
     # Items APIs
     #

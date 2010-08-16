@@ -334,6 +334,15 @@ class TestStorage(support.TestWsgiApp):
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.app.get('/1.0/tarek/storage/col2/two', status=404)
 
+        # testing the collection usage API
+        res = self.app.get('/1.0/tarek/info/collections_usage')
+        usage = json.loads(res.body)
+
+        col1_size = usage['col1'] * 1024
+        col2_size = usage['col2'] * 1024
+        self.assertEqual(col1_size, 9)
+        self.assertEqual(col2_size, 27)
+
     def test_delete_collection(self):
         self.storage.delete_items(1, 'col2')
 
