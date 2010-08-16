@@ -94,7 +94,8 @@ _KB = float(1024)
 
 class WeaveSQLStorage(object):
 
-    def __init__(self, sqluri=_SQLURI, standard_collections=False, quota=0):
+    def __init__(self, sqluri=_SQLURI, standard_collections=False,
+                 use_quota=False, quota_size=0):
         self.sqluri = sqluri
         self._engine = create_engine(sqluri, pool_size=20)
         for table in tables:
@@ -103,7 +104,8 @@ class WeaveSQLStorage(object):
         self._user_collections = {}
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
-        self.quota = long(quota)
+        self.use_quota = use_quota
+        self.quota_size = quota_size
 
     @classmethod
     def get_name(cls):
@@ -413,7 +415,8 @@ class WeaveSQLStorage(object):
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
-        if 'payload' in values and 'payload_size' not in values:
+        if (self.use_quota and 'payload' in values and
+            'payload_size' not in values):
             values['payload_size'] = len(values['payload'])
 
         if modified is None:   # does not exists
@@ -484,7 +487,7 @@ class WeaveSQLStorage(object):
                 'modified%d' % num not in values):
                 values['modified%d' % num] = time2bigint(time())
 
-            if ('payload%d' % num in values and
+            if (self.use_quota and 'payload%d' % num in values and
                 'payload_size%d' % num not in values):
                 size = len(values['payload%d' % num])
                 values['payload_size%d' % num] = size
@@ -570,6 +573,8 @@ class WeaveSQLStorage(object):
 
         The size is the sum of stored payloads.
         """
+        if not self.use_quota:
+            return 0.0
         res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id)
         res = res.fetchone()
         if res is None:

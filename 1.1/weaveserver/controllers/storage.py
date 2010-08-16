@@ -103,9 +103,11 @@ class StorageController(object):
         return response
 
     def get_quota(self, request):
+        if not self.storage.use_quota:
+            return json_response((0.0, 0))
         user_id = request.sync_info['user_id']
         used = self.storage.get_total_size(user_id)
-        return json_response((used, self.storage.quota))
+        return json_response((used, self.storage.quota_size))
 
     # XXX see if we want to use kwargs here instead
     def get_collection(self, request, ids=None, predecessorid=None,
