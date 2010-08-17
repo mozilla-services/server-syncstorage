@@ -1,7 +1,7 @@
 VIRTUALENV = virtualenv
 BIN = bin
 
-.PHONY: all build check coverage test mysqltest redisqltest
+.PHONY: all build check coverage test mysqltest redisqltest doc
 
 all:	build test
 
@@ -27,4 +27,7 @@ mysqltest:
 
 redisqltest:
 	WEAVE_TESTFILE=redisql $(BIN)/nosetests -s weaveserver
+
+doc:
+	$(BIN)/sphinx-build doc/source/ doc/build/
 
