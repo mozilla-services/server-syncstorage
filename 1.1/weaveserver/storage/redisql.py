@@ -217,7 +217,7 @@ class RediSQLStorage(WeaveSQLStorage):
         for item_id in self._conn.smembers(_key('tabs', user_id)):
             tab_size = self._conn.get(_key('tabs', 'size', user_id, item_id))
             if tab_size is not None:
-                tabs_size += tab_size
+                tabs_size += int(tab_size)
 
         return size + tabs_size / _KB
 
@@ -229,7 +229,7 @@ class RediSQLStorage(WeaveSQLStorage):
         for item_id in self._conn.smembers(_key('tabs', user_id)):
             tab_size = self._conn.get(_key('tabs', 'size', user_id, item_id))
             if tab_size is not None:
-                tabs_size += tab_size
+                tabs_size += int(tab_size)
 
         sizes['tabs'] = tabs_size
         return sizes
