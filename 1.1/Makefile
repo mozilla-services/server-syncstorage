@@ -1,7 +1,7 @@
 VIRTUALENV = virtualenv
 BIN = bin
 
-.PHONY: all build check coverage test mysqltest
+.PHONY: all build check coverage test mysqltest redisqltest
 
 all:	build test
 
