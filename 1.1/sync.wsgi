@@ -37,6 +37,7 @@
 import os
 import sys
 import site
+from logging.config import fileConfig
 
 # detecting if virtualenv was used in this dir
 _CURDIR = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +61,10 @@ sys.path[:] = saved
 # setting up the egg cache to a place where apache can write
 os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 
+# setting up logging
+ini_file = os.path.join(_CURDIR, 'development.ini')
+fileConfig(ini_file)
+
 # running the app using Paste
 from paste.deploy import loadapp
-application = loadapp('config:%s'% os.path.join(_CURDIR, 'development.ini'))
+application = loadapp('config:%s'% ini_file)
