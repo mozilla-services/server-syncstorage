@@ -25,3 +25,6 @@ test:
 mysqltest:
 	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s weaveserver
 
+redisqltest:
+	WEAVE_TESTFILE=redisql $(BIN)/nosetests -s weaveserver
+

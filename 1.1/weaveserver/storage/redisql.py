@@ -213,18 +213,23 @@ class RediSQLStorage(WeaveSQLStorage):
         size = super(RediSQLStorage, self).get_total_size(user_id)
 
         # add the tabs sizes, if any
-        tabs = 0
+        tabs_size = 0
         for item_id in self._conn.smembers(_key('tabs', user_id)):
-            tabs += self._conn.get(_key('tabs', 'size', user_id, item_id))
+            tab_size = self._conn.get(_key('tabs', 'size', user_id, item_id))
+            if tab_size is not None:
+                tabs_size += tab_size
 
-        return size + tabs / _KB
+        return size + tabs_size / _KB
 
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.
         """
         sizes = super(RediSQLStorage, self).get_collection_sizes(user_id)
-        tabs = 0
+        tabs_size = 0
         for item_id in self._conn.smembers(_key('tabs', user_id)):
-            tabs += self._conn.get(_key('tabs', 'size', user_id, item_id))
-        sizes['tabs'] = tabs
+            tab_size = self._conn.get(_key('tabs', 'size', user_id, item_id))
+            if tab_size is not None:
+                tabs_size += tab_size
+
+        sizes['tabs'] = tabs_size
         return sizes
