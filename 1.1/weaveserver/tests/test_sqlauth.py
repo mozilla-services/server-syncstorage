@@ -39,11 +39,9 @@ import datetime
 from sqlalchemy.sql import text
 
 from weaveserver.tests.support import initenv
-
 from weaveserver.auth.sql import SQLAuth
 from weaveserver.auth import WeaveAuth
 from weaveserver.util import ssha
-from weaveserver.tests.support import initenv
 
 WeaveAuth.register(SQLAuth)
 

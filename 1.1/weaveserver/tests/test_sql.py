@@ -35,8 +35,6 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 import os
-from ConfigParser import RawConfigParser
-
 from weaveserver.tests.support import initenv
 
 _UID = 1
