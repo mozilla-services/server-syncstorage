@@ -39,6 +39,8 @@ Application entry point.
 import time
 
 from paste.translogger import TransLogger
+from paste.exceptions.errormiddleware import ErrorMiddleware
+
 from repoze.profile.profiler import AccumulatingProfileMiddleware
 from routes import Mapper, URLGenerator
 
@@ -222,5 +224,9 @@ def make_app(global_conf, **app_conf):
                                          discard_first_request=True,
                                          flush_at_shutdown=True,
                                          path='/__profile__')
+
+    if params.get('debug', False):
+        app = ErrorMiddleware(app, debug=True,
+                              show_exceptions_in_wsgi_errors=True)
 
     return app
