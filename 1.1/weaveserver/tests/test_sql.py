@@ -37,31 +37,18 @@ import unittest
 import os
 from ConfigParser import RawConfigParser
 
-import weaveserver
-from weaveserver.storage.sql import WeaveSQLStorage
-from weaveserver.storage import WeaveStorage
+from weaveserver.tests.support import initenv
 
 _UID = 1
-
-# manual registration
-WeaveStorage.register(WeaveSQLStorage)
-
-_WEAVEDIR = os.path.dirname(weaveserver.__file__)
-_TOPDIR = os.path.split(_WEAVEDIR)[0]
-if 'WEAVE_TESTFILE' in os.environ:
-    _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
-                             os.environ['WEAVE_TESTFILE'])
-else:
-    _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
 
 
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        cfg = RawConfigParser()
-        cfg.read(_INI_FILE)
-        config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
-        self.storage = WeaveStorage.get_from_config(config)
+        self.appdir, self.config, self.storage, self.auth = initenv()
+        # we don't support other storages for this test
+        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
+
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history'):

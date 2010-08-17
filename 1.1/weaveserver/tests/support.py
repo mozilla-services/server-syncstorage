@@ -33,39 +33,37 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-""" Base test class, with an instanciated app.
-"""
+from ConfigParser import RawConfigParser
 import os
-import unittest
+from logging.config import fileConfig
 
-from webtest import TestApp
+from weaveserver.storage import WeaveStorage
+from weaveserver.auth import WeaveAuth
+import weaveserver
 
-from weaveserver.tests.support import initenv
-from weaveserver.wsgiapp import make_app
+_WEAVEDIR = os.path.dirname(weaveserver.__file__)
+_TOPDIR = os.path.split(_WEAVEDIR)[0]
+if 'WEAVE_TESTFILE' in os.environ:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
+                             os.environ['WEAVE_TESTFILE'])
+else:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
 
 
-class TestWsgiApp(unittest.TestCase):
+def initenv():
+    """Reads the config file and instanciates an auth and a storage.
 
-    def setUp(self):
-        # loading the app
-        self.appdir, self.config, self.storage, self.auth = initenv()
-        # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
-        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
-        self.app = TestApp(make_app(self.config))
+    The WEAVE_TESTFILE=name environment variable can be used to point
+    a particular tests_name.ini file.
+    """
+    cfg = RawConfigParser()
+    cfg.read(_INI_FILE)
 
-        # adding a user (sql)
-        self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
-        self.user_id = self.auth.get_user_id('tarek')
+    # loading loggers
+    if cfg.has_section('loggers'):
+        fileConfig(_INI_FILE)
 
-    def tearDown(self):
-        cef_logs = os.path.join(self.appdir, 'test_cef.log')
-        if os.path.exists(cef_logs):
-            os.remove(cef_logs)
-
-        if os.path.exists(self.sqlfile):
-            os.remove(self.sqlfile)
-        else:
-            self.auth._engine.execute('truncate users')
-            self.auth._engine.execute('truncate collections')
-            self.auth._engine.execute('truncate wbo')
+    config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
+    storage = WeaveStorage.get_from_config(config)
+    auth = WeaveAuth.get_from_config(config)
+    return _TOPDIR, config, storage, auth

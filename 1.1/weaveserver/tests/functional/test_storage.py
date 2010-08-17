@@ -109,7 +109,8 @@ class TestStorage(support.TestWsgiApp):
         # Returns the ids for objects in the collection that
         # are directly preceded by the id given. Usually only returns one
         # result.
-        self.storage.set_item(1, 'col2', '125', predecessorid='XXXX')
+        self.storage.set_item(self.user_id, 'col2', '125',
+                              predecessorid='XXXX')
         res = self.app.get('/1.0/tarek/storage/col2?predecessorid=XXXX')
         res = json.loads(res.body)
         self.assertEquals(res, ['125'])
@@ -117,8 +118,10 @@ class TestStorage(support.TestWsgiApp):
         # "parentid"
         # Returns the ids for objects in the collection that are the children
         # of the parent id given.
-        self.storage.set_item(1, 'col2', '126', parentid='papa', payload='x')
-        self.storage.set_item(1, 'col2', '127', parentid='papa', payload='x')
+        self.storage.set_item(self.user_id, 'col2', '126', parentid='papa',
+                              payload='x')
+        self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
+                              payload='x')
         res = self.app.get('/1.0/tarek/storage/col2?parentid=papa')
         res = json.loads(res.body)
         res.sort()
@@ -127,11 +130,11 @@ class TestStorage(support.TestWsgiApp):
         # "older"
         # Returns only ids for objects in the collection that have been last
         # modified before the date given.
-        self.storage.delete_items(1, 'col2')
-        ts = self.storage.set_item(1, 'col2', '128', payload='x')
+        self.storage.delete_items(self.user_id, 'col2')
+        ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
         fts = json.dumps(ts)
         time.sleep(0.2)
-        ts2 = self.storage.set_item(1, 'col2', '129', payload='x')
+        ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
         fts2 = json.dumps(ts2)
 
         self.assertTrue(fts < fts2)
@@ -163,8 +166,8 @@ class TestStorage(support.TestWsgiApp):
         # "index_above"
         # If defined, only returns items with a higher sortindex than the
         # value specified.
-        self.storage.set_item(1, 'col2', '130', sortindex=11)
-        self.storage.set_item(1, 'col2', '131', sortindex=9)
+        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
+        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
         res = self.app.get('/1.0/tarek/storage/col2?index_above=10')
         res = json.loads(res.body)
         self.assertEquals(res, ['130'])
@@ -178,10 +181,10 @@ class TestStorage(support.TestWsgiApp):
 
         # "limit"
         # Sets the maximum number of ids that will be returned
-        self.storage.delete_items(1, 'col2')
+        self.storage.delete_items(self.user_id, 'col2')
 
         for i in range(10):
-            self.storage.set_item(1, 'col2', str(i))
+            self.storage.set_item(self.user_id, 'col2', str(i))
         res = self.app.get('/1.0/tarek/storage/col2?limit=2')
         res = json.loads(res.body)
         self.assertEquals(len(res), 2)
@@ -205,11 +208,11 @@ class TestStorage(support.TestWsgiApp):
         #   'oldest' - Orders by modification date (oldest first)
         #   'newest' - Orders by modification date (newest first)
         #   'index' - Orders by the sortindex descending (highest weight first)
-        self.storage.delete_items(1, 'col2')
+        self.storage.delete_items(self.user_id, 'col2')
 
         for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
-            self.storage.set_item(1, 'col2', index, sortindex=sortindex,
-                                  payload='x')
+            self.storage.set_item(self.user_id, 'col2', index,
+                                  sortindex=sortindex, payload='x')
             time.sleep(0.1)
 
         res = self.app.get('/1.0/tarek/storage/col2?sort=oldest')
@@ -334,17 +337,22 @@ class TestStorage(support.TestWsgiApp):
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.app.get('/1.0/tarek/storage/col2/two', status=404)
 
-        # testing the collection usage API
+    def test_collection_sizes(self):
+        self.storage.delete_storage(self.user_id)
+
+        wbo1 = {'id': 13, 'payload': 'XyX'}
+        wbo2 = {'id': 14, 'payload': 'XXX'}
+        wbos = json.dumps([wbo1, wbo2])
+        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+
         res = self.app.get('/1.0/tarek/info/collections_usage')
         usage = json.loads(res.body)
-
-        col1_size = usage['col1'] * 1024
-        col2_size = usage['col2'] * 1024
-        self.assertEqual(col1_size, 9)
-        self.assertEqual(col2_size, 27)
+        col2_size = usage['col2']
+        wanted = len(wbo1['payload']) + len(wbo2['payload'])
+        self.assertEqual(col2_size, wanted / 1024.)
 
     def test_delete_collection(self):
-        self.storage.delete_items(1, 'col2')
+        self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': 'XXX'}
@@ -428,8 +436,8 @@ class TestStorage(support.TestWsgiApp):
         # Only delete objects with a higher sortindex than the value
         # specified
         self.app.delete('/1.0/tarek/storage/col2')
-        self.storage.set_item(1, 'col2', '130', sortindex=11)
-        self.storage.set_item(1, 'col2', '131', sortindex=9)
+        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
+        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
         res = self.app.delete('/1.0/tarek/storage/col2?index_above=10')
         res = self.app.get('/1.0/tarek/storage/col2')
         res = json.loads(res.body)
@@ -439,8 +447,8 @@ class TestStorage(support.TestWsgiApp):
         # Only delete objects with a lower sortindex than the value
         # specified.
         self.app.delete('/1.0/tarek/storage/col2')
-        self.storage.set_item(1, 'col2', '130', sortindex=11)
-        self.storage.set_item(1, 'col2', '131', sortindex=9)
+        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
+        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
         res = self.app.delete('/1.0/tarek/storage/col2?index_below=10')
         res = self.app.get('/1.0/tarek/storage/col2')
         res = json.loads(res.body)
@@ -467,7 +475,7 @@ class TestStorage(support.TestWsgiApp):
         # check this with toby
 
     def test_delete_item(self):
-        self.storage.delete_items(1, 'col2')
+        self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': 'XXX'}
@@ -487,7 +495,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete('/1.0/tarek/storage/col2/12982')
 
     def test_delete_storage(self):
-        self.storage.delete_items(1, 'col2')
+        self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': 'XXX'}

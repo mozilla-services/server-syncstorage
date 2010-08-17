@@ -38,9 +38,12 @@ import datetime
 
 from sqlalchemy.sql import text
 
+from weaveserver.tests.support import initenv
+
 from weaveserver.auth.sql import SQLAuth
 from weaveserver.auth import WeaveAuth
 from weaveserver.util import ssha
+from weaveserver.tests.support import initenv
 
 WeaveAuth.register(SQLAuth)
 
@@ -48,7 +51,10 @@ WeaveAuth.register(SQLAuth)
 class TestSQLAuth(unittest.TestCase):
 
     def setUp(self):
-        self.auth = WeaveAuth.get('sql', sqluri='sqlite:///:memory:')
+        self.appdir, self.config, self.storage, self.auth = initenv()
+        # we don't support other storages for this test
+        assert self.auth.sqluri.split(':/')[0] in ('mysql', 'sqlite')
+
         # lets add a user tarek/tarek
         password = ssha('tarek')
         query = text('insert into users (username, password_hash) '

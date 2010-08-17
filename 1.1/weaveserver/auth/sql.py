@@ -77,6 +77,7 @@ class SQLAuth(object):
         self.captcha_private_key = captcha_private_key
         self.captcha_use_ssl = captcha_use_ssl
         self.captcha = captcha
+        self.sqluri = sqluri
 
     @classmethod
     def get_name(self):

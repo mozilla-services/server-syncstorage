@@ -331,7 +331,7 @@ class WeaveSQLStorage(object):
         if not self.use_quota:
             return dict()
         res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id)
-        return dict([(self._collid2name(user_id, col[0]), col[1] / _KB)
+        return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
                      for col in res])
 
     #
@@ -431,8 +431,7 @@ class WeaveSQLStorage(object):
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
-        if (self.use_quota and 'payload' in values and
-            'payload_size' not in values):
+        if self.use_quota and 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
         if modified is None:   # does not exists
@@ -503,8 +502,7 @@ class WeaveSQLStorage(object):
                 'modified%d' % num not in values):
                 values['modified%d' % num] = time2bigint(time())
 
-            if (self.use_quota and 'payload%d' % num in values and
-                'payload_size%d' % num not in values):
+            if self.use_quota and 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
                 values['payload_size%d' % num] = size
 
@@ -593,10 +591,9 @@ class WeaveSQLStorage(object):
             return 0.0
         res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id)
         res = res.fetchone()
-        if res is None:
+        if res is None or res[0] is None:
             return 0.0
-
-        return res[0] / _KB
+        return int(res[0]) / _KB
 
     def get_size_left(self, user_id):
         """Returns the storage left for a user"""

@@ -1,6 +1,8 @@
 VIRTUALENV = virtualenv
 BIN = bin
 
+.PHONY: all build check coverage test mysqltest
+
 all:	build test
 
 build:
@@ -19,3 +21,7 @@ coverage:
 
 test:
 	$(BIN)/nosetests -s weaveserver
+
+mysqltest:
+	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s weaveserver
+
