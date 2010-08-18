@@ -154,7 +154,6 @@ class SyncServerApp(object):
 
         request.server_time = float('%.2f' % time.time())
         request.config = self.config
-
         match = self.mapper.routematch(environ=request.environ)
         if match is None:
             return HTTPNotFound()
@@ -215,7 +214,8 @@ def make_app(global_conf, **app_conf):
     app = SyncServerApp(params)
 
     if params.get('translogger', False):
-        app = TransLogger(app, logger_name='weaveserver')
+        app = TransLogger(app, logger_name='weaveserver',
+                          setup_console_handler=True)
 
     if params.get('profile', False):
         app = AccumulatingProfileMiddleware(app,
