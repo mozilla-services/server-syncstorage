@@ -100,9 +100,11 @@ _KB = float(1024)
 class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
-                 use_quota=False, quota_size=0):
+                 use_quota=False, quota_size=0, pool_size=100,
+                 pool_recycle=3600):
         self.sqluri = sqluri
-        self._engine = create_engine(sqluri, pool_size=20, pool_recycle=3600)
+        self._engine = create_engine(sqluri, pool_size=int(pool_size),
+                                     pool_recycle=int(pool_recycle))
         for table in tables:
             table.metadata.bind = self._engine
             table.create(checkfirst=True)

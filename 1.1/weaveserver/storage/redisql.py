@@ -76,10 +76,12 @@ class RediSQLStorage(WeaveSQLStorage):
     """
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
-                 use_quota=False, quota_size=0, redis_host='localhost',
+                 use_quota=False, quota_size=0, pool_size=100,
+                 pool_recycle=3600, redis_host='localhost',
                  redis_port=6379):
         super(RediSQLStorage, self).__init__(sqluri, standard_collections,
-                                             use_quota, quota_size)
+                                             use_quota, quota_size, pool_size,
+                                             pool_recycle)
         self._conn = GracefulRedisServer(host=redis_host, port=redis_port)
         self._conn.ping()  # will generate a connection error if down
 
