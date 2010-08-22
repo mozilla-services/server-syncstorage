@@ -283,9 +283,6 @@ class WeaveSQLStorage(object):
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        # XXX doing a call on two tables to get the collection name
-        # see if a client-side (eg this code) list of collections
-        # makes things faster but I doubt it
         res = self._engine.execute(_COLLECTION_STAMPS,
                                    user_id=user_id)
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
