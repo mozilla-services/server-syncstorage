@@ -38,7 +38,7 @@ Various utilities
 """
 import random
 import string
-from hashlib import sha1
+from hashlib import sha256
 import base64
 import simplejson as json
 
@@ -170,17 +170,18 @@ def round_time(value):
 
 
 def ssha(password, salt=None):
-    """Returns a Salted-SHA1 password"""
+    """Returns a Salted-SHA256 password"""
     if salt is None:
         salt = ''.join([random.choice(string.letters + string.digits)
                         for i in range(32)])
-    ssha = base64.encodestring(sha1(password + salt).digest() + salt).strip()
-    return "{SSHA}%s" % ssha
+    ssha = base64.encodestring(sha256(password + salt).digest()
+                               + salt).strip()
+    return "{SSHA-256}%s" % ssha
 
 
 def validate_password(clear, hash):
-    """Returns a Salted-SHA1 password"""
-    real_hash = hash.split('{SSHA}')[-1]
+    """Validates a Salted-SHA256 password"""
+    real_hash = hash.split('{SSHA-256}')[-1]
     salt = base64.decodestring(real_hash)[-32:]
     password = ssha(clear, salt)
     return password == hash
