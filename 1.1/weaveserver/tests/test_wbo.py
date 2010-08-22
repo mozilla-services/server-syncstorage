@@ -67,6 +67,13 @@ class TestWBO(unittest.TestCase):
         result, failure = wbo.validate()
         self.assertFalse(result)
 
+        data = {'parentid':  33, 'sortindex': '12'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+        self.assertEquals(wbo['parentid'], '33')
+        self.assertEquals(wbo['sortindex'], 12)
+
 
 def test_suite():
     suite = unittest.TestSuite()

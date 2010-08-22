@@ -65,8 +65,10 @@ class WBO(dict):
         for field in ('parentid', 'id', 'predecessorid'):
             if field not in self:
                 continue
-            if len(str(self[field])) > 64:
+            value = str(self[field])
+            if len(value) > 64:
                 return False, 'invalid %s' % field
+            self[field] = value
 
         for field in ('sortindex',):
             if field not in self:
