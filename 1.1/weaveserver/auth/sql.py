@@ -97,7 +97,7 @@ class SQLAuth(object):
         """Creates a user. Returns True on success."""
         password_hash = ssha(password)
         query = insert(users).values(username=user_name, email=email,
-                                     password_hash=password_hash, status=1)
+                                     password_hash=password_hash, status=0)
         res = self._engine.execute(query)
         return res.rowcount == 1
 
