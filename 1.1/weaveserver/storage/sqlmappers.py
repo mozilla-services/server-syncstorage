@@ -61,7 +61,7 @@ class Users(_Base):
     username = Column(String(32))
     password_hash = Column(String(128))
     email = Column(String(64))
-    status = Column(Integer)
+    status = Column(Integer, default=0)
     alert = Column(Text)
     reset = Column(String(32))
     reset_expiration = Column(DateTime())

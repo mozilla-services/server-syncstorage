@@ -57,7 +57,7 @@ _USER_ID = select([users.c.id], users.c.username == bindparam('user_name'))
 _USER_INFO = select([users.c.username, users.c.email],
                     users.c.id == bindparam('user_id'))
 
-_USER_AUTH = select([users.c.id, users.c.password_hash],
+_USER_AUTH = select([users.c.id, users.c.password_hash, users.c.status],
                     users.c.username == bindparam('user_name'))
 
 _USER_RESET_CODE = select([users.c.reset_expiration, users.c.reset],
@@ -108,6 +108,9 @@ class SQLAuth(object):
         user = self._engine.execute(_USER_AUTH,
                                     user_name=user_name).fetchone()
         if user is None:
+            return None
+
+        if user.status == 1:  # user is disabled
             return None
 
         if validate_password(password, user.password_hash):

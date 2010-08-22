@@ -55,9 +55,12 @@ class TestSQLAuth(unittest.TestCase):
 
         # lets add a user tarek/tarek
         password = ssha('tarek')
-        query = text('insert into users (username, password_hash) '
-                     'values (:username, :password)')
+        query = text('insert into users (username, password_hash, status) '
+                     'values (:username, :password, 0)')
         self.auth._engine.execute(query, username='tarek', password=password)
+
+    def tearDown(self):
+        self.auth._engine.execute('delete from users')
 
     def test_authenticate_user(self):
         self.assertEquals(self.auth.authenticate_user('tarek', 'xxx'), None)
@@ -84,6 +87,11 @@ class TestSQLAuth(unittest.TestCase):
                  'where id = 1')
         self.auth._engine.execute(text(query), expiration=expiration)
         self.assertFalse(self.auth.verify_reset_code(1, code))
+
+    def test_status(self):
+        # people with status '1' are disabled
+        self.auth._engine.execute('update users set status=1')
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), None)
 
 
 def test_suite():
