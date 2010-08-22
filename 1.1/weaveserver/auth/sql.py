@@ -71,7 +71,8 @@ class SQLAuth(object):
                  captcha_public_key=None, captcha_private_key=None,
                  captcha_use_ssl=False, pool_size=20, pool_recycle=3600):
         self._engine = create_engine(sqluri, pool_size=int(pool_recycle),
-                                     pool_recycle=int(pool_size))
+                                     pool_recycle=int(pool_size),
+                                     logging_name='weaveserver')
         users.metadata.bind = self._engine
         users.create(checkfirst=True)
         self.captcha_public_key = captcha_public_key
