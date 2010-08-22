@@ -122,8 +122,7 @@ class StorageController(object):
         # unknown values)
         filters = {}
         if ids is not None:
-            ids = [int(id_) for id_ in ids.split(',')]
-            filters['id'] = 'in', ids
+            filters['id'] = 'in', ids.split(',')
         if predecessorid is not None:
             filters['predecessorid'] = '=', predecessorid
         if parentid is not None:
