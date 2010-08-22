@@ -70,11 +70,9 @@ class TestStorage(support.TestWsgiApp):
         resp = self.app.get('/1.0/tarek/info/collections')
         res = json.loads(resp.body)
         keys = res.keys()
-        keys.sort()
-        # standard collections + custom ones
-        wanted = ['client', 'col1', 'col2', 'crypto', 'forms', 'history']
-        self.assertEquals(keys, wanted)
-        self.assertEquals(int(resp.headers['X-Weave-Records']), 6)
+        self.assertTrue('col1' in keys)
+        self.assertTrue('col1' in keys)
+        self.assertEquals(int(resp.headers['X-Weave-Records']), len(keys))
 
         # XXX need to test collections timestamps here
 
