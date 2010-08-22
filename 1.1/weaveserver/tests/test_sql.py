@@ -49,7 +49,8 @@ class TestSQLStorage(unittest.TestCase):
 
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         # make sure we have the standard collections in place
-        for name in ('client', 'crypto', 'forms', 'history'):
+        for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
+                     'bookmarks', 'prefs', 'tabs', 'passwords'):
             self.storage.set_collection(_UID, name)
 
     def tearDown(self):
@@ -71,7 +72,7 @@ class TestSQLStorage(unittest.TestCase):
         res = self.storage.get_user(_UID, fields=['email'])
         self.assertEquals(res, (u'tarek2@ziade.org',))
         res = self.storage.get_user(_UID)
-        self.assertEquals(res, (1, u'tarek', None, u'tarek2@ziade.org', None,
+        self.assertEquals(res, (1, u'tarek', None, u'tarek2@ziade.org', 0,
                                 None, None, None))
 
     def test_collections(self):
@@ -82,7 +83,7 @@ class TestSQLStorage(unittest.TestCase):
 
         res = self.storage.get_collection(_UID, 'My collection').items()
         res.sort()
-        wanted = [('collectionid', 5), ('name', u'My collection'),
+        wanted = [('collectionid', 11), ('name', u'My collection'),
                   ('userid', 1)]
         self.assertEquals(res, wanted)
         res = self.storage.get_collection(_UID, 'My collection',
@@ -90,7 +91,7 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(res, {'name': 'My collection'})
 
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 5)
+        self.assertEquals(len(res), 11)
         res = res[-1].items()
         res.sort()
         self.assertEquals(res, wanted)
@@ -103,16 +104,16 @@ class TestSQLStorage(unittest.TestCase):
         # adding a new collection
         self.storage.set_collection(_UID, 'My collection 2')
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 6)
+        self.assertEquals(len(res), 12)
 
         names = self.storage.get_collection_names(_UID)
-        self.assertEquals(names[-2:], [(5, 'My collection'),
-                                       (6, 'My collection 2')])
+        self.assertEquals(names[-2:], [(11, 'My collection'),
+                                       (12, 'My collection 2')])
 
         # removing a collection
         self.storage.delete_collection(_UID, 'My collection 2')
         res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 5)
+        self.assertEquals(len(res), 11)
 
         # removing *all*
         self.storage.delete_storage(_UID)
@@ -153,14 +154,13 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
         self.storage.set_collection(_UID, 'col2')
-
         self.storage.set_item(_UID, 'col1', 1, payload='XXX')
         self.storage.set_item(_UID, 'col2', 1, payload='XXX')
 
         timestamps = self.storage.get_collection_timestamps(_UID)
         names = timestamps.keys()
-        names.sort()
-        self.assertEquals(names[:2], ['col1', 'col2'])
+        self.assertTrue('col1' in names)
+        self.assertTrue('col2' in names)
         col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
         self.assertAlmostEquals(col1, timestamps['col2'])
 
