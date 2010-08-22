@@ -126,10 +126,6 @@ class RediSQLStorage(WeaveSQLStorage):
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        values['collection'] = self._get_collection_id(user_id,
-                                                       collection_name)
-        values['id'] = item_id
-        values['username'] = user_id
         if 'payload' in values and 'modified' not in values:
             values['modified'] = time()
 

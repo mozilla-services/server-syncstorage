@@ -193,6 +193,7 @@ class StorageController(object):
         user_id = request.sync_info['user_id']
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
+
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -261,7 +262,6 @@ class StorageController(object):
                 res['failed'][''] = ['invalid id']
                 continue
 
-            wbo['collection'] = collection_name
             if self._has_modifiers(wbo):
                 wbo['modified'] = request.server_time
 

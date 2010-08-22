@@ -160,7 +160,7 @@ class TestSQLStorage(unittest.TestCase):
         timestamps = self.storage.get_collection_timestamps(_UID)
         names = timestamps.keys()
         names.sort()
-        self.assertEquals(names[:3], ['client', 'col1', 'col2'])
+        self.assertEquals(names[:2], ['col1', 'col2'])
         col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
         self.assertAlmostEquals(col1, timestamps['col2'])
 

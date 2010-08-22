@@ -47,7 +47,10 @@ from weaveserver.util import time2bigint, bigint2time
 from weaveserver.wbo import WBO
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history'}
+_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
+                         5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
+                         9: 'tabs', 10: 'passwords'}
+
 _STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
@@ -67,8 +70,8 @@ _COLLECTION_EXISTS = select([collections.c.collectionid], _USER_N_COLL)
 _COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
                             collections.c.userid == bindparam('user_id'))
 
-_COLLECTION_STAMPS = select([collections.c.name, func.max(wbo.c.modified)],
-    collections.c.userid == bindparam('user_id')).group_by(collections.c.name)
+_COLLECTION_STAMPS = select([wbo.c.collection, func.max(wbo.c.modified)],
+            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
 
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
@@ -104,7 +107,8 @@ class WeaveSQLStorage(object):
                  pool_recycle=3600):
         self.sqluri = sqluri
         self._engine = create_engine(sqluri, pool_size=int(pool_size),
-                                     pool_recycle=int(pool_recycle))
+                                     pool_recycle=int(pool_recycle),
+                                     logging_name='weaveserver')
         for table in tables:
             table.metadata.bind = self._engine
             table.create(checkfirst=True)
@@ -284,8 +288,8 @@ class WeaveSQLStorage(object):
         # makes things faster but I doubt it
         res = self._engine.execute(_COLLECTION_STAMPS,
                                    user_id=user_id)
-        return dict([(name, bigint2time(stamp))
-                     for name, stamp in res])
+        return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
+                     for coll_id, stamp in res])
 
     def _collid2name(self, user_id, collection_id):
         if (self.standard_collections and
@@ -305,14 +309,12 @@ class WeaveSQLStorage(object):
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
+        res = self._engine.execute(_COLLECTION_COUNTS, user_id=user_id)
         try:
-            res = [(self._collid2name(user_id, collid), count)
-                    for collid, count in
-                   self._engine.execute(_COLLECTION_COUNTS, user_id=user_id)]
+            return dict([(self._collid2name(user_id, collid), count)
+                         for collid, count in res])
         finally:
             self._purge_user_collections(user_id)
-
-        return dict(res)
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
@@ -436,10 +438,20 @@ class WeaveSQLStorage(object):
         if self.use_quota and 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
+        collection_id = self._get_collection_id(user_id,
+                                                collection_name)
+
         if modified is None:   # does not exists
+            values['collection'] = collection_id
+            values['id'] = item_id
+            values['username'] = user_id
             query = insert(wbo).values(**values)
         else:
-            query = update(wbo).where(wbo.c.id == item_id).values(**values)
+            if 'id' in values:
+                del values['id']
+            key = and_(wbo.c.id == item_id, wbo.c.username == user_id,
+                       wbo.c.collection == collection_id)
+            query = update(wbo).where(key).values(**values)
 
         self._engine.execute(query)
 
@@ -450,10 +462,6 @@ class WeaveSQLStorage(object):
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        values['collection'] = self._get_collection_id(user_id,
-                                                       collection_name)
-        values['id'] = item_id
-        values['username'] = user_id
         if 'payload' in values and 'modified' not in values:
             values['modified'] = time()
 
@@ -464,7 +472,7 @@ class WeaveSQLStorage(object):
 
         Returns a list of success or failures.
         """
-        if self.engine_name == 'sqlite':
+        if self.engine_name in ('sqlite', 'postgresql'):
             count = 0
             for item in items:
                 if 'id' not in item:
