@@ -134,8 +134,7 @@ class SQLAuth(object):
         code = '-'.join([_4chars() for i in range(4)])
         expiration = datetime.datetime.now() + datetime.timedelta(hours=6)
 
-        query = update(users).values(id=user_id, reset=code,
-                                     reset_expiration=expiration)
+        query = update(users).values(reset=code, reset_expiration=expiration)
         res = self._engine.execute(query.where(users.c.id == user_id))
 
         if res.rowcount != 1:
