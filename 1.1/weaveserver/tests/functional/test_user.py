@@ -92,6 +92,11 @@ class TestUser(support.TestWsgiApp):
     def _submit(self, *args, **kw):
         return FakeCaptchaResponse()
 
+    def test_invalid_token(self):
+        environ = {'Authorization': 'FOooo baar'}
+        self.app.extra_environ = environ
+        self.app.get('/user/1.0/tarek/password_reset', status=401)
+
     def test_user_exists(self):
         res = self.app.get('/user/1.0/tarek')
         self.assertTrue(json.loads(res.body))

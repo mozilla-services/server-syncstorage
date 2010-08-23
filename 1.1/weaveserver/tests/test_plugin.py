@@ -34,52 +34,42 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-import time
-from base64 import encodestring
-
-from weaveserver.util import (authenticate_user, convert_config, bigint2time,
-                              time2bigint)
+from weaveserver.plugin import Plugin
 
 
-class Request(object):
+class TestPlugin(unittest.TestCase):
 
-    def __init__(self, path_info, environ):
-        self.path_info = path_info
-        self.environ = environ
+    def test_get(self):
+        self.assertRaises(KeyError, Plugin.get, 'xxx')
+
+        class Buggy(object):
+
+            def __init__(self):
+                raise IOError('boom')
+
+            @classmethod
+            def get_name(cls):
+                return 'buggy'
 
 
-class AuthTool(object):
+        Plugin.register(Buggy)
+        self.assertRaises(TypeError, Plugin.get, 'buggy')
 
-    def authenticate_user(self, *args):
-        return 1
+        class Cool(object):
+
+            @classmethod
+            def get_name(cls):
+                return 'cool'
+
+        Plugin.register(Cool)
+        p = Plugin.get('cool')
+        self.assertTrue(isinstance(p, Cool))
 
 
-class TestUtil(unittest.TestCase):
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestPlugin))
+    return suite
 
-    def test_authenticate_user(self):
-
-        token = 'Basic ' + encodestring('tarek:tarek')
-        req = Request('/1.0/tarek/info/collections', {})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, None)
-
-        # authenticated by auth
-        req = Request('/1.0/tarek/info/collections',
-                {'Authorization': token})
-        res = authenticate_user(req, AuthTool())
-        self.assertEquals(res, 1)
-
-    def test_convert_config(self):
-        config = {'one': '1', 'two': 'bla', 'three': 'false'}
-        config = convert_config(config)
-
-        self.assertTrue(config['one'])
-        self.assertEqual(config['two'], 'bla')
-        self.assertFalse(config['three'])
-
-    def test_bigint2time(self):
-        self.assertEquals(bigint2time(None), None)
-
-    def test_time2bigint(self):
-        now = time.time()
-        self.assertAlmostEqual(bigint2time(time2bigint(now)), now, places=1)
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

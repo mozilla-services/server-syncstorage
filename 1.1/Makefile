@@ -18,6 +18,7 @@ check:
 
 coverage:
 	$(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weaveserver weaveserver
+	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weaveserver weaveserver 
 
 test:
 	$(BIN)/nosetests -s weaveserver
