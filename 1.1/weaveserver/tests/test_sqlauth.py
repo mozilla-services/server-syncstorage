@@ -58,6 +58,8 @@ class TestSQLAuth(unittest.TestCase):
         query = text('insert into users (username, password_hash, status) '
                      'values (:username, :password, 0)')
         self.auth._engine.execute(query, username='tarek', password=password)
+        self.user_id = self.auth._engine.execute('select id from users where'
+                                            ' username="tarek"').fetchone().id
 
     def tearDown(self):
         self.auth._engine.execute('delete from users')
@@ -67,26 +69,26 @@ class TestSQLAuth(unittest.TestCase):
         self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
 
     def test_reset_code(self):
-        self.assertFalse(self.auth.verify_reset_code(1, 'x'))
+        self.assertFalse(self.auth.verify_reset_code(self.user_id, 'x'))
 
         # normal behavior
-        code = self.auth.generate_reset_code(1)
-        self.assertFalse(self.auth.verify_reset_code(1, 'BADCODE'))
-        self.assertTrue(self.auth.verify_reset_code(1, code))
+        code = self.auth.generate_reset_code(self.user_id)
+        self.assertFalse(self.auth.verify_reset_code(self.user_id, 'BADCODE'))
+        self.assertTrue(self.auth.verify_reset_code(self.user_id, code))
 
         # reseted
-        code = self.auth.generate_reset_code(1)
-        self.auth.clear_reset_code(1)
-        self.assertFalse(self.auth.verify_reset_code(1, code))
+        code = self.auth.generate_reset_code(self.user_id)
+        self.auth.clear_reset_code(self.user_id)
+        self.assertFalse(self.auth.verify_reset_code(self.user_id, code))
 
         # expired
-        code = self.auth.generate_reset_code(1)
+        code = self.auth.generate_reset_code(self.user_id)
         expiration = datetime.datetime.now() + datetime.timedelta(hours=-7)
 
         query = ('update users set reset_expiration = :expiration '
-                 'where id = 1')
+                 'where id = %d' % self.user_id)
         self.auth._engine.execute(text(query), expiration=expiration)
-        self.assertFalse(self.auth.verify_reset_code(1, code))
+        self.assertFalse(self.auth.verify_reset_code(self.user_id, code))
 
     def test_status(self):
         # people with status '1' are disabled

@@ -89,6 +89,25 @@ class RediSQLStorage(WeaveSQLStorage):
     def get_name(self):
         return 'redisql'
 
+    def _delete_cache(self, user_id):
+        """Removes all cache for the given user"""
+        item_ids = self._conn.smembers(_key('tabs', user_id))
+
+        for item_id in item_ids:
+            self._conn.srem(_key('tabs', user_id), item_id)
+            self._conn.set(_key('tabs', user_id, item_id), None)
+            self._conn.set(_key('tabs', 'size', user_id, item_id), None)
+
+        self._conn.set(_key('meta', 'global', user_id), None)
+
+    def delete_storage(self, user_id):
+        self._delete_cache(user_id)
+        super(RediSQLStorage, self).delete_storage(user_id)
+
+    def delete_user(self, user_id):
+        self._delete_cache(user_id)
+        super(RediSQLStorage, self).delete_user(user_id)
+
     def _is_meta_global(self, collection_name, item_id):
         return collection_name == 'meta' and item_id == 'global'
 

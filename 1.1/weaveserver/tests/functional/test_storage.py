@@ -131,7 +131,7 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
         ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
         fts = json.dumps(ts)
-        time.sleep(0.2)
+        time.sleep(.3)
         ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
         fts2 = json.dumps(ts2)
 
@@ -515,23 +515,23 @@ class TestStorage(support.TestWsgiApp):
 
     def test_x_weave_timestamp(self):
         res = self.app.get('/1.0/tarek/storage/col2')
-        self.assertTrue(time.time() -
-                        float(res.headers['X-Weave-Timestamp']) > 0)
+        self.assertTrue(abs(time.time() -
+                float(res.headers['X-Weave-Timestamp'])) < 0.1)
 
         # getting the timestamp with a PUT
         wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-        self.assertTrue(time.time() -
-                        float(res.headers['X-Weave-Timestamp']) > 0)
+        self.assertTrue(abs(time.time() -
+                        float(res.headers['X-Weave-Timestamp'])) < 0.1)
 
         # getting the timestamp with a POST
         wbo1 = {'id': 12, 'payload': 'XXX'}
         wbo2 = {'id': 13, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2])
         res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        self.assertTrue(time.time() -
-                        float(res.headers['X-Weave-Timestamp']) > 0)
+        self.assertTrue(abs(time.time() -
+                        float(res.headers['X-Weave-Timestamp'])) < 0.2)
 
     def test_ifunmodifiedsince(self):
         now = time.time()
