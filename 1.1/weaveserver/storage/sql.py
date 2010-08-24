@@ -107,8 +107,8 @@ class WeaveSQLStorage(object):
                  pool_recycle=3600):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
-              'pool_recycle' : int(pool_recycle),
-              'logging_name' : 'weaveserver'}
+              'pool_recycle': int(pool_recycle),
+              'logging_name': 'weaveserver'}
 
         if self.sqluri.startswith('mysql'):
             kw['reset_on_return'] = False

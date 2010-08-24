@@ -70,9 +70,8 @@ class SQLAuth(object):
     def __init__(self, sqluri=_SQLURI, captcha=False,
                  captcha_public_key=None, captcha_private_key=None,
                  captcha_use_ssl=False, pool_size=20, pool_recycle=3600):
-        kw = {'pool_size': int(pool_size),
-              'pool_recycle' : int(pool_recycle),
-              'logging_name' : 'weaveserver'}
+        kw = {'pool_size': int(pool_size), 'pool_recycle': int(pool_recycle),
+              'logging_name': 'weaveserver'}
 
         if sqluri.startswith('mysql'):
             kw['reset_on_return'] = False

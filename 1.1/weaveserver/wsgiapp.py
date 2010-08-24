@@ -42,7 +42,7 @@ from paste.translogger import TransLogger
 from paste.exceptions.errormiddleware import ErrorMiddleware
 
 from repoze.profile.profiler import AccumulatingProfileMiddleware
-from routes import Mapper, URLGenerator
+from routes import Mapper
 
 from webob.dec import wsgify
 from webob.exc import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest

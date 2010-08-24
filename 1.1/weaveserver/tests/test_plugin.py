@@ -51,7 +51,6 @@ class TestPlugin(unittest.TestCase):
             def get_name(cls):
                 return 'buggy'
 
-
         Plugin.register(Buggy)
         self.assertRaises(TypeError, Plugin.get, 'buggy')
 
