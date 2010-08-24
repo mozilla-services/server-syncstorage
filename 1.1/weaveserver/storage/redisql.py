@@ -70,6 +70,26 @@ class GracefulRedisServer(redis.Redis):
             logger.error(str(e))
             return None
 
+    def smembers(self, key):
+        try:
+            return super(GracefulRedisServer, self).smembers(key)
+        except redis.client.ConnectionError, e:
+            logger.error(str(e))
+            return []
+
+    def sismember(self, key, value):
+        try:
+            return super(GracefulRedisServer, self).sismember(key, value)
+        except redis.client.ConnectionError, e:
+            logger.error(str(e))
+            return False
+
+    def srem(self, key, value):
+        try:
+            super(GracefulRedisServer, self).srem(key, value)
+        except redis.client.ConnectionError, e:
+            logger.error(str(e))
+
 
 class RediSQLStorage(WeaveSQLStorage):
     """Uses Redis when possible/useful, SQL otherwise.
