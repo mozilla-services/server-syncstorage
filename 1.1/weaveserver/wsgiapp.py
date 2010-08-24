@@ -178,7 +178,6 @@ class SyncServerApp(object):
             raise HTTPNotFound('Unkown URL %r' % request.path_info)
 
         # extracting all the info from the headers and the url
-        request.link = URLGenerator(self.mapper, request.environ)
         request.sync_info = match
         request.config = self.config
 
