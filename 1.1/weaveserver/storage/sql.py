@@ -51,7 +51,7 @@ _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
                          5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
                          9: 'tabs', 10: 'passwords'}
 
-_STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
+STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
 # SQL Queries
@@ -172,8 +172,8 @@ class WeaveSQLStorage(object):
     def _get_collection_id(self, user_id, collection_name, create=True):
         """Returns a collection id, given the name."""
         if (self.standard_collections and
-            collection_name in _STANDARD_COLLECTIONS_NAMES):
-            return _STANDARD_COLLECTIONS_NAMES[collection_name]
+            collection_name in STANDARD_COLLECTIONS_NAMES):
+            return STANDARD_COLLECTIONS_NAMES[collection_name]
 
         # custom collection
         data = self.get_collection(user_id, collection_name,
@@ -284,7 +284,8 @@ class WeaveSQLStorage(object):
         """return the collection names for a given user"""
         query = text('select collectionid, name from collections '
                      'where userid = :user_id')
-        return self._engine.execute(query, user_id=user_id).fetchall()
+        return [(res[0], res[1]) for res in
+                self._engine.execute(query, user_id=user_id).fetchall()]
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""

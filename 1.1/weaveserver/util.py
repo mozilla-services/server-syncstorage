@@ -288,6 +288,10 @@ def convert_config(config):
     """
     res = {}
     for key, value in config.items():
+        if not isinstance(value, basestring):
+            res[key] = value
+            continue
+
         if value.lower() in ('1', 'yes', 'true', 'on'):
             res[key] = True
         elif value.lower() in ('0', 'no', 'false', 'off'):

@@ -40,12 +40,17 @@ import json
 from time import time
 
 import redis
+from sqlalchemy.sql import select, bindparam, func
 
-from weaveserver.storage.sql import WeaveSQLStorage
+from weaveserver.storage.sql import WeaveSQLStorage, STANDARD_COLLECTIONS_NAMES
 from weaveserver import logger
+from weaveserver.storage.sqlmappers import wbo
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _KB = float(1024)
+_COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
+                           func.count(wbo)],
+            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
 
 
 def _key(*args):
@@ -163,10 +168,16 @@ class RediSQLStorage(WeaveSQLStorage):
         return super(RediSQLStorage, self).get_item(user_id, collection_name,
                                                     item_id, fields)
 
+    def _update_cached_stamp(self, user_id, collection_name, stamp):
+        self._conn.set(_key('collections', 'stamp', user_id, collection_name),
+                       stamp)
+
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
         if 'payload' in values and 'modified' not in values:
-            values['modified'] = time()
+            now = time()
+            values['modified'] = now
+            self._update_cached_stamp(user_id, collection_name, now)
 
         if self._is_meta_global(collection_name, item_id):
             self._conn.set(_key('meta', 'global', user_id),
@@ -187,6 +198,7 @@ class RediSQLStorage(WeaveSQLStorage):
 
         Returns a list of success or failures.
         """
+        now = time()
         if self._is_meta_global(collection_name, items[0]['id']):
             values = items[0]
             values['username'] = user_id
@@ -201,13 +213,16 @@ class RediSQLStorage(WeaveSQLStorage):
                 self._conn.set(_key('tabs', 'size', user_id, item_id),
                                len(item.get('payload', '')))
             # we don't store tabs in SQL
+            self._update_cached_stamp(user_id, 'tabs', now)
             return
 
+        self._update_cached_stamp(user_id, collection_name, now)
         return super(RediSQLStorage, self).set_items(user_id, collection_name,
                                                      items)
 
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
+        now = time()
         if self._is_meta_global(collection_name, item_id):
             self._conn.set(_key('meta', 'global', user_id), None)
         elif collection_name == 'tabs':
@@ -215,8 +230,10 @@ class RediSQLStorage(WeaveSQLStorage):
             self._conn.set(_key('tabs', user_id, item_id), None)
             self._conn.set(_key('tabs', 'size', user_id, item_id), None)
             # we don't store tabs in SQL
+            self._update_cached_stamp(user_id, 'tabs', now)
             return
 
+        self._update_cached_stamp(user_id, collection_name, now)
         return super(RediSQLStorage, self).delete_item(user_id,
                                                        collection_name,
                                                        item_id)
@@ -224,6 +241,7 @@ class RediSQLStorage(WeaveSQLStorage):
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
+        self._update_cached_stamp(user_id, collection_name, time())
         if (collection_name == 'meta' and (item_ids is None
             or 'global' in item_ids)):
             self._conn.set(_key('meta', 'global', user_id), None)
@@ -270,3 +288,50 @@ class RediSQLStorage(WeaveSQLStorage):
 
         sizes['tabs'] = tabs_size
         return sizes
+
+    def get_collection_timestamps(self, user_id):
+        if self.standard_collections:
+            collection_names = STANDARD_COLLECTIONS_NAMES.keys()
+        else:
+            collection_names = [name for id_, name in
+                                self.get_collection_names(user_id)]
+
+        if self._conn.get(_key('stamps', user_id)) is None:
+            # not cached yet
+            stamps = super(RediSQLStorage,
+                           self).get_collection_timestamps(user_id)
+
+            # we also need to add the tabs timestamp
+            stamps['tabs'] = self._conn.get(_key('collections', 'stamp',
+                                            user_id, 'tabs'))
+
+            for name, value in stamps.items():
+                self._conn.set(_key('collections', 'stamp',
+                                    user_id, name), value)
+
+            for colname in collection_names:
+                if colname in stamps:
+                    continue
+                self._conn.set(_key('collections', 'stamp',
+                                    user_id, colname), None)
+                stamps[colname] = None
+
+            # cache marker
+            self._conn.set(_key('stamps', user_id), 1)
+            return stamps
+
+        # got it in cache
+        stamps = {}
+        for name in collection_names:
+            stamp = self._conn.get(_key('collections', 'stamp', user_id,
+                                        name))
+            if stamp is not None:
+                stamp = float(stamp)
+            stamps[name] = stamp
+
+        return stamps
+
+    def get_collection_max_timestamp(self, user_id, collection_name):
+        # let's get them all, so they get cached
+        stamps = self.get_collection_timestamps(user_id)
+        return stamps[collection_name]

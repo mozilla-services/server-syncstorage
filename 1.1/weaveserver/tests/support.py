@@ -39,6 +39,7 @@ from logging.config import fileConfig
 
 from weaveserver.storage import WeaveStorage
 from weaveserver.auth import WeaveAuth
+from weaveserver.util import convert_config
 import weaveserver
 
 _WEAVEDIR = os.path.dirname(weaveserver.__file__)
@@ -64,6 +65,7 @@ def initenv():
         fileConfig(_INI_FILE)
 
     config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
+    config = convert_config(config)
     storage = WeaveStorage.get_from_config(config)
     auth = WeaveAuth.get_from_config(config)
     return _TOPDIR, config, storage, auth

@@ -64,7 +64,10 @@ class FakeRedis(dict):
 
     def get(self, name):
         self.get_called += 1
-        return self[name]
+        try:
+            return self[name]
+        except KeyError:
+            return None
 
     def sadd(self, key, name):
         self.sets[key].append(name)
@@ -120,24 +123,28 @@ class TestRediSQLStorage(unittest.TestCase):
         res = self.storage.get_item(_UID, 'meta', 'global')
         self.assertEquals(res['payload'], 'XXX')
         self.assertEquals(self.storage._conn.get_called, 2)
-        self.assertEquals(self.storage._conn.set_called, 1)
-        self.assertEquals(self.storage._conn.keys(), ['meta:global:1'])
+        self.assertEquals(self.storage._conn.set_called, 2)
+        self.assertEquals(self.storage._conn.keys(), ['meta:global:1',
+                                                  'collections:stamp:1:meta'])
 
         # this should remove the cache
         self.storage.delete_item(_UID, 'meta', 'global')
-        self.assertEquals(self.storage._conn.keys(), [])
+        self.assertEquals(self.storage._conn.keys(),
+                          ['collections:stamp:1:meta'])
 
         items = [{'id': 'global', 'payload': 'xxx'},
                  {'id': 'other', 'payload': 'xxx'},
                 ]
         self.storage.set_items(_UID, 'meta', items)
-        self.assertEquals(self.storage._conn.keys(), ['meta:global:1'])
+        self.assertEquals(self.storage._conn.keys(), ['meta:global:1',
+                                                  'collections:stamp:1:meta'])
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'meta')
         items = self.storage.get_items(_UID, 'col')
         self.assertEquals(len(items), 0)
-        self.assertEquals(self.storage._conn.keys(), [])
+        self.assertEquals(self.storage._conn.keys(),
+                          ['collections:stamp:1:meta'])
 
     def test_tabs(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')
@@ -148,13 +155,15 @@ class TestRediSQLStorage(unittest.TestCase):
         res = self.storage.get_item(_UID, 'tabs', '1')
         self.assertEquals(res['payload'], 'XXX')
         self.assertEquals(self.storage._conn.get_called, 1)
-        self.assertEquals(self.storage._conn.set_called, 2)
+        self.assertEquals(self.storage._conn.set_called, 3)
         self.assertEquals(self.storage._conn.keys(), ['tabs:1:1',
-                                                      'tabs:size:1:1'])
+                                                  'tabs:size:1:1',
+                                                  'collections:stamp:1:tabs'])
 
         # this should remove the cache
         self.storage.delete_item(_UID, 'tabs', '1')
-        self.assertEquals(self.storage._conn.keys(), [])
+        self.assertEquals(self.storage._conn.keys(),
+                          ['collections:stamp:1:tabs'])
 
         items = [{'id': '1', 'payload': 'xxx'},
                  {'id': '2', 'payload': 'xxx'},
@@ -162,14 +171,16 @@ class TestRediSQLStorage(unittest.TestCase):
         self.storage.set_items(_UID, 'tabs', items)
         keys = self.storage._conn.keys()
         keys.sort()
-        self.assertEquals(keys, ['tabs:1:1', 'tabs:1:2',
-                                 'tabs:size:1:1', 'tabs:size:1:2'])
+        self.assertEquals(keys, ['collections:stamp:1:tabs', 'tabs:1:1',
+                                 'tabs:1:2', 'tabs:size:1:1',
+                                 'tabs:size:1:2'])
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'tabs')
         items = self.storage.get_items(_UID, 'tabs')
         self.assertEquals(len(items), 0)
-        self.assertEquals(self.storage._conn.keys(), [])
+        self.assertEquals(self.storage._conn.keys(),
+                          ['collections:stamp:1:tabs'])
 
     def test_size(self):
         # make sure we get the right size
@@ -181,6 +192,25 @@ class TestRediSQLStorage(unittest.TestCase):
 
         wanted = (len('XXX' * 200) * 2) / 1024.
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
+
+    def test_collection_stamps(self):
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'tabs')
+        self.storage.set_collection(_UID, 'foo')
+        self.storage.set_item(_UID, 'tabs', '1', payload='XXX' * 200)
+        self.storage.set_item(_UID, 'foo', '1', payload='XXX' * 200)
+
+        get = self.storage._conn.get_called
+        set = self.storage._conn.set_called
+        keys = self.storage._conn.keys()
+
+        stamps = self.storage.get_collection_timestamps(_UID)  # pumping cache
+        stamps2 = self.storage.get_collection_timestamps(_UID)
+        self.assertEquals(len(stamps), len(stamps2))
+        self.assertEquals(len(stamps), 6)
+        self.assertEquals(self.storage._conn.get_called, get + 9)
+        self.assertEquals(self.storage._conn.set_called, set + 7)
+        self.assertEquals(len(self.storage._conn.keys()), len(keys) + 5)
 
 
 def test_suite():
