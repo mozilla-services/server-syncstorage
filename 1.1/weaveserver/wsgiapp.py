@@ -136,7 +136,6 @@ class SyncServerApp(object):
         for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):
                 verbs = [verbs]
-
             for pattern, replacer in (('_API_', API_VERSION),
                                       ('_COLLECTION_',
                                        '{collection:[a-zA-Z0-9._-]+}'),
@@ -157,7 +156,13 @@ class SyncServerApp(object):
 
         request.server_time = float('%.2f' % time.time())
         request.config = self.config
+
+        # removing the trailing slash
+        url = request.environ['PATH_INFO'].rstrip('/')
+        if url != '':
+            request.environ['PATH_INFO'] = url
         match = self.mapper.routematch(environ=request.environ)
+
         if match is None:
             return HTTPNotFound()
 
