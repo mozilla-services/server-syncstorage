@@ -672,7 +672,7 @@ class TestStorage(unittest.TestCase):
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll3', {'id':'1', 'payload':'aNewPayload'}, withHost=test_config.HOST_NAME)
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll4', {'id':'2', 'payload':'aPayload'}, withHost=test_config.HOST_NAME)
         counts = weave.get_collection_counts(storageServer, userID, self.password, withHost=test_config.HOST_NAME)
-        counts = counts.items()
+        counts = [(k, int(v)) for k, v in counts.items()]
         counts.sort()
         self.failUnlessEqual(counts, [("coll", 1), ("coll2", 1),
                                       ("coll3", 1), ("coll4", 2)])
@@ -698,6 +698,7 @@ class TestStorage(unittest.TestCase):
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'2', 'payload':'aPayload'}, withHost=test_config.HOST_NAME)
         ts = weave.add_or_modify_item(storageServer, userID, self.password, 'coll', {'id':'3', 'payload':'aPayload'}, withHost=test_config.HOST_NAME)
         counts = weave.get_collection_ids(storageServer, userID, self.password, 'coll', withHost=test_config.HOST_NAME)
+        counts.sort()
         self.failUnlessEqual(counts, ["1","2","3"])
 
 
@@ -1271,8 +1272,9 @@ class TestStorageLarge(unittest.TestCase):
         timestamp2 = weave.add_or_modify_item(self.storageServer, self.userID, self.password, 'foo', item2, withHost=test_config.HOST_NAME);
 
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history': 1, 'foo': 1}, counts)
-
+        self.assertEqual(len(counts), 2)
+        self.assertEqual(int(counts['history']), 1)
+        self.assertEqual(int(counts['foo']), 1)
         timestamps = weave.get_collection_timestamps(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
         self.failUnlessEqual({'history':float(timestamp1), 'foo':float(timestamp2)}, timestamps)
 
@@ -1296,7 +1298,10 @@ class TestStorageLarge(unittest.TestCase):
 
 
         # xxxwhy this is not returning the 'modified' timestamp ? Tarek
-        self.failUnlessEqual({'failed':{'':['invalid id']},'success':['3', '4']}, result)
+        successes = [int(s) for s in result['success']]
+        successes.sort()
+        self.failUnlessEqual(successes, [3, 4])
+
 
         result = weave.get_collection_ids(self.storageServer, self.userID, self.password, 'foo', "sort=index", withHost=test_config.HOST_NAME)
         self.failUnlessEqual(['4', '3', '2'], result)
@@ -1309,7 +1314,9 @@ class TestStorageLarge(unittest.TestCase):
         self.failUnlessEqual(['4', '2'], result, "ID 3 should have been deleted")
 
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history': 1, 'foo': 2}, counts)
+        counts = [(k, int(v)) for k, v in counts.items()]
+        counts.sort()
+        self.failUnlessEqual([('foo', 2), ('history', 1)], counts)
 
         timestamp4 = weave.add_or_modify_item(self.storageServer, self.userID, self.password, 'foo', item4_update, withHost=test_config.HOST_NAME) # bump sortindex up; parentid is also updated
         result = weave.get_item(self.storageServer, self.userID, self.password, 'foo', '4', withHost=test_config.HOST_NAME)
@@ -1320,7 +1327,9 @@ class TestStorageLarge(unittest.TestCase):
         # delete updates the timestamp
         timestamp5 = weave.delete_items_older_than(self.storageServer, self.userID, self.password, 'foo', float(timestamp2) + .01, withHost=test_config.HOST_NAME)
         counts = weave.get_collection_counts(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
-        self.failUnlessEqual({'history': 1, 'foo': 1}, counts)
+        counts = [(k, int(v)) for k, v in counts.items()]
+        counts.sort()
+        self.failUnlessEqual([('foo', 1), ('history', 1)], counts)
 
         timestamps = weave.get_collection_timestamps(self.storageServer, self.userID, self.password, withHost=test_config.HOST_NAME)
         if test_config.memcache:
