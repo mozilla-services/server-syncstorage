@@ -244,11 +244,11 @@ class StorageController(object):
             # thats a batch of one
             if 'id' not in wbos:
                 raise HTTPBadRequest(WEAVE_INVALID_WBO)
-            id_ = wbos['id']
-            if '/' in str(id_):
+            id_ = str(wbos['id'])
+            if '/' in id_:
                 raise HTTPBadRequest(WEAVE_INVALID_WBO)
 
-            request.sync_info['item'] = wbos['id']
+            request.sync_info['item'] = id_
             return self.set_item(request)
 
         res = {'modified': request.server_time, 'success': [], 'failed': {}}
@@ -265,8 +265,8 @@ class StorageController(object):
             if self._has_modifiers(wbo):
                 wbo['modified'] = request.server_time
 
-            item_id = wbo['id']
             consistent, msg = wbo.validate()
+            item_id = wbo['id']
 
             if not consistent:
                 res['failed'][item_id] = [msg]
