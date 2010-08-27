@@ -80,8 +80,8 @@ class WBO(dict):
                     new = float(self[field])
                 except ValueError:
                     return False, 'invalid %s' % field
-                else:
-                    self[field] = int(new)
+
+                self[field] = int(new)
 
             if self[field] > 999999999 or self[field] < -999999999:
                 return False, 'invalid %s' % field
