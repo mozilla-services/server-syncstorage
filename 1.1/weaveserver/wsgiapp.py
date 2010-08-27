@@ -62,7 +62,7 @@ from weaveserver.controllers.static import StaticController
 # _API_ is replaced by API_VERSION
 # _COLLECTION_ is replaced by {collection:[a-zA-Z0-9._-]+}
 # _USERNAME_ is replaced by {username:[a-zA-Z0-9._-]+}
-# _ITEM_ is replaced by {item:[a-zA-Z0-9._-]+}
+# _ITEM_ is replaced by {item:[\\a-zA-Z0-9._?#~-]+}
 
 URLS = [('GET', '/', 'storage', 'index', True),
 
@@ -142,7 +142,7 @@ class SyncServerApp(object):
                                       ('_USERNAME_',
                                        '{username:[a-zA-Z0-9._-]+}'),
                                       ('_ITEM_',
-                                       '{item:[a-zA-Z0-9._-]+}')):
+                                       r'{item:[\\a-zA-Z0-9._?#~-]+}')):
                 match = match.replace(pattern, replacer)
 
             self.mapper.connect(None, match, controller=controller,
