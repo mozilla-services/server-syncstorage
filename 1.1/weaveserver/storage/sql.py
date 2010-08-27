@@ -544,55 +544,53 @@ class WeaveSQLStorage(object):
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
-
         if item_ids is None:
-            where = [wbo.c.collection == collection_id,
-                     wbo.c.username == user_id]
+            query = ('delete from wbo where username = :user_id and '
+                     'collection = :collection_id')
         else:
-            where = [wbo.c.collection == collection_id,
-                     wbo.c.username == user_id,
-                     wbo.c.id.in_(item_ids)]
+            ids = ', '.join([str(id_) for id_ in item_ids])
+            query = ('delete from wbo where username = :user_id and '
+                     'collection = :collection_id and id in (%s)' % ids)
 
         # preparing filters
+        extra = []
+        extra_values = {}
         if filters is not None:
             for field, value in filters.items():
-                field = getattr(wbo.c, field)
-
                 operator, value = value
-                if field.name == 'modified':
+                if field == 'modified':
                     value = time2bigint(value)
 
                 if isinstance(value, (list, tuple)):
                     value = [str(item) for item in value]
-                    where.append(field.in_(value))
+                    extra.append('%s %s (%s)' % (field, operator,
+                                 ','.join(value)))
                 else:
-                    if operator == '=':
-                        where.append(field == value)
-                    elif operator == '<':
-                        where.append(field < value)
-                    elif operator == '>':
-                        where.append(field > value)
+                    extra.append('%s %s :%s' % (field, operator, field))
+                    extra_values[field] = value
 
-        query = delete(wbo).where(and_(*where))
+        if extra != []:
+            query = '%s and %s' % (query, ' and '.join(extra))
 
         if sort is not None and self.engine_name != 'sqlite':
             if sort == 'oldest':
-                query = query.order_by(wbo.c.modified.asc())
+                query += " order by modified"
             elif sort == 'newest':
-                query = query.order_by(wbo.c.modified.desc())
-            else:
-                query = query.order_by(wbo.c.sortindex.desc())
+                query += " order by modified desc"
+            elif sort == 'index':
+                query += " order by sortindex desc"
 
         if self.engine_name != 'sqlite':
             if limit is not None and int(limit) > 0:
-                query = query.limit(int(limit))
+                query += ' limit %d' % limit
 
             if offset is not None and int(offset) > 0:
-                query = query.offset(int(offset))
+                query += ' offset %d' % offset
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        res = self._engine.execute(query)
+        res = self._engine.execute(text(query), user_id=user_id,
+                                   collection_id=collection_id, **extra_values)
         return res.rowcount > 0
 
     def get_total_size(self, user_id):
