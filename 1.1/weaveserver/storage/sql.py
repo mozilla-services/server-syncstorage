@@ -104,14 +104,14 @@ class WeaveSQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=3600):
+                 pool_recycle=3600, reset_on_return=True):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
               'pool_recycle': int(pool_recycle),
               'logging_name': 'weaveserver'}
 
         if self.sqluri.startswith('mysql'):
-            kw['reset_on_return'] = False
+            kw['reset_on_return'] = reset_on_return
 
         self._engine = create_engine(sqluri, **kw)
         for table in tables:
