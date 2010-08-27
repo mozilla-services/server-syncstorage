@@ -71,17 +71,6 @@ users = Users.__table__
 tables.append(users)
 
 
-class ResetCodes(_Base):
-    __tablename__ = 'reset_codes'
-
-    username = Column(String(32), primary_key=True, nullable=False)
-    reset = Column(String(128))
-    expiration = Column(DateTime)
-
-reset_code = ResetCodes.__table__
-tables.append(reset_code)
-
-
 class WBO(_Base):
     __tablename__ = 'wbo'
     __table_args__ = {'mysql_engine': 'InnoDB',
