@@ -84,17 +84,21 @@ tables.append(reset_code)
 
 class WBO(_Base):
     __tablename__ = 'wbo'
+    __table_args__ = {'mysql_engine': 'InnoDB',
+                      'mysql_charset': 'latin1'}
 
-    id = Column(String(64), primary_key=True)
+    id = Column(String(64), primary_key=True, autoincrement=False)
     # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True)
-    collection = Column(Integer(6), primary_key=True)
+    username = Column(Integer(11), primary_key=True, nullable=False)
+    collection = Column(Integer(6), primary_key=True, nullable=False,
+                        default=0)
     parentid = Column(String(64))
     predecessorid = Column(String(64))
     sortindex = Column(Integer(11))
     modified = Column(BigInteger(20))
     payload = Column(Text)
     payload_size = Column(Integer(11))
+
 
 wbo = WBO.__table__
 tables.append(wbo)
