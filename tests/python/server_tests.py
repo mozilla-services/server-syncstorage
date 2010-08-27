@@ -392,7 +392,7 @@ class TestStorage(unittest.TestCase):
             ts = weave.add_or_modify_item(storageServer, userID, self.password, '', {'id':'1234','payload':'ThisIsThePayload'}, withHost=test_config.HOST_NAME)
             self.fail("Should have reported error with zero-length collection")
         except weave.WeaveException, e:
-            self.failUnless(str(e).find("HTTP Error 400: Bad Request") > 0, "Should have been an HTTP 400 error")
+            self.failUnless(str(e).find("404") > 0, "Should have been an HTTP 404 error")
 
     def testAdd_MissingID(self):
         "testAdd_MissingID: Attempts to create an object without an ID report an error"
@@ -922,11 +922,13 @@ class TestStorage(unittest.TestCase):
             line.sort()
             lines.append(line)
 
+        lines.sort()
         expected = [[('id', 'id2'), ('modified', float(ts[1])),
                      ('payload', u'aPayload'), ('sortindex', 2)],
                     [('id', 'id1'), ('modified', float(ts[0])),
                      ('payload', 'aPayload'), ('sortindex', 1)]]
 
+        expected.sort()
         self.failUnlessEqual(lines, expected)
 
 
