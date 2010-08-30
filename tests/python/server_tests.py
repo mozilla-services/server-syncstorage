@@ -715,11 +715,14 @@ class TestStorage(unittest.TestCase):
             line.sort()
             lines.append(line)
 
+        lines.sort()
+
         ts = float(result[0]['modified'])
         expected = [[('id', 'id2'), ('modified', ts), ('payload', 'aPayload'),
                      ('sortindex', 2)],
                     [('id', 'id1'), ('modified', ts), ('payload', 'aPayload'),
                      (u'sortindex', 1)]]
+        expected.sort()
 
         self.failUnlessEqual(lines, expected)
 
