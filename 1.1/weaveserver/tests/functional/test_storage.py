@@ -544,34 +544,35 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(json.loads(res.body)), 0)
 
     def test_x_weave_timestamp(self):
+        now = time.time()
         res = self.app.get('/1.0/tarek/storage/col2')
-        self.assertTrue(abs(time.time() -
+        self.assertTrue(abs(now -
                 float(res.headers['X-Weave-Timestamp'])) < 0.1)
 
         # getting the timestamp with a PUT
         wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
+        now = time.time()
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-        self.assertTrue(abs(time.time() -
-                        float(res.headers['X-Weave-Timestamp'])) < 0.1)
+        self.assertTrue(abs(now -
+                        float(res.headers['X-Weave-Timestamp'])) < 0.2)
 
         # getting the timestamp with a POST
         wbo1 = {'id': 12, 'payload': 'XXX'}
         wbo2 = {'id': 13, 'payload': 'XXX'}
         wbos = json.dumps([wbo1, wbo2])
+        now = time.time()
         res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        self.assertTrue(abs(time.time() -
+        self.assertTrue(abs(now -
                         float(res.headers['X-Weave-Timestamp'])) < 0.2)
 
     def test_ifunmodifiedsince(self):
-        now = time.time()
         wbo = {'payload': 'XXX'}
         wbo = json.dumps(wbo)
-        time.sleep(0.1)
-        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-
+        ts = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        ts = json.loads(ts.body) - 10
         self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
-                        headers=[('X-If-Unmodified-Since', str(now))],
+                        headers=[('X-If-Unmodified-Since', str(ts))],
                         status=412)
 
     def test_quota(self):
@@ -602,3 +603,20 @@ class TestStorage(support.TestWsgiApp):
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
                            status=400)
+
+    def test_get_collection_ttl(self):
+        self.app.delete('/1.0/tarek/storage/col2')
+        wbo = {'payload': 'XXX', 'ttl': 0}
+        wbo = json.dumps(wbo)
+        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(json.loads(res.body), [])
+
+        wbo = {'payload': 'XXX', 'ttl': 1}
+        wbo = json.dumps(wbo)
+        self.app.put('/1.0/tarek/storage/col2/123456', params=wbo)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 1)
+        time.sleep(1.)
+        res = self.app.get('/1.0/tarek/storage/col2')
+        self.assertEquals(len(json.loads(res.body)), 0)

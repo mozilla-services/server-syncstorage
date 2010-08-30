@@ -172,6 +172,16 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 876)
         self.assertAlmostEquals(self.storage.get_total_size(_UID), 2.566, 3)
 
+    def test_ttl(self):
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col1')
+        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
+        self.storage.set_item(_UID, 'col1', 2, payload='XXX' * 876, ttl=0)
+        self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 1)
+        self.assertEquals(len(self.storage.get_items(_UID, 'col1',
+                                                filters={'ttl': ('>', -1)})),
+                                                2)
+
 
 def test_suite():
     suite = unittest.TestSuite()

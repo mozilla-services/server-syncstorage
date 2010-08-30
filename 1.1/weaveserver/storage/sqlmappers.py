@@ -87,6 +87,7 @@ class WBO(_Base):
     modified = Column(BigInteger(20))
     payload = Column(Text)
     payload_size = Column(Integer(11))
+    ttl = Column(Integer(11), default=2100000000)
 
 
 wbo = WBO.__table__

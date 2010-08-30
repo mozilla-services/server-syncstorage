@@ -74,6 +74,17 @@ class TestWBO(unittest.TestCase):
         self.assertEquals(wbo['parentid'], '33')
         self.assertEquals(wbo['sortindex'], 12)
 
+        for bad_ttl in ('bouh', -1, 31537000):
+            data = {'parentid':  33, 'ttl': bad_ttl}
+            wbo = WBO(data)
+            result, failure = wbo.validate()
+            self.assertFalse(result)
+
+        data = {'parentid':  33, 'ttl': 3600}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+
 
 def test_suite():
     suite = unittest.TestSuite()

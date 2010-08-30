@@ -71,31 +71,38 @@ _COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
                             collections.c.userid == bindparam('user_id'))
 
 _COLLECTION_STAMPS = select([wbo.c.collection, func.max(wbo.c.modified)],
-            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
+            and_(wbo.c.username == bindparam('user_id'),
+                 wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
-           wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
+           and_(wbo.c.username == bindparam('user_id'),
+                wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
 _COLLECTIONS_MAX_STAMPS = select([func.max(wbo.c.modified)],
             and_(wbo.c.collection == bindparam('collection_id'),
-                 wbo.c.username == bindparam('user_id')))
+                 wbo.c.username == bindparam('user_id'),
+                 wbo.c.ttl > bindparam('ttl')))
 
 _ITEM_ID_COL_USER = and_(wbo.c.collection == bindparam('collection_id'),
                          wbo.c.username == bindparam('user_id'),
-                         wbo.c.id == bindparam('item_id'))
+                         wbo.c.id == bindparam('item_id'),
+                         wbo.c.ttl > bindparam('ttl'))
 
 _ITEM_EXISTS = select([wbo.c.modified], _ITEM_ID_COL_USER)
 
 _DELETE_ITEMS = delete(wbo,
                        and_(wbo.c.collection == bindparam('collection_id'),
-                            wbo.c.username == bindparam('user_id')))
+                            wbo.c.username == bindparam('user_id'),
+                            wbo.c.ttl > bindparam('ttl')))
 
 _USER_STORAGE_SIZE = select([func.sum(wbo.c.payload_size)],
-                            wbo.c.username == bindparam('user_id'))
+                       and_(wbo.c.username == bindparam('user_id'),
+                            wbo.c.ttl > bindparam('ttl')))
 
 _COLLECTIONS_STORAGE_SIZE = select([wbo.c.collection,
             func.sum(wbo.c.payload_size)],
-            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
+            and_(wbo.c.username == bindparam('user_id'),
+                 wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
 _KB = float(1024)
 
@@ -290,7 +297,7 @@ class WeaveSQLStorage(object):
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
         res = self._engine.execute(_COLLECTION_STAMPS,
-                                   user_id=user_id)
+                                   user_id=user_id, ttl=time())
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
 
@@ -312,7 +319,8 @@ class WeaveSQLStorage(object):
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
-        res = self._engine.execute(_COLLECTION_COUNTS, user_id=user_id)
+        res = self._engine.execute(_COLLECTION_COUNTS, user_id=user_id,
+                                   ttl=time())
         try:
             return dict([(self._collid2name(user_id, collid), count)
                          for collid, count in res])
@@ -323,7 +331,7 @@ class WeaveSQLStorage(object):
         """Returns the max timestamp of a collection."""
         collection_id = self._get_collection_id(user_id, collection_name)
         res = self._engine.execute(_COLLECTIONS_MAX_STAMPS, user_id=user_id,
-                                   collection_id=collection_id)
+                                   collection_id=collection_id, ttl=time())
         res = res.fetchone()
         stamp = res[0]
         if stamp is None:
@@ -337,7 +345,8 @@ class WeaveSQLStorage(object):
         """
         if not self.use_quota:
             return dict()
-        res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id)
+        res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id,
+                                   ttl=time())
         return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
                      for col in res])
 
@@ -349,7 +358,7 @@ class WeaveSQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
         res = self._engine.execute(_ITEM_EXISTS, user_id=user_id,
                                    item_id=item_id,
-                                   collection_id=collection_id)
+                                   collection_id=collection_id, ttl=time())
         res = res.fetchone()
         if res is None:
             return None
@@ -394,6 +403,9 @@ class WeaveSQLStorage(object):
                     elif operator == '>':
                         where.append(field > value)
 
+        if filters is None or 'ttl' not in filters:
+            where.append(wbo.c.ttl > time())
+
         where = and_(*where)
         query = select(fields, where)
 
@@ -425,7 +437,8 @@ class WeaveSQLStorage(object):
 
         query = select(fields, _ITEM_ID_COL_USER)
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
-                                  collection_id=collection_id).first()
+                                   collection_id=collection_id,
+                                   ttl=time()).first()
         if res is None:
             return None
 
@@ -435,6 +448,11 @@ class WeaveSQLStorage(object):
         """Adds or update an item"""
         if 'modified' in values:
             values['modified'] = time2bigint(values['modified'])
+
+        if 'ttl' not in values:
+            values['ttl'] = 2100000000
+        else:
+            values['ttl'] += time()
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
@@ -488,7 +506,7 @@ class WeaveSQLStorage(object):
         # XXX See if SQLAlchemy knows how to do batch inserts
         # that's quite specific to mysql
         fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
-                  'payload', 'payload_size')
+                  'payload', 'payload_size', 'ttl')
 
         query = 'insert into wbo (username, collection, %s) values ' \
                     % ','.join(fields)
@@ -515,6 +533,11 @@ class WeaveSQLStorage(object):
                 'modified%d' % num not in values):
                 values['modified%d' % num] = time2bigint(time())
 
+            if values.get('ttl%d' % num) is None:
+                values['ttl%d' % num] = 2100000000
+            else:
+                values['ttl%d' % num] += time()
+
             if self.use_quota and 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
                 values['payload_size%d' % num] = size
@@ -526,7 +549,8 @@ class WeaveSQLStorage(object):
                   'predecessorid = values(predecessorid),'
                   'sortindex = values(sortindex),'
                   'modified = values(modified), payload = values(payload),'
-                  'payload_size = values(payload_size)')
+                  'payload_size = values(payload_size),'
+                  'ttl = values(ttl)')
 
         res = self._engine.execute(text(query), **values)
         return res.rowcount
@@ -600,7 +624,8 @@ class WeaveSQLStorage(object):
         """
         if not self.use_quota:
             return 0.0
-        res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id)
+        res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id,
+                                   ttl=time())
         res = res.fetchone()
         if res is None or res[0] is None:
             return 0.0

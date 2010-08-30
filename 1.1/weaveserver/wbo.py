@@ -38,7 +38,7 @@
 
 _FIELDS = ('id', 'username', 'collection', 'parentid',
            'predecessorid', 'sortindex', 'modified',
-           'payload', 'payload_size')
+           'payload', 'payload_size', 'ttl')
 
 
 class WBO(dict):
@@ -69,6 +69,17 @@ class WBO(dict):
             if len(value) > 64:
                 return False, 'invalid %s' % field
             self[field] = value
+
+        if 'ttl' in self:
+            # the maximum ttl is a year
+            try:
+                ttl = int(self['ttl'])
+            except ValueError:
+                return False, 'invalid ttl'
+
+            if ttl < 0 or ttl > 31536000:
+                return False, 'invalid ttl'
+            self['ttl'] = ttl
 
         for field in ('sortindex',):
             if field not in self:
