@@ -123,8 +123,22 @@ class TestUser(support.TestWsgiApp):
         msg = base64.decodestring(msg)
         link = msg.split('\n')[2].strip()
 
-        # it's a form we can fill
+        # let's try some bad links (unknown user)
+        badlink = link.replace('tarek', 'joe')
+        res = self.app.get(badlink)
+        res.form['password'].value = 'p' * 8
+        res.form['confirm'].value = 'p' * 8
+        res = res.form.submit()
+        self.assertTrue('unable to locate your account' in res)
 
+        badlink = link.replace('username=tarek&', '')
+        res = self.app.get(badlink)
+        res.form['password'].value = 'p' * 8
+        res.form['confirm'].value = 'p' * 8
+        res = res.form.submit()
+        self.assertTrue('Username not provided' in res)
+
+        # let's call the real link, it's a form we can fill
         # let's try bad values
         # mismatch
         res = self.app.get(link)

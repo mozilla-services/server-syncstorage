@@ -162,7 +162,7 @@ class UserController(object):
 
     def password_reset_form(self, request, **kw):
         """Returns a form for resetting the password"""
-        if 'key' in request.POST or 'key' in kw:
+        if 'key' in kw:
             # we have a key, let's display the key controlling form
             return render_mako('password_reset_form.mako', **kw)
         elif not request.POST and not request.GET:

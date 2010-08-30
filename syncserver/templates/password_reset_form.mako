@@ -21,7 +21,9 @@
    </label>
   </p>
   <input type="hidden" name="key" value="${key}"/>
+  %if username:
   <input type="hidden" name="username" value="${username}"/>
+  %endif
   <input type="submit" id="pchange" name="pchange"
          value="Change my password"/>
  </form>
