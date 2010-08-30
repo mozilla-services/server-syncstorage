@@ -128,7 +128,7 @@ class TestMultiStorage(unittest.TestCase):
         WeaveStorage.register(Storage)
 
         # Defining a master with two slaves, with the same backend
-        config = {'storage': 'weaveserver.storage.multi.WeaveMultiStorage',
+        config = {'storage': 'syncserver.storage.multi.WeaveMultiStorage',
                   'storage.master': 'storage',
                   'storage.master.param1': 'one',
                   'storage.master.param2': 'two',
