@@ -111,6 +111,16 @@ class TestUser(support.TestWsgiApp):
         self.assertEquals(res.body, 'success')
         self.assertEquals(len(FakeSMTP.msgs), 1)
 
+        # let's try some bad POSTs on weave-password-reset
+        self.app.post('/weave-password-reset',
+                      params={'username': 'tarek',
+                              'boo': 'foo'}, status=400)
+
+        res = self.app.post('/weave-password-reset',
+                      params={'username': 'tarek', 'key': 'xxx',
+                              'boo': 'foo'})
+        self.assertTrue('Password not provided' in res)
+
         # let's ask via the web form now
         res = self.app.get('/weave-password-reset')
         res.form['username'].value = 'tarek'
@@ -246,3 +256,7 @@ class TestUser(support.TestWsgiApp):
         # tarek should be gone
         res = self.app.get('/user/1.0/tarek')
         self.assertFalse(json.loads(res.body))
+
+    def test_recaptcha(self):
+        # make sre the captcha is rendered
+        self.app.get('/misc/1.0/captcha_html', status=200)

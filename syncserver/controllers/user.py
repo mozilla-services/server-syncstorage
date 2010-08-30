@@ -168,6 +168,7 @@ class UserController(object):
         elif not request.POST and not request.GET:
             # asking for the first time
             return render_mako('password_ask_reset_form.mako')
+        raise HTTPBadRequest()
 
     def _repost(self, request, error):
         request.POST['error'] = error
@@ -187,6 +188,7 @@ class UserController(object):
                 return render_mako('password_failure.mako', error=e.detail)
             else:
                 return render_mako('password_key_sent.mako')
+            raise HTTPBadRequest()
 
         # full form, the actual password reset
         password = request.POST.get('password')
