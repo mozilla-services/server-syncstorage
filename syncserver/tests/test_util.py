@@ -87,6 +87,8 @@ class TestUtil(unittest.TestCase):
     def test_valid_email(self):
         self.assertFalse(valid_email('tarek'))
         self.assertFalse(valid_email('tarek@moz'))
+        self.assertFalse(valid_email('tarek@192.12.32334.3'))
+
         self.assertTrue(valid_email('tarek@mozilla.com'))
         self.assertTrue(valid_email('tarek+sync@mozilla.com'))
         self.assertTrue(valid_email('tarek@127.0.0.1'))
