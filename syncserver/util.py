@@ -233,8 +233,12 @@ def send_email(sender, rcpt, subject, body, smtp_host='localhost',
     return True, None
 
 
-_RE_EMAIL = re.compile(r"(?:^|\s)[-a-z0-9_.]+@"
-                        "(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)", re.I)
+_USER = '(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))'
+_IP_DOMAIN = '([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})'
+_NAME_DOMAIN = '(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,})'
+_DOMAIN = '(%s|%s)' % (_IP_DOMAIN, _NAME_DOMAIN)
+_RE_EMAIL = '^%s@%s$' % (_USER, _DOMAIN)
+_RE_EMAIL = re.compile(_RE_EMAIL)
 
 
 def valid_email(email):
