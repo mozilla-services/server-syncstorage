@@ -42,7 +42,7 @@ from time import time
 import redis
 from sqlalchemy.sql import select, bindparam, func
 
-from syncserver.storage.sql import WeaveSQLStorage, STANDARD_COLLECTIONS_NAMES
+from syncserver.storage.sql import SQLStorage, STANDARD_COLLECTIONS_NAMES
 from syncserver import logger
 from syncserver.storage.sqlmappers import wbo
 
@@ -96,7 +96,7 @@ class GracefulRedisServer(redis.Redis):
             logger.error(str(e))
 
 
-class RediSQLStorage(WeaveSQLStorage):
+class RediSQLStorage(SQLStorage):
     """Uses Redis when possible/useful, SQL otherwise.
     """
 

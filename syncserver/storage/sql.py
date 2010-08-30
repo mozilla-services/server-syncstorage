@@ -107,7 +107,7 @@ _COLLECTIONS_STORAGE_SIZE = select([wbo.c.collection,
 _KB = float(1024)
 
 
-class WeaveSQLStorage(object):
+class SQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
