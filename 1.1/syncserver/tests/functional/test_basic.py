@@ -33,21 +33,27 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
-
-install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                  'Mako', 'redis', 'recaptcha-client',
-                  'repoze.profile', 'simplejson',
-                  'distribute']
-
-entry_points="""
-[paste.app_factory]
-main = syncserver.wsgiapp:make_app
-
-[paste.app_install]
-main = paste.script.appinstall:Installer
 """
+Basic tests to verify that the dispatching mechanism works.
+"""
+import base64
+from syncserver.tests.functional import support
 
-setup(name='SyncServer', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+
+class TestBasic(support.TestWsgiApp):
+
+    def test_404(self):
+        # make sure an unkown url returns a 404
+        self.app.get('/blabla', status=404)
+
+    def test_auth(self):
+        # make sure we are able to authenticate
+        # and that some APIs are protected
+        self.app.get('/', status=401)
+
+        environ = {'Authorization': 'Basic %s' % \
+                        base64.encodestring('tarek:tarek')}
+
+        res = self.app.get('/', extra_environ=environ)
+        self.assertEquals(res.status, '200 OK')
+        self.assertEquals(res.body, 'Sync Server')

@@ -13,21 +13,21 @@ build:
 	$(BIN)/python setup.py develop
 
 check:
-	rm -rf weaveserver/templates/*.py
-	$(BIN)/flake8 weaveserver
+	rm -rf syncserver/templates/*.py
+	$(BIN)/flake8 syncserver
 
 coverage:
-	$(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weaveserver weaveserver
-	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=weaveserver weaveserver 
+	$(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=syncserver syncserver
+	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s --cover-html --cover-html-dir=html --with-coverage --cover-package=syncserver syncserver 
 
 test:
-	$(BIN)/nosetests -s weaveserver
+	$(BIN)/nosetests -s syncserver
 
 mysqltest:
-	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s weaveserver
+	WEAVE_TESTFILE=mysql $(BIN)/nosetests -s syncserver
 
 redisqltest:
-	WEAVE_TESTFILE=redisql $(BIN)/nosetests -s weaveserver
+	WEAVE_TESTFILE=redisql $(BIN)/nosetests -s syncserver
 
 alltest: test mysqltest redisqltest
 

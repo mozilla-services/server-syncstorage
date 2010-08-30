@@ -33,21 +33,29 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
-
-install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                  'Mako', 'redis', 'recaptcha-client',
-                  'repoze.profile', 'simplejson',
-                  'distribute']
-
-entry_points="""
-[paste.app_factory]
-main = syncserver.wsgiapp:make_app
-
-[paste.app_install]
-main = paste.script.appinstall:Installer
 """
+Function called by :
 
-setup(name='SyncServer', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+    $ paster setup-app development.ini
+
+Used to initialize the DB and create some data.
+"""
+from syncserver import logger
+from syncserver.auth import WeaveAuth
+from syncserver.util import read_config
+
+
+def setup_app(command, filename, section):
+    """Called by setup-app"""
+    if '__file__' in filename:
+        config = read_config(filename['__file__'])
+    else:
+        config = dict()
+
+    # automatically creates the table if they don't exist yet
+    logger.info('Creating the DB tables if needed')
+    auth = WeaveAuth.get_from_config(config)
+
+    # create a tarek/tarek profile
+    logger.info('Adding a user')
+    auth.create_user('tarek', 'tarek', 'tarek@mozilla.com')

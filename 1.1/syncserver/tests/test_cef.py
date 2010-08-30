@@ -33,21 +33,52 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+import unittest
+import os
+from tempfile import mkstemp
 
-install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                  'Mako', 'redis', 'recaptcha-client',
-                  'repoze.profile', 'simplejson',
-                  'distribute']
+from syncserver.cef import auth_failure
 
-entry_points="""
-[paste.app_factory]
-main = syncserver.wsgiapp:make_app
 
-[paste.app_install]
-main = paste.script.appinstall:Installer
-"""
+class FakeRequest(object):
 
-setup(name='SyncServer', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+    host = remote_addr = '127.0.0.1'
+    url = 'http://example.com'
+    method = 'GET'
+    headers = {'User-Agent': 'MySuperBrowser'}
+    config = {'cef.version': '0', 'cef.vendor': 'mozilla',
+              'cef.device_version': '3', 'cef.product': 'weave',
+              'cef': True}
+
+
+class TestWeaveLogger(unittest.TestCase):
+
+    def test_cef_logging(self):
+        # just make sure we escape "|" when appropriate
+        request = FakeRequest()
+        filename = request.config['cef.file'] = mkstemp()[1]
+
+        try:
+            # should not fail
+            auth_failure('xx|x', 5, request)
+            with open(filename) as f:
+                content = f.read()
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
+
+        self.assertEquals(len(content.split('|')), 9)
+
+        # should fail
+        request.headers['User-Agent'] = "|"
+        self.assertRaises(ValueError,
+                          auth_failure, 'xxx', 5, request)
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWeaveLogger))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

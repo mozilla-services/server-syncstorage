@@ -33,21 +33,31 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+import unittest
 
-install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                  'Mako', 'redis', 'recaptcha-client',
-                  'repoze.profile', 'simplejson',
-                  'distribute']
+from syncserver.auth.dummy import DummyAuth
+from syncserver.auth import WeaveAuth
 
-entry_points="""
-[paste.app_factory]
-main = syncserver.wsgiapp:make_app
+WeaveAuth.register(DummyAuth)
 
-[paste.app_install]
-main = paste.script.appinstall:Installer
-"""
 
-setup(name='SyncServer', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+class TestDummyAuth(unittest.TestCase):
+
+    def setUp(self):
+        self.auth = WeaveAuth.get('dummy')
+
+    def test_authenticate_user(self):
+        tarek_id = self.auth.authenticate_user('tarek', 'tarek')
+        self.assertNotEquals(self.auth.authenticate_user('tarek2', 'tarek'),
+                             tarek_id)
+        self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'),
+                          tarek_id)
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestDummyAuth))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

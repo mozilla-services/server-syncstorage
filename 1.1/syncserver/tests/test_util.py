@@ -33,21 +33,53 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+import unittest
+import time
+from base64 import encodestring
 
-install_requires=['SQLALchemy', 'MySql-python', 'PasteDeploy',
-                  'PasteScript', 'Routes', 'WebOb', 'WebTest',
-                  'Mako', 'redis', 'recaptcha-client',
-                  'repoze.profile', 'simplejson',
-                  'distribute']
+from syncserver.util import (authenticate_user, convert_config, bigint2time,
+                              time2bigint)
 
-entry_points="""
-[paste.app_factory]
-main = syncserver.wsgiapp:make_app
 
-[paste.app_install]
-main = paste.script.appinstall:Installer
-"""
+class Request(object):
 
-setup(name='SyncServer', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+    def __init__(self, path_info, environ):
+        self.path_info = path_info
+        self.environ = environ
+
+
+class AuthTool(object):
+
+    def authenticate_user(self, *args):
+        return 1
+
+
+class TestUtil(unittest.TestCase):
+
+    def test_authenticate_user(self):
+
+        token = 'Basic ' + encodestring('tarek:tarek')
+        req = Request('/1.0/tarek/info/collections', {})
+        res = authenticate_user(req, AuthTool())
+        self.assertEquals(res, None)
+
+        # authenticated by auth
+        req = Request('/1.0/tarek/info/collections',
+                {'Authorization': token})
+        res = authenticate_user(req, AuthTool())
+        self.assertEquals(res, 1)
+
+    def test_convert_config(self):
+        config = {'one': '1', 'two': 'bla', 'three': 'false'}
+        config = convert_config(config)
+
+        self.assertTrue(config['one'])
+        self.assertEqual(config['two'], 'bla')
+        self.assertFalse(config['three'])
+
+    def test_bigint2time(self):
+        self.assertEquals(bigint2time(None), None)
+
+    def test_time2bigint(self):
+        now = time.time()
+        self.assertAlmostEqual(bigint2time(time2bigint(now)), now, places=1)
