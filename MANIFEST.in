@@ -1,4 +1,4 @@
-recursive-include weaveserver/templates *.mako
-recursive-include weaveserver/static *.*
+recursive-include syncserver/templates *.mako
+recursive-include syncserver/static *.*
 include *.cfg *.ini *.wsgi *.sh
 

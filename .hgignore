@@ -3,8 +3,8 @@ pyc$
 lib
 include
 bin
-WeaveServer.egg-info
+SyncServer.egg-info
 swp$
-1.1/html
-1.1/doc/build
+html
+doc/build
 \.coverage
