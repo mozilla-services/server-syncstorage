@@ -182,6 +182,19 @@ class TestSQLStorage(unittest.TestCase):
                                                 filters={'ttl': ('>', -1)})),
                                                 2)
 
+    def test_dashed_ids(self):
+        self.storage.set_user(_UID, email='tarek@ziade.org')
+        self.storage.set_collection(_UID, 'col1')
+        id1 = '{ec1b7457-003a-45a9-bf1c-c34e37225ad7}'
+        id2 = '{339f52e1-deed-497c-837a-1ab25a655e37}'
+        self.storage.set_item(_UID, 'col1', id1, payload='XXX' * 34)
+        self.storage.set_item(_UID, 'col1', id2, payload='XXX' * 89)
+        self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 2)
+
+        # now trying to delete them
+        self.storage.delete_items(_UID, 'col1', item_ids=[id1, id2])
+        self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 0)
+
 
 def test_suite():
     suite = unittest.TestSuite()

@@ -572,7 +572,7 @@ class SQLStorage(object):
             query = ('delete from wbo where username = :user_id and '
                      'collection = :collection_id')
         else:
-            ids = ', '.join([str(id_) for id_ in item_ids])
+            ids = ', '.join(['"%s"' % str(id_) for id_ in item_ids])
             query = ('delete from wbo where username = :user_id and '
                      'collection = :collection_id and id in (%s)' % ids)
 
