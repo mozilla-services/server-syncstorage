@@ -64,9 +64,8 @@ from syncserver.controllers.static import StaticController
 # _USERNAME_ is replaced by {username:[a-zA-Z0-9._-]+}
 # _ITEM_ is replaced by {item:[\\a-zA-Z0-9._?#~-]+}
 
-URLS = [('GET', '/', 'storage', 'index', True),
-
-        # storage API
+# Sync API
+_SYNC = [
         ('GET', '/_API_/_USERNAME_/info/collections',
          'storage', 'get_collections_info', True),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',
@@ -91,8 +90,10 @@ URLS = [('GET', '/', 'storage', 'index', True),
         ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_/_ITEM_', 'storage',
         'delete_item', True),
         ('DELETE', '/_API_/_USERNAME_/storage', 'storage', 'delete_storage',
-         True),
+         True)]
 
+# User API
+_USER = [
         # user API
         ('GET', '/user/_API_/_USERNAME_', 'user', 'user_exists', False),
         ('PUT', '/user/_API_/_USERNAME_', 'user', 'create_user', False),
@@ -107,7 +108,6 @@ URLS = [('GET', '/', 'storage', 'index', True),
         ('POST', '/weave-password-reset', 'user', 'do_password_reset', False),
         (('GET', 'POST'), '/misc/_API_/captcha_html', 'user', 'captcha_form',
          False),
-
         # media   XXX served by Apache in real production
         ('GET', '/media/{filename}', 'static', 'get_file', False)]
 
@@ -132,6 +132,13 @@ class SyncServerApp(object):
         self.controllers = {'storage': StorageController(self.storage),
                             'user': UserController(self.authtool),
                             'static': StaticController()}
+
+        URLS = []
+        if self.config.get('provides_sync_apis', False):
+            URLS.extend(_SYNC)
+
+        if self.config.get('provides_user_apis', False):
+            URLS.extend(_USER)
 
         for verbs, match, controller, method, auth in URLS:
             if isinstance(verbs, str):
