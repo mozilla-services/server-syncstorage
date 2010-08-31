@@ -41,7 +41,7 @@ import string
 from hashlib import sha256
 import base64
 import simplejson as json
-
+import itertools
 import struct
 from email.mime.text import MIMEText
 from email.header import Header
@@ -322,3 +322,14 @@ def filter_params(namespace, data, replace_dot='_', splitchar='.'):
             continue
         params[replace_dot.join(skey[1:])] = value
     return master_value, params
+
+
+def batch(iterable, size=100):
+    """Returns the given iterable split into batches, of size."""
+    counter = itertools.count()
+
+    def ticker(key):
+        return next(counter) // size
+
+    for key, group in itertools.groupby(iter(iterable), ticker):
+        yield group

@@ -38,7 +38,7 @@ import time
 from base64 import encodestring
 
 from syncserver.util import (authenticate_user, convert_config, bigint2time,
-                             time2bigint, valid_email)
+                             time2bigint, valid_email, batch)
 
 
 class Request(object):
@@ -92,3 +92,8 @@ class TestUtil(unittest.TestCase):
         self.assertTrue(valid_email('tarek@mozilla.com'))
         self.assertTrue(valid_email('tarek+sync@mozilla.com'))
         self.assertTrue(valid_email('tarek@127.0.0.1'))
+
+    def test_batch(self):
+        self.assertEquals(len(list(batch(range(250)))), 3)
+        self.assertEquals(len(list(batch(range(190)))), 2)
+        self.assertEquals(len(list(batch(range(24, 25)))), 1)

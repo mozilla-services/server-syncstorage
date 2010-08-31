@@ -43,7 +43,7 @@ import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 
-from syncserver.util import convert_response, json_response, round_time
+from syncserver.util import convert_response, json_response, round_time, batch
 from syncserver.wbo import WBO
 from syncserver.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                    WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
@@ -274,10 +274,18 @@ class StorageController(object):
                 kept_wbos.append(wbo)
 
         left = self._check_quota(request)
-        self.storage.set_items(user_id, collection_name, kept_wbos)
 
-        # XXX how to get back the real successes w/o an extra query
-        res['success'] = [wbo['id'] for wbo in kept_wbos]
+        for wbos in batch(kept_wbos):
+            wbos = list(wbos)   # to avoid exhaustion
+            try:
+                self.storage.set_items(user_id, collection_name, wbos)
+            except Exception, e:
+                # something went wrong
+                for wbo in wbos:
+                    res['failed'][wbo['id']] = str(e)
+            else:
+                res['success'].extend([wbo['id'] for wbo in wbos])
+
         response = json_response(res)
         if left <= 1024:
             response.headers['X-Weave-Quota-Remaining'] = str(left)

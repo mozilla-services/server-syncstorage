@@ -620,3 +620,12 @@ class TestStorage(support.TestWsgiApp):
         time.sleep(1.)
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
+
+    def test_batch(self):
+        # makes sure the server handles correctly large batches
+        # those are pushed in the DB in batches of 100
+        wbos = [{'id': str(i), 'payload': 'XXX'} for i in range(250)]
+        wbos = json.dumps(wbos)
+        res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = json.loads(res.body)
+        self.assertEquals(len(res['success']), 250)
