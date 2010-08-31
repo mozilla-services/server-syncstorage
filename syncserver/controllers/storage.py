@@ -41,9 +41,11 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 """
 import simplejson as json
 
-from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
+from webob.exc import (HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed,
+                       HTTPServiceUnavailable)
+from syncserver.util import (convert_response, json_response, round_time,
+                             batch, raise_503)
 
-from syncserver.util import convert_response, json_response, round_time, batch
 from syncserver.wbo import WBO
 from syncserver.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                    WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
@@ -55,7 +57,7 @@ _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
 class StorageController(object):
 
     def __init__(self, storage):
-        self.storage = storage
+        self.storage = raise_503(storage)
 
     def index(self, request):
         return "Sync Server"
@@ -110,6 +112,7 @@ class StorageController(object):
 
     def get_collection_sizes(self, request):
         user_id = request.sync_info['user_id']
+
         return json_response(self.storage.get_collection_sizes(user_id))
 
     # XXX see if we want to use kwargs here instead
@@ -279,7 +282,7 @@ class StorageController(object):
             wbos = list(wbos)   # to avoid exhaustion
             try:
                 self.storage.set_items(user_id, collection_name, wbos)
-            except Exception, e:
+            except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 for wbo in wbos:
                     res['failed'][wbo['id']] = str(e)

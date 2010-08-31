@@ -49,10 +49,11 @@ import smtplib
 import socket
 import re
 import os
+from functools import wraps
 
 from mako.lookup import TemplateLookup
 
-from webob.exc import HTTPUnauthorized
+from webob.exc import HTTPUnauthorized, HTTPServiceUnavailable
 from webob import Response
 
 from syncserver.cef import auth_failure
@@ -333,3 +334,33 @@ def batch(iterable, size=100):
 
     for key, group in itertools.groupby(iter(iterable), ticker):
         yield group
+
+
+def raise_503(instance):
+    """Will issue a 503 on any exception.
+    Args:
+        instance: any instance of a class
+
+    Response:
+        the instance, with its public callables decorated
+    """
+
+    def _503_func(func):
+        @wraps(func)
+        def __503_func(*args, **kw):
+            try:
+                return func(*args, **kw)
+            except Exception, e:
+                raise HTTPServiceUnavailable(str(e))
+        return __503_func
+
+    for func in dir(instance):
+        if func.startswith('_'):
+                continue
+        _func = getattr(instance, func)
+        if not callable(_func):
+            continue
+        _func = _503_func(_func)
+        setattr(instance, func, _func)
+
+    return instance

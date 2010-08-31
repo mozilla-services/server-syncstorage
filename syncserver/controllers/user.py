@@ -47,7 +47,7 @@ from webob.exc import (HTTPServiceUnavailable, HTTPBadRequest,
 from recaptcha.client import captcha
 
 from syncserver.util import (json_response, send_email, valid_email,
-                              valid_password, render_mako)
+                             valid_password, render_mako, raise_503)
 from syncserver.respcodes import (WEAVE_MISSING_PASSWORD,
                                    WEAVE_NO_EMAIL_ADRESS,
                                    WEAVE_INVALID_WRITE,
@@ -61,7 +61,7 @@ _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 class UserController(object):
 
     def __init__(self, auth):
-        self.auth = auth
+        self.auth = raise_503(auth)
 
     def user_exists(self, request):
         exists = (self.auth.get_user_id(request.sync_info['username'])
