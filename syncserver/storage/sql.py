@@ -42,9 +42,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
                             func, and_)
 
-from syncserver.storage.sqlmappers import tables, users, collections, wbo
+from syncserver.storage.sqlmappers import (tables, users, collections,
+                                           wbo, MAX_TTL)
 from syncserver.util import time2bigint, bigint2time
 from syncserver.wbo import WBO
+
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
@@ -450,7 +452,7 @@ class SQLStorage(object):
             values['modified'] = time2bigint(values['modified'])
 
         if 'ttl' not in values:
-            values['ttl'] = 2100000000
+            values['ttl'] = MAX_TTL
         else:
             values['ttl'] += time()
 

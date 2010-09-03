@@ -40,6 +40,7 @@ from sqlalchemy import Integer, String, DateTime, Text, BigInteger
 
 _Base = declarative_base()
 tables = []
+MAX_TTL = 2100000000
 
 
 class Collections(_Base):
@@ -87,7 +88,7 @@ class WBO(_Base):
     modified = Column(BigInteger(20))
     payload = Column(Text)
     payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=2100000000)
+    ttl = Column(Integer(11), default=MAX_TTL)
 
 
 wbo = WBO.__table__
