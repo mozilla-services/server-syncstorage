@@ -36,7 +36,6 @@
 """
 Basic tests to verify that the dispatching mechanism works.
 """
-import base64
 from syncserver.tests.functional import support
 
 

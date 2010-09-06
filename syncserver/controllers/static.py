@@ -52,6 +52,8 @@ _STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'static')
 class StaticController(object):
     """Used to return static files
     """
+    def __init__(self, app):
+        self.app = app
 
     def get_file(self, request):
         """Returns a file located in the static/ directory."""

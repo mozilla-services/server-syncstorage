@@ -60,7 +60,8 @@ _TPL_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 class UserController(object):
 
-    def __init__(self, auth):
+    def __init__(self, app, auth):
+        self.app = app
         self.auth = raise_503(auth)
 
     def user_exists(self, request):
@@ -128,14 +129,15 @@ class UserController(object):
         # check if captcha info are provided
         challenge = data.get('captcha-challenge')
         response = data.get('captcha-response')
+
         if challenge is not None and response is not None:
             resp = captcha.submit(challenge, response,
-                                  self.auth.captcha_private_key,
+                                  self.app.config['captcha.private_key'],
                                   remoteip=request.remote_addr)
             if not resp.is_valid:
                 raise HTTPBadRequest(WEAVE_INVALID_CAPTCHA)
         else:
-            if self.auth.captcha:
+            if self.app.config['use_captcha']:
                 raise HTTPBadRequest(WEAVE_INVALID_CAPTCHA)
 
         # all looks good, let's create the user
@@ -238,12 +240,12 @@ class UserController(object):
 
     def _captcha(self):
         """Return HTML string for inserting recaptcha into a form."""
-        return captcha.displayhtml(self.auth.captcha_public_key,
-                                   use_ssl=self.auth.captcha_use_ssl)
+        return captcha.displayhtml(self.app.config['captcha.public_key'],
+                                   use_ssl=self.app.config['captcha.use_ssl'])
 
     def captcha_form(self, request):
         """Renders the captcha form"""
-        if not self.auth.captcha:
+        if not self.app.config['use_captcha']:
             raise HTTPNotFound('No captcha configured')
 
         return render_mako('captcha.mako', captcha=self._captcha())

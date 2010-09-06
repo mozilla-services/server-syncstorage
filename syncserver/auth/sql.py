@@ -67,9 +67,7 @@ _USER_RESET_CODE = select([users.c.reset_expiration, users.c.reset],
 class SQLAuth(object):
     """SQL authentication."""
 
-    def __init__(self, sqluri=_SQLURI, captcha=False,
-                 captcha_public_key=None, captcha_private_key=None,
-                 captcha_use_ssl=False, pool_size=20, pool_recycle=3600):
+    def __init__(self, sqluri=_SQLURI, pool_size=20, pool_recycle=3600):
         kw = {'pool_size': int(pool_size), 'pool_recycle': int(pool_recycle),
               'logging_name': 'weaveserver'}
 
@@ -79,10 +77,6 @@ class SQLAuth(object):
         self._engine = create_engine(sqluri, **kw)
         users.metadata.bind = self._engine
         users.create(checkfirst=True)
-        self.captcha_public_key = captcha_public_key
-        self.captcha_private_key = captcha_private_key
-        self.captcha_use_ssl = captcha_use_ssl
-        self.captcha = captcha
         self.sqluri = sqluri
 
     @classmethod

@@ -55,7 +55,8 @@ _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
 
 class StorageController(object):
 
-    def __init__(self, storage):
+    def __init__(self, app, storage):
+        self.app = app
         self.storage = raise_503(storage)
 
     def index(self, request):

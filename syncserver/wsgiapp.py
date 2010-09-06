@@ -129,9 +129,9 @@ class SyncServerApp(object):
         self.storage = WeaveStorage.get_from_config(self.config)
 
         # loading and connecting controllers
-        self.controllers = {'storage': StorageController(self.storage),
-                            'user': UserController(self.authtool),
-                            'static': StaticController()}
+        self.controllers = {'storage': StorageController(self, self.storage),
+                            'user': UserController(self, self.authtool),
+                            'static': StaticController(self)}
 
         URLS = []
         if self.config.get('provides_sync_apis', False):
