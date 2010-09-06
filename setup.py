@@ -42,7 +42,7 @@ extra_requires = {'full': ['MySQL-python', 'WebTest', 'redis',
                            'repoze.profile', 'python-ldap']}
 
 
-entry_points="""
+entry_points = """
 [paste.app_factory]
 main = syncserver.wsgiapp:make_app
 
