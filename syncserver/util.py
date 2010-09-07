@@ -193,10 +193,16 @@ def ssha256(password, salt=None):
 
 
 def validate_password(clear, hash):
-    """Validates a Salted-SHA256 password"""
-    real_hash = hash.split('{SSHA-256}')[-1]
+    """Validates a Salted-SHA(256) password"""
+    if hash.startswith('{SSHA-256}'):
+        real_hash = hash.split('{SSHA-256}')[-1]
+        hash_meth = ssha256
+    else:
+        real_hash = hash.split('{SSHA}')[-1]
+        hash_meth = ssha
+
     salt = base64.decodestring(real_hash)[-32:]
-    password = ssha(clear, salt)
+    password = hash_meth(clear, salt)
     return password == hash
 
 
