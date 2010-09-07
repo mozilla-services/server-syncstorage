@@ -141,6 +141,7 @@ class UserController(object):
                 raise HTTPBadRequest(WEAVE_INVALID_CAPTCHA)
 
         # all looks good, let's create the user
+        # XXX need to do it in routes
         if not self.auth.create_user(user_name, password, email):
             raise HTTPInternalServerError('User creation failed.')
 

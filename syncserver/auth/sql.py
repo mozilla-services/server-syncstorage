@@ -35,22 +35,19 @@
 # ***** END LICENSE BLOCK *****
 """ SQL Authentication
 
-Users are stored with digest password (sha1)
+Users are stored with digest password (ssha256)
 """
-import string
-import random
 import datetime
-import re
 
 from sqlalchemy import create_engine
 from sqlalchemy.sql import bindparam, select, insert, update, delete
 
-from syncserver.util import validate_password, ssha
+from syncserver.util import (validate_password, ssha256, check_reset_code,
+                             generate_reset_code)
 # sharing the same table than the sql storage
 from syncserver.storage.sqlmappers import users
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-_RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
 
 _USER_ID = select([users.c.id], users.c.username == bindparam('user_name'))
 
@@ -93,7 +90,7 @@ class SQLAuth(object):
 
     def create_user(self, user_name, password, email):
         """Creates a user. Returns True on success."""
-        password_hash = ssha(password)
+        password_hash = ssha256(password)
         query = insert(users).values(username=user_name, email=email,
                                      password_hash=password_hash, status=0)
         res = self._engine.execute(query)
@@ -124,14 +121,7 @@ class SQLAuth(object):
         Returns:
             a reset code, or None if the generation failed
         """
-        chars = string.ascii_uppercase + string.digits
-
-        def _4chars():
-            return ''.join([random.choice(chars) for i in range(4)])
-
-        code = '-'.join([_4chars() for i in range(4)])
-        expiration = datetime.datetime.now() + datetime.timedelta(hours=6)
-
+        code, expiration = generate_reset_code()
         query = update(users).values(reset=code, reset_expiration=expiration)
         res = self._engine.execute(query.where(users.c.id == user_id))
 
@@ -150,7 +140,7 @@ class SQLAuth(object):
         Returns:
             True or False
         """
-        if _RE_CODE.match(code) is None:
+        if not check_reset_code(code):
             return False
 
         res = self._engine.execute(_USER_RESET_CODE, user_id=user_id)
@@ -231,7 +221,7 @@ class SQLAuth(object):
         Returns:
             True if the change was successful, False otherwise
         """
-        password_hash = ssha(password)
+        password_hash = ssha256(password)
         query = update(users).where(users.c.id == user_id)
         res = self._engine.execute(query.values(password_hash=password_hash))
         return res.rowcount == 1

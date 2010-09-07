@@ -54,12 +54,15 @@ class TestWsgiApp(unittest.TestCase):
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         self.app = TestApp(make_app(self.config))
 
-        # adding a user (sql)
-        self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
+        # adding a user if needed
         self.user_id = self.auth.get_user_id('tarek')
+        if self.user_id is None:
+            self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
+            self.user_id = self.auth.get_user_id('tarek')
 
     def tearDown(self):
         self.storage.delete_storage(self.user_id)
+        self.auth.delete_user(self.user_id)
         cef_logs = os.path.join(self.appdir, 'test_cef.log')
         if os.path.exists(cef_logs):
             os.remove(cef_logs)

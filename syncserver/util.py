@@ -38,7 +38,7 @@ Various utilities
 """
 import random
 import string
-from hashlib import sha256
+from hashlib import sha256, sha1
 import base64
 import simplejson as json
 import itertools
@@ -50,6 +50,7 @@ import socket
 import re
 import os
 from functools import wraps
+import datetime
 
 from mako.lookup import TemplateLookup
 
@@ -61,6 +62,7 @@ from syncserver.cef import auth_failure
 # various authorization header names, depending on the setup
 _AUTH_HEADERS = ('Authorization', 'AUTHORIZATION', 'HTTP_AUTHORIZATION',
                  'REDIRECT_HTTP_AUTHORIZATION')
+_RE_CODE = re.compile('[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}')
 
 
 def authenticate_user(request, authtool, username=None):
@@ -171,6 +173,16 @@ def round_time(value):
 
 
 def ssha(password, salt=None):
+    """Returns a Salted-SHA password"""
+    if salt is None:
+        salt = ''.join([random.choice(string.letters + string.digits)
+                        for i in range(32)])
+    ssha = base64.encodestring(sha1(password + salt).digest()
+                               + salt).strip()
+    return "{SSHA}%s" % ssha
+
+
+def ssha256(password, salt=None):
     """Returns a Salted-SHA256 password"""
     if salt is None:
         salt = ''.join([random.choice(string.letters + string.digits)
@@ -364,3 +376,31 @@ def raise_503(instance):
         setattr(instance, func, _func)
 
     return instance
+
+
+def generate_reset_code():
+    """Generates a reset code
+
+    Returns:
+        reset code, expiration date
+    """
+    chars = string.ascii_uppercase + string.digits
+
+    def _4chars():
+        return ''.join([random.choice(chars) for i in range(4)])
+
+    code = '-'.join([_4chars() for i in range(4)])
+    expiration = datetime.datetime.now() + datetime.timedelta(hours=6)
+    return code, expiration
+
+
+def check_reset_code(code):
+    """Verify a reset code
+
+    Args:
+        code: reset code
+
+    Returns:
+        True or False
+    """
+    return _RE_CODE.match(code) is not None

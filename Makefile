@@ -29,7 +29,11 @@ mysqltest:
 redisqltest:
 	WEAVE_TESTFILE=redisql $(BIN)/nosetests -s syncserver
 
-alltest: test mysqltest redisqltest
+ldaptest:
+	WEAVE_TESTFILE=ldap $(BIN)/nosetests -s syncserver
+
+
+alltest: test mysqltest redisqltest ldaptest
 
 doc:
 	$(BIN)/sphinx-build doc/source/ doc/build/

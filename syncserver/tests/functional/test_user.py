@@ -88,6 +88,11 @@ class TestUser(support.TestWsgiApp):
         # setting back smtp and recaptcha
         smtplib.SMTP = self.old
         captcha.submit = self.old_submit
+        for user in ('tarek', 'tarek2'):
+            user_id = self.auth.get_user_id(user)
+            if user_id is None:
+                continue
+            self.auth.delete_user(user_id)
 
     def _submit(self, *args, **kw):
         return FakeCaptchaResponse()
@@ -233,11 +238,14 @@ class TestUser(support.TestWsgiApp):
 
     def test_delete_user(self):
         # creating another user
-        payload = {'email': 'tarek@ziade.org', 'password': 'x' * 9,
-                   'captcha-challenge': 'xxx',
-                   'captcha-response': 'xxx'}
-        payload = json.dumps(payload)
-        self.app.put('/user/1.0/tarek2', params=payload)
+        res = self.app.get('/user/1.0/tarek2')
+        if not json.loads(res.body):
+            payload = {'email': 'tarek@ziade.org',
+                       'password': 'x' * 9,
+                       'captcha-challenge': 'xxx',
+                       'captcha-response': 'xxx'}
+            payload = json.dumps(payload)
+            self.app.put('/user/1.0/tarek2', params=payload)
 
         # trying to suppress 'tarek' with 'tarek2'
         # this should generate a 401

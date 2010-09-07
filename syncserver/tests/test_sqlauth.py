@@ -65,10 +65,18 @@ class TestSQLAuth(unittest.TestCase):
         self.auth._engine.execute('delete from users')
 
     def test_authenticate_user(self):
+        if self.auth.get_name() != 'sql':
+            # not supported yet
+            return
+
         self.assertEquals(self.auth.authenticate_user('tarek', 'xxx'), None)
         self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), 1)
 
     def test_reset_code(self):
+        if self.auth.get_name() != 'sql':
+            # not supported yet
+            return
+
         self.assertFalse(self.auth.verify_reset_code(self.user_id, 'x'))
 
         # normal behavior
@@ -91,6 +99,9 @@ class TestSQLAuth(unittest.TestCase):
         self.assertFalse(self.auth.verify_reset_code(self.user_id, code))
 
     def test_status(self):
+        if self.auth.get_name() != 'sql':
+            # not supported yet
+            return
         # people with status '1' are disabled
         self.auth._engine.execute('update users set status=1')
         self.assertEquals(self.auth.authenticate_user('tarek', 'tarek'), None)
