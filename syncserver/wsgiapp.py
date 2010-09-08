@@ -67,12 +67,12 @@ from syncserver.controllers.static import StaticController
 # Sync API
 _SYNC = [
         ('GET', '/_API_/_USERNAME_/info/collections',
-         'storage', 'get_collections_info', True),
+         'storage', 'get_collections', True),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',
-         'storage', 'get_collections_count', True),
+         'storage', 'get_collection_counts', True),
         ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota', True),
-        ('GET', '/_API_/_USERNAME_/info/collections_usage', 'storage',
-         'get_collection_sizes', True),
+        ('GET', '/_API_/_USERNAME_/info/collection_usage', 'storage',
+         'get_collection_usage', True),
         # XXX empty collection call
         ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage', True),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',

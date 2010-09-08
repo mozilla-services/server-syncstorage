@@ -65,7 +65,7 @@ class TestStorage(support.TestWsgiApp):
             self.storage.set_item(self.user_id, 'col2', str(item),
                                   payload='xxx')
 
-    def test_get_collections_info(self):
+    def test_get_collections(self):
 
         resp = self.app.get('/1.0/tarek/info/collections')
         res = json.loads(resp.body)
@@ -76,7 +76,7 @@ class TestStorage(support.TestWsgiApp):
 
         # XXX need to test collections timestamps here
 
-    def test_get_collections_count(self):
+    def test_get_collection_count(self):
 
         resp = self.app.get('/1.0/tarek/info/collection_counts')
         res = json.loads(resp.body)
@@ -365,7 +365,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
         self.app.get('/1.0/tarek/storage/col2/two', status=404)
 
-    def test_collection_sizes(self):
+    def test_collection_usage(self):
         self.storage.delete_storage(self.user_id)
 
         wbo1 = {'id': 13, 'payload': 'XyX'}
@@ -373,7 +373,7 @@ class TestStorage(support.TestWsgiApp):
         wbos = json.dumps([wbo1, wbo2])
         self.app.post('/1.0/tarek/storage/col2', params=wbos)
 
-        res = self.app.get('/1.0/tarek/info/collections_usage')
+        res = self.app.get('/1.0/tarek/info/collection_usage')
         usage = json.loads(res.body)
         col2_size = usage['col2']
         wanted = len(wbo1['payload']) + len(wbo2['payload'])

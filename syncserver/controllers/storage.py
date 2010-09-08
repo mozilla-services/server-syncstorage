@@ -82,7 +82,7 @@ class StorageController(object):
         # XXX returns a 400 if the root is called
         raise HTTPBadRequest()
 
-    def get_collections_info(self, request, v=None):
+    def get_collections(self, request, v=None):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
@@ -93,7 +93,7 @@ class StorageController(object):
         response.headers['X-Weave-Records'] = str(len(collections))
         return response
 
-    def get_collections_count(self, request):
+    def get_collection_counts(self, request):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
@@ -110,7 +110,7 @@ class StorageController(object):
         used = self.storage.get_total_size(user_id)
         return json_response((used, self.storage.quota_size))
 
-    def get_collection_sizes(self, request):
+    def get_collection_usage(self, request):
         user_id = request.sync_info['user_id']
 
         return json_response(self.storage.get_collection_sizes(user_id))
