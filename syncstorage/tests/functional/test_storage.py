@@ -42,6 +42,7 @@ import time
 import struct
 
 from syncstorage.tests.functional import support
+from synccore.respcodes import WEAVE_OVER_QUOTA
 
 
 class TestStorage(support.TestWsgiApp):
@@ -603,7 +604,9 @@ class TestStorage(support.TestWsgiApp):
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
                            status=400)
-
+        # the body should be 14
+        self.assertEquals(res.headers['Content-Type'], 'application/json')
+        self.assertEquals(json.loads(res.body), WEAVE_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
         self.app.delete('/1.0/tarek/storage/col2')

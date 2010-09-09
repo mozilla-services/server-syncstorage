@@ -41,6 +41,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 """
 import simplejson as json
 
+from webob.response import Response
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 from synccore.util import (convert_response, json_response, round_time,
                            batch, raise_503)
@@ -51,6 +52,27 @@ from syncstorage.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
+
+
+class _HTTPJsonBadRequest(HTTPBadRequest):
+    """Allow WebOb Exception to hold Json responses.
+
+    XXX Should be fixed in WebOb
+    """
+    def generate_response(self, environ, start_response):
+        if self.content_length is not None:
+            del self.content_length
+
+        headerlist = [(key, value) for key, value in
+                      list(self.headerlist)
+                      if key != 'Content-Type']
+        body = json.dumps(self.detail)
+        resp = Response(body,
+            status=self.status,
+            headerlist=headerlist,
+            content_type='application/json'
+        )
+        return resp(environ, start_response)
 
 
 class StorageController(object):
@@ -187,7 +209,7 @@ class StorageController(object):
         user_id = request.sync_info['user_id']
         left = self.storage.get_size_left(user_id)
         if left <= 0.:  # no space left
-            raise HTTPBadRequest(WEAVE_OVER_QUOTA)
+            raise _HTTPJsonBadRequest(WEAVE_OVER_QUOTA)
         return left
 
     def set_item(self, request):
@@ -203,7 +225,7 @@ class StorageController(object):
         try:
             data = json.loads(request.body)
         except ValueError:
-            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
+            raise _HTTPJsonBadRequest(WEAVE_MALFORMED_JSON)
 
         wbo = WBO(data)
         consistent, msg = wbo.validate()
@@ -241,15 +263,15 @@ class StorageController(object):
         try:
             wbos = json.loads(request.body)
         except ValueError:
-            raise HTTPBadRequest(WEAVE_MALFORMED_JSON)
+            raise _HTTPJsonBadRequest(WEAVE_MALFORMED_JSON)
 
         if not isinstance(wbos, (tuple, list)):
             # thats a batch of one
             if 'id' not in wbos:
-                raise HTTPBadRequest(WEAVE_INVALID_WBO)
+                raise _HTTPJsonBadRequest(WEAVE_INVALID_WBO)
             id_ = str(wbos['id'])
             if '/' in id_:
-                raise HTTPBadRequest(WEAVE_INVALID_WBO)
+                raise _HTTPJsonBadRequest(WEAVE_INVALID_WBO)
 
             request.sync_info['item'] = id_
             return self.set_item(request)
@@ -345,7 +367,7 @@ class StorageController(object):
         is included.
         """
         if 'X-Confirm-Delete' not in request.headers:
-            raise HTTPBadRequest(WEAVE_INVALID_WRITE)
+            raise _HTTPJsonBadRequest(WEAVE_INVALID_WRITE)
         user_id = request.sync_info['user_id']
         self.storage.delete_storage(user_id)  # XXX failures ?
         return json_response(True)
