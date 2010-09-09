@@ -3,7 +3,7 @@ pyc$
 lib
 include
 bin
-SyncServer.egg-info
+SyncStorage.egg-info
 swp$
 html
 doc/build
