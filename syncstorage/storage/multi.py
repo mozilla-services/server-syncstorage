@@ -38,7 +38,7 @@ Multiple backend -- read to a master storage,
 writes to a collection of slave storages
 """
 from syncstorage.storage import WeaveStorage
-from syncstorage.plugin import filter_params
+from synccore.plugin import filter_params
 
 
 def _prepare_apis(name, bases, attrs):

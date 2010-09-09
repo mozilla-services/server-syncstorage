@@ -38,8 +38,8 @@ import os
 from logging.config import fileConfig
 
 from syncstorage.storage import WeaveStorage
-from syncstorage.auth import WeaveAuth
-from syncstorage.util import convert_config
+from synccore.auth import WeaveAuth
+from synccore.util import convert_config
 import syncstorage
 
 _WEAVEDIR = os.path.dirname(syncstorage.__file__)
