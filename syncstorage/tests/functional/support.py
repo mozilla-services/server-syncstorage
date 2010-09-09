@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,43 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+""" Base test class, with an instanciated app.
+"""
 import os
-import sys
-import site
-from logging.config import fileConfig
+import unittest
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
+from webtest import TestApp
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
+from syncstorage.tests.support import initenv
+from syncstorage.wsgiapp import make_app
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
 
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
+class TestWsgiApp(unittest.TestCase):
 
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
+    def setUp(self):
+        # loading the app
+        self.appdir, self.config, self.storage, self.auth = initenv()
+        # we don't support other storages for this test
+        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
+        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
+        self.app = TestApp(make_app(self.config))
 
-sys.path[:] = saved
+        # adding a user if needed
+        self.user_id = self.auth.get_user_id('tarek')
+        if self.user_id is None:
+            self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
+            self.user_id = self.auth.get_user_id('tarek')
 
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
+    def tearDown(self):
+        self.storage.delete_storage(self.user_id)
+        self.auth.delete_user(self.user_id)
+        cef_logs = os.path.join(self.appdir, 'test_cef.log')
+        if os.path.exists(cef_logs):
+            os.remove(cef_logs)
 
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
-
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
-
-application = loadapp('development.ini')
+        if os.path.exists(self.sqlfile):
+            os.remove(self.sqlfile)
+        else:
+            self.auth._engine.execute('truncate users')
+            self.auth._engine.execute('truncate collections')
+            self.auth._engine.execute('truncate wbo')

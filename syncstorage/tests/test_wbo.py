@@ -33,22 +33,63 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
+import unittest
 
-install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb', 'Mako', 'WebTest',
-                    'recaptcha-client', 'Routes', 'simplejson', 'distribute',
-                    'repoze.profile', 'SyncCore']
-
-extra_requires = {'full': ['MySQL-python', 'redis', 'python-ldap']}
+from syncstorage.wbo import WBO
 
 
-entry_points = """
-[paste.app_factory]
-main = syncstorage.wsgiapp:make_app
+class TestWBO(unittest.TestCase):
 
-[paste.app_install]
-main = paste.script.appinstall:Installer
-"""
+    def test_basic(self):
+        wbo = WBO()
+        wbo = WBO({'boooo': ''})
+        self.assertTrue('boooo' not in wbo)
 
-setup(name='SyncStorage', version=0.1, packages=find_packages(),
-      install_requires=install_requires, entry_points=entry_points)
+    def test_validation(self):
+        data = {'parentid': 'bigid' * 30}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+        data = {'parentid': 'id', 'sortindex': 9999999999}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+        data = {'parentid': 'id', 'sortindex': '9999.1'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+        self.assertTrue(wbo['sortindex'], 9999)
+
+        data = {'parentid': 'id', 'sortindex': 'ok'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
+        data = {'parentid':  33, 'sortindex': '12'}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+        self.assertEquals(wbo['parentid'], '33')
+        self.assertEquals(wbo['sortindex'], 12)
+
+        for bad_ttl in ('bouh', -1, 31537000):
+            data = {'parentid':  33, 'ttl': bad_ttl}
+            wbo = WBO(data)
+            result, failure = wbo.validate()
+            self.assertFalse(result)
+
+        data = {'parentid':  33, 'ttl': 3600}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWBO))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

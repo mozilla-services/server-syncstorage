@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,39 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+from ConfigParser import RawConfigParser
 import os
-import sys
-import site
 from logging.config import fileConfig
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
+from syncstorage.storage import WeaveStorage
+from syncstorage.auth import WeaveAuth
+from syncstorage.util import convert_config
+import syncstorage
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
+_WEAVEDIR = os.path.dirname(syncstorage.__file__)
+_TOPDIR = os.path.split(_WEAVEDIR)[0]
+if 'WEAVE_TESTFILE' in os.environ:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
+                             os.environ['WEAVE_TESTFILE'])
+else:
+    _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
 
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
+def initenv():
+    """Reads the config file and instanciates an auth and a storage.
 
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
+    The WEAVE_TESTFILE=name environment variable can be used to point
+    a particular tests_name.ini file.
+    """
+    cfg = RawConfigParser()
+    cfg.read(_INI_FILE)
 
-sys.path[:] = saved
+    # loading loggers
+    if cfg.has_section('loggers'):
+        fileConfig(_INI_FILE)
 
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
-
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
-
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
-
-application = loadapp('development.ini')
+    config = dict(cfg.items('DEFAULT') + cfg.items('app:main'))
+    config = convert_config(config)
+    storage = WeaveStorage.get_from_config(config)
+    auth = WeaveAuth.get_from_config(config)
+    return _TOPDIR, config, storage, auth

@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,42 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import os
-import sys
-import site
-from logging.config import fileConfig
+import unittest
+from syncstorage.plugin import Plugin
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
+class TestPlugin(unittest.TestCase):
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
+    def test_get(self):
+        self.assertRaises(KeyError, Plugin.get, 'xxx')
 
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
+        class Buggy(object):
 
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
+            def __init__(self):
+                raise IOError('boom')
 
-sys.path[:] = saved
+            @classmethod
+            def get_name(cls):
+                return 'buggy'
 
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
+        Plugin.register(Buggy)
+        self.assertRaises(TypeError, Plugin.get, 'buggy')
 
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
+        class Cool(object):
 
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
+            @classmethod
+            def get_name(cls):
+                return 'cool'
 
-application = loadapp('development.ini')
+        Plugin.register(Cool)
+        p = Plugin.get('cool')
+        self.assertTrue(isinstance(p, Cool))
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestPlugin))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")

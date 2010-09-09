@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,29 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import os
-import sys
-import site
-from logging.config import fileConfig
+"""
+Function called by :
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
+    $ paster setup-app development.ini
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
+Used to initialize the DB and create some data.
+"""
+from syncstorage import logger
+from syncstorage.auth import WeaveAuth
+from syncstorage.util import read_config
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
 
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
+def setup_app(command, filename, section):
+    """Called by setup-app"""
+    if '__file__' in filename:
+        config = read_config(filename['__file__'])
+    else:
+        config = dict()
 
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
+    # automatically creates the table if they don't exist yet
+    logger.info('Creating the DB tables if needed')
+    auth = WeaveAuth.get_from_config(config)
 
-sys.path[:] = saved
-
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
-
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
-
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
-
-application = loadapp('development.ini')
+    # create a tarek/tarek profile
+    logger.info('Adding a user')
+    auth.create_user('tarek', 'tarek', 'tarek@mozilla.com')

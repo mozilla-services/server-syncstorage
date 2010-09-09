@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,14 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import os
-import sys
-import site
-from logging.config import fileConfig
+"""
+Basic tests to verify that the dispatching mechanism works.
+"""
+from syncstorage.tests.functional import support
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
+class TestBasic(support.TestWsgiApp):
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
-
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
-
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
-
-sys.path[:] = saved
-
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
-
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
-
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
-
-application = loadapp('development.ini')
+    def test_404(self):
+        # make sure an unkown url returns a 404
+        self.app.get('/blabla', status=404)

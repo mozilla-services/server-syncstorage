@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -34,40 +33,52 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import unittest
 import os
-import sys
-import site
-from logging.config import fileConfig
+from tempfile import mkstemp
 
-# detecting if virtualenv was used in this dir
-_CURDIR = os.path.dirname(os.path.abspath(__file__))
-_PY_VER = sys.version.split()[0][:3]
+from syncstorage.cef import auth_failure
 
-# XXX Posix scheme
-_SITE_PKG = os.path.join(_CURDIR, 'lib', 'python' + _PY_VER, 'site-packages')
 
-# adding virtualenv's site-package and ordering paths
-saved = sys.path[:]
+class FakeRequest(object):
 
-if os.path.exists(_SITE_PKG):
-    site.addsitedir(_SITE_PKG)
+    host = remote_addr = '127.0.0.1'
+    url = 'http://example.com'
+    method = 'GET'
+    headers = {'User-Agent': 'MySuperBrowser'}
+    config = {'cef.version': '0', 'cef.vendor': 'mozilla',
+              'cef.device_version': '3', 'cef.product': 'weave',
+              'cef': True}
 
-for path in sys.path:
-    if path not in saved:
-        saved.insert(0, path)
 
-sys.path[:] = saved
+class TestWeaveLogger(unittest.TestCase):
 
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
+    def test_cef_logging(self):
+        # just make sure we escape "|" when appropriate
+        request = FakeRequest()
+        filename = request.config['cef.file'] = mkstemp()[1]
 
-# setting up logging
-ini_file = os.path.join(_CURDIR, 'development.ini')
-fileConfig(ini_file)
+        try:
+            # should not fail
+            auth_failure('xx|x', 5, request)
+            with open(filename) as f:
+                content = f.read()
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
 
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
-from synccore.wsgi import loadapp
+        self.assertEquals(len(content.split('|')), 9)
 
-application = loadapp('development.ini')
+        # should fail
+        request.headers['User-Agent'] = "|"
+        self.assertRaises(ValueError,
+                          auth_failure, 'xxx', 5, request)
+
+
+def test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestWeaveLogger))
+    return suite
+
+if __name__ == "__main__":
+    unittest.main(defaultTest="test_suite")
