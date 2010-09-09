@@ -604,6 +604,7 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
                            status=400)
 
+
     def test_get_collection_ttl(self):
         self.app.delete('/1.0/tarek/storage/col2')
         wbo = {'payload': 'XXX', 'ttl': 0}
