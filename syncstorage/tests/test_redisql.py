@@ -87,6 +87,7 @@ class FakeRedis(dict):
         return [id_ for id_ in self.sets[key]]
 
 if REDIS:
+
     class TestRediSQLStorage(unittest.TestCase):
 
         def setUp(self):
@@ -130,7 +131,7 @@ if REDIS:
             self.assertEquals(self.storage._conn.get_called, 2)
             self.assertEquals(self.storage._conn.set_called, 2)
             self.assertEquals(self.storage._conn.keys(), ['meta:global:1',
-                                                    'collections:stamp:1:meta'])
+                                                   'collections:stamp:1:meta'])
 
             # this should remove the cache
             self.storage.delete_item(_UID, 'meta', 'global')
@@ -142,7 +143,7 @@ if REDIS:
                     ]
             self.storage.set_items(_UID, 'meta', items)
             self.assertEquals(self.storage._conn.keys(), ['meta:global:1',
-                                                    'collections:stamp:1:meta'])
+                                                   'collections:stamp:1:meta'])
 
             # this should remove the cache
             self.storage.delete_items(_UID, 'meta')
@@ -162,8 +163,8 @@ if REDIS:
             self.assertEquals(self.storage._conn.get_called, 1)
             self.assertEquals(self.storage._conn.set_called, 3)
             self.assertEquals(self.storage._conn.keys(), ['tabs:1:1',
-                                                    'tabs:size:1:1',
-                                                    'collections:stamp:1:tabs'])
+                                                   'tabs:size:1:1',
+                                                   'collections:stamp:1:tabs'])
 
             # this should remove the cache
             self.storage.delete_item(_UID, 'tabs', '1')
@@ -209,7 +210,7 @@ if REDIS:
             set = self.storage._conn.set_called
             keys = self.storage._conn.keys()
 
-            stamps = self.storage.get_collection_timestamps(_UID)  # pumping cache
+            stamps = self.storage.get_collection_timestamps(_UID)  # pump cache
             stamps2 = self.storage.get_collection_timestamps(_UID)
             self.assertEquals(len(stamps), len(stamps2))
             self.assertEquals(len(stamps), 6)

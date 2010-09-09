@@ -69,6 +69,7 @@ urls = [('GET', '/_API_/_USERNAME_/info/collections',
 
 controllers = {'storage': StorageController}
 
+
 class StorageServerApp(SyncServerApp):
     """Storage application"""
     def __init__(self, urls, controllers, config=None):
