@@ -140,7 +140,7 @@ class TestStorage(support.TestWsgiApp):
         #self.storage.delete_items(self.user_id, 'col2')
         self.app.delete('/1.0/tarek/storage/col2')
 
-        wbo = {'id': '128', 'payload': 'x', 'payload': 'x'}
+        wbo = {'id': '128', 'payload': 'x'}
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/128', params=wbo)
         ts = json.loads(res.body)
@@ -149,7 +149,7 @@ class TestStorage(support.TestWsgiApp):
         fts = json.dumps(ts)
         time.sleep(.3)
 
-        wbo = {'id': '128', 'payload': 'x', 'payload': 'x'}
+        wbo = {'id': '129', 'payload': 'x'}
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/129', params=wbo)
         ts2 = json.loads(res.body)
