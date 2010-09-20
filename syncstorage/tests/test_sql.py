@@ -35,6 +35,7 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 import os
+import time
 from syncstorage.tests.support import initenv
 
 _UID = 1
@@ -176,6 +177,7 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_collection(_UID, 'col1')
         self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
         self.storage.set_item(_UID, 'col1', 2, payload='XXX' * 876, ttl=0)
+        time.sleep(1.1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1',
                                                 filters={'ttl': ('>', -1)})),

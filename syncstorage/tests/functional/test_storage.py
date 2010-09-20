@@ -617,6 +617,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'payload': 'XXX', 'ttl': 0}
         wbo = json.dumps(wbo)
         res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        time.sleep(1.1)
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(json.loads(res.body), [])
 
@@ -625,7 +626,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.put('/1.0/tarek/storage/col2/123456', params=wbo)
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 1)
-        time.sleep(1.)
+        time.sleep(1.1)
         res = self.app.get('/1.0/tarek/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
 
