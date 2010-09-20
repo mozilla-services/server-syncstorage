@@ -97,9 +97,8 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(res, wanted)
 
         res = self.storage.get_collections(_UID, fields=['name'])
-        res = res[-1].items()
-        res.sort()
-        self.assertEquals(res[-1], ('name', 'My collection'))
+        res = [line[0] for line in res]
+        self.assertTrue('My collection' in res)
 
         # adding a new collection
         self.storage.set_collection(_UID, 'My collection 2')

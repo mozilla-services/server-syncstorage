@@ -71,8 +71,7 @@ class TestStorage(support.TestWsgiApp):
         resp = self.app.get('/1.0/tarek/info/collections')
         res = json.loads(resp.body)
         keys = res.keys()
-        self.assertTrue('col1' in keys)
-        self.assertTrue('col1' in keys)
+        self.assertTrue(len(keys), 2)
         self.assertEquals(int(resp.headers['X-Weave-Records']), len(keys))
 
         # XXX need to test collections timestamps here
@@ -81,8 +80,9 @@ class TestStorage(support.TestWsgiApp):
 
         resp = self.app.get('/1.0/tarek/info/collection_counts')
         res = json.loads(resp.body)
-        self.assertEquals(res['col1'], 3)
-        self.assertEquals(res['col2'], 5)
+        values = res.values()
+        values.sort()
+        self.assertEquals(values, [3, 5])
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
     def test_get_collection(self):
@@ -380,7 +380,7 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get('/1.0/tarek/info/collection_usage')
         usage = json.loads(res.body)
-        col2_size = usage['col2']
+        col2_size = usage.values()[0]
         wanted = len(wbo1['payload']) + len(wbo2['payload'])
         self.assertEqual(col2_size, wanted / 1024.)
 
