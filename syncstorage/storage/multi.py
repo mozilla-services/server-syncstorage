@@ -83,13 +83,13 @@ class WeaveMultiStorage(object):
     __metaclass__ = _prepare_apis
 
     def __init__(self, master, slaves, **params):
-        __, master_params = filter_params('master', params, splitchar='_')
+        master_params = filter_params('master', params, splitchar='_')
         self.master = WeaveStorage.get(master, **master_params)
         self.slaves = []
 
         for slave in slaves.split(','):
             name, type_ = slave.split(':')
-            __, slave_params = filter_params(name, params, splitchar='_')
+            slave_params = filter_params(name, params, splitchar='_')
             self.slaves.append(WeaveStorage.get(type_, **slave_params))
 
     @classmethod

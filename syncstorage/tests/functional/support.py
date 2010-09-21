@@ -62,7 +62,7 @@ class TestWsgiApp(unittest.TestCase):
 
     def tearDown(self):
         self.storage.delete_storage(self.user_id)
-        self.auth.delete_user(self.user_id)
+        self.auth.delete_user(self.user_id, 'tarek')
         cef_logs = os.path.join(self.appdir, 'test_cef.log')
         if os.path.exists(cef_logs):
             os.remove(cef_logs)
