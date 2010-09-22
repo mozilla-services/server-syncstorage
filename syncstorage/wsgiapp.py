@@ -41,6 +41,10 @@ from synccore.baseapp import set_app, SyncServerApp
 from syncstorage.controllers.storage import StorageController
 from syncstorage.storage import WeaveStorage
 
+# pre-registering storage backend so they are easier to set up
+from syncstorage.storage.sql import SQLStorage
+WeaveStorage.register(SQLStorage)
+
 urls = [('GET', '/_API_/_USERNAME_/info/collections',
          'storage', 'get_collections', True),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',

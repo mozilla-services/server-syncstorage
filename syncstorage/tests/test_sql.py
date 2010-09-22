@@ -36,7 +36,15 @@
 import unittest
 import os
 import time
+
 from syncstorage.tests.support import initenv
+from syncstorage.storage import WeaveStorage
+from syncstorage.storage.sql import SQLStorage
+WeaveStorage.register(SQLStorage)
+
+from synccore.auth import WeaveAuth
+from synccore.auth.sql import SQLAuth
+WeaveAuth.register(SQLAuth)
 
 _UID = 1
 
