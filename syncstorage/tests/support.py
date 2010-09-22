@@ -63,6 +63,19 @@ def initenv():
     The WEAVE_TESTFILE=name environment variable can be used to point
     a particular tests_name.ini file.
     """
+    # pre-registering plugins
+    from syncstorage.storage.sql import SQLStorage
+    WeaveStorage.register(SQLStorage)
+    from synccore.auth.sql import SQLAuth
+    WeaveAuth.register(SQLAuth)
+    try:
+        from synccore.auth.ldapsql import LDAPAuth
+        WeaveAuth.register(LDAPAuth)
+    except ImportError:
+        pass
+    from synccore.auth.dummy import DummyAuth
+    WeaveAuth.register(DummyAuth)
+
     cfg = RawConfigParser()
     cfg.read(_INI_FILE)
 
