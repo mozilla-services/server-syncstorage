@@ -104,7 +104,7 @@ class CacheManager(Client):
 
 
 class MemcachedSQLStorage(SQLStorage):
-    """Uses Redis when possible/useful, SQL otherwise.
+    """Uses Memcached when possible/useful, SQL otherwise.
     """
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
