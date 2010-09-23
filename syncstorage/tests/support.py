@@ -66,6 +66,12 @@ def initenv():
     # pre-registering plugins
     from syncstorage.storage.sql import SQLStorage
     WeaveStorage.register(SQLStorage)
+
+    try:
+        from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+        WeaveStorage.register(MemcachedSQLStorage)
+    except ImportError:
+        pass
     from synccore.auth.sql import SQLAuth
     WeaveAuth.register(SQLAuth)
     try:

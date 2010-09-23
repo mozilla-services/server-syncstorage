@@ -43,7 +43,7 @@ from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
                             func, and_)
 
 from syncstorage.storage.sqlmappers import (tables, users, collections,
-                                           wbo, MAX_TTL)
+                                            wbo, MAX_TTL)
 from synccore.util import time2bigint, bigint2time
 from syncstorage.wbo import WBO
 
@@ -299,7 +299,7 @@ class SQLStorage(object):
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
         res = self._engine.execute(_COLLECTION_STAMPS,
-                                   user_id=user_id, ttl=time())
+                                   user_id=user_id, ttl=int(time()))
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
 
@@ -322,7 +322,7 @@ class SQLStorage(object):
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
         res = self._engine.execute(_COLLECTION_COUNTS, user_id=user_id,
-                                   ttl=time())
+                                   ttl=int(time()))
         try:
             return dict([(self._collid2name(user_id, collid), count)
                          for collid, count in res])
@@ -333,7 +333,7 @@ class SQLStorage(object):
         """Returns the max timestamp of a collection."""
         collection_id = self._get_collection_id(user_id, collection_name)
         res = self._engine.execute(_COLLECTIONS_MAX_STAMPS, user_id=user_id,
-                                   collection_id=collection_id, ttl=time())
+                                  collection_id=collection_id, ttl=int(time()))
         res = res.fetchone()
         stamp = res[0]
         if stamp is None:
@@ -348,7 +348,7 @@ class SQLStorage(object):
         if not self.use_quota:
             return dict()
         res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id,
-                                   ttl=time())
+                                   ttl=int(time()))
         return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
                      for col in res])
 
@@ -359,8 +359,8 @@ class SQLStorage(object):
         """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)
         res = self._engine.execute(_ITEM_EXISTS, user_id=user_id,
-                                   item_id=item_id,
-                                   collection_id=collection_id, ttl=time())
+                                  item_id=item_id,
+                                  collection_id=collection_id, ttl=int(time()))
         res = res.fetchone()
         if res is None:
             return None
@@ -406,7 +406,7 @@ class SQLStorage(object):
                         where.append(field > value)
 
         if filters is None or 'ttl' not in filters:
-            where.append(wbo.c.ttl > time())
+            where.append(wbo.c.ttl > int(time()))
 
         where = and_(*where)
         query = select(fields, where)
@@ -440,7 +440,7 @@ class SQLStorage(object):
         query = select(fields, _ITEM_ID_COL_USER)
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                    collection_id=collection_id,
-                                   ttl=time()).first()
+                                   ttl=int(time())).first()
         if res is None:
             return None
 
@@ -454,7 +454,7 @@ class SQLStorage(object):
         if 'ttl' not in values:
             values['ttl'] = MAX_TTL
         else:
-            values['ttl'] += time()
+            values['ttl'] += int(time())
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
@@ -538,7 +538,7 @@ class SQLStorage(object):
             if values.get('ttl%d' % num) is None:
                 values['ttl%d' % num] = 2100000000
             else:
-                values['ttl%d' % num] += time()
+                values['ttl%d' % num] += int(time())
 
             if self.use_quota and 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
@@ -627,7 +627,7 @@ class SQLStorage(object):
         if not self.use_quota:
             return 0.0
         res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id,
-                                   ttl=time())
+                                   ttl=int(time()))
         res = res.fetchone()
         if res is None or res[0] is None:
             return 0.0

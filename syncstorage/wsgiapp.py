@@ -44,6 +44,11 @@ from syncstorage.storage import WeaveStorage
 # pre-registering storage backend so they are easier to set up
 from syncstorage.storage.sql import SQLStorage
 WeaveStorage.register(SQLStorage)
+try:
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    WeaveStorage.register(MemcachedSQLStorage)
+except ImportError:
+    pass
 
 urls = [('GET', '/_API_/_USERNAME_/info/collections',
          'storage', 'get_collections', True),
