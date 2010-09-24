@@ -331,20 +331,21 @@ class WeaveStorage(Plugin):
         """
 
     @abc.abstractmethod
-    def get_total_size(self, user_id):
+    def get_total_size(self, user_id, recalculate):
         """Returns the total size in KB of a user storage.
 
         The size is the sum of stored payloads.
 
         Args:
             user_id: integer identifying the user in the storage.
+            recalculate: if True, kill any cache
 
         Returns:
             The size in Kbytes (float)
         """
 
     @abc.abstractmethod
-    def get_size_left(self, user_id):
+    def get_size_left(self, user_id, recalculate=False):
         """Returns the remaining size in KB of a user storage.
 
         The remaining size is calculated by substracting the
@@ -352,6 +353,7 @@ class WeaveStorage(Plugin):
 
         Args:
             user_id: integer identifying the user in the storage.
+            recalculate: if True, kill any cache
 
         Returns:
             The remaining size in Kbytes (float)

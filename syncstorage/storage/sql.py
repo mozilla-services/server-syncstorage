@@ -619,7 +619,7 @@ class SQLStorage(object):
                                    collection_id=collection_id, **extra_values)
         return res.rowcount > 0
 
-    def get_total_size(self, user_id):
+    def get_total_size(self, user_id, recalculate=False):
         """Returns the total size in KB of a user storage.
 
         The size is the sum of stored payloads.
@@ -633,6 +633,6 @@ class SQLStorage(object):
             return 0.0
         return int(res[0]) / _KB
 
-    def get_size_left(self, user_id):
+    def get_size_left(self, user_id, recalculate=False):
         """Returns the storage left for a user"""
-        return self.quota_size - self.get_total_size(user_id)
+        return self.quota_size - self.get_total_size(user_id, recalculate)

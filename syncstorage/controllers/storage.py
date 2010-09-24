@@ -52,7 +52,7 @@ from syncstorage.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
-
+_ONE_MEG = 1024
 
 class _HTTPJsonBadRequest(HTTPBadRequest):
     """Allow WebOb Exception to hold Json responses.
@@ -208,6 +208,8 @@ class StorageController(object):
         """
         user_id = request.sync_info['user_id']
         left = self.storage.get_size_left(user_id)
+        if left < _ONE_MEG:
+            left = self.storage.get_size_left(user_id, recalculate=True)
         if left <= 0.:  # no space left
             raise _HTTPJsonBadRequest(WEAVE_OVER_QUOTA)
         return left
@@ -238,7 +240,7 @@ class StorageController(object):
 
         res = self.storage.set_item(user_id, collection_name, item_id, **wbo)
         response = json_response(res)
-        if left <= 1024:
+        if left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
         return response
 

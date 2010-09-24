@@ -71,7 +71,9 @@ class CacheManager(Client):
 
     def get_tab(self, user_id, tab_id):
         tabs = self.get_tabs(user_id)
-        return tabs[tab_id]
+        if tabs is None:
+            return None
+        return tabs.get(tab_id)
 
     def get_tabs(self, user_id):
         key = _key(user_id, 'tabs')
@@ -284,15 +286,8 @@ class MemcachedSQLStorage(SQLStorage):
         """Returns the total size in KB for each collection of a user storage.
         """
         sizes = self.sqlstorage.get_collection_sizes(user_id)
-        tabs_size = 0
-
-        # xxx
-        #for item_id in self._conn.smembers(_key('tabs', user_id)):
-        #    tab_size = self._conn.get(_key('tabs', 'size', user_id, item_id))
-        #    if tab_size is not None:
-        #        tabs_size += int(tab_size)
-
-        sizes['tabs'] = tabs_size
+        tabs = self.cache.get_tabs(user_id)
+        sizes['tabs'] = sum([len(tab.get('payload'), '') for tab in tabs])
         return sizes
 
     def get_collection_timestamps(self, user_id):
