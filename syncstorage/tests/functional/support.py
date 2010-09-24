@@ -37,6 +37,7 @@
 """
 import os
 import unittest
+import random
 
 from webtest import TestApp
 
@@ -55,14 +56,18 @@ class TestWsgiApp(unittest.TestCase):
         self.app = TestApp(make_app(self.config))
 
         # adding a user if needed
-        self.user_id = self.auth.get_user_id('tarek')
+        self.user_name = 'test_user_%d' % random.randint(1, 100000)
+        self.user_id = self.auth.get_user_id(self.user_name)
+        self.password = 'x' * 9
+
         if self.user_id is None:
-            self.auth.create_user('tarek', 'tarek', 'tarek@mozilla.con')
-            self.user_id = self.auth.get_user_id('tarek')
+            self.auth.create_user(self.user_name, self.password,
+                                  'tarek@mozilla.con')
+            self.user_id = self.auth.get_user_id(self.user_name)
 
     def tearDown(self):
         self.storage.delete_storage(self.user_id)
-        self.auth.delete_user(self.user_id, 'tarek')
+        self.auth.delete_user(self.user_id, self.password)
         cef_logs = os.path.join(self.appdir, 'test_cef.log')
         if os.path.exists(cef_logs):
             os.remove(cef_logs)

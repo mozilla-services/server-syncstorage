@@ -51,9 +51,10 @@ class TestStorage(support.TestWsgiApp):
     def setUp(self):
         super(TestStorage, self).setUp()
         # user auth token
-        environ = {'Authorization': 'Basic %s' % \
-                        base64.encodestring('tarek:tarek')}
+        token = base64.encodestring('%s:%s' % (self.user_name, self.password))
+        environ = {'Authorization': 'Basic %s' % token}
         self.app.extra_environ = environ
+        self.root = '/1.0/%s' % self.user_name
 
         # let's create some collections for our tests
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
@@ -69,7 +70,7 @@ class TestStorage(support.TestWsgiApp):
 
     def test_get_collections(self):
 
-        resp = self.app.get('/1.0/tarek/info/collections')
+        resp = self.app.get(self.root + '/info/collections')
         res = json.loads(resp.body)
         keys = res.keys()
         self.assertTrue(len(keys), 2)
@@ -79,7 +80,7 @@ class TestStorage(support.TestWsgiApp):
 
     def test_get_collection_count(self):
 
-        resp = self.app.get('/1.0/tarek/info/collection_counts')
+        resp = self.app.get(self.root + '/info/collection_counts')
         res = json.loads(resp.body)
         values = res.values()
         values.sort()
@@ -87,9 +88,9 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
     def test_get_collection(self):
-        res = self.app.get('/1.0/tarek/storage/col3')
+        res = self.app.get(self.root + '/storage/col3')
         self.assertEquals(json.loads(res.body), [])
-        resp = self.app.get('/1.0/tarek/storage/col2')
+        resp = self.app.get(self.root + '/storage/col2')
         res = json.loads(resp.body)
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
@@ -100,7 +101,7 @@ class TestStorage(support.TestWsgiApp):
         # "ids"
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
-        res = self.app.get('/1.0/tarek/storage/col2?ids=1,3')
+        res = self.app.get(self.root + '/storage/col2?ids=1,3')
         res = json.loads(res.body)
         res.sort()
         self.assertEquals(res, ['1', '3'])
@@ -111,10 +112,10 @@ class TestStorage(support.TestWsgiApp):
         # result.
         wbo1 = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
         wbos = json.dumps([wbo1])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
         #self.storage.set_item(self.user_id, 'col2', '125',
         #                      predecessorid='XXXX')
-        res = self.app.get('/1.0/tarek/storage/col2?predecessorid=XXXX')
+        res = self.app.get(self.root + '/storage/col2?predecessorid=XXXX')
         res = json.loads(res.body)
         self.assertEquals(res, ['125'])
 
@@ -124,12 +125,12 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': '126', 'payload': 'x', 'parentid': 'papa'}
         wbo2 = {'id': '127', 'payload': 'x', 'parentid': 'papa'}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
         #self.storage.set_item(self.user_id, 'col2', '126', parentid='papa',
         #                      payload='x')
         #self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
         #                      payload='x')
-        res = self.app.get('/1.0/tarek/storage/col2?parentid=papa')
+        res = self.app.get(self.root + '/storage/col2?parentid=papa')
         res = json.loads(res.body)
         res.sort()
         self.assertEquals(res, ['126', '127'])
@@ -139,11 +140,11 @@ class TestStorage(support.TestWsgiApp):
         # modified before the date given.
 
         #self.storage.delete_items(self.user_id, 'col2')
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
 
         wbo = {'id': '128', 'payload': 'x'}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/128', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/128', params=wbo)
         ts = json.loads(res.body)
 
         #ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
@@ -152,7 +153,7 @@ class TestStorage(support.TestWsgiApp):
 
         wbo = {'id': '129', 'payload': 'x'}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/129', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/129', params=wbo)
         ts2 = json.loads(res.body)
 
         #ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
@@ -160,14 +161,14 @@ class TestStorage(support.TestWsgiApp):
 
         self.assertTrue(fts < fts2)
 
-        res = self.app.get('/1.0/tarek/storage/col2?older=%s' % ts2)
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
         res = json.loads(res.body)
         self.assertEquals(res, ['128'])
 
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
-        res = self.app.get('/1.0/tarek/storage/col2?newer=%s' % ts)
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
         res = json.loads(res.body)
         try:
             self.assertEquals(res, ['129'])
@@ -177,14 +178,14 @@ class TestStorage(support.TestWsgiApp):
 
         # "full"
         # If defined, returns the full WBO, rather than just the id.
-        res = self.app.get('/1.0/tarek/storage/col2?full=1')
+        res = self.app.get(self.root + '/storage/col2?full=1')
         res = json.loads(res.body)
         keys = res[0].keys()
         keys.sort()
         wanted = ['id', 'modified', 'payload', 'payload_size']
         self.assertEquals(keys, wanted)
 
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         res = json.loads(res.body)
         self.assertTrue(isinstance(res, list))
 
@@ -194,35 +195,35 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': '130', 'payload': 'x', 'sortindex': 11}
         wbo2 = {'id': '131', 'payload': 'x', 'sortindex': 9}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
-        res = self.app.get('/1.0/tarek/storage/col2?index_above=10')
+        res = self.app.get(self.root + '/storage/col2?index_above=10')
         res = json.loads(res.body)
         self.assertEquals(res, ['130'])
 
         # "index_below"
         # If defined, only returns items with a lower sortindex than the value
         # specified.
-        res = self.app.get('/1.0/tarek/storage/col2?index_below=10')
+        res = self.app.get(self.root + '/storage/col2?index_below=10')
         res = json.loads(res.body)
         self.assertEquals(res, ['131'])
 
         # "limit"
         # Sets the maximum number of ids that will be returned
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
 
         wbos = []
         for i in range(10):
             wbo = {'id': str(i), 'payload': 'x'}
             wbos.append(wbo)
         wbos = json.dumps(wbos)
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
-        res = self.app.get('/1.0/tarek/storage/col2?limit=2')
+        res = self.app.get(self.root + '/storage/col2?limit=2')
         res = json.loads(res.body)
         self.assertEquals(len(res), 2)
 
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         res = json.loads(res.body)
         self.assertTrue(len(res) > 9)
 
@@ -231,7 +232,7 @@ class TestStorage(support.TestWsgiApp):
         # paginate through a result set.
 
         # let's get 2, 3 and 4
-        res = self.app.get('/1.0/tarek/storage/col2?offset=2&limit=3')
+        res = self.app.get(self.root + '/storage/col2?offset=2&limit=3')
         res = json.loads(res.body)
         self.assertEquals(len(res), 3)
         res.sort()
@@ -241,30 +242,30 @@ class TestStorage(support.TestWsgiApp):
         #   'oldest' - Orders by modification date (oldest first)
         #   'newest' - Orders by modification date (newest first)
         #   'index' - Orders by the sortindex descending (highest weight first)
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
 
         for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
             wbo = {'id': index, 'payload': 'x', 'sortindex': sortindex}
             wbo = json.dumps(wbo)
-            self.app.post('/1.0/tarek/storage/col2', params=wbo)
+            self.app.post(self.root + '/storage/col2', params=wbo)
             time.sleep(0.1)
 
-        res = self.app.get('/1.0/tarek/storage/col2?sort=oldest')
+        res = self.app.get(self.root + '/storage/col2?sort=oldest')
         res = json.loads(res.body)
         self.assertEquals(res, ['0', '1', '2'])
 
-        res = self.app.get('/1.0/tarek/storage/col2?sort=newest')
+        res = self.app.get(self.root + '/storage/col2?sort=newest')
         res = json.loads(res.body)
         self.assertEquals(res, ['2', '1', '0'])
 
-        res = self.app.get('/1.0/tarek/storage/col2?sort=index')
+        res = self.app.get(self.root + '/storage/col2?sort=index')
         res = json.loads(res.body)
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
 
         # application/json
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.content_type, 'application/json')
 
         res = json.loads(res.body)
@@ -272,7 +273,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
         # application/newlines
-        res = self.app.get('/1.0/tarek/storage/col2',
+        res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/newlines')])
         self.assertEquals(res.content_type, 'application/newlines')
 
@@ -281,7 +282,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
         # application/whoisi
-        res = self.app.get('/1.0/tarek/storage/col2',
+        res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/whoisi')])
         self.assertEquals(res.content_type, 'application/whoisi')
 
@@ -301,13 +302,13 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(lines, ['0', '1', '2', '3', '4'])
 
         # unkown format defaults to json
-        res = self.app.get('/1.0/tarek/storage/col2',
+        res = self.app.get(self.root + '/storage/col2',
                         headers=[('Accept', 'application/xxx')])
         self.assertEquals(res.content_type, 'application/json')
 
     def test_get_item(self):
         # grabbing object 1 from col2
-        res = self.app.get('/1.0/tarek/storage/col2/1')
+        res = self.app.get(self.root + '/storage/col2/1')
         res = json.loads(res.body)
         keys = res.keys()
         keys.sort()
@@ -315,22 +316,22 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['id'], '1')
 
         # unexisting object
-        self.app.get('/1.0/tarek/storage/col2/99', status=404)
+        self.app.get(self.root + '/storage/col2/99', status=404)
 
     def test_set_item(self):
         # let's create an object
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
-        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-        res = self.app.get('/1.0/tarek/storage/col2/12345')
+        self.app.put(self.root + '/storage/col2/12345', params=wbo)
+        res = self.app.get(self.root + '/storage/col2/12345')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], _PLD)
 
         # now let's update it
         wbo = {'payload': 'YYY'}
         wbo = json.dumps(wbo)
-        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-        res = self.app.get('/1.0/tarek/storage/col2/12345')
+        self.app.put(self.root + '/storage/col2/12345', params=wbo)
+        res = self.app.get(self.root + '/storage/col2/12345')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], 'YYY')
 
@@ -339,13 +340,13 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 12, 'payload': _PLD}
         wbo2 = {'id': 13, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
         # checking what we did
-        res = self.app.get('/1.0/tarek/storage/col2/12')
+        res = self.app.get(self.root + '/storage/col2/12')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], _PLD)
-        res = self.app.get('/1.0/tarek/storage/col2/13')
+        res = self.app.get(self.root + '/storage/col2/13')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], _PLD)
 
@@ -353,13 +354,13 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 13, 'payload': 'XyX'}
         wbo2 = {'id': 14, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
         # checking what we did
-        res = self.app.get('/1.0/tarek/storage/col2/14')
+        res = self.app.get(self.root + '/storage/col2/14')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], _PLD)
-        res = self.app.get('/1.0/tarek/storage/col2/13')
+        res = self.app.get(self.root + '/storage/col2/13')
         res = json.loads(res.body)
         self.assertEquals(res['payload'], 'XyX')
 
@@ -368,8 +369,8 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 'two', 'payload': _PLD,
                 'sortindex': 'FAIL'}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        self.app.get('/1.0/tarek/storage/col2/two', status=404)
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_collection_usage(self):
         self.storage.delete_storage(self.user_id)
@@ -377,9 +378,9 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 13, 'payload': 'XyX'}
         wbo2 = {'id': 14, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
-        res = self.app.get('/1.0/tarek/info/collection_usage')
+        res = self.app.get(self.root + '/info/collection_usage')
         usage = json.loads(res.body)
         col2_size = usage['col2']
         wanted = len(wbo1['payload']) + len(wbo2['payload'])
@@ -393,13 +394,13 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 13, 'payload': _PLD}
         wbo3 = {'id': 14, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2, wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 3)
 
         # deleting all items
-        self.app.delete('/1.0/tarek/storage/col2')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
 
         # now trying deletion with filters
@@ -407,12 +408,12 @@ class TestStorage(support.TestWsgiApp):
         # "ids"
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        self.app.delete('/1.0/tarek/storage/col2?ids=12,14')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        self.app.delete(self.root + '/storage/col2?ids=12,14')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 1)
-        self.app.delete('/1.0/tarek/storage/col2?ids=13')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2?ids=13')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
 
         # "parentid"
@@ -422,69 +423,69 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
         wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
         wbos = json.dumps([wbo1, wbo2, wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        self.app.delete('/1.0/tarek/storage/col2?parentid=1')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        self.app.delete(self.root + '/storage/col2?parentid=1')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 1)
 
         # "older"
         # Only deletes objects in the collection that have been last
         # modified before the date given
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
         wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
         wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
         time.sleep(.1)
         now = time.time()
         time.sleep(.1)
         wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
         wbos = json.dumps([wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
-        self.app.delete('/1.0/tarek/storage/col2?older=%f' % now)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2?older=%f' % now)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 1)
 
         # "newer"
         # Only deletes objects in the collection that have been last modified
         # since the date given.
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
         wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
         wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
         wbos = json.dumps([wbo1, wbo2])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
         now = time.time()
         time.sleep(.3)
         wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
         wbos = json.dumps([wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        self.app.post(self.root + '/storage/col2', params=wbos)
 
-        self.app.delete('/1.0/tarek/storage/col2?newer=%f' % now)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2?newer=%f' % now)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 2)
 
         # "index_above"
         # Only delete objects with a higher sortindex than the value
         # specified
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
         self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
         self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
-        res = self.app.delete('/1.0/tarek/storage/col2?index_above=10')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.delete(self.root + '/storage/col2?index_above=10')
+        res = self.app.get(self.root + '/storage/col2')
         res = json.loads(res.body)
         self.assertEquals(res, ['131'])
 
         # "index_below"
         # Only delete objects with a lower sortindex than the value
         # specified.
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
         self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
         self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
-        res = self.app.delete('/1.0/tarek/storage/col2?index_below=10')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.delete(self.root + '/storage/col2?index_below=10')
+        res = self.app.get(self.root + '/storage/col2')
         res = json.loads(res.body)
         self.assertEquals(res, ['130'])
 
@@ -492,11 +493,11 @@ class TestStorage(support.TestWsgiApp):
         # Sets the maximum number of objects that will be deleted.
         # xxx see how to activate this under sqlite
 
-        #self.app.delete('/1.0/tarek/storage/col2')
+        #self.app.delete(self.root + '/storage/col2')
         #wbos = json.dumps([wbo1, wbo2, wbo3])
-        #self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        #self.app.delete('/1.0/tarek/storage/col2?limit=2')
-        #res = self.app.get('/1.0/tarek/storage/col2')
+        #self.app.post(self.root + '/storage/col2', params=wbos)
+        #self.app.delete(self.root + '/storage/col2?limit=2')
+        #res = self.app.get(self.root + '/storage/col2')
         #self.assertEquals(len(json.loads(res.body)), 1)
 
         # "sort"
@@ -516,17 +517,17 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 13, 'payload': _PLD}
         wbo3 = {'id': 14, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2, wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 3)
 
         # deleting item 13
-        self.app.delete('/1.0/tarek/storage/col2/13')
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2/13')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 2)
 
         # unexisting item should return a 200
-        self.app.delete('/1.0/tarek/storage/col2/12982')
+        self.app.delete(self.root + '/storage/col2/12982')
 
     def test_delete_storage(self):
         self.storage.delete_items(self.user_id, 'col2')
@@ -536,22 +537,22 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 13, 'payload': _PLD}
         wbo3 = {'id': 14, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2, wbo3])
-        self.app.post('/1.0/tarek/storage/col2', params=wbos)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.post(self.root + '/storage/col2', params=wbos)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 3)
 
         # deleting all with no confirmation
-        self.app.delete('/1.0/tarek/storage', status=400)
+        self.app.delete(self.root + '/storage', status=400)
 
         # deleting all for real now
-        res = self.app.delete('/1.0/tarek/storage/col2',
+        res = self.app.delete(self.root + '/storage/col2',
                               headers=[('X-Confirm-Delete', '1')])
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
 
     def test_x_weave_timestamp(self):
         now = time.time()
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertTrue(abs(now -
                 float(res.headers['X-Weave-Timestamp'])) < 0.1)
 
@@ -559,7 +560,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
         now = time.time()
-        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         self.assertTrue(abs(now -
                         float(res.headers['X-Weave-Timestamp'])) < 0.2)
 
@@ -568,26 +569,26 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': 13, 'payload': _PLD}
         wbos = json.dumps([wbo1, wbo2])
         now = time.time()
-        res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
         self.assertTrue(abs(now -
                         float(res.headers['X-Weave-Timestamp'])) < 0.2)
 
     def test_ifunmodifiedsince(self):
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
-        ts = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        ts = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         ts = json.loads(ts.body) - 1000
-        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+        self.app.put(self.root + '/storage/col2/12345', params=wbo,
                      headers=[('X-If-Unmodified-Since', str(ts))],
                      status=412)
 
     def test_quota(self):
-        res = self.app.get('/1.0/tarek/info/quota')
+        res = self.app.get(self.root + '/info/quota')
         old_used, quota = json.loads(res.body)
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
-        self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
-        res = self.app.get('/1.0/tarek/info/quota')
+        self.app.put(self.root + '/storage/col2/12345', params=wbo)
+        res = self.app.get(self.root + '/info/quota')
         used, quota = json.loads(res.body)
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
@@ -599,7 +600,7 @@ class TestStorage(support.TestWsgiApp):
             self.app.app.application.storage.quota_size = 0.1
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         self.assertEquals(res.headers['X-Weave-Quota-Remaining'], '0.0765625')
         try:
             self.app.app.storage.quota_size = 0
@@ -608,28 +609,28 @@ class TestStorage(support.TestWsgiApp):
             self.app.app.application.storage.quota_size = 0
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo,
+        res = self.app.put(self.root + '/storage/col2/12345', params=wbo,
                            status=400)
         # the body should be 14
         self.assertEquals(res.headers['Content-Type'], 'application/json')
         self.assertEquals(json.loads(res.body), WEAVE_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
-        self.app.delete('/1.0/tarek/storage/col2')
+        self.app.delete(self.root + '/storage/col2')
         wbo = {'payload': _PLD, 'ttl': 0}
         wbo = json.dumps(wbo)
-        res = self.app.put('/1.0/tarek/storage/col2/12345', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         time.sleep(1.1)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(json.loads(res.body), [])
 
         wbo = {'payload': _PLD, 'ttl': 1}
         wbo = json.dumps(wbo)
-        self.app.put('/1.0/tarek/storage/col2/123456', params=wbo)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        self.app.put(self.root + '/storage/col2/123456', params=wbo)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 1)
         time.sleep(1.1)
-        res = self.app.get('/1.0/tarek/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(json.loads(res.body)), 0)
 
     def test_batch(self):
@@ -637,6 +638,6 @@ class TestStorage(support.TestWsgiApp):
         # those are pushed in the DB in batches of 100
         wbos = [{'id': str(i), 'payload': _PLD} for i in range(250)]
         wbos = json.dumps(wbos)
-        res = self.app.post('/1.0/tarek/storage/col2', params=wbos)
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
         res = json.loads(res.body)
         self.assertEquals(len(res['success']), 250)
