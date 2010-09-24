@@ -136,7 +136,7 @@ if MEMCACHED:
                 self.assertEquals(meta, None)
 
         def test_tabs(self):
-            if not self._is_up():
+            if not self._is_up():  # no memcached == no tabs
                 return
 
             self.storage.set_user(_UID, email='tarek@ziade.org')
@@ -169,16 +169,16 @@ if MEMCACHED:
             self.assertEquals(tabs, None)
 
         def test_size(self):
-            if not self._is_up():
-                # see if we want to raise here
-                return
             # make sure we get the right size
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
-            self.storage.set_item(_UID, 'tabs', '1', payload=_PLD * 200)
-            self.storage.set_item(_UID, 'foo', '1', payload=_PLD * 200)
-            wanted = (len(_PLD * 200) * 2) / 1024.
+            self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
+            if self._is_up():
+                self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
+                wanted = len(_PLD) * 2 / 1024.
+            else:
+                wanted = len(_PLD) / 1024.
             self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
         def test_collection_stamps(self):
@@ -195,7 +195,10 @@ if MEMCACHED:
 
             stamps2 = self.storage.get_collection_timestamps(_UID)
             self.assertEquals(len(stamps), len(stamps2))
-            self.assertEquals(len(stamps), 2)
+            if self._is_up():
+                self.assertEquals(len(stamps), 2)
+            else:
+                self.assertEquals(len(stamps), 1)
 
 
 def test_suite():

@@ -45,11 +45,10 @@ from time import time
 from memcache import Client
 from sqlalchemy.sql import select, bindparam, func
 
-from syncstorage.storage.sql import SQLStorage
+from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 
 _SQLURI = 'mysql://sync:sync@localhost/sync'
-_KB = float(1024)
 _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
                            func.count(wbo)],
             wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
@@ -77,7 +76,11 @@ class CacheManager(Client):
 
     def get_tabs(self, user_id):
         key = _key(user_id, 'tabs')
-        return self.get(key)
+        tabs = self.get(key)
+        if tabs is None:
+            # memcached down ?
+            return []
+        return tabs
 
     def set_tabs(self, user_id, tabs):
         key = _key(user_id, 'tabs')
@@ -100,6 +103,9 @@ class CacheManager(Client):
 
     def tab_exists(self, user_id, tab_id):
         tabs = self.get_tabs(user_id)
+        if tabs is None:
+            # memcached down ?
+            return None
         if tab_id in tabs:
             return tabs[tab_id]['modified']
         return None
@@ -182,6 +188,7 @@ class MemcachedSQLStorage(SQLStorage):
         # update the total size cache
         total_size = sum([len(item.get('payload', '')) for item in items])
         if not self.cache.incr(_key(user_id, 'size'), total_size):
+            # stored in bytes
             self.cache.set(_key(user_id, 'size'), total_size)
 
         # update the meta/global cache or the tabs cache
@@ -274,12 +281,12 @@ class MemcachedSQLStorage(SQLStorage):
         """Returns the total size in KB of a user storage"""
         if recalculate:
             size = self.sqlstorage.get_total_size(user_id)
-            self.cache.set(_key(user_id, 'size'), size)
+            self.cache.set(_key(user_id, 'size'), int(size * _KB))
             return size
 
         size = self.cache.get(_key(user_id, 'size'))
-        if size is None:
-            return 0.
+        if size is None:    # memcached server seems down
+            size = self.sqlstorage.get_total_size(user_id) * _KB
         return  size / _KB
 
     def get_collection_sizes(self, user_id):
@@ -293,25 +300,19 @@ class MemcachedSQLStorage(SQLStorage):
     def get_collection_timestamps(self, user_id):
         stamps = self.cache.get(_key(user_id, 'stamps'))
 
+        # not cached yet or memcached is down
         if stamps is None:
-            # not cached yet
             stamps = super(MemcachedSQLStorage,
                            self).get_collection_timestamps(user_id)
 
             # caching it
             self.cache.set(_key(user_id, 'stamps'), stamps)
 
-            # we also need to add the tabs timestamp
-            key = _key(user_id, 'collections', 'stamp', 'tabs')
-            stamps['tabs'] = self.cache.get(key)
-
-            # cache marker
-            self.cache.set(_key(user_id, 'stamps'), stamps)
-            return stamps
-
         # we also need to add the tabs timestamp
         key = _key(user_id, 'collections', 'stamp', 'tabs')
-        stamps['tabs'] = self.cache.get(key)
+        tabs_stamp = self.cache.get(key)
+        if tabs_stamp is not None:  # memcached down ?
+            stamps['tabs'] = tabs_stamp
         return stamps
 
     def get_collection_max_timestamp(self, user_id, collection_name):
