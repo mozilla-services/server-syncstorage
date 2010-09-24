@@ -47,7 +47,7 @@ from synccore.auth.sql import SQLAuth
 WeaveAuth.register(SQLAuth)
 
 _UID = 1
-
+_PLD = '*' * 500
 
 class TestSQLStorage(unittest.TestCase):
 
@@ -136,11 +136,11 @@ class TestSQLStorage(unittest.TestCase):
         self.assertFalse(self.storage.item_exists(_UID, 'col', 1))
         self.assertEquals(self.storage.get_items(_UID, 'col'), [])
 
-        self.storage.set_item(_UID, 'col', 1, payload='XXX')
+        self.storage.set_item(_UID, 'col', 1, payload=_PLD)
         res = self.storage.get_item(_UID, 'col', 1)
-        self.assertEquals(res['payload'], 'XXX')
+        self.assertEquals(res['payload'], _PLD)
 
-        self.storage.set_item(_UID, 'col', 2, payload='XXX')
+        self.storage.set_item(_UID, 'col', 2, payload=_PLD)
 
         items = self.storage.get_items(_UID, 'col')
         self.assertEquals(len(items), 2)
@@ -154,16 +154,16 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(len(items), 0)
 
         self.storage.set_items(_UID, 'col',
-                               items=[{'id': 'o', 'payload': 'XXX'}])
+                               items=[{'id': 'o', 'payload': _PLD}])
         res = self.storage.get_item(_UID, 'col', 'o')
-        self.assertEquals(res['payload'], 'XXX')
+        self.assertEquals(res['payload'], _PLD)
 
     def test_get_collection_timestamps(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
         self.storage.set_collection(_UID, 'col2')
-        self.storage.set_item(_UID, 'col1', 1, payload='XXX')
-        self.storage.set_item(_UID, 'col2', 1, payload='XXX')
+        self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
+        self.storage.set_item(_UID, 'col2', 1, payload=_PLD)
 
         timestamps = self.storage.get_collection_timestamps(_UID)
         names = timestamps.keys()
@@ -173,18 +173,19 @@ class TestSQLStorage(unittest.TestCase):
         self.assertAlmostEquals(col1, timestamps['col2'])
 
     def test_storage_size(self):
+        before  = self.storage.get_total_size(_UID)
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
-
-        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
-        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 876)
-        self.assertAlmostEquals(self.storage.get_total_size(_UID), 2.566, 3)
+        self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
+        self.storage.set_item(_UID, 'col1', 2, payload=_PLD)
+        wanted = len(_PLD) * 2 / 1024.
+        self.assertEquals(self.storage.get_total_size(_UID) - before, wanted)
 
     def test_ttl(self):
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
-        self.storage.set_item(_UID, 'col1', 1, payload='XXX' * 34)
-        self.storage.set_item(_UID, 'col1', 2, payload='XXX' * 876, ttl=0)
+        self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
+        self.storage.set_item(_UID, 'col1', 2, payload=_PLD , ttl=0)
         time.sleep(1.1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1',
@@ -196,8 +197,8 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_collection(_UID, 'col1')
         id1 = '{ec1b7457-003a-45a9-bf1c-c34e37225ad7}'
         id2 = '{339f52e1-deed-497c-837a-1ab25a655e37}'
-        self.storage.set_item(_UID, 'col1', id1, payload='XXX' * 34)
-        self.storage.set_item(_UID, 'col1', id2, payload='XXX' * 89)
+        self.storage.set_item(_UID, 'col1', id1, payload=_PLD)
+        self.storage.set_item(_UID, 'col1', id2, payload=_PLD * 89)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 2)
 
         # now trying to delete them
