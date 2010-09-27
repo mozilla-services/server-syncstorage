@@ -57,17 +57,16 @@ class TestWsgiApp(unittest.TestCase):
 
         # adding a user if needed
         self.user_name = 'test_user_%d' % random.randint(1, 100000)
-        self.user_id = self.auth.get_user_id(self.user_name)
         self.password = 'x' * 9
-
-        if self.user_id is None:
-            self.auth.create_user(self.user_name, self.password,
-                                  'tarek@mozilla.con')
-            self.user_id = self.auth.get_user_id(self.user_name)
+        self.auth.create_user(self.user_name, self.password,
+                              'tarek@mozilla.com')
+        self.user_id = self.auth.get_user_id(self.user_name)
 
     def tearDown(self):
         self.storage.delete_storage(self.user_id)
-        self.auth.delete_user(self.user_id, self.password)
+        if not self.auth.delete_user(self.user_id, self.password):
+            raise ValueError('Could not remove user "%s"' % self.user_name)
+
         cef_logs = os.path.join(self.appdir, 'test_cef.log')
         if os.path.exists(cef_logs):
             os.remove(cef_logs)
