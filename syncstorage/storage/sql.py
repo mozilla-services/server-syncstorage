@@ -113,7 +113,7 @@ class SQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=3600, reset_on_return=True):
+                 pool_recycle=3600, reset_on_return=True, **kw):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
               'pool_recycle': int(pool_recycle),

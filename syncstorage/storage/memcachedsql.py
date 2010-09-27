@@ -117,7 +117,7 @@ class MemcachedSQLStorage(SQLStorage):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=3600, servers='127.0.01:11211'):
+                 pool_recycle=3600, servers='127.0.01:11211', **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
         self.sqlstorage.__init__(sqluri, standard_collections,
                                  use_quota, quota_size, pool_size,

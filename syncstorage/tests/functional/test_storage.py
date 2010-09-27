@@ -641,3 +641,24 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.post(self.root + '/storage/col2', params=wbos)
         res = json.loads(res.body)
         self.assertEquals(len(res['success']), 250)
+
+    def test_blacklisted_nodes(self):
+        app = self._get_app()
+        if not app.config.get('storage.check_blacklisted_nodes', False):
+            return
+
+        # "backoff:server" will add a X-Weave-Backoff header
+        app.cache.set('backoff:localhost:80', 2)
+        try:
+            resp = self.app.get(self.root + '/info/collections')
+            self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
+        finally:
+            app.cache.delete('backoff:localhost:80')
+
+        # "down:server" will make the node unavailable
+        app.cache.set('down:localhost:80', 1)
+        try:
+            resp = self.app.get(self.root + '/info/collections', status=503)
+            self.assertTrue("Server Problem Detected" in resp.body)
+        finally:
+            app.cache.delete('down:localhost:80')

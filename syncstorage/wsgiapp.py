@@ -36,8 +36,9 @@
 """
 Application entry point.
 """
-from synccore.baseapp import set_app, SyncServerApp
+from webob.exc import HTTPServiceUnavailable
 
+from synccore.baseapp import set_app, SyncServerApp
 from syncstorage.controllers.storage import StorageController
 from syncstorage.storage import WeaveStorage
 
@@ -49,6 +50,12 @@ try:
     WeaveStorage.register(MemcachedSQLStorage)
 except ImportError:
     pass
+
+try:
+    from memcache import Client
+except ImportError:
+    Client = None
+
 
 urls = [('GET', '/_API_/_USERNAME_/info/collections',
          'storage', 'get_collections', True),
@@ -84,6 +91,28 @@ class StorageServerApp(SyncServerApp):
     def __init__(self, urls, controllers, config=None):
         self.storage = WeaveStorage.get_from_config(config)
         super(StorageServerApp, self).__init__(urls, controllers, config)
+        self.check_blacklist = \
+                self.config.get('storage.check_blacklisted_nodes', False)
+        if self.check_blacklist and Client is not None:
+            servers = self.config.get('servers', '127.0.0.1:11211')
+            self.cache = Client(servers.split(','))
+        else:
+            self.cache = None
 
+    def _before_call(self, request):
+        # let's control if this server is not on the blacklist
+        if not self.check_blacklist:
+            return
+        host = request.host
+        if self.cache.get('down:%s' % host) is not None:
+            # the server is marked as down -- let's exit
+            raise HTTPServiceUnavailable("Server Problem Detected")
+
+        backoff = self.cache.get('backoff:%s' % host)
+        if backoff is not None:
+            # the server is marked to back-off requests. We will treat those
+            # but add the header
+            return {'X-Weave-Backoff': str(backoff)}
+        return {}
 
 make_app = set_app(urls, controllers, klass=StorageServerApp)

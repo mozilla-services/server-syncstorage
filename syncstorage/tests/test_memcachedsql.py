@@ -200,7 +200,6 @@ if MEMCACHED:
             else:
                 self.assertEquals(len(stamps), 1)
 
-
 def test_suite():
     suite = unittest.TestSuite()
     if MEMCACHED:

@@ -42,7 +42,7 @@ import random
 from webtest import TestApp
 
 from syncstorage.tests.support import initenv
-from syncstorage.wsgiapp import make_app
+from syncstorage.wsgiapp import make_app, SyncServerApp
 
 
 class TestWsgiApp(unittest.TestCase):
@@ -78,3 +78,12 @@ class TestWsgiApp(unittest.TestCase):
             self.auth._engine.execute('truncate users')
             self.auth._engine.execute('truncate collections')
             self.auth._engine.execute('truncate wbo')
+
+    def _get_app(self):
+        app = self.app
+        while not isinstance(app, SyncServerApp):
+            try:
+                app = app.app
+            except AttributeError:
+                app = app.application
+        return app
