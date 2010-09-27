@@ -646,6 +646,8 @@ class TestStorage(support.TestWsgiApp):
         app = self._get_app()
         if not app.config.get('storage.check_blacklisted_nodes', False):
             return
+        if app.cache is None:
+            return   # memcached is probably not installed
 
         # "backoff:server" will add a X-Weave-Backoff header
         app.cache.set('backoff:localhost:80', 2)
