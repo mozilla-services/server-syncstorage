@@ -117,12 +117,16 @@ class MemcachedSQLStorage(SQLStorage):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=3600, servers='127.0.01:11211', **kw):
+                 pool_recycle=3600, cache_servers=None, **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
         self.sqlstorage.__init__(sqluri, standard_collections,
                                  use_quota, quota_size, pool_size,
                                  pool_recycle)
-        self.cache = CacheManager(servers.split(','))
+        if isinstance(cache_servers, str):
+            cache_servers = [cache_servers]
+        elif cache_servers is None:
+            cache_servers = ['127.0.0.1:11211']
+        self.cache = CacheManager(cache_servers)
 
     @classmethod
     def get_name(self):
