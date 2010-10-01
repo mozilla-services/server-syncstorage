@@ -39,7 +39,7 @@ Application entry point.
 from webob.exc import HTTPServiceUnavailable
 
 from synccore.baseapp import set_app, SyncServerApp
-from syncstorage.controllers.storage import StorageController
+from syncstorage.controller import StorageController
 from syncstorage.storage import WeaveStorage
 
 # pre-registering storage backend so they are easier to set up
