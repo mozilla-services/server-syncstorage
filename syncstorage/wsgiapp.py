@@ -54,7 +54,7 @@ except ImportError:
 try:
     from memcache import Client
 except ImportError:
-    Client = None
+    Client = None       # NOQA
 
 
 urls = [('GET', '/_API_/_USERNAME_/info/collections',
