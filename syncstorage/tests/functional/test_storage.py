@@ -40,11 +40,19 @@ import base64
 import json
 import time
 import struct
+import random
+import string
 
 from syncstorage.tests.functional import support
 from synccore.respcodes import WEAVE_OVER_QUOTA
 
 _PLD = '*' * 500
+_ASCII = string.ascii_letters + string.digits
+
+
+def randtext(size=10):
+    return ''.join([random.choice(_ASCII) for i in range(size)])
+
 
 class TestStorage(support.TestWsgiApp):
 
@@ -650,7 +658,7 @@ class TestStorage(support.TestWsgiApp):
             return   # memcached is probably not installed
 
         if not app.cache.set('TEST', 1):
-            return # memcached server is probably down
+            return   # memcached server is probably down
 
         # "backoff:server" will add a X-Weave-Backoff header
         app.cache.set('backoff:localhost:80', 2)
@@ -667,3 +675,26 @@ class TestStorage(support.TestWsgiApp):
             self.assertTrue("Server Problem Detected" in resp.body)
         finally:
             app.cache.delete('down:localhost:80')
+
+    def test_weird_args(self):
+        # pushing some data in col2
+        wbos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
+        wbos = json.dumps(wbos)
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
+        res = json.loads(res.body)
+
+        # trying weird args and make sure the server returns 400s
+        args = ('older', 'newer', 'index_above', 'index_below', 'limit',
+                'offset')
+        for arg in args:
+            self.app.get(self.root + '/storage/col2?%s=%s' % (arg, randtext()),
+                         status=400)
+
+        # what about a crazy ids= string ?
+        ids = ','.join([randtext(100) for i in range(10)])
+        res = self.app.get(self.root + '/storage/col2?ids=%s' % ids)
+        self.assertEquals(json.loads(res.body), [])
+
+        # trying unexpected args - they should not break
+        self.app.get(self.root + '/storage/col2?blabla=1',
+                     status=200)

@@ -49,10 +49,10 @@ from synccore.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from syncstorage.wbo import WBO
 
-
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size']
 _ONE_MEG = 1024
+
 
 class _HTTPJsonBadRequest(HTTPBadRequest):
     """Allow WebOb Exception to hold Json responses.
@@ -70,8 +70,7 @@ class _HTTPJsonBadRequest(HTTPBadRequest):
         resp = Response(body,
             status=self.status,
             headerlist=headerlist,
-            content_type='application/json'
-        )
+            content_type='application/json')
         return resp(environ, start_response)
 
 
@@ -92,7 +91,6 @@ class StorageController(object):
         unmodified = request.headers.get('X-If-Unmodified-Since')
         if unmodified is None:
             return False
-
         unmodified = round_time(unmodified)
         max = self.storage.get_collection_max_timestamp(user_id,
                                                         collection_name)
@@ -137,49 +135,91 @@ class StorageController(object):
 
         return json_response(self.storage.get_collection_sizes(user_id))
 
-    # XXX see if we want to use kwargs here instead
-    def get_collection(self, request, ids=None, predecessorid=None,
-                       parentid=None, older=None, newer=None, full=False,
-                       index_above=None, index_below=None, limit=None,
-                       offset=None, sort=None):
-        """Returns a list of the WBO ids contained in a collection."""
-        # XXX sanity check on arguments (detect incompatible params here, or
-        # unknown values)
+    def _convert_args(self, kw):
+        """Converts incoming arguments for GET and DELETE on collections.
+
+        This function will also raise a 400 on bad args.
+        Unknown args are just dropped.
+        XXX see if we want to raise a 400 in that case
+        """
+        args = {}
         filters = {}
-        if ids is not None:
-            filters['id'] = 'in', ids.split(',')
-        if predecessorid is not None:
-            filters['predecessorid'] = '=', predecessorid
-        if parentid is not None:
-            filters['parentid'] = '=', parentid
-        if older is not None:
-            filters['modified'] = '<', older
-        if newer is not None:
-            filters['modified'] = '>', newer
-        if index_above is not None:
-            filters['sortindex'] = '>', float(index_above)
-        if index_below is not None:
-            filters['sortindex'] = '<', float(index_below)
+        convert_name = {'older': 'modified',
+                        'newer': 'modified',
+                        'index_above': 'sortindex',
+                        'index_below': 'sortindex'}
 
-        if limit is not None:
-            limit = int(limit)
-
-        if offset is not None:
-            # we need both
-            if limit is None:
-                offset = None
+        for arg in  ('older', 'newer', 'index_above', 'index_below'):
+            value = kw.get(arg)
+            if value is None:
+                continue
+            try:
+                value = float(value)
+            except ValueError:
+                raise HTTPBadRequest('Invalid value for "%s"' % arg)
+            if arg in ('older', 'index_below'):
+                filters[convert_name[arg]] = '<', value
             else:
-                offset = int(offset)
+                filters[convert_name[arg]] = '>', value
 
+        # convert limit and offset
+        limit = offset = None
+        for arg in ('limit', 'offset'):
+            value = kw.get(arg)
+            if value is None:
+                continue
+            try:
+                value = int(value)
+            except ValueError:
+                raise HTTPBadRequest('Invalid value for "%s"' % arg)
+            if arg == 'limit':
+                limit = value
+            else:
+                offset = value
+
+        # we can't have offset without limit
+        if limit is not None:
+            args['limit'] = limit
+
+        if offset is not None and limit is not None:
+            args['offset'] = offset
+
+        for arg in ('predecessorid', 'parentid'):
+            value = kw.get(arg)
+            if value is None:
+                continue
+            filters[arg] = '=', value
+
+        # XXX should we control id lengths ?
+        for arg in ('ids',):
+            value = kw.get(arg)
+            if value is None:
+                continue
+            filters['id'] = 'in', value.split(',')
+
+        sort = kw.get('sort')
+        if sort in ('oldest', 'newest', 'index'):
+            args['sort'] = sort
+        args['full'] = kw.get('full', False)
+        args['filters'] = filters
+        return args
+
+    def get_collection(self, request, **kw):
+        """Returns a list of the WBO ids contained in a collection."""
+        kw = self._convert_args(kw)
         collection_name = request.sync_info['collection']
         user_id = request.sync_info['user_id']
+        full = kw['full']
+
         if not full:
             fields = ['id']
         else:
             fields = _WBO_FIELDS
 
-        res = self.storage.get_items(user_id, collection_name, fields, filters,
-                                     limit, offset, sort)
+        res = self.storage.get_items(user_id, collection_name, fields,
+                                     kw['filters'],
+                                     kw.get('limit'), kw.get('offset'),
+                                     kw.get('sort'))
         if not full:
             res = [line['id'] for line in res]
 
@@ -318,48 +358,23 @@ class StorageController(object):
             response.headers['X-Weave-Quota-Remaining'] = str(left)
         return response
 
-    def delete_collection(self, request, ids=None, parentid=None, older=None,
-                          newer=None, index_above=None, index_below=None,
-                          predecessorid=None, limit=None, offset=None,
-                          sort=None):
+    def delete_collection(self, request, **kw):
         """Deletes the collection and all contents.
 
         Additional request parameters may modify the selection of which
         items to delete.
         """
-        # XXX sanity check on arguments (detect incompatible params here, or
-        # unknown values)
+        kw = self._convert_args(kw)
         collection_name = request.sync_info['collection']
         user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        filters = {}
-        if ids is not None:
-            ids = [id_.strip() for id_ in ids.split(',')]
-        if parentid is not None:
-            filters['parentid'] = '=', parentid
-        if predecessorid is not None:
-            filters['predecessorid'] = '=', predecessorid
-        if older is not None:
-            filters['modified'] = '<', float(older)
-        if newer is not None:
-            filters['modified'] = '>', float(newer)
-        if index_above is not None:
-            filters['sortindex'] = '>', float(index_above)
-        if index_below is not None:
-            filters['sortindex'] = '<', float(index_below)
-        if limit is not None:
-            limit = int(limit)
-        if offset is not None:
-            # we need both
-            if limit is None:
-                offset = None
-            else:
-                offset = int(offset)
-
-        res = self.storage.delete_items(user_id, collection_name, ids, filters,
-                                        limit=limit, offset=offset, sort=sort)
+        res = self.storage.delete_items(user_id, collection_name,
+                                        kw.get('ids'), kw['filters'],
+                                        limit=kw.get('limit'),
+                                        offset=kw.get('offset'),
+                                        sort=kw.get('sort'))
         return json_response(res)
 
     def delete_storage(self, request):
