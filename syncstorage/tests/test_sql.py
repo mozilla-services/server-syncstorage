@@ -49,6 +49,7 @@ WeaveAuth.register(SQLAuth)
 _UID = 1
 _PLD = '*' * 500
 
+
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
@@ -173,7 +174,7 @@ class TestSQLStorage(unittest.TestCase):
         self.assertAlmostEquals(col1, timestamps['col2'])
 
     def test_storage_size(self):
-        before  = self.storage.get_total_size(_UID)
+        before = self.storage.get_total_size(_UID)
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
@@ -185,7 +186,7 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_user(_UID, email='tarek@ziade.org')
         self.storage.set_collection(_UID, 'col1')
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
-        self.storage.set_item(_UID, 'col1', 2, payload=_PLD , ttl=0)
+        self.storage.set_item(_UID, 'col1', 2, payload=_PLD, ttl=0)
         time.sleep(1.1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 1)
         self.assertEquals(len(self.storage.get_items(_UID, 'col1',

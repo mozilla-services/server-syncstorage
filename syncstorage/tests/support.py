@@ -57,6 +57,7 @@ while True:
 
     _TOPDIR = os.path.split(_TOPDIR)[0]
 
+
 def initenv():
     """Reads the config file and instanciates an auth and a storage.
 

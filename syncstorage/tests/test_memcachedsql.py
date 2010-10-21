@@ -34,11 +34,9 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from collections import defaultdict
 
 #try:
 from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-from syncstorage.storage import memcachedsql
 MEMCACHED = True
 
 #except ImportError:
@@ -199,6 +197,7 @@ if MEMCACHED:
                 self.assertEquals(len(stamps), 2)
             else:
                 self.assertEquals(len(stamps), 1)
+
 
 def test_suite():
     suite = unittest.TestSuite()
