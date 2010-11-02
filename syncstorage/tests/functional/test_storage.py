@@ -698,3 +698,20 @@ class TestStorage(support.TestWsgiApp):
         # trying unexpected args - they should not break
         self.app.get(self.root + '/storage/col2?blabla=1',
                      status=200)
+
+    def test_guid_deletion(self):
+        # pushing some data in col2
+        wbos = [{'id': '{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i,
+                 'payload': _PLD} for i in range(5)]
+        wbos = json.dumps(wbos)
+        res = self.app.post(self.root + '/storage/passwords', params=wbos)
+        res = json.loads(res.body)
+
+        # now deleting some of them
+        ids = ','.join(['{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i
+                        for i in range(2)])
+
+        self.app.delete(self.root + '/storage/passwords?ids=%s' % ids)
+
+        res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
+        self.assertEqual(json.loads(res.body), [])

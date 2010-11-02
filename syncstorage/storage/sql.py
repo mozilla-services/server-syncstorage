@@ -63,6 +63,12 @@ _USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
 _USER_EXISTS = select([users.c.id], users.c.id == bindparam('user_id'))
 _DELETE_USER_COLLECTIONS = delete(collections).where( \
                                  collections.c.userid == bindparam('user_id'))
+_DELETE_SOME_USER_WBO = delete(wbo).where( \
+                                 and_(wbo.c.username == bindparam('user_id'),
+                                      wbo.c.collection ==
+                                      bindparam('collection_id'),
+                                      wbo.c.id == bindparam('item_id')))
+
 _DELETE_USER_COLLECTION = delete(collections).where(_USER_N_COLL)
 _DELETE_USER_WBOS = delete(wbo, wbo.c.username == bindparam('user_id'))
 _DELETE_USER = delete(users, users.c.id == bindparam('user_id'))
@@ -399,7 +405,6 @@ class SQLStorage(object):
                     value = time2bigint(value)
 
                 if isinstance(value, (list, tuple)):
-                    value = [str(item) for item in value]
                     where.append(field.in_(value))
                 else:
                     if operator == '=':
@@ -564,63 +569,61 @@ class SQLStorage(object):
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
-        query = text('delete from wbo where username = :user_id and '
-                     'collection = :collection_id and id = :item_id')
-        res = self._engine.execute(query, user_id=user_id,
-                                 collection_id=collection_id, item_id=item_id)
+        res = self._engine.execute(_DELETE_SOME_USER_WBO, user_id=user_id,
+                                   collection_id=collection_id,
+                                   item_id=item_id)
         return res.rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
-        if item_ids is None:
-            query = ('delete from wbo where username = :user_id and '
-                     'collection = :collection_id')
-        else:
-            ids = ', '.join(['"%s"' % str(id_) for id_ in item_ids])
-            query = ('delete from wbo where username = :user_id and '
-                     'collection = :collection_id and id in (%s)' % ids)
+        query = delete(wbo)
+        where = [wbo.c.username == bindparam('user_id'),
+                 wbo.c.collection == bindparam('collection_id')]
 
-        # preparing filters
-        extra = []
-        extra_values = {}
+        if item_ids is not None:
+            where.append(wbo.c.id.in_(item_ids))
+
         if filters is not None:
             for field, value in filters.items():
+                field = getattr(wbo.c, field)
+
                 operator, value = value
-                if field == 'modified':
+                if field.name == 'modified':
                     value = time2bigint(value)
-
                 if isinstance(value, (list, tuple)):
-                    value = [str(item) for item in value]
-                    extra.append('%s %s (%s)' % (field, operator,
-                                 ','.join(value)))
+                    where.append(field.in_(value))
                 else:
-                    extra.append('%s %s :%s' % (field, operator, field))
-                    extra_values[field] = value
+                    if operator == '=':
+                        where.append(field == value)
+                    elif operator == '<':
+                        where.append(field < value)
+                    elif operator == '>':
+                        where.append(field > value)
 
-        if extra != []:
-            query = '%s and %s' % (query, ' and '.join(extra))
-
-        if sort is not None and self.engine_name != 'sqlite':
-            if sort == 'oldest':
-                query += " order by modified"
-            elif sort == 'newest':
-                query += " order by modified desc"
-            elif sort == 'index':
-                query += " order by sortindex desc"
+        where = and_(*where)
+        query = query.where(where)
 
         if self.engine_name != 'sqlite':
+            if sort is not None:
+                if sort == 'oldest':
+                    query = query.order_by(wbo.c.modified.asc())
+                elif sort == 'newest':
+                    query = query.order_by(wbo.c.modified.desc())
+                else:
+                    query = query.order_by(wbo.c.sortindex.desc())
+
             if limit is not None and int(limit) > 0:
-                query += ' limit %d' % limit
+                query = query.limit(int(limit))
 
             if offset is not None and int(offset) > 0:
-                query += ' offset %d' % offset
+                query = query.offset(int(offset))
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        res = self._engine.execute(text(query), user_id=user_id,
-                                   collection_id=collection_id, **extra_values)
+        res = self._engine.execute(query, user_id=user_id,
+                                   collection_id=collection_id)
         return res.rowcount > 0
 
     def get_total_size(self, user_id, recalculate=False):
