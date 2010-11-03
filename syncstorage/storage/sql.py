@@ -78,13 +78,18 @@ _COLLECTION_EXISTS = select([collections.c.collectionid], _USER_N_COLL)
 _COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
                             collections.c.userid == bindparam('user_id'))
 
-_COLLECTION_MODIFIED = select([wbo.c.modified]).order_by(wbo.c.username.desc(),
-                wbo.c.collection.desc(),
-                wbo.c.modified.desc()).limit(1).alias('modified')
+wbo_alias = wbo.alias()
+
+_COLLECTION_MODIFIED = select([wbo_alias.c.modified],
+              and_(wbo_alias.c.username == wbo.c.username,
+                   wbo_alias.c.collection == wbo.c.collection)).\
+              order_by(wbo_alias.c.username.desc(),
+                       wbo_alias.c.collection.desc(),
+                       wbo_alias.c.modified.desc()).limit(1).as_scalar()
 
 _COLLECTION_STAMPS = select([wbo.c.collection, _COLLECTION_MODIFIED],
-            and_(wbo.c.username == bindparam('user_id'),
-                 wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
+                and_(wbo.c.username == bindparam('user_id'),
+                     wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
            and_(wbo.c.username == bindparam('user_id'),

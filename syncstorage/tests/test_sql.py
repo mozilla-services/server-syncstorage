@@ -173,6 +173,26 @@ class TestSQLStorage(unittest.TestCase):
         col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
         self.assertAlmostEquals(col1, timestamps['col2'])
 
+        # check that when we have several users, the method
+        # still returns the same timestamps for the first user
+        # which differs from the second user
+        time.sleep(1.)
+        self.storage.set_user(2, email='tarek2@ziade.org')
+        self.storage.set_collection(2, 'col1')
+        self.storage.set_collection(2, 'col2')
+        self.storage.set_item(2, 'col1', 1, payload=_PLD)
+        self.storage.set_item(2, 'col2', 1, payload=_PLD)
+
+        user1_timestamps = self.storage.get_collection_timestamps(_UID)
+        user1_timestamps = user1_timestamps.items()
+        user1_timestamps.sort()
+
+        user2_timestamps = self.storage.get_collection_timestamps(2)
+        user2_timestamps = user2_timestamps.items()
+        user2_timestamps.sort()
+
+        self.assertNotEqual(user1_timestamps, user2_timestamps)
+
     def test_storage_size(self):
         before = self.storage.get_total_size(_UID)
         self.storage.set_user(_UID, email='tarek@ziade.org')
