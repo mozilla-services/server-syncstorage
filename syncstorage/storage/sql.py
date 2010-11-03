@@ -121,6 +121,10 @@ _COLLECTIONS_STORAGE_SIZE = select([wbo.c.collection,
             and_(wbo.c.username == bindparam('user_id'),
                  wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
+_USER_COLLECTION_NAMES = select([collections.c.collectionid,
+                                 collections.c.name],
+                                collections.c.userid == bindparam('user_id'))
+
 _KB = float(1024)
 
 
@@ -306,10 +310,8 @@ class SQLStorage(object):
 
     def get_collection_names(self, user_id):
         """return the collection names for a given user"""
-        query = text('select collectionid, name from collections '
-                     'where userid = :user_id')
-        return [(res[0], res[1]) for res in
-                self._engine.execute(query, user_id=user_id).fetchall()]
+        names = self._engine.execute(_USER_COLLECTION_NAMES, user_id=user_id)
+        return [(res[0], res[1]) for res in names.fetchall()]
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
