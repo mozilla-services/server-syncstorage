@@ -36,11 +36,8 @@
 from setuptools import setup, find_packages
 
 install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb',
-                    'recaptcha-client', 'Routes', 'simplejson', 'distribute',
+                    'Routes', 'simplejson', 'distribute',
                     'SyncCore']
-
-extra_requires = {'full': ['MySQL-python', 'redis', 'python-ldap']}
-
 
 entry_points = """
 [paste.app_factory]
