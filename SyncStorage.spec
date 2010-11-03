@@ -44,11 +44,11 @@ install -m 0644 etc/production.ini %{buildroot}%{_sysconfdir}/sync/production.in
 # nginx config
 mkdir -p %{buildroot}%{_sysconfdir}/nginx
 mkdir -p %{buildroot}%{_sysconfdir}/nginx/conf.d
-install -m 0644 etc/synccore.nginx.conf %{buildroot}%{_sysconfdir}/nginx/conf.d/synccore.conf
+install -m 0644 etc/syncstorage.nginx.conf %{buildroot}%{_sysconfdir}/nginx/conf.d/syncstorage.conf
 
 # logging
 mkdir -p %{buildroot}%{_localstatedir}/log
-touch %{buildroot}%{_localstatedir}/log/synccore.log
+touch %{buildroot}%{_localstatedir}/log/syncstorage.log
 
 # the app
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES

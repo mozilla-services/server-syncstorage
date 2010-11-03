@@ -1,2 +1,2 @@
 include *.cfg *.ini *.wsgi *.sh
-
+recursive-include etc *
