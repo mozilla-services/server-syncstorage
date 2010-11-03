@@ -35,9 +35,9 @@
 # ***** END LICENSE BLOCK *****
 from setuptools import setup, find_packages
 
-install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb', 'Mako', 'WebTest',
+install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb',
                     'recaptcha-client', 'Routes', 'simplejson', 'distribute',
-                    'repoze.profile', 'SyncCore']
+                    'SyncCore']
 
 extra_requires = {'full': ['MySQL-python', 'redis', 'python-ldap']}
 

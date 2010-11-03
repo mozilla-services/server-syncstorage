@@ -1,8 +1,5 @@
-========
-Sync 1.1
-========
+============
+Sync Storage
+============
 
-This is the Python implementation of the Sync Server 1.1.
-
-The documentation is located in the doc folder.
-
+This is the Python implementation of the Storage Server.
