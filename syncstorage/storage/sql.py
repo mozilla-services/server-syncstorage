@@ -91,6 +91,10 @@ _COLLECTION_STAMPS = select([wbo.c.collection, _COLLECTION_MODIFIED],
                 and_(wbo.c.username == bindparam('user_id'),
                      wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
 
+_PG_COLLECTION_STAMPS = select([wbo.c.collection, func.max(wbo.c.modified)],
+             and_(wbo.c.username == bindparam('user_id'),
+                  wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
+
 _COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
            and_(wbo.c.username == bindparam('user_id'),
                 wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
@@ -150,6 +154,10 @@ class SQLStorage(object):
         self.standard_collections = standard_collections
         self.use_quota = use_quota
         self.quota_size = long(quota_size)
+        if self.engine_name == 'postgresql':
+            self.stamp_query = _PG_COLLECTION_STAMPS
+        else:
+            self.stamp_query = _COLLECTION_STAMPS
 
     @classmethod
     def get_name(cls):
@@ -315,7 +323,7 @@ class SQLStorage(object):
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        res = self._engine.execute(_COLLECTION_STAMPS,
+        res = self._engine.execute(self.stamp_query,
                                    user_id=user_id, ttl=int(time()))
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
