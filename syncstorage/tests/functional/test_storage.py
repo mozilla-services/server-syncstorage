@@ -60,7 +60,7 @@ class TestStorage(support.TestWsgiApp):
         super(TestStorage, self).setUp()
         # user auth token
         token = base64.encodestring('%s:%s' % (self.user_name, self.password))
-        environ = {'Authorization': 'Basic %s' % token}
+        environ = {'HTTP_AUTHORIZATION': 'Basic %s' % token}
         self.app.extra_environ = environ
         self.root = '/1.0/%s' % self.user_name
 
