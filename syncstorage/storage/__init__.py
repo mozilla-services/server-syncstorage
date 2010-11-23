@@ -44,10 +44,10 @@
 
 """
 import abc
-from synccore.plugin import Plugin
+from synccore.pluginreg import PluginRegistry
 
 
-class WeaveStorage(Plugin):
+class WeaveStorage(PluginRegistry):
     """Abstract Base Class for the storage."""
     name = 'storage'
 
