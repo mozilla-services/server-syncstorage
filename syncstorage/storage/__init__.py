@@ -49,7 +49,7 @@ from synccore.pluginreg import PluginRegistry
 
 class WeaveStorage(PluginRegistry):
     """Abstract Base Class for the storage."""
-    name = 'storage'
+    plugin_type = 'storage'
 
     @abc.abstractmethod
     def get_name(self):
