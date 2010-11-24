@@ -58,12 +58,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 touch %{_localstatedir}/log/syncstorage.log
-chown apache:apache %{_localstatedir}/log/syncstorage.log
-chmod 750 %{_localstatedir}/log/syncstorage.log
+chown nginx:nginx %{_localstatedir}/log/syncstorage.log
+chmod 640 %{_localstatedir}/log/syncstorage.log
 
 %files -f INSTALLED_FILES
 
-%attr(750, apache, apache) %ghost %{_localstatedir}/log/syncstorage.log
+%attr(640, nginx, nginx) %ghost %{_localstatedir}/log/syncstorage.log
 
 %dir %{_sysconfdir}/sync/
 
