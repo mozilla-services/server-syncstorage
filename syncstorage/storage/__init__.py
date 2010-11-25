@@ -370,7 +370,7 @@ def get_storage(config):
       backend class to be used, or the name of any backend synccore provides.
       "sql" or "memcachedsql".
 
-    - other keys that starts with "auth." are passed to the backend
+    - other keys that starts with "storage." are passed to the backend
       constructor -- with the prefix stripped.
     """
     # pre-loading auth plugins synccore provides to ease configuration
