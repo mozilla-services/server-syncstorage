@@ -40,16 +40,7 @@ from webob.exc import HTTPServiceUnavailable
 
 from synccore.baseapp import set_app, SyncServerApp
 from syncstorage.controller import StorageController
-from syncstorage.storage import WeaveStorage
-
-# pre-registering storage backend so they are easier to set up
-from syncstorage.storage.sql import SQLStorage
-WeaveStorage.register(SQLStorage)
-try:
-    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-    WeaveStorage.register(MemcachedSQLStorage)
-except ImportError:
-    pass
+from syncstorage.storage import get_storage
 
 try:
     from memcache import Client
@@ -89,7 +80,7 @@ controllers = {'storage': StorageController}
 class StorageServerApp(SyncServerApp):
     """Storage application"""
     def __init__(self, urls, controllers, config=None):
-        self.storage = WeaveStorage.get_from_config(config)
+        self.storage = get_storage(config)
         super(StorageServerApp, self).__init__(urls, controllers, config)
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)

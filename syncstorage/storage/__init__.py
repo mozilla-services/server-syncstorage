@@ -358,3 +358,28 @@ class WeaveStorage(PluginRegistry):
         Returns:
             The remaining size in Kbytes (float)
         """
+
+
+def get_storage(config):
+    """Returns a storage backend instance, given a config.
+
+    "config" is a mapping, containing the configuration.
+    All keys that starts with "auth." are used in the function.
+
+    - "storage.backend" must be present and contain a fully qualified name of a
+      backend class to be used, or the name of any backend synccore provides.
+      "sql" or "memcachedsql".
+
+    - other keys that starts with "auth." are passed to the backend
+      constructor -- with the prefix stripped.
+    """
+    # pre-loading auth plugins synccore provides to ease configuration
+    from syncstorage.storage.sql import SQLStorage
+    WeaveStorage.register(SQLStorage)
+    try:
+        from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+        WeaveStorage.register(MemcachedSQLStorage)
+    except ImportError:
+        pass
+
+    return WeaveStorage.get_from_config(config)
