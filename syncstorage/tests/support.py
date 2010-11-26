@@ -38,8 +38,8 @@ import os
 from logging.config import fileConfig
 
 from syncstorage.storage import WeaveStorage
-from synccore.auth import WeaveAuth
-from synccore.util import convert_config
+from services.auth import WeaveAuth
+from services.util import convert_config
 import syncstorage
 
 _WEAVEDIR = os.path.dirname(syncstorage.__file__)
@@ -73,14 +73,14 @@ def initenv():
         WeaveStorage.register(MemcachedSQLStorage)
     except ImportError:
         pass
-    from synccore.auth.sql import SQLAuth
+    from services.auth.sql import SQLAuth
     WeaveAuth.register(SQLAuth)
     try:
-        from synccore.auth.ldapsql import LDAPAuth
+        from services.auth.ldapsql import LDAPAuth
         WeaveAuth.register(LDAPAuth)
     except ImportError:
         pass
-    from synccore.auth.dummy import DummyAuth
+    from services.auth.dummy import DummyAuth
     WeaveAuth.register(DummyAuth)
 
     cfg = RawConfigParser()

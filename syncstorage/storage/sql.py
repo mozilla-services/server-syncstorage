@@ -44,7 +44,7 @@ from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
 
 from syncstorage.storage.sqlmappers import (tables, users, collections,
                                             wbo, MAX_TTL)
-from synccore.util import time2bigint, bigint2time
+from services.util import time2bigint, bigint2time
 from syncstorage.wbo import WBO
 
 

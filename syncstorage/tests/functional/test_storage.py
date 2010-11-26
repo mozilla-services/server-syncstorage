@@ -44,7 +44,7 @@ import random
 import string
 
 from syncstorage.tests.functional import support
-from synccore.respcodes import WEAVE_OVER_QUOTA
+from services.respcodes import WEAVE_OVER_QUOTA
 
 _PLD = '*' * 500
 _ASCII = string.ascii_letters + string.digits

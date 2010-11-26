@@ -43,9 +43,9 @@ import simplejson as json
 
 from webob.response import Response
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
-from synccore.util import (convert_response, json_response, round_time,
+from services.util import (convert_response, json_response, round_time,
                            batch, raise_503, HTTPJsonBadRequest)
-from synccore.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
+from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from syncstorage.wbo import WBO
 

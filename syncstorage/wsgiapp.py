@@ -38,7 +38,7 @@ Application entry point.
 """
 from webob.exc import HTTPServiceUnavailable
 
-from synccore.baseapp import set_app, SyncServerApp
+from services.baseapp import set_app, SyncServerApp
 from syncstorage.controller import StorageController
 from syncstorage.storage import get_storage
 

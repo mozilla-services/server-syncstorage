@@ -42,8 +42,8 @@ from syncstorage.storage import WeaveStorage
 from syncstorage.storage.sql import SQLStorage
 WeaveStorage.register(SQLStorage)
 
-from synccore.auth import WeaveAuth
-from synccore.auth.sql import SQLAuth
+from services.auth import WeaveAuth
+from services.auth.sql import SQLAuth
 WeaveAuth.register(SQLAuth)
 
 _UID = 1

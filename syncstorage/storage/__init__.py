@@ -44,7 +44,7 @@
 
 """
 import abc
-from synccore.pluginreg import PluginRegistry
+from services.pluginreg import PluginRegistry
 
 
 class WeaveStorage(PluginRegistry):
