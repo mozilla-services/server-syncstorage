@@ -35,12 +35,17 @@
 # ***** END LICENSE BLOCK *****
 """ SQL Mappers
 """
+from services.auth.sqlmappers import users
+
 from sqlalchemy.ext.declarative import declarative_base, Column
 from sqlalchemy import Integer, String, DateTime, Text, BigInteger
 
 _Base = declarative_base()
 tables = []
 MAX_TTL = 2100000000
+
+# mapper defined in services.auth
+tables.append(users)
 
 
 class Collections(_Base):
@@ -53,23 +58,6 @@ class Collections(_Base):
 
 collections = Collections.__table__
 tables.append(collections)
-
-
-class Users(_Base):
-    __tablename__ = 'users'
-
-    id = Column(Integer, primary_key=True, nullable=False)
-    username = Column(String(32))
-    password_hash = Column(String(128))
-    email = Column(String(64))
-    status = Column(Integer, default=0)
-    alert = Column(Text)
-    reset = Column(String(32))
-    reset_expiration = Column(DateTime())
-
-
-users = Users.__table__
-tables.append(users)
 
 
 class WBO(_Base):
