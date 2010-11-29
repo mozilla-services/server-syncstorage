@@ -37,7 +37,7 @@ from ConfigParser import RawConfigParser
 import os
 from logging.config import fileConfig
 
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage import SyncStorage
 from services.auth import ServicesAuth
 from services.util import convert_config
 import syncstorage
@@ -66,11 +66,11 @@ def initenv():
     """
     # pre-registering plugins
     from syncstorage.storage.sql import SQLStorage
-    WeaveStorage.register(SQLStorage)
+    SyncStorage.register(SQLStorage)
 
     try:
         from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-        WeaveStorage.register(MemcachedSQLStorage)
+        SyncStorage.register(MemcachedSQLStorage)
     except ImportError:
         pass
     from services.auth.sql import SQLAuth
@@ -94,6 +94,6 @@ def initenv():
     config = dict([(key, value % here)for key, value in
                    cfg.items('DEFAULT') + cfg.items('app:main')])
     config = convert_config(config)
-    storage = WeaveStorage.get_from_config(config)
+    storage = SyncStorage.get_from_config(config)
     auth = ServicesAuth.get_from_config(config)
     return _TOPDIR, config, storage, auth

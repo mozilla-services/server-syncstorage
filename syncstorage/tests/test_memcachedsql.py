@@ -41,14 +41,14 @@ MEMCACHED = True
 
 #except ImportError:
 #    MEMCACHED = False
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage import SyncStorage
 
 _UID = 1
 _PLD = '*' * 500
 
 # manual registration
 if MEMCACHED:
-    WeaveStorage.register(MemcachedSQLStorage)
+    SyncStorage.register(MemcachedSQLStorage)
 
     class TestMemcachedSQLStorage(unittest.TestCase):
 
@@ -57,7 +57,7 @@ if MEMCACHED:
                   'use_quota': True,
                   'quota_size': 5120}
 
-            self.storage = WeaveStorage.get('memcached', **kw)
+            self.storage = SyncStorage.get('memcached', **kw)
 
             # make sure we have the standard collections in place
             for name in ('client', 'crypto', 'forms', 'history'):

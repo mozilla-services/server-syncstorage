@@ -35,10 +35,10 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 
-from syncstorage.storage.multi import WeaveMultiStorage
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage.multi import SyncMultiStorage
+from syncstorage.storage import SyncStorage
 
-WeaveStorage.register(WeaveMultiStorage)
+SyncStorage.register(SyncMultiStorage)
 
 
 class Storage(object):
@@ -125,11 +125,11 @@ class Storage(object):
 class TestMultiStorage(unittest.TestCase):
 
     def test_multiple_storages(self):
-        WeaveStorage.register(Storage)
+        SyncStorage.register(Storage)
 
         # Defining a master with two slaves, with the same backend
         config = {'storage.backend':
-                    'syncstorage.storage.multi.WeaveMultiStorage',
+                    'syncstorage.storage.multi.SyncMultiStorage',
                   'storage.master': 'storage',
                   'storage.master.param1': 'one',
                   'storage.master.param2': 'two',
@@ -139,7 +139,7 @@ class TestMultiStorage(unittest.TestCase):
                   'storage.storage2.param1': 'three',
                   'storage.storage2.param2': 'four',
                   }
-        multi = WeaveStorage.get_from_config(config)
+        multi = SyncStorage.get_from_config(config)
 
         # trying a read
         self.assertTrue(multi.user_exists('tarek'))

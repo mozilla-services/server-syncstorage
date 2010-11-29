@@ -34,7 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage import SyncStorage
 
 
 class IAmAValidStorage(object):
@@ -111,21 +111,21 @@ class IAmAValidStorage(object):
         ''
 
 
-class TestWeaveStorageBase(unittest.TestCase):
+class TestSyncStorageBase(unittest.TestCase):
 
     def test_register(self):
 
         class NotAStorage(object):
             pass
 
-        self.assertRaises(TypeError, WeaveStorage.register, NotAStorage)
-        WeaveStorage.register(IAmAValidStorage)
-        self.assert_(isinstance(WeaveStorage.get('valid'), IAmAValidStorage))
+        self.assertRaises(TypeError, SyncStorage.register, NotAStorage)
+        SyncStorage.register(IAmAValidStorage)
+        self.assert_(isinstance(SyncStorage.get('valid'), IAmAValidStorage))
 
 
 def test_suite():
     suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestWeaveStorageBase))
+    suite.addTest(unittest.makeSuite(TestSyncStorageBase))
     return suite
 
 if __name__ == "__main__":

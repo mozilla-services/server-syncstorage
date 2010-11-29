@@ -37,7 +37,7 @@
 Multiple backend -- read to a master storage,
 writes to a collection of slave storages
 """
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage import SyncStorage
 from services.pluginreg import filter_params
 
 
@@ -78,19 +78,19 @@ def _prepare_apis(name, bases, attrs):
     return type(name, bases, attrs)
 
 
-class WeaveMultiStorage(object):
+class SyncMultiStorage(object):
     """Iterate on storages on every call."""
     __metaclass__ = _prepare_apis
 
     def __init__(self, master, slaves, **params):
         master_params = filter_params('master', params, splitchar='_')
-        self.master = WeaveStorage.get(master, **master_params)
+        self.master = SyncStorage.get(master, **master_params)
         self.slaves = []
 
         for slave in slaves.split(','):
             name, type_ = slave.split(':')
             slave_params = filter_params(name, params, splitchar='_')
-            self.slaves.append(WeaveStorage.get(type_, **slave_params))
+            self.slaves.append(SyncStorage.get(type_, **slave_params))
 
     @classmethod
     def get_name(cls):

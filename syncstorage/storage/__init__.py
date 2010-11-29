@@ -47,7 +47,7 @@ import abc
 from services.pluginreg import PluginRegistry
 
 
-class WeaveStorage(PluginRegistry):
+class SyncStorage(PluginRegistry):
     """Abstract Base Class for the storage."""
     plugin_type = 'storage'
 
@@ -375,11 +375,11 @@ def get_storage(config):
     """
     # pre-loading auth plugins synccore provides to ease configuration
     from syncstorage.storage.sql import SQLStorage
-    WeaveStorage.register(SQLStorage)
+    SyncStorage.register(SQLStorage)
     try:
         from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-        WeaveStorage.register(MemcachedSQLStorage)
+        SyncStorage.register(MemcachedSQLStorage)
     except ImportError:
         pass
 
-    return WeaveStorage.get_from_config(config)
+    return SyncStorage.get_from_config(config)

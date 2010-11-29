@@ -38,9 +38,9 @@ import os
 import time
 
 from syncstorage.tests.support import initenv
-from syncstorage.storage import WeaveStorage
+from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
-WeaveStorage.register(SQLStorage)
+SyncStorage.register(SQLStorage)
 
 from services.auth import ServicesAuth
 from services.auth.sql import SQLAuth
