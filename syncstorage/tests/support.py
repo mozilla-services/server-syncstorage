@@ -38,7 +38,7 @@ import os
 from logging.config import fileConfig
 
 from syncstorage.storage import WeaveStorage
-from services.auth import WeaveAuth
+from services.auth import ServicesAuth
 from services.util import convert_config
 import syncstorage
 
@@ -74,14 +74,14 @@ def initenv():
     except ImportError:
         pass
     from services.auth.sql import SQLAuth
-    WeaveAuth.register(SQLAuth)
+    ServicesAuth.register(SQLAuth)
     try:
         from services.auth.ldapsql import LDAPAuth
-        WeaveAuth.register(LDAPAuth)
+        ServicesAuth.register(LDAPAuth)
     except ImportError:
         pass
     from services.auth.dummy import DummyAuth
-    WeaveAuth.register(DummyAuth)
+    ServicesAuth.register(DummyAuth)
 
     cfg = RawConfigParser()
     cfg.read(_INI_FILE)
@@ -95,5 +95,5 @@ def initenv():
                    cfg.items('DEFAULT') + cfg.items('app:main')])
     config = convert_config(config)
     storage = WeaveStorage.get_from_config(config)
-    auth = WeaveAuth.get_from_config(config)
+    auth = ServicesAuth.get_from_config(config)
     return _TOPDIR, config, storage, auth

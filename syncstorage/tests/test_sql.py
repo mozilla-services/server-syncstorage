@@ -42,9 +42,9 @@ from syncstorage.storage import WeaveStorage
 from syncstorage.storage.sql import SQLStorage
 WeaveStorage.register(SQLStorage)
 
-from services.auth import WeaveAuth
+from services.auth import ServicesAuth
 from services.auth.sql import SQLAuth
-WeaveAuth.register(SQLAuth)
+ServicesAuth.register(SQLAuth)
 
 _UID = 1
 _PLD = '*' * 500
