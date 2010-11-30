@@ -38,7 +38,7 @@ Application entry point.
 """
 from webob.exc import HTTPServiceUnavailable
 
-from services.baseapp import set_app, SyncServerApp
+from services.baseapp import set_app, SyncServerApp, Authentication
 from syncstorage.controller import StorageController
 from syncstorage.storage import get_storage
 
@@ -79,9 +79,11 @@ controllers = {'storage': StorageController}
 
 class StorageServerApp(SyncServerApp):
     """Storage application"""
-    def __init__(self, urls, controllers, config=None):
+    def __init__(self, urls, controllers, config=None,
+                 auth_class=Authentication):
         self.storage = get_storage(config)
-        super(StorageServerApp, self).__init__(urls, controllers, config)
+        super(StorageServerApp, self).__init__(urls, controllers, config,
+                                               auth_class)
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)
         if self.check_blacklist and Client is not None:
