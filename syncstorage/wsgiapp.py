@@ -47,32 +47,35 @@ try:
 except ImportError:
     Client = None       # NOQA
 
+_EXTRAS = {'auth': True}
 
 urls = [('GET', '/_API_/_USERNAME_/info/collections',
-         'storage', 'get_collections', True),
+         'storage', 'get_collections', _EXTRAS),
         ('GET', '/_API_/_USERNAME_/info/collection_counts',
-         'storage', 'get_collection_counts', True),
-        ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota', True),
+         'storage', 'get_collection_counts', _EXTRAS),
+        ('GET', '/_API_/_USERNAME_/info/quota', 'storage', 'get_quota',
+          _EXTRAS),
         ('GET', '/_API_/_USERNAME_/info/collection_usage', 'storage',
-         'get_collection_usage', True),
+         'get_collection_usage', _EXTRAS),
         # XXX empty collection call
-        ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage', True),
+        ('PUT', '/_API_/_USERNAME_/storage/', 'storage', 'get_storage',
+         _EXTRAS),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'get_collection', True),
+        'get_collection', _EXTRAS),
         ('GET', '/_API_/_USERNAME_/storage/_COLLECTION_/_ITEM_', 'storage',
-        'get_item', True),
+        'get_item', _EXTRAS),
         ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_/_ITEM_', 'storage',
-        'set_item', True),
+        'set_item', _EXTRAS),
         ('POST', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'set_collection', True),
+        'set_collection', _EXTRAS),
         ('PUT', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',  # XXX FT
-        'set_collection', True),
+        'set_collection', _EXTRAS),
         ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_', 'storage',
-        'delete_collection', True),
+        'delete_collection', _EXTRAS),
         ('DELETE', '/_API_/_USERNAME_/storage/_COLLECTION_/_ITEM_', 'storage',
-        'delete_item', True),
+        'delete_item', _EXTRAS),
         ('DELETE', '/_API_/_USERNAME_/storage', 'storage', 'delete_storage',
-         True)]
+         _EXTRAS)]
 
 controllers = {'storage': StorageController}
 
