@@ -41,7 +41,6 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 """
 import simplejson as json
 
-from webob.response import Response
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 from services.util import (convert_response, json_response, round_time,
                            batch, raise_503, HTTPJsonBadRequest)

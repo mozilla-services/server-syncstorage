@@ -40,6 +40,7 @@ import time
 from sqlalchemy.exc import OperationalError
 
 from syncstorage.tests.support import initenv
+from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
 SyncStorage.register(SQLStorage)
@@ -238,6 +239,32 @@ class TestSQLStorage(unittest.TestCase):
         # this should fail because the table is absent
         self.assertRaises(OperationalError, storage.set_user, _UID,
                           email='tarek@ziade.org')
+
+    def test_shard(self):
+        # make shure we do shard
+        testsdir = os.path.dirname(__file__)
+        conf = os.path.join(testsdir, 'tests2.ini')
+
+        appdir, config, storage, auth = initenv(conf)
+
+        res = storage._engine.execute('select count(*) from wbo1')
+        self.assertEqual(res.fetchall()[0][0], 0)
+
+        # doing a few things on the DB
+        storage.set_user(_UID, email='tarek@ziade.org')
+        storage.set_collection(_UID, 'col1')
+        id1 = '{ec1b7457-003a-45a9-bf1c-c34e37225ad7}'
+        id2 = '{339f52e1-deed-497c-837a-1ab25a655e37}'
+        storage.set_item(_UID, 'col1', id1, payload=_PLD)
+        storage.set_item(_UID, 'col1', id2, payload=_PLD * 89)
+        self.assertEquals(len(storage.get_items(_UID, 'col1')), 2)
+
+        # now making sure we did that in the right table
+        table = get_wbo_table_name(_UID)
+        self.assertEqual(table, 'wbo1')
+        res = storage._engine.execute('select count(*) from wbo1')
+        self.assertEqual(res.fetchall()[0][0], 2)
+
 
 def test_suite():
     suite = unittest.TestSuite()

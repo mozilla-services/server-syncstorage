@@ -40,14 +40,17 @@ from time import time
 
 from sqlalchemy import create_engine
 from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
-                            func, and_)
+                            and_)
 
+from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import (tables, users, collections,
-                                            wbo, MAX_TTL)
+                                            get_wbo_table_name, MAX_TTL,
+                                            get_wbo_table, shards)
+from syncstorage.storage.sqlmappers import wbo as _wbo
 from services.util import time2bigint, bigint2time
 from syncstorage.wbo import WBO
 
-
+_KB = float(1024)
 _SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
                          5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
@@ -56,88 +59,13 @@ _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
 STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
                                     _STANDARD_COLLECTIONS.items()])
 
-# SQL Queries
-_USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
-                    collections.c.name == bindparam('collection_name'))
-
-_USER_EXISTS = select([users.c.id], users.c.id == bindparam('user_id'))
-_DELETE_USER_COLLECTIONS = delete(collections).where( \
-                                 collections.c.userid == bindparam('user_id'))
-_DELETE_SOME_USER_WBO = delete(wbo).where( \
-                                 and_(wbo.c.username == bindparam('user_id'),
-                                      wbo.c.collection ==
-                                      bindparam('collection_id'),
-                                      wbo.c.id == bindparam('item_id')))
-
-_DELETE_USER_COLLECTION = delete(collections).where(_USER_N_COLL)
-_DELETE_USER_WBOS = delete(wbo, wbo.c.username == bindparam('user_id'))
-_DELETE_USER = delete(users, users.c.id == bindparam('user_id'))
-
-_COLLECTION_EXISTS = select([collections.c.collectionid], _USER_N_COLL)
-
-_COLLECTION_NEXTID = select([func.max(collections.c.collectionid)],
-                            collections.c.userid == bindparam('user_id'))
-
-wbo_alias = wbo.alias()
-
-_COLLECTION_MODIFIED = select([wbo_alias.c.modified],
-              and_(wbo_alias.c.username == wbo.c.username,
-                   wbo_alias.c.collection == wbo.c.collection)).\
-              order_by(wbo_alias.c.username.desc(),
-                       wbo_alias.c.collection.desc(),
-                       wbo_alias.c.modified.desc()).limit(1).as_scalar()
-
-_COLLECTION_STAMPS = select([wbo.c.collection, _COLLECTION_MODIFIED],
-                and_(wbo.c.username == bindparam('user_id'),
-                     wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
-
-_PG_COLLECTION_STAMPS = select([wbo.c.collection, func.max(wbo.c.modified)],
-             and_(wbo.c.username == bindparam('user_id'),
-                  wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
-
-_COLLECTION_COUNTS = select([wbo.c.collection, func.count(wbo.c.collection)],
-           and_(wbo.c.username == bindparam('user_id'),
-                wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
-
-_COLLECTIONS_MAX_STAMPS = select([func.max(wbo.c.modified)],
-            and_(wbo.c.collection == bindparam('collection_id'),
-                 wbo.c.username == bindparam('user_id'),
-                 wbo.c.ttl > bindparam('ttl')))
-
-_ITEM_ID_COL_USER = and_(wbo.c.collection == bindparam('collection_id'),
-                         wbo.c.username == bindparam('user_id'),
-                         wbo.c.id == bindparam('item_id'),
-                         wbo.c.ttl > bindparam('ttl'))
-
-_ITEM_EXISTS = select([wbo.c.modified], _ITEM_ID_COL_USER)
-
-_DELETE_ITEMS = delete(wbo,
-                       and_(wbo.c.collection == bindparam('collection_id'),
-                            wbo.c.username == bindparam('user_id'),
-                            wbo.c.ttl > bindparam('ttl')))
-
-_USER_STORAGE_SIZE = select([func.sum(wbo.c.payload_size)],
-                       and_(wbo.c.username == bindparam('user_id'),
-                            wbo.c.ttl > bindparam('ttl')))
-
-_COLLECTIONS_STORAGE_SIZE = select([wbo.c.collection,
-            func.sum(wbo.c.payload_size)],
-            and_(wbo.c.username == bindparam('user_id'),
-                 wbo.c.ttl > bindparam('ttl'))).group_by(wbo.c.collection)
-
-_USER_COLLECTION_NAMES = select([collections.c.collectionid,
-                                 collections.c.name],
-                                collections.c.userid == bindparam('user_id'))
-
-_KB = float(1024)
-
 
 class SQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, reset_on_return=True, create_tables=True,
-                 **kw):
+                 shard=False, **kw):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
               'pool_recycle': int(pool_recycle),
@@ -156,10 +84,16 @@ class SQLStorage(object):
         self.standard_collections = standard_collections
         self.use_quota = use_quota
         self.quota_size = long(quota_size)
-        if self.engine_name == 'postgresql':
-            self.stamp_query = _PG_COLLECTION_STAMPS
+        self.shard = shard
+        if self.shard:
+            for table in shards:
+                table.metadata.bind = self._engine
+                if create_tables:
+                    table.create(checkfirst=True)
         else:
-            self.stamp_query = _COLLECTION_STAMPS
+            _wbo.metadata.bind = self._engine
+            if create_tables:
+                _wbo.create(checkfirst=True)
 
     @classmethod
     def get_name(cls):
@@ -169,10 +103,15 @@ class SQLStorage(object):
     #
     # Users APIs
     #
+    def _get_query(self, name, user_id):
+        if self.shard:
+            return get_query(name, user_id)
+        return get_query(name)
 
     def user_exists(self, user_id):
         """Returns true if the user exists."""
-        res = self._engine.execute(_USER_EXISTS, user_id=user_id).fetchone()
+        query = self._get_query('USER_EXISTS', user_id)
+        res = self._engine.execute(query, user_id=user_id).fetchone()
         return res is not None
 
     def set_user(self, user_id, **values):
@@ -203,8 +142,9 @@ class SQLStorage(object):
 
     def delete_user(self, user_id):
         """Removes a user (and all its data)"""
-        for query in (_DELETE_USER_COLLECTIONS, _DELETE_USER_WBOS,
-                      _DELETE_USER):
+        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS',
+                      'DELETE_USER'):
+            query = self._get_query(query, user_id)
             self._engine.execute(query, user_id=user_id)
 
     def _get_collection_id(self, user_id, collection_name, create=True):
@@ -226,7 +166,8 @@ class SQLStorage(object):
 
     def delete_storage(self, user_id):
         """Removes all user data"""
-        for query in (_DELETE_USER_COLLECTIONS, _DELETE_USER_WBOS):
+        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS'):
+            query = self._get_query(query, user_id)
             self._engine.execute(query, user_id=user_id)
         # XXX see if we want to check the rowcount
         return True
@@ -244,12 +185,14 @@ class SQLStorage(object):
         self.delete_items(user_id, collection_name)
 
         # then the collection
-        return self._engine.execute(_DELETE_USER_COLLECTION, user_id=user_id,
+        query = self._get_query('DELETE_USER_COLLECTION', user_id)
+        return self._engine.execute(query, user_id=user_id,
                                     collection_name=collection_name)
 
     def collection_exists(self, user_id, collection_name):
         """Returns True if the collection exists"""
-        res = self._engine.execute(_COLLECTION_EXISTS, user_id=user_id,
+        query = self._get_query('COLLECTION_EXISTS', user_id)
+        res = self._engine.execute(query, user_id=user_id,
                                    collection_name=collection_name)
         res = res.fetchone()
         return res is not None
@@ -267,8 +210,8 @@ class SQLStorage(object):
         # getting the max collection_id
         # XXX why don't we have an autoinc here ?
         # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
-        max = self._engine.execute(_COLLECTION_NEXTID,
-                                   user_id=user_id).first()
+        query = self._get_query('COLLECTION_NEXTID', user_id)
+        max = self._engine.execute(query, user_id=user_id).first()
         if max[0] is None:
             next_id = 1
         else:
@@ -320,13 +263,18 @@ class SQLStorage(object):
 
     def get_collection_names(self, user_id):
         """return the collection names for a given user"""
-        names = self._engine.execute(_USER_COLLECTION_NAMES, user_id=user_id)
+        query = self._get_query('USER_COLLECTION_NAMES', user_id)
+        names = self._engine.execute(query, user_id=user_id)
         return [(res[0], res[1]) for res in names.fetchall()]
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        res = self._engine.execute(self.stamp_query,
-                                   user_id=user_id, ttl=int(time()))
+        if self.engine_name == 'postgresql':
+            query = 'PG_COLLECTION_STAMPS'
+        else:
+            query = 'COLLECTION_STAMPS'
+        query = self._get_query(query, user_id)
+        res = self._engine.execute(query, user_id=user_id, ttl=int(time()))
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
 
@@ -348,8 +296,8 @@ class SQLStorage(object):
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
-        res = self._engine.execute(_COLLECTION_COUNTS, user_id=user_id,
-                                   ttl=int(time()))
+        query = self._get_query('COLLECTION_COUNTS', user_id)
+        res = self._engine.execute(query, user_id=user_id, ttl=int(time()))
         try:
             return dict([(self._collid2name(user_id, collid), count)
                          for collid, count in res])
@@ -358,8 +306,9 @@ class SQLStorage(object):
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
+        query = self._get_query('COLLECTION_MAX_STAMPS', user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
-        res = self._engine.execute(_COLLECTIONS_MAX_STAMPS, user_id=user_id,
+        res = self._engine.execute(query, user_id=user_id,
                                   collection_id=collection_id, ttl=int(time()))
         res = res.fetchone()
         stamp = res[0]
@@ -374,8 +323,8 @@ class SQLStorage(object):
         """
         if not self.use_quota:
             return dict()
-        res = self._engine.execute(_COLLECTIONS_STORAGE_SIZE, user_id=user_id,
-                                   ttl=int(time()))
+        query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
+        res = self._engine.execute(query, user_id=user_id, ttl=int(time()))
         return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
                      for col in res])
 
@@ -385,13 +334,19 @@ class SQLStorage(object):
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)
-        res = self._engine.execute(_ITEM_EXISTS, user_id=user_id,
-                                  item_id=item_id,
-                                  collection_id=collection_id, ttl=int(time()))
+        query = self._get_query('ITEM_EXISTS', user_id)
+        res = self._engine.execute(query, user_id=user_id,
+                                 item_id=item_id,
+                                 collection_id=collection_id, ttl=int(time()))
         res = res.fetchone()
         if res is None:
             return None
         return bigint2time(res[0])
+
+    def _get_wbo_table(self, user_id):
+        if self.shard:
+            return get_wbo_table(user_id)
+        return _wbo
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
                   limit=None, offset=None, sort=None):
@@ -403,6 +358,7 @@ class SQLStorage(object):
         It can be a single value, or a list. For the latter the in()
         operator is used. For single values, the operator has to be provided.
         """
+        wbo = self._get_wbo_table(user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
             fields = [wbo]
@@ -457,13 +413,14 @@ class SQLStorage(object):
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
+        wbo = self._get_wbo_table(user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
             fields = [wbo]
         else:
             fields = [getattr(wbo.c, field) for field in fields]
-
-        query = select(fields, _ITEM_ID_COL_USER)
+        where = self._get_query('ITEM_ID_COL_USER', user_id)
+        query = select(fields, where)
         res = self._engine.execute(query, user_id=user_id, item_id=item_id,
                                    collection_id=collection_id,
                                    ttl=int(time())).first()
@@ -474,6 +431,8 @@ class SQLStorage(object):
 
     def _set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
+        wbo = self._get_wbo_table(user_id)
+
         if 'modified' in values:
             values['modified'] = time2bigint(values['modified'])
 
@@ -516,6 +475,11 @@ class SQLStorage(object):
 
         return self._set_item(user_id, collection_name, item_id, **values)
 
+    def _get_wbo_table_name(self, user_id):
+        if self.shard:
+            return get_wbo_table_name(user_id)
+        return 'wbo'
+
     def set_items(self, user_id, collection_name, items):
         """Adds or update a batch of items.
 
@@ -536,8 +500,9 @@ class SQLStorage(object):
         fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                   'payload', 'payload_size', 'ttl')
 
-        query = 'insert into wbo (username, collection, %s) values ' \
-                    % ','.join(fields)
+        table = self._get_wbo_table_name(user_id)
+        query = 'insert into %s (username, collection, %s) values ' \
+                    % (table, ','.join(fields))
 
         values = {}
         values['collection'] = self._get_collection_id(user_id,
@@ -586,7 +551,8 @@ class SQLStorage(object):
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
-        res = self._engine.execute(_DELETE_SOME_USER_WBO, user_id=user_id,
+        query = self._get_query('DELETE_SOME_USER_WBO', user_id)
+        res = self._engine.execute(query, user_id=user_id,
                                    collection_id=collection_id,
                                    item_id=item_id)
         return res.rowcount == 1
@@ -595,6 +561,7 @@ class SQLStorage(object):
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
+        wbo = self._get_wbo_table(user_id)
         query = delete(wbo)
         where = [wbo.c.username == bindparam('user_id'),
                  wbo.c.collection == bindparam('collection_id')]
@@ -650,7 +617,9 @@ class SQLStorage(object):
         """
         if not self.use_quota:
             return 0.0
-        res = self._engine.execute(_USER_STORAGE_SIZE, user_id=user_id,
+
+        query = self._get_query('USER_STORAGE_SIZE', user_id)
+        res = self._engine.execute(query, user_id=user_id,
                                    ttl=int(time()))
         res = res.fetchone()
         if res is None or res[0] is None:
