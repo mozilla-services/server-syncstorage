@@ -37,6 +37,8 @@ import unittest
 import os
 import time
 
+from sqlalchemy.exc import OperationalError
+
 from syncstorage.tests.support import initenv
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
@@ -226,6 +228,16 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.delete_items(_UID, 'col1', item_ids=[id1, id2])
         self.assertEquals(len(self.storage.get_items(_UID, 'col1')), 0)
 
+    def test_no_create(self):
+        # testing the create_tables option
+        testsdir = os.path.dirname(__file__)
+        conf = os.path.join(testsdir, 'tests.ini')
+
+        appdir, config, storage, self.auth = initenv(conf)
+
+        # this should fail because the table is absent
+        self.assertRaises(OperationalError, storage.set_user, _UID,
+                          email='tarek@ziade.org')
 
 def test_suite():
     suite = unittest.TestSuite()

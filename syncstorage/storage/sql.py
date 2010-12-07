@@ -136,7 +136,8 @@ class SQLStorage(object):
 
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=3600, reset_on_return=True, **kw):
+                 pool_recycle=3600, reset_on_return=True, create_tables=True,
+                 **kw):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
               'pool_recycle': int(pool_recycle),
@@ -148,7 +149,8 @@ class SQLStorage(object):
         self._engine = create_engine(sqluri, **kw)
         for table in tables:
             table.metadata.bind = self._engine
-            table.create(checkfirst=True)
+            if create_tables:
+                table.create(checkfirst=True)
         self._user_collections = {}
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
