@@ -233,7 +233,7 @@ class TestSQLStorage(unittest.TestCase):
         testsdir = os.path.dirname(__file__)
         conf = os.path.join(testsdir, 'tests.ini')
 
-        appdir, config, storage, self.auth = initenv(conf)
+        appdir, config, storage, auth = initenv(conf)
 
         # this should fail because the table is absent
         self.assertRaises(OperationalError, storage.set_user, _UID,
