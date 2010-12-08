@@ -283,8 +283,8 @@ shards = [cls.__table__ for cls in (WBO0, WBO1, WBO2, WBO3, WBO4, WBO5, WBO6,
 
 
 def get_wbo_table(user_id):
-    return shards[user_id % 10]
+    return shards[int(user_id) % 10]
 
 
 def get_wbo_table_name(user_id):
-    return 'wbo%d' % (user_id % 10)
+    return 'wbo%d' % (int(user_id) % 10)

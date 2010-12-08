@@ -101,14 +101,9 @@ class StorageServerApp(SyncServerApp):
                                                auth_class)
         # collecting the host-specific config and building connectors
         self.storages = {}
-        hosts = ['localhost']
-        for key in config.keys():
-            if not key.startswith('host:'):
-                continue
-            host = key.split('.')[0][len('host:'):]
-            if host not in hosts:
-                hosts.append(host)
-
+        hosts = config.get('storage.hosts', ['localhost'])
+        if 'localhost' not in hosts:
+            hosts.append('localhost')
         for host in hosts:
             config = self._host_specific(host, config)
             self.storages[host] = get_storage(config)
