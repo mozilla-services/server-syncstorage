@@ -62,6 +62,9 @@ class StorageController(object):
         self.app = app
 
     def index(self, request):
+        if not self.app.config.get('storage.display_config', False):
+            return HTTPNotFound()
+
         # let's print out the info
         res = ['<html><body><h1>Request</h1>']
         # environ
