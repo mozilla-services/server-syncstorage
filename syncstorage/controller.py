@@ -39,6 +39,8 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
+import pprint
+from StringIO import StringIO
 import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
@@ -46,6 +48,7 @@ from services.util import (convert_response, json_response, round_time,
                            batch, raise_503, HTTPJsonBadRequest)
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
+from services.util import html_response
 from syncstorage.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
@@ -57,13 +60,33 @@ class StorageController(object):
 
     def __init__(self, app):
         self.app = app
-        self.storage = raise_503(app.storage)
 
     def index(self, request):
-        return "Sync Server"
+        # let's print out the info
+        res = ['<html><body><h1>Request</h1>']
+        # environ
+        out = StringIO()
+        pprint.pprint(request.environ, out)
+        out.seek(0)
+        environ = out.read()
+        res.append('<pre>%s</pre>' % environ)
+
+        # config
+        res.append('<h1>Storage in usage</h1>')
+        storage = self._get_storage(request)
+        res.append('<ul>')
+        res.append('<li>backend: %s</li>' %  storage.get_name())
+        if storage.get_name() in ('sql',):
+            res.append('<li>sqluri: %s</li>' %  storage.sqluri)
+        res.append('</ul>')
+        res.append('</body></html>')
+        return html_response(''.join(res))
 
     def _has_modifiers(self, data):
         return 'payload' in data
+
+    def _get_storage(self, request):
+        return self.app.get_storage(request)
 
     def _was_modified(self, request, user_id, collection_name):
         """Checks the X-If-Unmodified-Since header."""
@@ -71,7 +94,7 @@ class StorageController(object):
         if unmodified is None:
             return False
         unmodified = round_time(unmodified)
-        max = self.storage.get_collection_max_timestamp(user_id,
+        max = self._get_storage(request).get_collection_max_timestamp(user_id,
                                                         collection_name)
         if max is None:
             return False
@@ -87,7 +110,7 @@ class StorageController(object):
         """
         # 'v' is the version of the client, given the first time
         user_id = request.sync_info['user_id']
-        collections = self.storage.get_collection_timestamps(user_id)
+        collections = self._get_storage(request).get_collection_timestamps(user_id)
         response = convert_response(request, collections)
         response.headers['X-Weave-Records'] = str(len(collections))
         return response
@@ -97,22 +120,22 @@ class StorageController(object):
         Along with the total number of items for each collection.
         """
         user_id = request.sync_info['user_id']
-        counts = self.storage.get_collection_counts(user_id)
+        counts = self._get_storage(request).get_collection_counts(user_id)
         response = convert_response(request, counts)
         response.headers['X-Weave-Records'] = str(len(counts))
         return response
 
     def get_quota(self, request):
-        if not self.storage.use_quota:
+        if not self._get_storage(request).use_quota:
             return json_response((0.0, 0))
         user_id = request.sync_info['user_id']
-        used = self.storage.get_total_size(user_id)
-        return json_response((used, self.storage.quota_size))
+        used = self._get_storage(request).get_total_size(user_id)
+        return json_response((used, self._get_storage(request).quota_size))
 
     def get_collection_usage(self, request):
         user_id = request.sync_info['user_id']
 
-        return json_response(self.storage.get_collection_sizes(user_id))
+        return json_response(self._get_storage(request).get_collection_sizes(user_id))
 
     def _convert_args(self, kw):
         """Converts incoming arguments for GET and DELETE on collections.
@@ -195,7 +218,7 @@ class StorageController(object):
         else:
             fields = _WBO_FIELDS
 
-        res = self.storage.get_items(user_id, collection_name, fields,
+        res = self._get_storage(request).get_items(user_id, collection_name, fields,
                                      kw['filters'],
                                      kw.get('limit'), kw.get('offset'),
                                      kw.get('sort'))
@@ -212,7 +235,7 @@ class StorageController(object):
         item_id = request.sync_info['item']
         user_id = request.sync_info['user_id']
         fields = _WBO_FIELDS
-        res = self.storage.get_item(user_id, collection_name, item_id,
+        res = self._get_storage(request).get_item(user_id, collection_name, item_id,
                                     fields=fields)
         if res is None:
             raise HTTPNotFound()
@@ -226,9 +249,9 @@ class StorageController(object):
         If the quota is reached, issues a 400
         """
         user_id = request.sync_info['user_id']
-        left = self.storage.get_size_left(user_id)
+        left = self._get_storage(request).get_size_left(user_id)
         if left < _ONE_MEG:
-            left = self.storage.get_size_left(user_id, recalculate=True)
+            left = self._get_storage(request).get_size_left(user_id, recalculate=True)
         if left <= 0.:  # no space left
             raise HTTPJsonBadRequest(WEAVE_OVER_QUOTA)
         return left
@@ -257,7 +280,7 @@ class StorageController(object):
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
 
-        res = self.storage.set_item(user_id, collection_name, item_id, **wbo)
+        res = self._get_storage(request).set_item(user_id, collection_name, item_id, **wbo)
         response = json_response(res)
         if left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
@@ -270,7 +293,7 @@ class StorageController(object):
         user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
-        self.storage.delete_item(user_id, collection_name, item_id)
+        self._get_storage(request).delete_item(user_id, collection_name, item_id)
         return json_response(request.server_time)
 
     def set_collection(self, request):
@@ -324,7 +347,7 @@ class StorageController(object):
         for wbos in batch(kept_wbos):
             wbos = list(wbos)   # to avoid exhaustion
             try:
-                self.storage.set_items(user_id, collection_name, wbos)
+                self._get_storage(request).set_items(user_id, collection_name, wbos)
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 for wbo in wbos:
@@ -349,7 +372,7 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        res = self.storage.delete_items(user_id, collection_name,
+        res = self._get_storage(request).delete_items(user_id, collection_name,
                                         kw.get('ids'), kw['filters'],
                                         limit=kw.get('limit'),
                                         offset=kw.get('offset'),
@@ -365,5 +388,5 @@ class StorageController(object):
         if 'X-Confirm-Delete' not in request.headers:
             raise HTTPJsonBadRequest(WEAVE_INVALID_WRITE)
         user_id = request.sync_info['user_id']
-        self.storage.delete_storage(user_id)  # XXX failures ?
+        self._get_storage(request).delete_storage(user_id)  # XXX failures ?
         return json_response(True)

@@ -601,20 +601,26 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
-        try:
-            self.app.app.storage.quota_size = 0.1
-        except AttributeError:
-            # ErrorMiddleware is activated
-            self.app.app.application.storage.quota_size = 0.1
+
+        def _set_quota(size):
+            class FakeReq:
+                host = 'localhost'
+
+            req = FakeReq()
+            try:
+                self.app.app.get_storage(req).quota_size = size
+            except AttributeError:
+                # ErrorMiddleware is activated
+                app = self.app.app.application
+                app.get_storage(req).quota_size = size
+
+        _set_quota(0.1)
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
         res = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         self.assertEquals(res.headers['X-Weave-Quota-Remaining'], '0.0765625')
-        try:
-            self.app.app.storage.quota_size = 0
-        except AttributeError:
-            # ErrorMiddleware is activated
-            self.app.app.application.storage.quota_size = 0
+
+        _set_quota(0)
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
         res = self.app.put(self.root + '/storage/col2/12345', params=wbo,

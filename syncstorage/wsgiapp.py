@@ -61,7 +61,8 @@ def _url(url):
     return url
 
 
-urls = [('GET', _url('/_API_/_USERNAME_/info/collections'),
+urls = [('GET', '/', 'storage', 'index'),
+        ('GET', _url('/_API_/_USERNAME_/info/collections'),
          'storage', _url('get_collections'), _EXTRAS),
         ('GET', _url('/_API_/_USERNAME_/info/collection_counts'),
          'storage', 'get_collection_counts', _EXTRAS),
@@ -96,9 +97,23 @@ class StorageServerApp(SyncServerApp):
     """Storage application"""
     def __init__(self, urls, controllers, config=None,
                  auth_class=Authentication):
-        self.storage = get_storage(config)
         super(StorageServerApp, self).__init__(urls, controllers, config,
                                                auth_class)
+        # collecting the host-specific config and building connectors
+        self.storages = {}
+        hosts = ['localhost']
+        for key in config.keys():
+            if not key.startswith('host:'):
+                continue
+            host = key.split('.')[0][len('host:'):]
+            if host not in hosts:
+                hosts.append(host)
+
+        for host in hosts:
+            config = self._host_specific(host, config)
+            self.storages[host] = get_storage(config)
+
+        self.config = config
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)
         if self.check_blacklist and Client is not None:
@@ -106,6 +121,12 @@ class StorageServerApp(SyncServerApp):
             self.cache = Client(servers.split(','))
         else:
             self.cache = None
+
+    def get_storage(self, request):
+        host = request.host
+        if host not in self.storages:
+            host = 'localhost'
+        return self.storages[host]
 
     def _before_call(self, request):
         # let's control if this server is not on the blacklist
