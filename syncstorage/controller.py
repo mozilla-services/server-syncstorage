@@ -45,7 +45,7 @@ import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 from services.util import (convert_response, json_response, round_time,
-                           batch, raise_503, HTTPJsonBadRequest)
+                           batch, HTTPJsonBadRequest)
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from services.util import html_response
@@ -78,9 +78,9 @@ class StorageController(object):
         res.append('<h1>Storage in usage</h1>')
         storage = self._get_storage(request)
         res.append('<ul>')
-        res.append('<li>backend: %s</li>' %  storage.get_name())
+        res.append('<li>backend: %s</li>' % storage.get_name())
         if storage.get_name() in ('sql',):
-            res.append('<li>sqluri: %s</li>' %  storage.sqluri)
+            res.append('<li>sqluri: %s</li>' % storage.sqluri)
         res.append('</ul>')
         res.append('</body></html>')
         return html_response(''.join(res))
@@ -113,7 +113,8 @@ class StorageController(object):
         """
         # 'v' is the version of the client, given the first time
         user_id = request.sync_info['user_id']
-        collections = self._get_storage(request).get_collection_timestamps(user_id)
+        storage = self._get_storage(request)
+        collections = storage.get_collection_timestamps(user_id)
         response = convert_response(request, collections)
         response.headers['X-Weave-Records'] = str(len(collections))
         return response
@@ -137,8 +138,8 @@ class StorageController(object):
 
     def get_collection_usage(self, request):
         user_id = request.sync_info['user_id']
-
-        return json_response(self._get_storage(request).get_collection_sizes(user_id))
+        storage = self._get_storage(request)
+        return json_response(storage.get_collection_sizes(user_id))
 
     def _convert_args(self, kw):
         """Converts incoming arguments for GET and DELETE on collections.
@@ -221,10 +222,11 @@ class StorageController(object):
         else:
             fields = _WBO_FIELDS
 
-        res = self._get_storage(request).get_items(user_id, collection_name, fields,
-                                     kw['filters'],
-                                     kw.get('limit'), kw.get('offset'),
-                                     kw.get('sort'))
+        storage = self._get_storage(request)
+        res = storage.get_items(user_id, collection_name, fields,
+                                kw['filters'],
+                                kw.get('limit'), kw.get('offset'),
+                                kw.get('sort'))
         if not full:
             res = [line['id'] for line in res]
 
@@ -238,8 +240,9 @@ class StorageController(object):
         item_id = request.sync_info['item']
         user_id = request.sync_info['user_id']
         fields = _WBO_FIELDS
-        res = self._get_storage(request).get_item(user_id, collection_name, item_id,
-                                    fields=fields)
+        storage = self._get_storage(request)
+        res = storage.get_item(user_id, collection_name, item_id,
+                               fields=fields)
         if res is None:
             raise HTTPNotFound()
 
@@ -252,9 +255,10 @@ class StorageController(object):
         If the quota is reached, issues a 400
         """
         user_id = request.sync_info['user_id']
-        left = self._get_storage(request).get_size_left(user_id)
+        storage = self._get_storage(request)
+        left = storage.get_size_left(user_id)
         if left < _ONE_MEG:
-            left = self._get_storage(request).get_size_left(user_id, recalculate=True)
+            left = storage.get_size_left(user_id, recalculate=True)
         if left <= 0.:  # no space left
             raise HTTPJsonBadRequest(WEAVE_OVER_QUOTA)
         return left
@@ -283,7 +287,8 @@ class StorageController(object):
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
 
-        res = self._get_storage(request).set_item(user_id, collection_name, item_id, **wbo)
+        res = self._get_storage(request).set_item(user_id, collection_name,
+                                                  item_id, **wbo)
         response = json_response(res)
         if left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
@@ -296,7 +301,8 @@ class StorageController(object):
         user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
-        self._get_storage(request).delete_item(user_id, collection_name, item_id)
+        self._get_storage(request).delete_item(user_id, collection_name,
+                                               item_id)
         return json_response(request.server_time)
 
     def set_collection(self, request):
@@ -350,7 +356,8 @@ class StorageController(object):
         for wbos in batch(kept_wbos):
             wbos = list(wbos)   # to avoid exhaustion
             try:
-                self._get_storage(request).set_items(user_id, collection_name, wbos)
+                self._get_storage(request).set_items(user_id, collection_name,
+                                                     wbos)
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 for wbo in wbos:
@@ -375,7 +382,8 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        res = self._get_storage(request).delete_items(user_id, collection_name,
+        res = self._get_storage(request).delete_items(user_id,
+                                        collection_name,
                                         kw.get('ids'), kw['filters'],
                                         limit=kw.get('limit'),
                                         offset=kw.get('offset'),

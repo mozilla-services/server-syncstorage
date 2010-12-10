@@ -49,6 +49,7 @@ except ImportError:
 
 _EXTRAS = {'auth': True}
 
+
 def _url(url):
     for pattern, replacer in (('_API_', '{api:1.0|1}'),
                               ('_COLLECTION_',
