@@ -45,6 +45,7 @@ import string
 
 from syncstorage.tests.functional import support
 from services.respcodes import WEAVE_OVER_QUOTA
+from services.tests.support import get_app
 
 _PLD = '*' * 500
 _ASCII = string.ascii_letters + string.digits
@@ -605,14 +606,9 @@ class TestStorage(support.TestWsgiApp):
         def _set_quota(size):
             class FakeReq:
                 host = 'localhost'
-
             req = FakeReq()
-            try:
-                self.app.app.get_storage(req).quota_size = size
-            except AttributeError:
-                # ErrorMiddleware is activated
-                app = self.app.app.application
-                app.get_storage(req).quota_size = size
+            app = get_app(self.app)
+            app.get_storage(req).quota_size = size
 
         _set_quota(0.1)
         wbo = {'payload': _PLD}
@@ -657,7 +653,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['success']), 250)
 
     def test_blacklisted_nodes(self):
-        app = self._get_app()
+        app = get_app(self.app)
         if not app.config.get('storage.check_blacklisted_nodes', False):
             return
         if app.cache is None:
