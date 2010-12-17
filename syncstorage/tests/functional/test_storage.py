@@ -80,7 +80,7 @@ class TestStorage(support.TestWsgiApp):
     def test_get_collections(self):
 
         resp = self.app.get(self.root + '/info/collections')
-        res = json.loads(resp.body)
+        res = resp.json
         keys = res.keys()
         self.assertTrue(len(keys), 2)
         self.assertEquals(int(resp.headers['X-Weave-Records']), len(keys))
@@ -90,7 +90,7 @@ class TestStorage(support.TestWsgiApp):
     def test_get_collection_count(self):
 
         resp = self.app.get(self.root + '/info/collection_counts')
-        res = json.loads(resp.body)
+        res = resp.json
         values = res.values()
         values.sort()
         self.assertEquals(values, [3, 5])
@@ -98,9 +98,9 @@ class TestStorage(support.TestWsgiApp):
 
     def test_get_collection(self):
         res = self.app.get(self.root + '/storage/col3')
-        self.assertEquals(json.loads(res.body), [])
+        self.assertEquals(res.json, [])
         resp = self.app.get(self.root + '/storage/col2')
-        res = json.loads(resp.body)
+        res = resp.json
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
         self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
@@ -111,7 +111,7 @@ class TestStorage(support.TestWsgiApp):
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
         res = self.app.get(self.root + '/storage/col2?ids=1,3')
-        res = json.loads(res.body)
+        res = res.json
         res.sort()
         self.assertEquals(res, ['1', '3'])
 
@@ -125,7 +125,7 @@ class TestStorage(support.TestWsgiApp):
         #self.storage.set_item(self.user_id, 'col2', '125',
         #                      predecessorid='XXXX')
         res = self.app.get(self.root + '/storage/col2?predecessorid=XXXX')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['125'])
 
         # "parentid"
@@ -140,7 +140,7 @@ class TestStorage(support.TestWsgiApp):
         #self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
         #                      payload='x')
         res = self.app.get(self.root + '/storage/col2?parentid=papa')
-        res = json.loads(res.body)
+        res = res.json
         res.sort()
         self.assertEquals(res, ['126', '127'])
 
@@ -154,7 +154,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'id': '128', 'payload': 'x'}
         wbo = json.dumps(wbo)
         res = self.app.put(self.root + '/storage/col2/128', params=wbo)
-        ts = json.loads(res.body)
+        ts = res.json
 
         #ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
         fts = json.dumps(ts)
@@ -163,7 +163,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'id': '129', 'payload': 'x'}
         wbo = json.dumps(wbo)
         res = self.app.put(self.root + '/storage/col2/129', params=wbo)
-        ts2 = json.loads(res.body)
+        ts2 = res.json
 
         #ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
         fts2 = json.dumps(ts2)
@@ -171,14 +171,14 @@ class TestStorage(support.TestWsgiApp):
         self.assertTrue(fts < fts2)
 
         res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['128'])
 
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
-        res = json.loads(res.body)
+        res = res.json
         try:
             self.assertEquals(res, ['129'])
         except AssertionError:
@@ -188,14 +188,14 @@ class TestStorage(support.TestWsgiApp):
         # "full"
         # If defined, returns the full WBO, rather than just the id.
         res = self.app.get(self.root + '/storage/col2?full=1')
-        res = json.loads(res.body)
+        res = res.json
         keys = res[0].keys()
         keys.sort()
         wanted = ['id', 'modified', 'payload', 'payload_size']
         self.assertEquals(keys, wanted)
 
         res = self.app.get(self.root + '/storage/col2')
-        res = json.loads(res.body)
+        res = res.json
         self.assertTrue(isinstance(res, list))
 
         # "index_above"
@@ -207,14 +207,14 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', params=wbos)
 
         res = self.app.get(self.root + '/storage/col2?index_above=10')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['130'])
 
         # "index_below"
         # If defined, only returns items with a lower sortindex than the value
         # specified.
         res = self.app.get(self.root + '/storage/col2?index_below=10')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['131'])
 
         # "limit"
@@ -229,11 +229,11 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', params=wbos)
 
         res = self.app.get(self.root + '/storage/col2?limit=2')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(len(res), 2)
 
         res = self.app.get(self.root + '/storage/col2')
-        res = json.loads(res.body)
+        res = res.json
         self.assertTrue(len(res) > 9)
 
         # "offset"
@@ -242,7 +242,7 @@ class TestStorage(support.TestWsgiApp):
 
         # let's get 2, 3 and 4
         res = self.app.get(self.root + '/storage/col2?offset=2&limit=3')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(len(res), 3)
         res.sort()
         self.assertEquals(res, ['2', '3', '4'])
@@ -260,15 +260,15 @@ class TestStorage(support.TestWsgiApp):
             time.sleep(0.1)
 
         res = self.app.get(self.root + '/storage/col2?sort=oldest')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['0', '1', '2'])
 
         res = self.app.get(self.root + '/storage/col2?sort=newest')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['2', '1', '0'])
 
         res = self.app.get(self.root + '/storage/col2?sort=index')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
@@ -277,7 +277,7 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.content_type, 'application/json')
 
-        res = json.loads(res.body)
+        res = res.json
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
@@ -318,7 +318,7 @@ class TestStorage(support.TestWsgiApp):
     def test_get_item(self):
         # grabbing object 1 from col2
         res = self.app.get(self.root + '/storage/col2/1')
-        res = json.loads(res.body)
+        res = res.json
         keys = res.keys()
         keys.sort()
         self.assertEquals(keys, ['id', 'modified', 'payload', 'payload_size'])
@@ -333,7 +333,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/12345', params=wbo)
         res = self.app.get(self.root + '/storage/col2/12345')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], _PLD)
 
         # now let's update it
@@ -341,7 +341,7 @@ class TestStorage(support.TestWsgiApp):
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/12345', params=wbo)
         res = self.app.get(self.root + '/storage/col2/12345')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], 'YYY')
 
     def test_set_collection(self):
@@ -353,10 +353,10 @@ class TestStorage(support.TestWsgiApp):
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/12')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], _PLD)
         res = self.app.get(self.root + '/storage/col2/13')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], _PLD)
 
         # one more time, with changes
@@ -367,10 +367,10 @@ class TestStorage(support.TestWsgiApp):
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/14')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], _PLD)
         res = self.app.get(self.root + '/storage/col2/13')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res['payload'], 'XyX')
 
         # sending two wbos with one bad sortindex
@@ -390,7 +390,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', params=wbos)
 
         res = self.app.get(self.root + '/info/collection_usage')
-        usage = json.loads(res.body)
+        usage = res.json
         col2_size = usage['col2']
         wanted = len(wbo1['payload']) + len(wbo2['payload'])
         self.assertEqual(col2_size, wanted / 1024.)
@@ -405,12 +405,12 @@ class TestStorage(support.TestWsgiApp):
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post(self.root + '/storage/col2', params=wbos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 3)
+        self.assertEquals(len(res.json), 3)
 
         # deleting all items
         self.app.delete(self.root + '/storage/col2')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 0)
+        self.assertEquals(len(res.json), 0)
 
         # now trying deletion with filters
 
@@ -420,10 +420,10 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', params=wbos)
         self.app.delete(self.root + '/storage/col2?ids=12,14')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 1)
+        self.assertEquals(len(res.json), 1)
         self.app.delete(self.root + '/storage/col2?ids=13')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 0)
+        self.assertEquals(len(res.json), 0)
 
         # "parentid"
         # Only deletes objects in the collection that are the
@@ -435,7 +435,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', params=wbos)
         self.app.delete(self.root + '/storage/col2?parentid=1')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 1)
+        self.assertEquals(len(res.json), 1)
 
         # "older"
         # Only deletes objects in the collection that have been last
@@ -455,7 +455,7 @@ class TestStorage(support.TestWsgiApp):
 
         self.app.delete(self.root + '/storage/col2?older=%f' % now)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 1)
+        self.assertEquals(len(res.json), 1)
 
         # "newer"
         # Only deletes objects in the collection that have been last modified
@@ -474,7 +474,7 @@ class TestStorage(support.TestWsgiApp):
 
         self.app.delete(self.root + '/storage/col2?newer=%f' % now)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 2)
+        self.assertEquals(len(res.json), 2)
 
         # "index_above"
         # Only delete objects with a higher sortindex than the value
@@ -484,7 +484,7 @@ class TestStorage(support.TestWsgiApp):
         self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
         res = self.app.delete(self.root + '/storage/col2?index_above=10')
         res = self.app.get(self.root + '/storage/col2')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['131'])
 
         # "index_below"
@@ -495,7 +495,7 @@ class TestStorage(support.TestWsgiApp):
         self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
         res = self.app.delete(self.root + '/storage/col2?index_below=10')
         res = self.app.get(self.root + '/storage/col2')
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(res, ['130'])
 
         # "limit"
@@ -507,7 +507,7 @@ class TestStorage(support.TestWsgiApp):
         #self.app.post(self.root + '/storage/col2', params=wbos)
         #self.app.delete(self.root + '/storage/col2?limit=2')
         #res = self.app.get(self.root + '/storage/col2')
-        #self.assertEquals(len(json.loads(res.body)), 1)
+        #self.assertEquals(len(res.json), 1)
 
         # "sort"
         #   'oldest' - Orders by modification date (oldest first)
@@ -528,12 +528,12 @@ class TestStorage(support.TestWsgiApp):
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post(self.root + '/storage/col2', params=wbos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 3)
+        self.assertEquals(len(res.json), 3)
 
         # deleting item 13
         self.app.delete(self.root + '/storage/col2/13')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 2)
+        self.assertEquals(len(res.json), 2)
 
         # unexisting item should return a 200
         self.app.delete(self.root + '/storage/col2/12982')
@@ -548,7 +548,7 @@ class TestStorage(support.TestWsgiApp):
         wbos = json.dumps([wbo1, wbo2, wbo3])
         self.app.post(self.root + '/storage/col2', params=wbos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 3)
+        self.assertEquals(len(res.json), 3)
 
         # deleting all with no confirmation
         self.app.delete(self.root + '/storage', status=400)
@@ -557,7 +557,7 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.delete(self.root + '/storage/col2',
                               headers=[('X-Confirm-Delete', '1')])
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 0)
+        self.assertEquals(len(res.json), 0)
 
     def test_x_weave_timestamp(self):
         now = time.time()
@@ -593,12 +593,12 @@ class TestStorage(support.TestWsgiApp):
 
     def test_quota(self):
         res = self.app.get(self.root + '/info/quota')
-        old_used, quota = json.loads(res.body)
+        old_used, quota = res.json
         wbo = {'payload': _PLD}
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/12345', params=wbo)
         res = self.app.get(self.root + '/info/quota')
-        used, quota = json.loads(res.body)
+        used, quota = res.json
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
@@ -623,7 +623,7 @@ class TestStorage(support.TestWsgiApp):
                            status=400)
         # the body should be 14
         self.assertEquals(res.headers['Content-Type'], 'application/json')
-        self.assertEquals(json.loads(res.body), WEAVE_OVER_QUOTA)
+        self.assertEquals(res.json, WEAVE_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
         self.app.delete(self.root + '/storage/col2')
@@ -632,16 +632,16 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.put(self.root + '/storage/col2/12345', params=wbo)
         time.sleep(1.1)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(json.loads(res.body), [])
+        self.assertEquals(res.json, [])
 
         wbo = {'payload': _PLD, 'ttl': 1}
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/123456', params=wbo)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 1)
+        self.assertEquals(len(res.json), 1)
         time.sleep(1.1)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(json.loads(res.body)), 0)
+        self.assertEquals(len(res.json), 0)
 
     def test_batch(self):
         # makes sure the server handles correctly large batches
@@ -649,7 +649,7 @@ class TestStorage(support.TestWsgiApp):
         wbos = [{'id': str(i), 'payload': _PLD} for i in range(250)]
         wbos = json.dumps(wbos)
         res = self.app.post(self.root + '/storage/col2', params=wbos)
-        res = json.loads(res.body)
+        res = res.json
         self.assertEquals(len(res['success']), 250)
 
     def test_blacklisted_nodes(self):
@@ -683,7 +683,7 @@ class TestStorage(support.TestWsgiApp):
         wbos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
         wbos = json.dumps(wbos)
         res = self.app.post(self.root + '/storage/col2', params=wbos)
-        res = json.loads(res.body)
+        res = res.json
 
         # trying weird args and make sure the server returns 400s
         args = ('older', 'newer', 'index_above', 'index_below', 'limit',
@@ -695,7 +695,7 @@ class TestStorage(support.TestWsgiApp):
         # what about a crazy ids= string ?
         ids = ','.join([randtext(100) for i in range(10)])
         res = self.app.get(self.root + '/storage/col2?ids=%s' % ids)
-        self.assertEquals(json.loads(res.body), [])
+        self.assertEquals(res.json, [])
 
         # trying unexpected args - they should not break
         self.app.get(self.root + '/storage/col2?blabla=1',
@@ -707,7 +707,7 @@ class TestStorage(support.TestWsgiApp):
                  'payload': _PLD} for i in range(5)]
         wbos = json.dumps(wbos)
         res = self.app.post(self.root + '/storage/passwords', params=wbos)
-        res = json.loads(res.body)
+        res = res.json
 
         # now deleting some of them
         ids = ','.join(['{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i
@@ -716,4 +716,4 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage/passwords?ids=%s' % ids)
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
-        self.assertEqual(json.loads(res.body), [])
+        self.assertEqual(res.json, [])
