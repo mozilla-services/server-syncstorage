@@ -36,9 +36,9 @@
 """ WBO object -- used for (de)serialization
 """
 
-_FIELDS = ('id', 'username', 'collection', 'parentid',
-           'predecessorid', 'sortindex', 'modified',
-           'payload', 'payload_size', 'ttl')
+_FIELDS = set(('id', 'username', 'collection', 'parentid',
+               'predecessorid', 'sortindex', 'modified',
+               'payload', 'payload_size', 'ttl'))
 
 
 class WBO(dict):
