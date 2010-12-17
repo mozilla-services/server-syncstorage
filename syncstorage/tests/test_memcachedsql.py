@@ -34,6 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 import unittest
+import time
 
 #try:
 from syncstorage.storage.memcachedsql import MemcachedSQLStorage
@@ -183,6 +184,8 @@ if MEMCACHED:
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
+            self.storage.set_collection(_UID, 'baz')
+
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD * 200)
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD * 200)
 
@@ -197,6 +200,33 @@ if MEMCACHED:
                 self.assertEquals(len(stamps), 2)
             else:
                 self.assertEquals(len(stamps), 1)
+
+            # checking the stamps
+            if self._is_up():
+                stamps = self.storage.cache.get('1:stamps')
+                self.assertEquals(stamps.keys(), ['foo'])
+
+            # adding a new item should invalidate the stamps cache
+            self.storage.set_item(_UID, 'baz', '2', payload=_PLD * 200)
+
+            # checking the stamps
+            if self._is_up():
+                stamps = self.storage.cache.get('1:stamps')
+                self.assertEqual(stamps, None)
+
+            stamps = self.storage.get_collection_timestamps(_UID)
+            if self._is_up():
+                _stamps = self.storage.cache.get('1:stamps')
+                keys = _stamps.keys()
+                keys.sort()
+                self.assertEquals(keys, ['baz', 'foo'])
+
+            # deleting the item should also update the stamp
+            baz_stamp = stamps['baz']
+            time.sleep(0.2)    # to make sure the stamps differ
+            self.storage.delete_item(_UID, 'baz', '2')
+            stamps = self.storage.get_collection_timestamps(_UID)
+            self.assertFalse('baz' in stamps)
 
 
 def test_suite():

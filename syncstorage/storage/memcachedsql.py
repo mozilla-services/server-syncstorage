@@ -209,6 +209,9 @@ class MemcachedSQLStorage(SQLStorage):
             key = _key(user_id, 'collections', 'stamp', 'tabs')
             self.cache.set(key, time())
 
+        # invalidate the stamps cache
+        self.cache.delete(_key(user_id, 'stamps'))
+
     def _update_item(self, item, when):
         if self.use_quota and 'payload' in item:
             item['payload_size'] = len(item['payload'])
@@ -247,6 +250,9 @@ class MemcachedSQLStorage(SQLStorage):
         # delete the cached size
         self.cache.delete(_key(user_id, 'size'))
 
+        # invalidate the stamps cache
+        self.cache.delete(_key(user_id, 'stamps'))
+
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, item_id):
             key = _key(user_id, 'meta', 'global')
@@ -263,8 +269,9 @@ class MemcachedSQLStorage(SQLStorage):
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        # delete the cached size
+        # delete the cached size and stamps
         self.cache.delete(_key(user_id, 'size'))
+        self.cache.delete(_key(user_id, 'stamps'))
 
         # remove the cached values
         if (collection_name == 'meta' and (item_ids is None
