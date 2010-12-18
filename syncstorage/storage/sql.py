@@ -52,30 +52,29 @@ from services.util import time2bigint, bigint2time
 from syncstorage.wbo import WBO
 
 _KB = float(1024)
-_SQLURI = 'mysql://sync:sync@localhost/sync'
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
                          5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
                          9: 'tabs', 10: 'passwords'}
 
-STANDARD_COLLECTIONS_NAMES = dict([(value, key) for key, value in
-                                    _STANDARD_COLLECTIONS.items()])
+STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
+                                   _STANDARD_COLLECTIONS.items())
 
 
 class SQLStorage(object):
 
-    def __init__(self, sqluri=_SQLURI, standard_collections=False,
+    def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, reset_on_return=True, create_tables=True,
                  shard=False, shardsize=100, **kw):
         self.sqluri = sqluri
-        kw = {'pool_size': int(pool_size),
-              'pool_recycle': int(pool_recycle),
-              'logging_name': 'weaveserver'}
+        sqlkw = {'pool_size': int(pool_size),
+                 'pool_recycle': int(pool_recycle),
+                 'logging_name': 'syncserver'}
 
         if self.sqluri.startswith('mysql'):
             kw['reset_on_return'] = reset_on_return
 
-        self._engine = create_engine(sqluri, **kw)
+        self._engine = create_engine(sqluri, **sqlkw)
         for table in tables:
             table.metadata.bind = self._engine
             if create_tables:
@@ -84,7 +83,7 @@ class SQLStorage(object):
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
         self.use_quota = use_quota
-        self.quota_size = long(quota_size)
+        self.quota_size = int(quota_size)
         self.shard = shard
         self.shardsize = shardsize
         if self.shard:
@@ -286,7 +285,9 @@ class SQLStorage(object):
             collection_id in _STANDARD_COLLECTIONS):
             return _STANDARD_COLLECTIONS[collection_id]
 
-        # custom collections
+        # custom collections - we don't have any yet with sync
+        # but if we potentially do, this cache should go into
+        # memcached
         if user_id not in self._user_collections:
             names = dict(self.get_collection_names(user_id))
             self._user_collections[user_id] = names
