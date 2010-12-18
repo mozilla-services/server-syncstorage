@@ -51,11 +51,11 @@ tables.append(users)
 
 class Collections(_Base):
     __tablename__ = 'collections'
-
     # XXX add indexes
     userid = Column(Integer(11), primary_key=True, nullable=False)
     collectionid = Column(Integer(6), primary_key=True, nullable=False)
     name = Column(String(32), nullable=False)
+
 
 collections = Collections.__table__
 tables.append(collections)
@@ -67,7 +67,6 @@ class WBO(_Base):
                       'mysql_charset': 'latin1'}
 
     id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
     username = Column(Integer(11), primary_key=True, nullable=False)
     collection = Column(Integer(6), primary_key=True, nullable=False,
                         default=0)
@@ -82,19 +81,10 @@ class WBO(_Base):
 
 wbo = WBO.__table__
 
+
 # preparing the sharded tables
-#
-# XXX instead of an ugly cut-n-paste, I need to use
-# http://www.sqlalchemy.org/trac/wiki/UsageRecipes/EntityName
-
-
-class WBO0(_Base):
-    __tablename__ = 'wbo0'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
+class _WBOBase(object):
     id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
     username = Column(Integer(11), primary_key=True, nullable=False)
     collection = Column(Integer(6), primary_key=True, nullable=False,
                         default=0)
@@ -107,184 +97,23 @@ class WBO0(_Base):
     ttl = Column(Integer(11), default=MAX_TTL)
 
 
-class WBO1(_Base):
-    __tablename__ = 'wbo1'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
+_SHARDS = {}
 
 
-class WBO2(_Base):
-    __tablename__ = 'wbo2'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
+def get_wbo_table_byindex(index):
+    if index not in _SHARDS:
+        args = {'__tablename__': 'wbo%d' % index,
+                '__table_args__':
+                     {'mysql_engine': 'InnoDB',
+                      'mysql_charset': 'latin1'}}
+        klass = type('WBO%d' % index, (_WBOBase, _Base), args)
+        _SHARDS[index] = klass.__table__
+    return _SHARDS[index]
 
 
-class WBO3(_Base):
-    __tablename__ = 'wbo3'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
+def get_wbo_table(user_id, shardsize=100):
+    return get_wbo_table_byindex(int(user_id) % shardsize)
 
 
-class WBO4(_Base):
-    __tablename__ = 'wbo4'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-class WBO5(_Base):
-    __tablename__ = 'wbo5'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-class WBO6(_Base):
-    __tablename__ = 'wbo6'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-class WBO7(_Base):
-    __tablename__ = 'wbo7'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-class WBO8(_Base):
-    __tablename__ = 'wbo8'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-class WBO9(_Base):
-    __tablename__ = 'wbo9'
-    __table_args__ = {'mysql_engine': 'InnoDB',
-                      'mysql_charset': 'latin1'}
-
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    # XXX that's user id in fact
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11))
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
-shards = [cls.__table__ for cls in (WBO0, WBO1, WBO2, WBO3, WBO4, WBO5, WBO6,
-                                    WBO7, WBO8, WBO9)]
-
-
-def get_wbo_table(user_id):
-    return shards[int(user_id) % 10]
-
-
-def get_wbo_table_name(user_id):
-    return 'wbo%d' % (int(user_id) % 10)
+def get_wbo_table_name(user_id, shardsize=100):
+    return 'wbo%d' % (int(user_id) % shardsize)

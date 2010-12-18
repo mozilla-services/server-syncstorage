@@ -45,7 +45,8 @@ from sqlalchemy.sql import (text, select, bindparam, delete, insert, update,
 from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import (tables, users, collections,
                                             get_wbo_table_name, MAX_TTL,
-                                            get_wbo_table, shards)
+                                            get_wbo_table,
+                                            get_wbo_table_byindex)
 from syncstorage.storage.sqlmappers import wbo as _wbo
 from services.util import time2bigint, bigint2time
 from syncstorage.wbo import WBO
@@ -65,7 +66,7 @@ class SQLStorage(object):
     def __init__(self, sqluri=_SQLURI, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, reset_on_return=True, create_tables=True,
-                 shard=False, **kw):
+                 shard=False, shardsize=100, **kw):
         self.sqluri = sqluri
         kw = {'pool_size': int(pool_size),
               'pool_recycle': int(pool_recycle),
@@ -85,8 +86,10 @@ class SQLStorage(object):
         self.use_quota = use_quota
         self.quota_size = long(quota_size)
         self.shard = shard
+        self.shardsize = shardsize
         if self.shard:
-            for table in shards:
+            for index in range(shardsize):
+                table = get_wbo_table_byindex(index)
                 table.metadata.bind = self._engine
                 if create_tables:
                     table.create(checkfirst=True)
@@ -345,7 +348,7 @@ class SQLStorage(object):
 
     def _get_wbo_table(self, user_id):
         if self.shard:
-            return get_wbo_table(user_id)
+            return get_wbo_table(user_id, self.shardsize)
         return _wbo
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
