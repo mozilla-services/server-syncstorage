@@ -191,7 +191,7 @@ class TestStorage(support.TestWsgiApp):
         res = res.json
         keys = res[0].keys()
         keys.sort()
-        wanted = ['id', 'modified', 'payload', 'payload_size']
+        wanted = ['id', 'modified', 'payload']
         self.assertEquals(keys, wanted)
 
         res = self.app.get(self.root + '/storage/col2')
@@ -321,7 +321,7 @@ class TestStorage(support.TestWsgiApp):
         res = res.json
         keys = res.keys()
         keys.sort()
-        self.assertEquals(keys, ['id', 'modified', 'payload', 'payload_size'])
+        self.assertEquals(keys, ['id', 'modified', 'payload'])
         self.assertEquals(res['id'], '1')
 
         # unexisting object

@@ -52,7 +52,7 @@ from services.util import html_response
 from syncstorage.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
-               'payload', 'payload_size']
+               'payload']
 _ONE_MEG = 1024
 
 
