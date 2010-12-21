@@ -68,7 +68,7 @@ def get_query(name, user_id=None):
     elif name == 'DELETE_USER_COLLECTION':
         return delete(collections).where(_USER_N_COLL)
     elif name == 'DELETE_USER_WBOS':
-        return delete(wbo, table.c.username == bindparam('user_id'))
+        return delete(table, table.c.username == bindparam('user_id'))
     elif name == 'DELETE_USER':
         return delete(users, users.c.id == bindparam('user_id'))
     elif name == 'COLLECTION_EXISTS':
