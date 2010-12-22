@@ -38,9 +38,10 @@ Memcached + SQL backend
 
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
-- The meta/global wbo is stored in "user_id
+- The meta/global wbo is stored in "user_id"
 """
 from time import time
+import threading
 
 from memcache import Client
 from sqlalchemy.sql import select, bindparam, func
@@ -48,7 +49,7 @@ from sqlalchemy.sql import select, bindparam, func
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 
-_SQLURI = 'mysql://sync:sync@localhost/sync'
+
 _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
                            func.count(wbo)],
             wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
@@ -61,6 +62,13 @@ def _key(*args):
 class CacheManager(Client):
     """ Helpers on the top of memcached.Client
     """
+    def __init__(self, *args, **kw):
+        Client.__init__(self, *args, **kw)
+        # using a locker to avoid race conditions
+        # when several clients for the same user
+        # get/set the cached data
+        self._locker = threading.RLock()
+
     def get_set(self, key, func):
         res = self.get(key)
         if res is None:
@@ -75,31 +83,35 @@ class CacheManager(Client):
         return tabs.get(tab_id)
 
     def get_tabs(self, user_id):
-        key = _key(user_id, 'tabs')
-        tabs = self.get(key)
-        if tabs is None:
-            # memcached down ?
-            return []
-        return tabs
+        with self._locker:
+            key = _key(user_id, 'tabs')
+            tabs = self.get(key)
+            if tabs is None:
+                # memcached down ?
+                return []
+            return tabs
 
     def set_tabs(self, user_id, tabs):
-        key = _key(user_id, 'tabs')
-        existing_tabs = self.get(key)
-        if existing_tabs is None:
-            existing_tabs = {}
-        for tab in tabs:
-            existing_tabs[tab['id']] = tab
-        self.set(key, existing_tabs)
+        with self._locker:
+            key = _key(user_id, 'tabs')
+            existing_tabs = self.get(key)
+            if existing_tabs is None:
+                existing_tabs = {}
+            for tab in tabs:
+                existing_tabs[tab['id']] = tab
+            self.set(key, existing_tabs)
 
     def delete_tab(self, user_id, tab_id):
-        key = _key(user_id, 'tabs')
-        tabs = self.get_tabs(user_id)
-        del tabs[tab_id]
-        self.set(key, tabs)
+        with self._locker:
+            key = _key(user_id, 'tabs')
+            tabs = self.get_tabs(user_id)
+            del tabs[tab_id]
+            self.set(key, tabs)
 
     def delete_tabs(self, user_id):
-        key = _key(user_id, 'tabs')
-        return self.delete(key)
+        with self._locker:
+            key = _key(user_id, 'tabs')
+            return self.delete(key)
 
     def tab_exists(self, user_id, tab_id):
         tabs = self.get_tabs(user_id)
@@ -115,7 +127,7 @@ class MemcachedSQLStorage(SQLStorage):
     """Uses Memcached when possible/useful, SQL otherwise.
     """
 
-    def __init__(self, sqluri=_SQLURI, standard_collections=False,
+    def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, cache_servers=None,
                  create_tables=True, shard=False, shardsize=100, **kw):
