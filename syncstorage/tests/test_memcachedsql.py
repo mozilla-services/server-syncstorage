@@ -228,6 +228,20 @@ if MEMCACHED:
             stamps = self.storage.get_collection_timestamps(_UID)
             self.assertFalse('baz' in stamps)
 
+        def test_json(self):
+            kw = {'sqluri': 'sqlite:///:memory:',
+                  'use_quota': True,
+                  'quota_size': 5120,
+                  'memcached_json': True}
+
+            # this should use json to set/get in memcached
+            storage = SyncStorage.get('memcached', **kw)
+            item = {'id': 1, 'payload': 'xxx'}
+            storage.set_item(1, 'tabs', 'one', **item)
+
+            item_stored = storage.get_item(1, 'tabs', 'one')
+            self.assertEqual(item_stored['payload'], 'xxx')
+
 
 def test_suite():
     suite = unittest.TestSuite()

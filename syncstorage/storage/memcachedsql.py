@@ -42,6 +42,7 @@ Memcached + SQL backend
 """
 from time import time
 import threading
+import json
 
 from memcache import Client
 from sqlalchemy.sql import select, bindparam, func
@@ -123,6 +124,23 @@ class CacheManager(Client):
         return None
 
 
+# XXX suboptimal: creates an object on every dump/load call
+# but that's how python-memcached works - using a class
+# instead of an object would not be thread-safe.
+#
+# Need to ask Sean to improve this
+class _JSONDumper(object):
+    """Dumps and loads json in a file-like object"""
+    def __init__(self, file, protocol=0):
+        self.file = file
+
+    def dump(self, val):
+        self.file.write(json.dumps(val))
+
+    def load(self):
+        return json.loads(self.file.read())
+
+
 class MemcachedSQLStorage(SQLStorage):
     """Uses Memcached when possible/useful, SQL otherwise.
     """
@@ -130,7 +148,8 @@ class MemcachedSQLStorage(SQLStorage):
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, cache_servers=None,
-                 create_tables=True, shard=False, shardsize=100, **kw):
+                 create_tables=True, shard=False, shardsize=100,
+                 memcached_json=False, **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
         self.sqlstorage.__init__(sqluri, standard_collections,
                                  use_quota, quota_size, pool_size,
@@ -140,7 +159,11 @@ class MemcachedSQLStorage(SQLStorage):
             cache_servers = [cache_servers]
         elif cache_servers is None:
             cache_servers = ['127.0.0.1:11211']
-        self.cache = CacheManager(cache_servers)
+        extra_kw = {}
+        if memcached_json:
+            extra_kw['pickler'] = _JSONDumper
+            extra_kw['unpickler'] = _JSONDumper
+        self.cache = CacheManager(cache_servers, **extra_kw)
 
     @classmethod
     def get_name(self):
