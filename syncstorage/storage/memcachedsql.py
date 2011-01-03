@@ -248,8 +248,6 @@ class MemcachedSQLStorage(SQLStorage):
         self.cache.delete(_key(user_id, 'stamps'))
 
     def _update_item(self, item, when):
-        if self.use_quota and 'payload' in item:
-            item['payload_size'] = len(item['payload'])
         item['modified'] = when
 
     def set_item(self, user_id, collection_name, item_id, **values):
