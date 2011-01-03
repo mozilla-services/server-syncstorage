@@ -248,7 +248,8 @@ class MemcachedSQLStorage(SQLStorage):
         self.cache.delete(_key(user_id, 'stamps'))
 
     def _update_item(self, item, when):
-        item['modified'] = when
+        if 'payload' in item:
+            item['modified'] = when
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
