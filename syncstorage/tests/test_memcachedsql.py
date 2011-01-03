@@ -36,12 +36,11 @@
 import unittest
 import time
 
-#try:
-from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-MEMCACHED = True
-
-#except ImportError:
-#    MEMCACHED = False
+try:
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    MEMCACHED = True
+except ImportError:
+    MEMCACHED = False
 from syncstorage.storage import SyncStorage
 
 _UID = 1

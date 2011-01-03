@@ -654,29 +654,33 @@ class TestStorage(support.TestWsgiApp):
 
     def test_blacklisted_nodes(self):
         app = get_app(self.app)
-        if not app.config.get('storage.check_blacklisted_nodes', False):
-            return
-        if app.cache is None:
-            return   # memcached is probably not installed
-
-        if not app.cache.set('TEST', 1):
-            return   # memcached server is probably down
-
-        # "backoff:server" will add a X-Weave-Backoff header
-        app.cache.set('backoff:localhost:80', 2)
+        old = app.config.get('storage.check_blacklisted_nodes', False)
+        app.config['storage.check_blacklisted_nodes'] = True
         try:
-            resp = self.app.get(self.root + '/info/collections')
-            self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
-        finally:
-            app.cache.delete('backoff:localhost:80')
+            if app.cache is None:
+                return   # memcached is probably not installed
 
-        # "down:server" will make the node unavailable
-        app.cache.set('down:localhost:80', 1)
-        try:
-            resp = self.app.get(self.root + '/info/collections', status=503)
-            self.assertTrue("Server Problem Detected" in resp.body)
+            if not app.cache.set('TEST', 1):
+                return   # memcached server is probably down
+
+            # "backoff:server" will add a X-Weave-Backoff header
+            app.cache.set('backoff:localhost:80', 2)
+            try:
+                resp = self.app.get(self.root + '/info/collections')
+                self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
+            finally:
+                app.cache.delete('backoff:localhost:80')
+
+            # "down:server" will make the node unavailable
+            app.cache.set('down:localhost:80', 1)
+            try:
+                resp = self.app.get(self.root + '/info/collections',
+                                    status=503)
+                self.assertTrue("Server Problem Detected" in resp.body)
+            finally:
+                app.cache.delete('down:localhost:80')
         finally:
-            app.cache.delete('down:localhost:80')
+            app.config['storage.check_blacklisted_nodes'] = old
 
     def test_weird_args(self):
         # pushing some data in col2
@@ -717,3 +721,16 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
         self.assertEqual(res.json, [])
+
+    def test_dependant_options(self):
+        config = dict(self.config)
+        config['storage.check_blacklisted_nodes'] = True
+        from syncstorage import wsgiapp
+        old_client = wsgiapp.Client
+        wsgiapp.Client = None
+        # make sure the app cannot be initialized if it's asked
+        # to check for blacklisted node and memcached is not present
+        try:
+            self.assertRaises(ValueError, support.make_app, config)
+        finally:
+            wsgiapp.Client = old_client

@@ -113,9 +113,12 @@ class StorageServerApp(SyncServerApp):
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)
         if self.check_blacklist and Client is not None:
-            servers = self.config.get('servers', '127.0.0.1:11211')
+            servers = self.config.get('storage.cache_servers', '127.0.0.1:11211')
             self.cache = Client(servers.split(','))
         else:
+            if self.check_blacklist:
+                raise ValueError('The "check_blacklisted_node" option '
+                                 'needs a memcached server')
             self.cache = None
 
     def get_storage(self, request):
