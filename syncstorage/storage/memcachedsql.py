@@ -89,7 +89,7 @@ class CacheManager(Client):
             tabs = self.get(key)
             if tabs is None:
                 # memcached down ?
-                return []
+                return {}
             return tabs
 
     def set_tabs(self, user_id, tabs):
