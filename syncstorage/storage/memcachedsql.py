@@ -83,23 +83,53 @@ class CacheManager(Client):
             return None
         return tabs.get(tab_id)
 
-    def get_tabs(self, user_id):
+    def get_tabs(self, user_id, filters=None):
         with self._locker:
             key = _key(user_id, 'tabs')
             tabs = self.get(key)
             if tabs is None:
                 # memcached down ?
-                return {}
+                tabs = {}
+            if filters is not None:
+                if 'id' in filters:
+                    operator, ids = filters['id']
+                    if operator == 'in':
+                        for tab_id in list(tabs.keys()):
+                            if tab_id not in ids:
+                                del tabs[tab_id]
+                if 'modified' in filters:
+                    operator, stamp = filters['modified']
+                    if operator == '>':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['modified'] <= stamp:
+                                del tabs[tab_id]
+                    elif operator == '<':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['modified'] >= stamp:
+                                del tabs[tab_id]
+                if 'sortindex' in filters:
+                    operator, stamp = filters['sortindex']
+                    if operator == '>':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['sortindex'] <= stamp:
+                                del tabs[tab_id]
+                    elif operator == '<':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['sortindex'] >= stamp:
+                                del tabs[tab_id]
             return tabs
 
-    def set_tabs(self, user_id, tabs):
+    def set_tabs(self, user_id, tabs, merge=True):
         with self._locker:
             key = _key(user_id, 'tabs')
-            existing_tabs = self.get(key)
-            if existing_tabs is None:
+            if merge:
+                existing_tabs = self.get(key)
+                if existing_tabs is None:
+                    existing_tabs = {}
+            else:
                 existing_tabs = {}
-            for tab in tabs:
-                existing_tabs[tab['id']] = tab
+            for tab_id, tab in tabs.items():
+                existing_tabs[tab_id] = tab
             self.set(key, existing_tabs)
 
     def delete_tab(self, user_id, tab_id):
@@ -109,10 +139,43 @@ class CacheManager(Client):
             del tabs[tab_id]
             self.set(key, tabs)
 
-    def delete_tabs(self, user_id):
+    def delete_tabs(self, user_id, filters=None):
         with self._locker:
             key = _key(user_id, 'tabs')
-            return self.delete(key)
+            kept = {}
+            tabs = self.get(key)
+            if tabs is None:
+                # memcached down ?
+                tabs = {}
+
+            if filters is not None:
+                if 'id' in filters:
+                    operator, ids = filters['id']
+                    if operator == 'in':
+                        for tab_id in list(tabs.keys()):
+                            if tab_id not in ids:
+                                kept[tab_id] = tabs[tab_id]
+                if 'modified' in filters:
+                    operator, stamp = filters['modified']
+                    if operator == '>':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['modified'] <= stamp:
+                                kept[tab_id] = tabs[tab_id]
+                    elif operator == '<':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['modified'] >= stamp:
+                                kept[tab_id] = tabs[tab_id]
+                if 'sortindex' in filters:
+                    operator, stamp = filters['sortindex']
+                    if operator == '>':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['sortindex'] <= stamp:
+                                kept[tab_id] = tabs[tab_id]
+                    elif operator == '<':
+                        for tab_id, tab in list(tabs.items()):
+                            if tab['sortindex'] >= stamp:
+                                kept[tab_id] = tabs[tab_id]
+            self.set(key, kept)
 
     def tab_exists(self, user_id, tab_id):
         tabs = self.get_tabs(user_id)
@@ -207,6 +270,24 @@ class MemcachedSQLStorage(SQLStorage):
 
         return self.sqlstorage.item_exists(user_id, collection_name, item_id)
 
+    def get_items(self, user_id, collection_name, fields=None, filters=None,
+                  limit=None, offset=None, sort=None):
+        """returns items from a collection
+
+        "filter" is a dict used to add conditions to the db query.
+        Its keys are the field names on which the condition operates.
+        Its values are the values the field should have.
+        It can be a single value, or a list. For the latter the in()
+        operator is used. For single values, the operator has to be provided.
+        """
+        # returning cached values when possible
+        if collection_name == 'tabs':
+            # tabs are not stored at all in SQL
+            return self.cache.get_tabs(user_id, filters).values()
+
+        return self.sqlstorage.get_items(user_id, collection_name,
+                                         fields, filters, limit, offset, sort)
+
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """Returns one item.
 
@@ -239,7 +320,8 @@ class MemcachedSQLStorage(SQLStorage):
             key = _key(user_id, 'meta', 'global')
             self.cache.set(key, item)
         elif collection_name == 'tabs':
-            self.cache.set_tabs(user_id, items)
+            tabs = dict([(item['id'], item) for item in items])
+            self.cache.set_tabs(user_id, tabs)
             # update the timestamp cache
             key = _key(user_id, 'collections', 'stamp', 'tabs')
             self.cache.set(key, time())
@@ -313,7 +395,9 @@ class MemcachedSQLStorage(SQLStorage):
             key = _key(user_id, 'meta', 'global')
             self.cache.delete(key)
         elif collection_name == 'tabs':
-            self.cache.delete_tabs(user_id)
+            # tabs are not stored at all in SQL
+            self.cache.delete_tabs(user_id, filters)
+
             # we don't store tabs in SQL
             # update the timestamp cache
             key = _key(user_id, 'collections', 'stamp', collection_name)
