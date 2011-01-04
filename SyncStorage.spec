@@ -3,7 +3,7 @@
 %define version 0.1
 %define unmangled_version 0.1
 %define unmangled_version 0.1
-%define release 11
+%define release 12
 
 Summary: Sync Storage server
 Name: %{name}
