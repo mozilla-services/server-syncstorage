@@ -164,7 +164,7 @@ if MEMCACHED:
             items = self.storage.get_items(_UID, 'tabs')
             self.assertEquals(len(items), 0)
             tabs = self.storage.cache.get('1:tabs')
-            self.assertEquals(tabs, None)
+            self.assertEquals(tabs, {})
 
         def test_size(self):
             # make sure we get the right size
