@@ -96,7 +96,7 @@ class TestSQLStorage(unittest.TestCase):
 
         res = self.storage.get_collection(_UID, 'My collection').items()
         res.sort()
-        wanted = [('collectionid', 11), ('name', u'My collection'),
+        wanted = [('collectionid', 10), ('name', u'My collection'),
                   ('userid', 1)]
         self.assertEquals(res, wanted)
         res = self.storage.get_collection(_UID, 'My collection',
@@ -119,8 +119,8 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(len(res), 12)
 
         names = self.storage.get_collection_names(_UID)
-        self.assertEquals(names[-2:], [(11, 'My collection'),
-                                       (12, 'My collection 2')])
+        self.assertEquals(names[-2:], [(10, 'My collection'),
+                                       (11, 'My collection 2')])
 
         # removing a collection
         self.storage.delete_collection(_UID, 'My collection 2')
