@@ -228,6 +228,8 @@ if MEMCACHED:
             self.assertFalse('baz' in stamps)
 
         def test_json(self):
+            if not self._is_up():  # no memcached
+                return
             kw = {'sqluri': 'sqlite:///:memory:',
                   'use_quota': True,
                   'quota_size': 5120,
