@@ -240,12 +240,9 @@ class SQLStorage(object):
 
         # custom collection
         data = self.get_collection(user_id, collection_name,
-                                   ['collectionid'])
+                                   ['collectionid'], create)
         if data is None:
-            # we want to create it
-            if not create:
-                return None
-            return self.set_collection(user_id, collection_name)
+            return None
 
         return data['collectionid']
 
@@ -292,15 +289,23 @@ class SQLStorage(object):
         values['userid'] = user_id
         values['name'] = collection_name
 
+        if self.standard_collections:
+            ids = _STANDARD_COLLECTIONS.keys()
+            min_id = max(ids) + 1
+        else:
+            min_id = 0
+
         # getting the max collection_id
         # XXX why don't we have an autoinc here ?
         # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
-        query = self._get_query('COLLECTION_NEXTID', user_id)
-        max = self._engine.execute(query, user_id=user_id).first()
-        if max[0] is None:
-            next_id = 1
-        else:
-            next_id = max[0] + 1
+        next_id = -1
+        while next_id < min_id:
+            query = self._get_query('COLLECTION_NEXTID', user_id)
+            max_ = self._engine.execute(query, user_id=user_id).first()
+            if max_[0] is None:
+                next_id = min_id
+            else:
+                next_id = max_[0] + 1
 
         # insertion
         values['collectionid'] = next_id
@@ -308,7 +313,8 @@ class SQLStorage(object):
         self._engine.execute(query, **values)
         return next_id
 
-    def get_collection(self, user_id, collection_name, fields=None):
+    def get_collection(self, user_id, collection_name, fields=None,
+                       create=True):
         """Return information about a collection."""
         if fields is None:
             fields = [collections]
@@ -322,7 +328,7 @@ class SQLStorage(object):
         res = self._engine.execute(query).first()
 
         # the collection is created
-        if res is None:
+        if res is None and create:
             collid = self.set_collection(user_id, collection_name)
             res = {'userid': user_id, 'collectionid': collid,
                    'name': collection_name}
