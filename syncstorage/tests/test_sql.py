@@ -47,6 +47,7 @@ SyncStorage.register(SQLStorage)
 
 from services.auth import ServicesAuth
 from services.auth.sql import SQLAuth
+from services.util import BackendError
 ServicesAuth.register(SQLAuth)
 
 _UID = 1
@@ -235,7 +236,7 @@ class TestSQLStorage(unittest.TestCase):
         appdir, config, storage, auth = initenv(conf)
 
         # this should fail because the table is absent
-        self.assertRaises(OperationalError, storage.set_user, _UID,
+        self.assertRaises(BackendError, storage.set_user, _UID,
                           email='tarek@ziade.org')
 
     def test_shard(self):

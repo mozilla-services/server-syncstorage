@@ -47,6 +47,7 @@ import json
 from memcache import Client
 from sqlalchemy.sql import select, bindparam, func
 
+from services.util import BackendError
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 
@@ -69,6 +70,10 @@ class CacheManager(Client):
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
+
+    def set(self, key, value):
+        if not Client.set(self, key, value):
+            raise BackendError()
 
     def get_set(self, key, func):
         res = self.get(key)
@@ -136,8 +141,9 @@ class CacheManager(Client):
         with self._locker:
             key = _key(user_id, 'tabs')
             tabs = self.get_tabs(user_id)
-            del tabs[tab_id]
-            self.set(key, tabs)
+            if tab_id in tabs:
+                del tabs[tab_id]
+                self.set(key, tabs)
 
     def delete_tabs(self, user_id, filters=None):
         with self._locker:
@@ -304,6 +310,7 @@ class MemcachedSQLStorage(SQLStorage):
         elif collection_name == 'tabs':
             # tabs are not stored at all in SQL
             return self.cache.get_tab(user_id, item_id)
+
         return _get_item()
 
     def _update_cache(self, user_id, collection_name, items):
@@ -335,8 +342,8 @@ class MemcachedSQLStorage(SQLStorage):
 
     def set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        now = time()
         values['id'] = item_id
+        now = time()
         self._update_item(values, now)
         self._update_cache(user_id, collection_name, [values])
 
@@ -449,4 +456,6 @@ class MemcachedSQLStorage(SQLStorage):
     def get_collection_max_timestamp(self, user_id, collection_name):
         # let's get them all, so they get cached
         stamps = self.get_collection_timestamps(user_id)
+        if collection_name == 'tabs' and 'tabs' not in stamps:
+            return None
         return stamps[collection_name]

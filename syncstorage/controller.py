@@ -101,7 +101,7 @@ class StorageController(object):
                                                         collection_name)
         if max is None:
             return False
-        return max > unmodified
+        return round_time(max) > unmodified
 
     def get_storage(self, request):
         # XXX returns a 400 if the root is called
