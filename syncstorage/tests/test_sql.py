@@ -94,20 +94,18 @@ class TestSQLStorage(unittest.TestCase):
         self.storage.set_collection(_UID, 'My collection')
         self.assertTrue(self.storage.collection_exists(_UID, 'My collection'))
 
-        res = self.storage.get_collection(_UID, 'My collection').items()
-        res.sort()
-        wanted = [('collectionid', 10), ('name', u'My collection'),
-                  ('userid', 1)]
-        self.assertEquals(res, wanted)
+        res = dict(self.storage.get_collection(_UID, 'My collection').items())
+        self.assertEqual(res['name'], 'My collection')
+        self.assertEqual(res['userid'], 1)
         res = self.storage.get_collection(_UID, 'My collection',
                                           fields=['name'])
         self.assertEquals(res, {'name': 'My collection'})
 
         res = self.storage.get_collections(_UID)
         self.assertEquals(len(res), 11)
-        res = res[-1].items()
-        res.sort()
-        self.assertEquals(res, wanted)
+        res = dict(res[-1].items())
+        self.assertEqual(res['name'], 'My collection')
+        self.assertEqual(res['userid'], 1)
 
         res = self.storage.get_collections(_UID, fields=['name'])
         res = [line[0] for line in res]
@@ -119,8 +117,8 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(len(res), 12)
 
         names = self.storage.get_collection_names(_UID)
-        self.assertEquals(names[-2:], [(10, 'My collection'),
-                                       (11, 'My collection 2')])
+        self.assertEquals([name[1] for name in names[-2:]],
+                          ['My collection', 'My collection 2'])
 
         # removing a collection
         self.storage.delete_collection(_UID, 'My collection 2')
