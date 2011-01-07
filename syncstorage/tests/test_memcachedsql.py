@@ -42,6 +42,7 @@ try:
 except ImportError:
     MEMCACHED = False
 from syncstorage.storage import SyncStorage
+from services.util import BackendError
 
 _UID = 1
 _PLD = '*' * 500
@@ -68,10 +69,15 @@ if MEMCACHED:
             self.storage.delete_user(_UID)
 
         def _is_up(self):
-            self.storage.cache.set('test', 1)
+            try:
+                self.storage.cache.set('test', 1)
+            except BackendError:
+                return False
             return self.storage.cache.get('test') == 1
 
         def test_basic(self):
+            if not self._is_up():
+                return
             # just make sure calls goes through
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'col1')
@@ -87,6 +93,8 @@ if MEMCACHED:
             self.assertEquals(len(items), 0)
 
         def test_meta_global(self):
+            if not self._is_up():
+                return
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'meta')
             self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
@@ -168,18 +176,20 @@ if MEMCACHED:
 
         def test_size(self):
             # make sure we get the right size
+            if not self._is_up():  # no memcached == no size
+                return
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
-            if self._is_up():
-                self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
-                wanted = len(_PLD) * 2 / 1024.
-            else:
-                wanted = len(_PLD) / 1024.
+            self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
+            wanted = len(_PLD) * 2 / 1024.
             self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
         def test_collection_stamps(self):
+            if not self._is_up():
+                return
+
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
