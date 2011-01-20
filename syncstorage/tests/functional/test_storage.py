@@ -734,3 +734,8 @@ class TestStorage(support.TestWsgiApp):
             self.assertRaises(ValueError, support.make_app, config)
         finally:
             wsgiapp.Client = old_client
+
+    def test_metrics(self):
+        # make sure we support any metrics marker on info/collections
+        self.app.get(self.root + '/info/collections?client=FxHome&v=1.1b2',
+                     status=200)
