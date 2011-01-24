@@ -84,14 +84,10 @@ def get_query(name, user_id=None):
                        wbo_alias.c.collection.desc(),
                        wbo_alias.c.modified.desc()).limit(1).as_scalar()
     elif name == 'COLLECTION_STAMPS':
-        modified = get_query('COLLECTION_MODIFIED', user_id)
-        return select([table.c.collection, modified],
-                and_(table.c.username == bindparam('user_id'),
-                 table.c.ttl > bindparam('ttl'))).group_by(table.c.collection)
-    elif name == 'PG_COLLECTION_STAMPS':
         return select([table.c.collection, func.max(table.c.modified)],
              and_(table.c.username == bindparam('user_id'),
-                  table.c.ttl > bindparam('ttl'))).group_by(table.c.collection)
+                  table.c.ttl > bindparam('ttl'))).group_by(table.c.username,
+                                                            table.c.collection)
     elif name == 'COLLECTION_COUNTS':
         return select([table.c.collection, func.count(table.c.collection)],
            and_(table.c.username == bindparam('user_id'),

@@ -360,10 +360,7 @@ class SQLStorage(object):
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        if self.engine_name == 'postgresql':
-            query = 'PG_COLLECTION_STAMPS'
-        else:
-            query = 'COLLECTION_STAMPS'
+        query = 'COLLECTION_STAMPS'
         query = self._get_query(query, user_id)
         res = safe_execute(self._engine, query, user_id=user_id, ttl=int(time()))
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
