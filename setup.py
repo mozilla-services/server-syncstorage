@@ -37,7 +37,7 @@ from setuptools import setup, find_packages
 
 install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson',
-                    'Services']
+                    'Services>=0.2']
 
 entry_points = """
 [paste.app_factory]
