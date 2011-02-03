@@ -231,7 +231,6 @@ if MEMCACHED:
                 self.assertEquals(keys, ['baz', 'foo'])
 
             # deleting the item should also update the stamp
-            baz_stamp = stamps['baz']
             time.sleep(0.2)    # to make sure the stamps differ
             self.storage.delete_item(_UID, 'baz', '2')
             stamps = self.storage.get_collection_timestamps(_UID)

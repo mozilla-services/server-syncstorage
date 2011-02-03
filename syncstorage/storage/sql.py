@@ -362,7 +362,8 @@ class SQLStorage(object):
         """return the collection names for a given user"""
         query = 'COLLECTION_STAMPS'
         query = self._get_query(query, user_id)
-        res = safe_execute(self._engine, query, user_id=user_id, ttl=int(time()))
+        res = safe_execute(self._engine, query, user_id=user_id,
+                           ttl=int(time()))
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
 
@@ -513,8 +514,8 @@ class SQLStorage(object):
             fields = [getattr(wbo.c, field) for field in fields]
         where = self._get_query('ITEM_ID_COL_USER', user_id)
         query = select(fields, where)
-        res = safe_execute(self._engine, query, user_id=user_id, item_id=item_id,
-                           collection_id=collection_id,
+        res = safe_execute(self._engine, query, user_id=user_id,
+                           item_id=item_id, collection_id=collection_id,
                            ttl=int(time())).first()
         if res is None:
             return None

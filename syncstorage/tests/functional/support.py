@@ -42,7 +42,7 @@ import random
 from webtest import TestApp
 
 from syncstorage.tests.support import initenv
-from syncstorage.wsgiapp import make_app, SyncServerApp
+from syncstorage.wsgiapp import make_app
 
 
 class TestWsgiApp(unittest.TestCase):

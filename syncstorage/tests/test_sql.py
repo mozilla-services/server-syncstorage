@@ -37,8 +37,6 @@ import unittest
 import os
 import time
 
-from sqlalchemy.exc import OperationalError
-
 from syncstorage.tests.support import initenv
 from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
