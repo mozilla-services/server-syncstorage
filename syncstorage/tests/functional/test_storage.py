@@ -42,6 +42,8 @@ import time
 import struct
 import random
 import string
+import simplejson as json
+from decimal import Decimal
 
 from syncstorage.tests.functional import support
 from services.respcodes import WEAVE_OVER_QUOTA
@@ -739,3 +741,31 @@ class TestStorage(support.TestWsgiApp):
         # make sure we support any metrics marker on info/collections
         self.app.get(self.root + '/info/collections?client=FxHome&v=1.1b2',
                      status=200)
+
+    def test_rounding(self):
+        # make sure the server returns only rounded timestamps
+        resp = self.app.get(self.root + '/storage/col2?full=1')
+
+        # it's up to the client json deserializer to do the right
+        # thing then - e.g. like converting it into a decimal 2 digit
+        wbos = json.loads(resp.body, use_decimal=True)
+
+        # check how the timestamps look - we need two digits stuff
+        stamps = []
+        two_place = Decimal('1.00')
+        for wbo in wbos:
+            stamp = wbo['modified']
+            self.assertEqual(stamp, stamp.quantize(two_place))
+            stamps.append(stamp)
+
+        stamps.sort()
+        total = len(stamps)
+
+        # try a newer filter now, to get the last two objects
+        ts = float(stamps[-3])
+
+        # Returns only ids for objects in the collection that have been
+        # last modified since the date given.
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
+        res = res.json
+        self.assertEquals(res, ['3', '4'])

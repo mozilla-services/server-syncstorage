@@ -308,6 +308,7 @@ class StorageController(object):
 
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
+
         user_id = request.sync_info['user_id']
         collection_name = request.sync_info['collection']
 
@@ -365,7 +366,6 @@ class StorageController(object):
                     res['failed'][wbo['id']] = str(e)
             else:
                 res['success'].extend([wbo['id'] for wbo in wbos])
-
         response = json_response(res)
         if left <= 1024:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
