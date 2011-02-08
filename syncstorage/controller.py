@@ -365,8 +365,8 @@ class StorageController(object):
         for wbos in batch(kept_wbos):
             wbos = list(wbos)   # to avoid exhaustion
             try:
-                rowcount = storage.set_items(user_id, collection_name,
-                                             wbos, storage_time=storage_time)
+                storage.set_items(user_id, collection_name,
+                                  wbos, storage_time=storage_time)
 
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong

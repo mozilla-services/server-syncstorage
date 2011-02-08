@@ -37,7 +37,6 @@
 Basic tests to verify that the dispatching mechanism works.
 """
 import base64
-import json
 import time
 import struct
 import random
@@ -762,7 +761,6 @@ class TestStorage(support.TestWsgiApp):
             stamps.append(stamp)
 
         stamps.sort()
-        total = len(stamps)
 
         # try a newer filter now, to get the last two objects
         ts = float(stamps[-3])
@@ -811,7 +809,7 @@ class TestStorage(support.TestWsgiApp):
         wbo3 = {'id': 3, 'payload': _PLD}
         wbo4 = {'id': 4, 'payload': _PLD}
         wbos = json.dumps([wbo3, wbo4])
-        res2 = self.app.post(self.root + '/storage/tabs', params=wbos)
+        self.app.post(self.root + '/storage/tabs', params=wbos)
 
         # asking for wbos using newer=ts where newer is the timestamps
         # of wbo 1 and 2, should not return them
