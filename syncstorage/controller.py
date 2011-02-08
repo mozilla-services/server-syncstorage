@@ -49,6 +49,8 @@ from services.util import (convert_response, json_response, round_time,
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from services.util import html_response
+from services.cef import log_cef
+
 from syncstorage.wbo import WBO
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
@@ -114,7 +116,15 @@ class StorageController(object):
         Along with the last modified timestamp for each collection
         """
         # metrics are additional parameters used by the various clients
-        # to mark the logs for stats
+        # to mark the logs for stats. We also want to send a CEF log when
+        # this happens
+        if metrics != {}:
+            username = request.sync_info['username']
+            values = ['%s=%s' % (key, value)
+                      for key, value in metrics.items()]
+            log_cef('Daily metric call', 5, request.environ, self.app.config,
+                    username=username, msg=','.join(values))
+
         user_id = request.sync_info['user_id']
         storage = self._get_storage(request)
         collections = storage.get_collection_timestamps(user_id)
@@ -304,11 +314,20 @@ class StorageController(object):
         """Deletes a single WBO object."""
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
+
         user_id = request.sync_info['user_id']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
+
         self._get_storage(request).delete_item(user_id, collection_name,
                                                item_id)
+
+        if collection_name == 'crypto' and item_id == 'keys':
+            msg = 'Crypto keys deleted'
+            username = request.sync_info['username']
+            log_cef(msg, 5, request.environ, self.app.config,
+                    username=username)
+
         return json_response(request.server_time)
 
     def set_collection(self, request):
