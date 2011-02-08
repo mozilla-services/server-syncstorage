@@ -126,7 +126,7 @@ def get_query(name, user_id=None):
                  table.c.ttl > bindparam('ttl'))).group_by(table.c.collection)
     elif name == 'USER_COLLECTION_NAMES':
         return select([collections.c.collectionid,
-                                 collections.c.name],
-                                collections.c.userid == bindparam('user_id'))
+                       collections.c.name],
+                      collections.c.userid == bindparam('user_id'))
 
     raise ValueError(name)

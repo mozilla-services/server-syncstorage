@@ -42,12 +42,12 @@ Memcached + SQL backend
 """
 from time import time
 import threading
-import json
+import simplejson as json
 
 from memcache import Client
 from sqlalchemy.sql import select, bindparam, func
 
-from services.util import BackendError
+from services.util import BackendError, round_time
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 
@@ -204,7 +204,7 @@ class _JSONDumper(object):
         self.file = file
 
     def dump(self, val):
-        self.file.write(json.dumps(val))
+        self.file.write(json.dumps(val, use_decimal=True))
 
     def load(self):
         return json.loads(self.file.read())
@@ -313,7 +313,7 @@ class MemcachedSQLStorage(SQLStorage):
 
         return _get_item()
 
-    def _update_cache(self, user_id, collection_name, items):
+    def _update_cache(self, user_id, collection_name, items, storage_time):
         # update the total size cache
         total_size = sum([len(item.get('payload', '')) for item in items])
         if not self.cache.incr(_key(user_id, 'size'), total_size):
@@ -331,7 +331,7 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.set_tabs(user_id, tabs)
             # update the timestamp cache
             key = _key(user_id, 'collections', 'stamp', 'tabs')
-            self.cache.set(key, time())
+            self.cache.set(key, storage_time)
 
         # invalidate the stamps cache
         self.cache.delete(_key(user_id, 'stamps'))
@@ -340,33 +340,41 @@ class MemcachedSQLStorage(SQLStorage):
         if 'payload' in item:
             item['modified'] = when
 
-    def set_item(self, user_id, collection_name, item_id, **values):
+    def set_item(self, user_id, collection_name, item_id, storage_time=None,
+                 **values):
         """Adds or update an item"""
         values['id'] = item_id
-        now = time()
-        self._update_item(values, now)
-        self._update_cache(user_id, collection_name, [values])
+        if storage_time is None:
+            storage_time = round_time()
+
+        self._update_item(values, storage_time)
+        self._update_cache(user_id, collection_name, [values], storage_time)
 
         if collection_name == 'tabs':
             # return now : we don't store tabs in sql
-            return now
-        return self.sqlstorage.set_item(user_id, collection_name, item_id,
-                                        **values)
+            return storage_time
 
-    def set_items(self, user_id, collection_name, items):
+        return self.sqlstorage.set_item(user_id, collection_name, item_id,
+                                        storage_time=storage_time, **values)
+
+    def set_items(self, user_id, collection_name, items, storage_time=None):
         """Adds or update a batch of items.
 
         Returns a list of success or failures.
         """
-        now = time()
-        for item in items:
-            self._update_item(item, now)
+        if storage_time is None:
+            storage_time = round_time()
 
-        self._update_cache(user_id, collection_name, items)
+        for item in items:
+            self._update_item(item, storage_time)
+
+        self._update_cache(user_id, collection_name, items, storage_time)
         if collection_name == 'tabs':
             # return now : we don't store tabs in sql
             return len(items)
-        return self.sqlstorage.set_items(user_id, collection_name, items)
+
+        return self.sqlstorage.set_items(user_id, collection_name, items,
+                                         storage_time=storage_time)
 
     def delete_item(self, user_id, collection_name, item_id):
         """Deletes an item"""

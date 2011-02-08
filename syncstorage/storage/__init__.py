@@ -276,13 +276,17 @@ class SyncStorage(PluginRegistry):
         """
 
     @abc.abstractmethod
-    def set_item(self, user_id, collection_name, item_id, **values):
+    def set_item(self, user_id, collection_name, item_id, storage_time,
+                 **values):
         """Sets an item.
 
         Args:
             - user_id: integer identifying the user in the storage.
             - collection_name: name of the collection.
             - item_id: string identifying the item
+            - storage_time: time of the storage, if none provided, use current
+              time
+
             - values: mapping containing the values.
 
         Returns:
@@ -290,14 +294,15 @@ class SyncStorage(PluginRegistry):
         """
 
     @abc.abstractmethod
-    def set_items(self, user_id, collection_name, items):
+    def set_items(self, user_id, collection_name, items, storage_time=None):
         """Adds or update a batch of items.
 
         Args:
             - user_id: integer identifying the user in the storage.
             - collection_name: name of the collection.
             - items: a list of dict
-
+            - storage_time: time of the storage, if none provided, use current
+              time
         Returns:
             Integer: number of inserts/updates
         """

@@ -51,7 +51,7 @@ from syncstorage.storage.sqlmappers import (tables, users, collections,
                                             get_wbo_table,
                                             get_wbo_table_byindex)
 from syncstorage.storage.sqlmappers import wbo as _wbo
-from services.util import time2bigint, bigint2time, safe_execute
+from services.util import time2bigint, bigint2time, safe_execute, round_time
 from syncstorage.wbo import WBO
 
 
@@ -62,6 +62,14 @@ _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
 
 STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
                                    _STANDARD_COLLECTIONS.items())
+
+
+def _roundedbigint(value):
+    return time2bigint(round_time(value))
+
+
+def _int_now():
+    return int(time())
 
 
 class _CustomCompiler(SQLCompiler):
@@ -363,7 +371,7 @@ class SQLStorage(object):
         query = 'COLLECTION_STAMPS'
         query = self._get_query(query, user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=int(time()))
+                           ttl=_int_now())
         return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
                      for coll_id, stamp in res])
 
@@ -389,7 +397,7 @@ class SQLStorage(object):
         """Return the collection counts for a given user"""
         query = self._get_query('COLLECTION_COUNTS', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=int(time()))
+                           ttl=_int_now())
         try:
             return dict([(self._collid2name(user_id, collid), count)
                          for collid, count in res])
@@ -401,7 +409,7 @@ class SQLStorage(object):
         query = self._get_query('COLLECTION_MAX_STAMPS', user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_id=collection_id, ttl=int(time()))
+                           collection_id=collection_id, ttl=_int_now())
         res = res.fetchone()
         stamp = res[0]
         if stamp is None:
@@ -417,7 +425,7 @@ class SQLStorage(object):
             return dict()
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=int(time()))
+                           ttl=_int_now())
         return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
                      for col in res])
 
@@ -430,7 +438,7 @@ class SQLStorage(object):
         query = self._get_query('ITEM_EXISTS', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
                            item_id=item_id,
-                                 collection_id=collection_id, ttl=int(time()))
+                           collection_id=collection_id, ttl=_int_now())
         res = res.fetchone()
         if res is None:
             return None
@@ -468,7 +476,7 @@ class SQLStorage(object):
 
                 operator, value = value
                 if field.name == 'modified':
-                    value = time2bigint(value)
+                    value = _roundedbigint(value)
 
                 if isinstance(value, (list, tuple)):
                     where.append(field.in_(value))
@@ -481,7 +489,7 @@ class SQLStorage(object):
                         where.append(field > value)
 
         if filters is None or 'ttl' not in filters:
-            where.append(wbo.c.ttl > int(time()))
+            where.append(wbo.c.ttl > _int_now())
 
         where = and_(*where)
         query = select(fields, where)
@@ -516,7 +524,7 @@ class SQLStorage(object):
         query = select(fields, where)
         res = safe_execute(self._engine, query, user_id=user_id,
                            item_id=item_id, collection_id=collection_id,
-                           ttl=int(time())).first()
+                           ttl=_int_now()).first()
         if res is None:
             return None
 
@@ -527,12 +535,14 @@ class SQLStorage(object):
         wbo = self._get_wbo_table(user_id)
 
         if 'modified' in values:
-            values['modified'] = time2bigint(values['modified'])
+            values['modified'] = _roundedbigint(values['modified'])
 
         if 'ttl' not in values:
             values['ttl'] = MAX_TTL
         else:
-            values['ttl'] += int(time())
+            # ttl is provided in seconds, so we add it
+            # to the current timestamp
+            values['ttl'] += _int_now()
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
@@ -561,10 +571,14 @@ class SQLStorage(object):
 
         return modified
 
-    def set_item(self, user_id, collection_name, item_id, **values):
+    def set_item(self, user_id, collection_name, item_id, storage_time=None,
+                 **values):
         """Adds or update an item"""
+        if storage_time is None:
+            storage_time = round_time()
+
         if 'payload' in values and 'modified' not in values:
-            values['modified'] = time()
+            values['modified'] = storage_time
 
         return self._set_item(user_id, collection_name, item_id, **values)
 
@@ -573,17 +587,24 @@ class SQLStorage(object):
             return get_wbo_table_name(user_id)
         return 'wbo'
 
-    def set_items(self, user_id, collection_name, items):
+    def set_items(self, user_id, collection_name, items, storage_time=None):
         """Adds or update a batch of items.
 
         Returns a list of success or failures.
         """
+        if not self.standard_collections:
+            self.set_collection(user_id, collection_name)
+
+        if storage_time is None:
+            storage_time = round_time()
+
         if self.engine_name in ('sqlite', 'postgresql'):
             count = 0
             for item in items:
                 if 'id' not in item:
                     continue
                 item_id = item['id']
+                item['modified'] = storage_time
                 self.set_item(user_id, collection_name, item_id, **item)
                 count += 1
             return count
@@ -614,17 +635,17 @@ class SQLStorage(object):
                 if value is None:
                     continue
                 if field == 'modified' and value is not None:
-                    value = time2bigint(value)
+                    value = _roundedbigint(storage_time)
                 values['%s%d' % (field, num)] = value
 
             if ('payload%d' % num in values and
                 'modified%d' % num not in values):
-                values['modified%d' % num] = time2bigint(time())
+                values['modified%d' % num] = _roundedbigint(storage_time)
 
             if values.get('ttl%d' % num) is None:
                 values['ttl%d' % num] = 2100000000
             else:
-                values['ttl%d' % num] += int(time())
+                values['ttl%d' % num] += int(storage_time)
 
             if self.use_quota and 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
@@ -670,7 +691,7 @@ class SQLStorage(object):
 
                 operator, value = value
                 if field.name == 'modified':
-                    value = time2bigint(value)
+                    value = _roundedbigint(value)
                 if isinstance(value, (list, tuple)):
                     where.append(field.in_(value))
                 else:
@@ -715,7 +736,7 @@ class SQLStorage(object):
 
         query = self._get_query('USER_STORAGE_SIZE', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=int(time()))
+                           ttl=_int_now())
         res = res.fetchone()
         if res is None or res[0] is None:
             return 0.0

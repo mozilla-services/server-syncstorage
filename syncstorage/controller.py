@@ -97,11 +97,13 @@ class StorageController(object):
         if unmodified is None:
             return False
         unmodified = round_time(unmodified)
-        max = self._get_storage(request).get_collection_max_timestamp(user_id,
-                                                        collection_name)
+        storage = self._get_storage(request)
+        max = storage.get_collection_max_timestamp(user_id,
+                                                   collection_name)
         if max is None:
             return False
-        return round_time(max) > unmodified
+
+        return max > unmodified
 
     def get_storage(self, request):
         # XXX returns a 400 if the root is called
@@ -161,7 +163,10 @@ class StorageController(object):
             if value is None:
                 continue
             try:
-                value = float(value)
+                if arg in ('older', 'newer'):
+                    value = round_time(value)
+                else:
+                    value = float(value)
             except ValueError:
                 raise HTTPBadRequest('Invalid value for "%s"' % arg)
             if arg in ('older', 'index_below'):
@@ -331,7 +336,7 @@ class StorageController(object):
             request.sync_info['item'] = id_
             return self.set_item(request)
 
-        res = {'modified': request.server_time, 'success': [], 'failed': {}}
+        res = {'success': [], 'failed': {}}
 
         # sanity chech
         kept_wbos = []
@@ -354,18 +359,23 @@ class StorageController(object):
                 kept_wbos.append(wbo)
 
         left = self._check_quota(request)
+        storage_time = request.server_time
+        storage = self._get_storage(request)
 
         for wbos in batch(kept_wbos):
             wbos = list(wbos)   # to avoid exhaustion
             try:
-                self._get_storage(request).set_items(user_id, collection_name,
-                                                     wbos)
+                rowcount = storage.set_items(user_id, collection_name,
+                                             wbos, storage_time=storage_time)
+
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 for wbo in wbos:
                     res['failed'][wbo['id']] = str(e)
             else:
                 res['success'].extend([wbo['id'] for wbo in wbos])
+
+        res['modified'] = storage_time
         response = json_response(res)
         if left <= 1024:
             response.headers['X-Weave-Quota-Remaining'] = str(left)

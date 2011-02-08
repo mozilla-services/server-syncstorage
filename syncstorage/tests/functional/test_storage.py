@@ -639,6 +639,9 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'payload': _PLD, 'ttl': 1}
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/123456', params=wbo)
+        # trying a second put again
+        self.app.put(self.root + '/storage/col2/123456', params=wbo)
+
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
         time.sleep(1.1)
@@ -767,5 +770,51 @@ class TestStorage(support.TestWsgiApp):
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
+        res = res.json
+        self.assertEquals(res, ['3', '4'])
+
+    def test_strict_newer(self):
+        # send two wbos in the 'meh' collection
+        wbo1 = {'id': 1, 'payload': _PLD}
+        wbo2 = {'id': 2, 'payload': _PLD}
+        wbos = json.dumps([wbo1, wbo2])
+        res = self.app.post(self.root + '/storage/meh', params=wbos)
+        ts = json.loads(res.body, use_decimal=True)['modified']
+
+        # wait a bit
+        time.sleep(0.2)
+
+        # send two more wbos
+        wbo3 = {'id': 3, 'payload': _PLD}
+        wbo4 = {'id': 4, 'payload': _PLD}
+        wbos = json.dumps([wbo3, wbo4])
+        res = self.app.post(self.root + '/storage/meh', params=wbos)
+
+        # asking for wbos using newer=ts where newer is the timestamps
+        # of wbo 1 and 2, should not return them
+        res = self.app.get(self.root + '/storage/meh?newer=%s' % ts)
+        res = res.json
+        self.assertEquals(res, ['3', '4'])
+
+    def test_strict_newer_tabs(self):
+        # send two wbos in the 'tabs' collection
+        wbo1 = {'id': 1, 'payload': _PLD}
+        wbo2 = {'id': 2, 'payload': _PLD}
+        wbos = json.dumps([wbo1, wbo2])
+        res = self.app.post(self.root + '/storage/tabs', params=wbos)
+        ts = json.loads(res.body, use_decimal=True)['modified']
+
+        # wait a bit
+        time.sleep(0.2)
+
+        # send two more wbos
+        wbo3 = {'id': 3, 'payload': _PLD}
+        wbo4 = {'id': 4, 'payload': _PLD}
+        wbos = json.dumps([wbo3, wbo4])
+        res2 = self.app.post(self.root + '/storage/tabs', params=wbos)
+
+        # asking for wbos using newer=ts where newer is the timestamps
+        # of wbo 1 and 2, should not return them
+        res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
         res = res.json
         self.assertEquals(res, ['3', '4'])
