@@ -796,10 +796,7 @@ class TestStorage(support.TestWsgiApp):
         two_place = Decimal('1.00')
         for wbo in wbos:
             stamp = wbo['modified']
-            try:
-                self.assertEqual(stamp, stamp.quantize(two_place))
-            except:
-                import pdb; pdb.set_trace()
+            self.assertEqual(stamp, stamp.quantize(two_place))
             stamps.append(stamp)
 
         stamps.sort()
