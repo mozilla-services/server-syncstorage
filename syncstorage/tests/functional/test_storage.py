@@ -796,7 +796,14 @@ class TestStorage(support.TestWsgiApp):
         two_place = Decimal('1.00')
         for wbo in wbos:
             stamp = wbo['modified']
-            self.assertEqual(stamp, stamp.quantize(two_place))
+            try:
+                self.assertEqual(stamp, stamp.quantize(two_place))
+            except:
+                # XXX more info to track down this issue
+                msg = 'could not quantize '
+                msg += res.body
+                raise AssertionError(msg)
+
             stamps.append(stamp)
 
         stamps.sort()
