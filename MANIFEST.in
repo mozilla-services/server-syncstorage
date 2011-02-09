@@ -1,2 +1,4 @@
+include README
+include RELEASE.txt
 include *.cfg *.ini *.wsgi *.sh
 recursive-include etc *

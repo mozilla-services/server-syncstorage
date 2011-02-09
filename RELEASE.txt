@@ -1,0 +1,16 @@
+0.1-16 - 20011-02-10
+====================
+
+Impacts:
+
+- Infrastructure Security
+- Quality
+
+Dependencies
+
+- python-services: 0.2-7
+
+Relevant changes:
+
+- 626967 - Add more CEF logs on specific activity
+- 631233, 631137 - Removed all float representation of time
