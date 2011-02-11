@@ -815,7 +815,13 @@ class TestStorage(support.TestWsgiApp):
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
         res = res.json
-        self.assertEquals(res, ['3', '4'])
+        try:
+            self.assertEquals(res, ['3', '4'])
+        except AssertionError:
+            # need to display the whole collection to understand the issue
+            msg = str(float)
+            msg += ' ' + self.app.get(self.root + '/storage/col2?full=1').body
+            raise AssertionError(msg)
 
     def test_strict_newer(self):
         # send two wbos in the 'meh' collection
