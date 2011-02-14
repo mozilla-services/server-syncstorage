@@ -35,7 +35,7 @@
 # ***** END LICENSE BLOCK *****
 from setuptools import setup, find_packages
 
-install_requires = ['SQLALchemy', 'PasteDeploy', 'WebOb',
+install_requires = ['SQLALchemy==0.6.6', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson',
                     'Services>=0.2']
 
