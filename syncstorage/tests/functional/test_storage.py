@@ -801,7 +801,7 @@ class TestStorage(support.TestWsgiApp):
             except:
                 # XXX more info to track down this issue
                 msg = 'could not quantize '
-                msg += res.body
+                msg += resp.body
                 raise AssertionError(msg)
 
             stamps.append(stamp)
@@ -868,3 +868,15 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
         res = res.json
         self.assertEquals(res, ['3', '4'])
+
+    def test_debug_screen(self):
+        # deactivated by default
+        self.app.get(self.root + '/__debug__', status=404)
+
+        # let's activate it
+        app = get_app(self.app)
+        app.debug_page = '__debug__'
+
+        # what do we have ?
+        res = self.app.get('/__debug__')
+        self.assertTrue('- backend: sql' in res.body)

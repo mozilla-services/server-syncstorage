@@ -39,8 +39,6 @@ Storage controller. Implements all info, user APIs from:
 https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 
 """
-import pprint
-from StringIO import StringIO
 import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
@@ -48,7 +46,6 @@ from services.util import (convert_response, json_response, round_time,
                            batch, HTTPJsonBadRequest)
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
-from services.util import html_response
 from services.cef import log_cef
 
 from syncstorage.wbo import WBO
@@ -62,30 +59,6 @@ class StorageController(object):
 
     def __init__(self, app):
         self.app = app
-
-    def index(self, request):
-        if not self.app.config.get('storage.display_config', False):
-            return HTTPNotFound()
-
-        # let's print out the info
-        res = ['<html><body><h1>Request</h1>']
-        # environ
-        out = StringIO()
-        pprint.pprint(request.environ, out)
-        out.seek(0)
-        environ = out.read()
-        res.append('<pre>%s</pre>' % environ)
-
-        # config
-        res.append('<h1>Storage in usage</h1>')
-        storage = self._get_storage(request)
-        res.append('<ul>')
-        res.append('<li>backend: %s</li>' % storage.get_name())
-        if storage.get_name() in ('sql',):
-            res.append('<li>sqluri: %s</li>' % storage.sqluri)
-        res.append('</ul>')
-        res.append('</body></html>')
-        return html_response(''.join(res))
 
     def _has_modifiers(self, data):
         return 'payload' in data

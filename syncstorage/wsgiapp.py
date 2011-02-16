@@ -62,8 +62,7 @@ def _url(url):
     return url
 
 
-urls = [('GET', '/', 'storage', 'index'),
-        ('GET', _url('/_API_/_USERNAME_/info/collections'),
+urls = [('GET', _url('/_API_/_USERNAME_/info/collections'),
          'storage', _url('get_collections'), _EXTRAS),
         ('GET', _url('/_API_/_USERNAME_/info/collection_counts'),
          'storage', 'get_collection_counts', _EXTRAS),
@@ -143,5 +142,20 @@ class StorageServerApp(SyncServerApp):
             # but add the header
             return {'X-Weave-Backoff': str(backoff)}
         return {}
+
+    def _debug_server(self, request):
+        res = []
+        storage = self.get_storage(request)
+        res.append('- backend: %s' % storage.get_name())
+        if storage.get_name() in ('memcached',):
+            cache_servers = ['%s:%d' % (server.ip, server.port)
+                             for server in storage.cache.servers]
+            res.append('- memcached servers: %s</li>' % \
+                    ', '.join(cache_servers))
+
+        if storage.get_name() in ('sql', 'memcached'):
+            res.append('- sqluri: %s' % storage.sqluri)
+        return res
+
 
 make_app = set_app(urls, controllers, klass=StorageServerApp)
