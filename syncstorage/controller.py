@@ -47,6 +47,7 @@ from services.util import (convert_response, json_response, round_time,
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from services.cef import log_cef
+from services import logger
 
 from syncstorage.wbo import WBO
 
@@ -254,7 +255,12 @@ class StorageController(object):
 
     def set_item(self, request):
         """Sets a single WBO object."""
-        left = self._check_quota(request)
+        storage = self._get_storage(request)
+        if storage.use_quota:
+            left = self._check_quota(request)
+        else:
+            left = 0.
+
         user_id = request.sync_info['user_id']
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
@@ -276,10 +282,9 @@ class StorageController(object):
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
 
-        res = self._get_storage(request).set_item(user_id, collection_name,
-                                                  item_id, **wbo)
+        res = storage.set_item(user_id, collection_name, item_id, **wbo)
         response = json_response(res)
-        if left <= _ONE_MEG:
+        if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
         return response
 
@@ -350,9 +355,13 @@ class StorageController(object):
             else:
                 kept_wbos.append(wbo)
 
-        left = self._check_quota(request)
-        storage_time = request.server_time
         storage = self._get_storage(request)
+        if storage.use_quota:
+            left = self._check_quota(request)
+        else:
+            left = 0.
+
+        storage_time = request.server_time
 
         for wbos in batch(kept_wbos):
             wbos = list(wbos)   # to avoid exhaustion
@@ -362,6 +371,8 @@ class StorageController(object):
 
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
+                logger.error('Could not set items')
+                logger.error(str(e))
                 for wbo in wbos:
                     res['failed'][wbo['id']] = str(e)
             else:
@@ -369,7 +380,7 @@ class StorageController(object):
 
         res['modified'] = storage_time
         response = json_response(res)
-        if left <= 1024:
+        if storage.use_quota and left <= 1024:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
         return response
 

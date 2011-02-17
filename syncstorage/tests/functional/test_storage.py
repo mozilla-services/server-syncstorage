@@ -47,8 +47,10 @@ from decimal import Decimal
 from tempfile import mkstemp
 
 from syncstorage.tests.functional import support
+
 from services.respcodes import WEAVE_OVER_QUOTA
 from services.tests.support import get_app
+from services.util import BackendError
 
 
 _PLD = '*' * 500
@@ -868,6 +870,48 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
         res = res.json
         self.assertEquals(res, ['3', '4'])
+
+    def test_write_tabs_503(self):
+        # make sure a tentative to write in tabs w/ memcached leads to a 503
+        try:
+            from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+        except ImportError:
+            return
+
+        class BadCache(object):
+            def incr(*args, **kw):
+                return False
+
+            def set(*args, **kw):
+                pass
+
+            def delete(*args, **kw):
+                pass
+
+            def get(*args, **kw):
+                return None
+
+            def set_tabs(*args, **kw):
+                raise BackendError()
+
+        app = get_app(self.app)
+        storage = MemcachedSQLStorage('sqlite:///:memory:')
+        storage.cache = BadCache()
+        app.storages['localhost'] = storage
+
+        # send two wbos in the 'tabs' collection
+        wbo1 = {'id': 'sure', 'payload': _PLD}
+        wbo2 = {'id': 'thing', 'payload': _PLD}
+        wbos = json.dumps([wbo1, wbo2])
+
+        # on batch, we get back a 200 - but only failures
+        res = self.app.post(self.root + '/storage/tabs', params=wbos)
+        self.assertEqual(len(res.json['failed']), 2)
+        self.assertEqual(len(res.json['success']), 0)
+
+        # on single PUT, we get a 503
+        wbo1 = json.dumps(wbo1)
+        self.app.put(self.root + '/storage/tabs/sure', params=wbo1, status=503)
 
     def test_debug_screen(self):
         # deactivated by default

@@ -39,6 +39,7 @@ install_requires = ['SQLALchemy==0.6.6', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson',
                     'Services>=0.2']
 
+
 entry_points = """
 [paste.app_factory]
 main = syncstorage.wsgiapp:make_app
