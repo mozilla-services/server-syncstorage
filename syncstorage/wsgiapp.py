@@ -130,7 +130,8 @@ class StorageServerApp(SyncServerApp):
     def _before_call(self, request):
         # let's control if this server is not on the blacklist
         if not self.check_blacklist:
-            return
+            return {}
+
         host = request.host
         if self.cache.get('down:%s' % host) is not None:
             # the server is marked as down -- let's exit
