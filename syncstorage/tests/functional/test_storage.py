@@ -78,10 +78,12 @@ class TestStorage(support.TestWsgiApp):
         for item in range(3):
             self.storage.set_item(self.user_id, 'col1', str(item),
                                   payload='xxx')
+            time.sleep(0.02)   # make sure we have different timestamps
 
         for item in range(5):
             self.storage.set_item(self.user_id, 'col2', str(item),
                                   payload='xxx')
+            time.sleep(0.02)   # make sure we have different timestamps
 
     def test_get_collections(self):
 
@@ -821,8 +823,9 @@ class TestStorage(support.TestWsgiApp):
             self.assertEquals(res, ['3', '4'])
         except AssertionError:
             # need to display the whole collection to understand the issue
-            msg = str(float)
+            msg = 'Stamp used: %s' % ts
             msg += ' ' + self.app.get(self.root + '/storage/col2?full=1').body
+            msg += ' Stamps received: %s' % str(stamps)
             raise AssertionError(msg)
 
     def test_strict_newer(self):
