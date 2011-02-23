@@ -1,5 +1,24 @@
-0.1-16 - 20011-02-10
-====================
+0.1-17 - 2011-02-23
+===================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 0.2-13
+
+Relevant changes:
+
+- 635112 - Pooling is off by default for LDAP
+- 627652 - check 503+retry on memcache failure for tab writes
+- 633479 - use the new /__debug__ page to add more info, instead of /
+
+
+
+0.1-16 - 2011-02-10
+===================
 
 Impacts:
 
