@@ -42,14 +42,15 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
+from cef import log_cef
+
 from services.util import (convert_response, json_response, round_time,
                            batch, HTTPJsonBadRequest)
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
-from services.cef import log_cef
 from services import logger
-
 from syncstorage.wbo import WBO
+
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload']
