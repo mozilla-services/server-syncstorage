@@ -37,6 +37,7 @@
 SQL backend
 """
 from time import time
+from collections import defaultdict
 
 from sqlalchemy import create_engine
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
@@ -170,7 +171,6 @@ class SQLStorage(object):
             table.metadata.bind = self._engine
             if create_tables:
                 table.create(checkfirst=True)
-        self._user_collections = {}
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
         self.use_quota = use_quota
@@ -187,6 +187,8 @@ class SQLStorage(object):
             _wbo.metadata.bind = self._engine
             if create_tables:
                 _wbo.create(checkfirst=True)
+
+        self._temp_cache = defaultdict(dict)
 
     @classmethod
     def get_name(cls):
@@ -372,26 +374,35 @@ class SQLStorage(object):
         query = self._get_query(query, user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
                            ttl=_int_now())
-        return dict([(self._collid2name(user_id, coll_id), bigint2time(stamp))
-                     for coll_id, stamp in res])
+        try:
+            return dict([(self._collid2name(user_id, coll_id),
+                        bigint2time(stamp)) for coll_id, stamp in res])
+        finally:
+            self._purge_cache(user_id)
+
+    def _cache(self, user_id, name, func):
+        user_cache = self._temp_cache[user_id]
+        if name in user_cache:
+            return user_cache[name]
+        data = func()
+        user_cache[name] = data
+        return data
+
+    def _purge_cache(self, user_id):
+        self._temp_cache[user_id].clear()
 
     def _collid2name(self, user_id, collection_id):
         if (self.standard_collections and
             collection_id in _STANDARD_COLLECTIONS):
             return _STANDARD_COLLECTIONS[collection_id]
 
-        # custom collections - we don't have any yet with sync
-        # but if we potentially do, this cache should go into
-        # memcached
-        if user_id not in self._user_collections:
-            names = dict(self.get_collection_names(user_id))
-            self._user_collections[user_id] = names
+        # custom collections
+        def _coll():
+            data = self.get_collection_names(user_id)
+            return dict(data)
 
-        return self._user_collections[user_id][collection_id]
-
-    def _purge_user_collections(self, user_id):
-        if user_id in self._user_collections:
-            del self._user_collections[user_id]
+        collections = self._cache(user_id, 'collection_names', _coll)
+        return collections[collection_id]
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
@@ -400,9 +411,9 @@ class SQLStorage(object):
                            ttl=_int_now())
         try:
             return dict([(self._collid2name(user_id, collid), count)
-                         for collid, count in res])
+                          for collid, count in res])
         finally:
-            self._purge_user_collections(user_id)
+            self._purge_cache(user_id)
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
@@ -426,8 +437,11 @@ class SQLStorage(object):
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
                            ttl=_int_now())
-        return dict([(self._collid2name(user_id, col[0]), int(col[1]) / _KB)
-                     for col in res])
+        try:
+            return dict([(self._collid2name(user_id, col[0]),
+                        int(col[1]) / _KB) for col in res])
+        finally:
+            self._purge_cache(user_id)
 
     #
     # Items APIs

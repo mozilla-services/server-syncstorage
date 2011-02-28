@@ -104,6 +104,26 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(values, [3, 5])
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
+    def test_bad_cache(self):
+        # fixes #637332
+        # the collection name <-> id mapper is temporarely cached to
+        # save a few requests.
+        # but should get purged when new collections are added
+
+        # 1. get collection info
+        resp = self.app.get(self.root + '/info/collections')
+        numcols = len(resp.json)
+
+        # 2. add a new collection + stuff
+        self.storage.set_collection(self.user_id, 'xxxx')
+        wbo = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
+        wbo = json.dumps(wbo)
+        self.app.put(self.root + '/storage/xxxx/125', params=wbo)
+
+        # 3. get collection info again, should find the new ones
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(len(resp.json), numcols + 1)
+
     def test_get_collection(self):
         res = self.app.get(self.root + '/storage/col3')
         self.assertEquals(res.json, [])
