@@ -1,3 +1,19 @@
+0.1-18 - 2011-02-28
+===================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 0.2-14
+
+Relevant changes:
+
+- 637332 - Fix the bad cache on custom collections
+
+
 0.1-17 - 2011-02-23
 ===================
 
