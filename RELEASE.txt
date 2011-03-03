@@ -1,3 +1,19 @@
+0.1-19 - 2011-03-03
+===================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 0.2-15
+
+Relevant changes:
+
+- 638330 - fix how get_collection_sizes reads tabs
+
+
 0.1-18 - 2011-02-28
 ===================
 
