@@ -35,6 +35,7 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 import time
+from decimal import Decimal
 
 try:
     from syncstorage.storage.memcachedsql import MemcachedSQLStorage
@@ -251,6 +252,26 @@ if MEMCACHED:
 
             item_stored = storage.get_item(1, 'tabs', 'one')
             self.assertEqual(item_stored['payload'], 'xxx')
+
+        def test_collection_sizes(self):
+            if not self._is_up():  # no memcached
+                return
+            kw = {'sqluri': 'sqlite:///:memory:',
+                  'use_quota': True,
+                  'quota_size': 5120,
+                  'memcached_json': True}
+
+            storage = SyncStorage.get('memcached', **kw)
+
+            # setting the tabs in memcache
+            tabs = {'mCwylprUEiP5':
+                     {'payload': '*' * 500,
+                      'id': 'mCwylprUEiP5',
+                      'modified': Decimal('1299142695.76')}}
+            storage.cache.set_tabs(1, tabs)
+
+            size = storage.get_collection_sizes(1)
+            self.assertEqual(size['tabs'], 500)
 
 
 def test_suite():

@@ -440,7 +440,8 @@ class MemcachedSQLStorage(SQLStorage):
         """
         sizes = self.sqlstorage.get_collection_sizes(user_id)
         tabs = self.cache.get_tabs(user_id)
-        sizes['tabs'] = sum([len(tab.get('payload'), '') for tab in tabs])
+        sizes['tabs'] = sum([len(tab.get('payload', ''))
+              for tab in tabs.values()])
         return sizes
 
     def get_collection_timestamps(self, user_id):
