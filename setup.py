@@ -37,7 +37,7 @@ from setuptools import setup, find_packages
 
 install_requires = ['SQLALchemy==0.6.6', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson', 'cef',
-                    'Services>=0.2']
+                    'Services>=1.0']
 
 
 entry_points = """
@@ -48,5 +48,5 @@ main = syncstorage.wsgiapp:make_app
 main = paste.script.appinstall:Installer
 """
 
-setup(name='SyncStorage', version=0.1, packages=find_packages(),
+setup(name='SyncStorage', version='1.0', packages=find_packages(),
       install_requires=install_requires, entry_points=entry_points)

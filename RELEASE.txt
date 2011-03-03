@@ -1,3 +1,19 @@
+1.0-1 - 2011-03-03
+==================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 1.0-1
+
+Relevant changes:
+
+- None
+
+
 0.1-19 - 2011-03-03
 ===================
 

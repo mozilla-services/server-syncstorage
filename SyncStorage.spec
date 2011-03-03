@@ -1,9 +1,8 @@
 %define name python26-syncstorage
 %define pythonname SyncStorage
-%define version 0.1
-%define unmangled_version 0.1
-%define unmangled_version 0.1
-%define release 19
+%define version 1.0
+%define unmangled_version 1.0
+%define release 1
 
 Summary: Sync Storage server
 Name: %{name}
@@ -16,7 +15,7 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
-Requires: nginx memcached gunicorn python26 python26-memcached python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 0.2 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef
+Requires: nginx memcached gunicorn python26 python26-memcached python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 1.0 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef
 Conflicts: python26-syncreg
 Url: https://hg.mozilla.org/services/server-storage
 
