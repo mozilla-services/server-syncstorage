@@ -156,7 +156,7 @@ class SQLStorage(object):
 
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
-                 pool_recycle=60, reset_on_return=True, create_tables=True,
+                 pool_recycle=60, reset_on_return=True, create_tables=False,
                  shard=False, shardsize=100, **kw):
         self.sqluri = sqluri
         sqlkw = {'pool_size': int(pool_size),

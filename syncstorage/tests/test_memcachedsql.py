@@ -57,7 +57,8 @@ if MEMCACHED:
         def setUp(self):
             kw = {'sqluri': 'sqlite:///:memory:',
                   'use_quota': True,
-                  'quota_size': 5120}
+                  'quota_size': 5120,
+                  'create_tables': True}
 
             self.storage = SyncStorage.get('memcached', **kw)
 
@@ -259,7 +260,8 @@ if MEMCACHED:
             kw = {'sqluri': 'sqlite:///:memory:',
                   'use_quota': True,
                   'quota_size': 5120,
-                  'memcached_json': True}
+                  'memcached_json': True,
+                  'create_tables': True}
 
             storage = SyncStorage.get('memcached', **kw)
 

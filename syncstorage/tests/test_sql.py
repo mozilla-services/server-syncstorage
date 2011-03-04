@@ -229,13 +229,29 @@ class TestSQLStorage(unittest.TestCase):
     def test_no_create(self):
         # testing the create_tables option
         testsdir = os.path.dirname(__file__)
-        conf = os.path.join(testsdir, 'tests.ini')
 
+        # when not provided it is not created
+        conf = os.path.join(testsdir, 'tests3.ini')
         appdir, config, storage, auth = initenv(conf)
 
         # this should fail because the table is absent
         self.assertRaises(BackendError, storage.set_user, _UID,
                           email='tarek@ziade.org')
+
+        # create_table = false
+        conf = os.path.join(testsdir, 'tests.ini')
+        appdir, config, storage, auth = initenv(conf)
+
+        # this should fail because the table is absent
+        self.assertRaises(BackendError, storage.set_user, _UID,
+                          email='tarek@ziade.org')
+
+        # create_table = true
+        conf = os.path.join(testsdir, 'tests2.ini')
+        appdir, config, storage, auth = initenv(conf)
+
+        # this should work because the table is absent
+        storage.set_user(_UID, email='tarek@ziade.org')
 
     def test_shard(self):
         # make shure we do shard
