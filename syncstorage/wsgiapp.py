@@ -51,7 +51,7 @@ _EXTRAS = {'auth': True}
 
 
 def _url(url):
-    for pattern, replacer in (('_API_', '{api:1.0|1}'),
+    for pattern, replacer in (('_API_', '{api:1.0|1|1.1}'),
                               ('_COLLECTION_',
                                '{collection:[a-zA-Z0-9._-]+}'),
                               ('_USERNAME_',
