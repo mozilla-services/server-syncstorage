@@ -42,12 +42,16 @@ Memcached + SQL backend
 """
 from time import time
 import threading
+import thread
 import simplejson as json
 
-from memcache import Client
+from pylibmc import Client, NotFound, ThreadMappedPool, SomeErrors, WriteError
 from sqlalchemy.sql import select, bindparam, func
 
 from services.util import BackendError, round_time
+from services import logger
+from services.events import REQUEST_ENDS, subscribe
+
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 
@@ -61,19 +65,54 @@ def _key(*args):
     return ':'.join([str(arg) for arg in args])
 
 
-class CacheManager(Client):
-    """ Helpers on the top of memcached.Client
+class CacheManager(object):
+    """ Helpers on the top of pylibmc
     """
     def __init__(self, *args, **kw):
-        Client.__init__(self, *args, **kw)
+        self._client = Client(*args, **kw)
+        self.pool = ThreadMappedPool(self._client)
         # using a locker to avoid race conditions
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
+        subscribe(REQUEST_ENDS, self._cleanup_pool)
+
+    def _cleanup_pool(self, response):
+        self.pool.pop(thread.get_ident(), None)
+
+    def flush_all(self):
+        with self.pool.reserve() as mc:
+            mc.flush_all()
+
+    def get(self, key):
+        with self.pool.reserve() as mc:
+            try:
+                return mc.get(key)
+            except SomeErrors:
+                # memcache seems down
+                raise BackendError()
+
+    def delete(self, key):
+        with self.pool.reserve() as mc:
+            try:
+                return mc.delete(key)
+            except NotFound:
+                return False
+
+    def incr(self, key, size=1):
+        with self.pool.reserve() as mc:
+            try:
+                return mc.incr(key, size)
+            except WriteError:
+                raise BackendError()
 
     def set(self, key, value):
-        if not Client.set(self, key, value):
-            raise BackendError()
+        with self.pool.reserve() as mc:
+            try:
+                if not mc.set(key, value):
+                    raise BackendError()
+            except WriteError:
+                raise BackendError()
 
     def get_set(self, key, func):
         res = self.get(key)
@@ -88,6 +127,21 @@ class CacheManager(Client):
             return None
         return tabs.get(tab_id)
 
+    def _filter_tabs(self, tabs, filters):
+        for field, value in filters.items():
+            if field not in ('id', 'modified', 'sortindex'):
+                continue
+
+            operator, values = value
+
+            # removing entries
+            for tab_id, tab_value in tabs.items():
+                if ((operator == 'in' and tab_id not in values) or
+                    (operator == '>' and tab_value <= values) or
+                    (operator == '<' and tab_value >= values)):
+
+                    del tabs[tab_id]
+
     def get_tabs(self, user_id, filters=None):
         with self._locker:
             key = _key(user_id, 'tabs')
@@ -96,33 +150,9 @@ class CacheManager(Client):
                 # memcached down ?
                 tabs = {}
             if filters is not None:
-                if 'id' in filters:
-                    operator, ids = filters['id']
-                    if operator == 'in':
-                        for tab_id in list(tabs.keys()):
-                            if tab_id not in ids:
-                                del tabs[tab_id]
-                if 'modified' in filters:
-                    operator, stamp = filters['modified']
-                    if operator == '>':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['modified'] <= stamp:
-                                del tabs[tab_id]
-                    elif operator == '<':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['modified'] >= stamp:
-                                del tabs[tab_id]
-                if 'sortindex' in filters:
-                    operator, stamp = filters['sortindex']
-                    if operator == '>':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['sortindex'] <= stamp:
-                                del tabs[tab_id]
-                    elif operator == '<':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['sortindex'] >= stamp:
-                                del tabs[tab_id]
-            return tabs
+                self._filter_tabs(tabs, filters)
+
+        return tabs
 
     def set_tabs(self, user_id, tabs, merge=True):
         with self._locker:
@@ -316,8 +346,9 @@ class MemcachedSQLStorage(SQLStorage):
     def _update_cache(self, user_id, collection_name, items, storage_time):
         # update the total size cache
         total_size = sum([len(item.get('payload', '')) for item in items])
-        if not self.cache.incr(_key(user_id, 'size'), total_size):
-            # stored in bytes
+        try:
+            self.cache.incr(_key(user_id, 'size'), total_size)
+        except NotFound:
             self.cache.set(_key(user_id, 'size'), total_size)
 
         # update the meta/global cache or the tabs cache
@@ -425,14 +456,28 @@ class MemcachedSQLStorage(SQLStorage):
 
     def get_total_size(self, user_id, recalculate=False):
         """Returns the total size in KB of a user storage"""
-        if recalculate:
-            size = self.sqlstorage.get_total_size(user_id)
-            self.cache.set(_key(user_id, 'size'), int(size * _KB))
+        key = _key(user_id, 'size')
+
+        def _get_set_size():
+            size = self.sqlstorage.get_total_size(user_id) * _KB
+            # if this fail it's not a big deal
+            try:
+                self.cache.set(key, size)
+            except BackendError:
+                logger.error('Could not write to memcached')
             return size
 
-        size = self.cache.get(_key(user_id, 'size'))
-        if size is None:    # memcached server seems down
-            size = self.sqlstorage.get_total_size(user_id) * _KB
+        if recalculate:
+            return _get_set_size()
+
+        try:
+            size = self.cache.get(_key(user_id, 'size'))
+        except BackendError:
+            size = None
+
+        if not size:    # memcached server seems down or needs a reset
+            return _get_set_size()
+
         return  size / _KB
 
     def get_collection_sizes(self, user_id):
