@@ -71,7 +71,7 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms SQLAlchemy --version=0.6.6
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms WSGIProxy --version=0.2.2
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pylibmc
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pymysql
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms PyMySQL
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pymysql_sa
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms gevent
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms greenlet
