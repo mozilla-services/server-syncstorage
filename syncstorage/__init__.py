@@ -36,4 +36,3 @@
 import logging
 
 logger = logging.getLogger('weaveserver')
-

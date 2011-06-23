@@ -120,7 +120,8 @@ class TestSyncStorageBase(unittest.TestCase):
 
         self.assertRaises(TypeError, SyncStorage.register, NotAStorage)
         SyncStorage.register(IAmAValidStorage)
-        self.assert_(isinstance(SyncStorage.get('valid'), IAmAValidStorage))
+        fqn = 'syncstorage.tests.test_storagebase.IAmAValidStorage'
+        self.assert_(isinstance(SyncStorage.get(fqn), IAmAValidStorage))
 
 
 def test_suite():

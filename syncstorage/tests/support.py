@@ -40,22 +40,22 @@ from logging.config import fileConfig
 from syncstorage.storage import SyncStorage
 from services.auth import ServicesAuth
 from services.util import convert_config
-import syncstorage
 
-_WEAVEDIR = os.path.dirname(syncstorage.__file__)
-_TOPDIR = os.path.split(_WEAVEDIR)[0]
+_DIR = os.path.dirname(__file__)
 
 while True:
     if 'WEAVE_TESTFILE' in os.environ:
-        _INI_FILE = os.path.join(_TOPDIR, 'tests_%s.ini' % \
+        _INI_FILE = os.path.join(_DIR, 'tests_%s.ini' % \
                                  os.environ['WEAVE_TESTFILE'])
     else:
-        _INI_FILE = os.path.join(_TOPDIR, 'tests.ini')
+        _INI_FILE = os.path.join(_DIR, 'tests.ini')
 
     if os.path.exists(_INI_FILE):
         break
 
-    _TOPDIR = os.path.split(_TOPDIR)[0]
+    _DIR = os.path.split(_DIR)[0]
+    if _DIR == '/':
+        raise IOError("could not find a test ini")
 
 
 def initenv(config=_INI_FILE):
@@ -96,4 +96,4 @@ def initenv(config=_INI_FILE):
     config = convert_config(config)
     storage = SyncStorage.get_from_config(config)
     auth = ServicesAuth.get_from_config(config)
-    return _TOPDIR, config, storage, auth
+    return _DIR, config, storage, auth

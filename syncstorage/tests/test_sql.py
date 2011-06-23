@@ -66,6 +66,9 @@ class TestSQLStorage(unittest.TestCase):
             self.storage.set_collection(_UID, name)
 
     def tearDown(self):
+        self._del_db()
+
+    def _del_db(self):
         if os.path.exists(self.sqlfile):
             os.remove(self.sqlfile)
         else:
@@ -239,7 +242,7 @@ class TestSQLStorage(unittest.TestCase):
                           email='tarek@ziade.org')
 
         # create_table = false
-        conf = os.path.join(testsdir, 'tests.ini')
+        conf = os.path.join(testsdir, 'tests4.ini')
         appdir, config, storage, auth = initenv(conf)
 
         # this should fail because the table is absent
