@@ -15,7 +15,7 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
-Requires: nginx memcached gunicorn python26 python26-memcached python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 1.0 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef
+Requires: nginx memcached gunicorn python26 python26-pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 1.0 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef python26-gevent python26-pymysql python26-pymsql_sa python26-greenlet
 Conflicts: python26-syncreg
 Url: https://hg.mozilla.org/services/server-storage
 
