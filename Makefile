@@ -57,7 +57,7 @@ test:
 build_rpms:
 	rm -rf $(CURDIR)/rpms
 	mkdir $(CURDIR)/rpms
-	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=SyncReg.spec --dist-dir=$(CURDIR)/rpms --binary-only
+	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=SyncStorage.spec --dist-dir=$(CURDIR)/rpms --binary-only
 	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=Services.spec --dist-dir=$(CURDIR)/rpms --binary-only
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms cef --version=0.2
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms WebOb --version=1.0.7
