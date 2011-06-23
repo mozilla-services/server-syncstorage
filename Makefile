@@ -75,6 +75,8 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pymysql_sa
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms gevent
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms greenlet
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms python-memcached
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms MySQL-python
 
 mock: build build_rpms
 	mock init
