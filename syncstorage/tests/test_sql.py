@@ -244,10 +244,15 @@ class TestSQLStorage(unittest.TestCase):
         # create_table = false
         conf = os.path.join(testsdir, 'tests4.ini')
         appdir, config, storage, auth = initenv(conf)
-
-        # this should fail because the table is absent
-        self.assertRaises(BackendError, storage.set_user, _UID,
-                          email='tarek@ziade.org')
+        sqlfile = storage.sqluri.split('sqlite:///')[-1]
+        try:
+            # this should fail because the table is absent
+            self.assertRaises(BackendError, storage.set_user, _UID,
+                              email='tarek@ziade.org')
+        finally:
+            # removing the db created
+            if os.path.exists(sqlfile):
+                os.remove(sqlfile)
 
         # create_table = true
         conf = os.path.join(testsdir, 'tests2.ini')
