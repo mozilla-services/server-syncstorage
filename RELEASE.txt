@@ -1,3 +1,21 @@
+1.1 - 2011-06-11
+================
+
+Impacts:
+
+- Ops
+
+
+Dependencies:
+
+- python-services: 2.0
+
+Relevant changes:
+
+- bug 656267 - memcachedsql is not using pylibmc - r=telliott
+- Now has its own Makefile
+
+
 1.0-1 - 2011-03-03
 ==================
 
