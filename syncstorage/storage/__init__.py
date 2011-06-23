@@ -378,13 +378,4 @@ def get_storage(config):
     - other keys that starts with "storage." are passed to the backend
       constructor -- with the prefix stripped.
     """
-    # pre-loading auth plugins synccore provides to ease configuration
-    from syncstorage.storage.sql import SQLStorage
-    SyncStorage.register(SQLStorage)
-    try:
-        from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-        SyncStorage.register(MemcachedSQLStorage)
-    except ImportError:
-        pass
-
-    return SyncStorage.get_from_config(config)
+    return SyncStorage.get_from_config(config, 'storage')

@@ -94,6 +94,6 @@ def initenv(config=_INI_FILE):
     config = dict([(key, value % here)for key, value in
                    cfg.items('DEFAULT') + cfg.items('app:main')])
     config = convert_config(config)
-    storage = SyncStorage.get_from_config(config)
-    auth = ServicesAuth.get_from_config(config)
+    storage = SyncStorage.get_from_config(config, 'storage')
+    auth = ServicesAuth.get_from_config(config, 'auth')
     return _DIR, config, storage, auth
