@@ -78,7 +78,7 @@ build_rpms:
 
 mock: build build_rpms
 	mock init
-	mock --install python26 python26-setuptools
+	mock --install python26 python26-setuptools libmemcached-devel
 	cd rpms; wget http://mrepo.mozilla.org/mrepo/5-x86_64/RPMS.mozilla-services/gunicorn-0.11.2-1moz.x86_64.rpm
 	cd rpms; wget http://mrepo.mozilla.org/mrepo/5-x86_64/RPMS.mozilla/nginx-0.7.65-4.x86_64.rpm
 	mock --install rpms/*
