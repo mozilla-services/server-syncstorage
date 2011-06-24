@@ -1,4 +1,21 @@
-1.1 - 2011-06-11
+1.2 - 2011-06-24
+================
+
+Impacts:
+
+- Ops
+
+
+Dependencies:
+
+- python-services: 2.0
+
+Relevant changes:
+
+- fixed a bug in config reading
+
+
+1.1 - 2011-06-24
 ================
 
 Impacts:
