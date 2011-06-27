@@ -61,6 +61,7 @@ class StorageController(object):
 
     def __init__(self, app):
         self.app = app
+        self.batch_size = app.config.get('storage.batch_size', 100)
 
     def _has_modifiers(self, data):
         return 'payload' in data
@@ -364,7 +365,7 @@ class StorageController(object):
 
         storage_time = request.server_time
 
-        for wbos in batch(kept_wbos):
+        for wbos in batch(kept_wbos, size=self.batch_size):
             wbos = list(wbos)   # to avoid exhaustion
             try:
                 storage.set_items(user_id, collection_name,

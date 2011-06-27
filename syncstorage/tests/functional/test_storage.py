@@ -947,3 +947,8 @@ class TestStorage(support.TestWsgiApp):
         # what do we have ?
         res = self.app.get('/__debug__')
         self.assertTrue('- backend: sql' in res.body)
+
+    def test_batch_size(self):
+        # check that the batch size is correctly set
+        size = get_app(self.app).controllers['storage'].batch_size
+        self.assertEqual(size, 25)
