@@ -57,7 +57,8 @@ class TestSQLStorage(unittest.TestCase):
     def setUp(self):
         self.appdir, self.config, self.storage, self.auth = initenv()
         # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
+        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite',
+                                                      'pymysql')
 
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         # make sure we have the standard collections in place

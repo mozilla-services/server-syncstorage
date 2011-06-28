@@ -300,7 +300,8 @@ class StorageController(object):
             raise HTTPPreconditionFailed(collection_name)
 
         self._get_storage(request).delete_item(user_id, collection_name,
-                                               item_id)
+                                              item_id,
+                                              storage_time=request.server_time)
 
         if collection_name == 'crypto' and item_id == 'keys':
             msg = 'Crypto keys deleted'
@@ -403,7 +404,9 @@ class StorageController(object):
                                         kw.get('ids'), kw['filters'],
                                         limit=kw.get('limit'),
                                         offset=kw.get('offset'),
-                                        sort=kw.get('sort'))
+                                        sort=kw.get('sort'),
+                                        storage_time=request.server_time)
+
         return json_response(res)
 
     def delete_storage(self, request):

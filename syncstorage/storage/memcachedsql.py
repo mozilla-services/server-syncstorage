@@ -40,20 +40,16 @@ Memcached + SQL backend
 - The total storage size is stored in "user_id:size"
 - The meta/global wbo is stored in "user_id"
 """
-from time import time
-import threading
-import thread
 import simplejson as json
 
-from pylibmc import Client, NotFound, ThreadMappedPool, SomeErrors, WriteError
 from sqlalchemy.sql import select, bindparam, func
 
 from services.util import BackendError, round_time
 from services import logger
-from services.events import REQUEST_ENDS, subscribe
 
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
+from syncstorage.storage.cachemanager import CacheManager
 
 
 _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
@@ -63,164 +59,6 @@ _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
 
 def _key(*args):
     return ':'.join([str(arg) for arg in args])
-
-
-class CacheManager(object):
-    """ Helpers on the top of pylibmc
-    """
-    def __init__(self, *args, **kw):
-        self._client = Client(*args, **kw)
-        self.pool = ThreadMappedPool(self._client)
-        # using a locker to avoid race conditions
-        # when several clients for the same user
-        # get/set the cached data
-        self._locker = threading.RLock()
-        subscribe(REQUEST_ENDS, self._cleanup_pool)
-
-    def _cleanup_pool(self, response):
-        self.pool.pop(thread.get_ident(), None)
-
-    def flush_all(self):
-        with self.pool.reserve() as mc:
-            mc.flush_all()
-
-    def get(self, key):
-        with self.pool.reserve() as mc:
-            try:
-                return mc.get(key)
-            except SomeErrors:
-                # memcache seems down
-                raise BackendError()
-
-    def delete(self, key):
-        with self.pool.reserve() as mc:
-            try:
-                return mc.delete(key)
-            except NotFound:
-                return False
-
-    def incr(self, key, size=1):
-        with self.pool.reserve() as mc:
-            try:
-                return mc.incr(key, size)
-            except WriteError:
-                raise BackendError()
-
-    def set(self, key, value):
-        with self.pool.reserve() as mc:
-            try:
-                if not mc.set(key, value):
-                    raise BackendError()
-            except WriteError:
-                raise BackendError()
-
-    def get_set(self, key, func):
-        res = self.get(key)
-        if res is None:
-            res = func()
-            self.set(key, res)
-        return res
-
-    def get_tab(self, user_id, tab_id):
-        tabs = self.get_tabs(user_id)
-        if tabs is None:
-            return None
-        return tabs.get(tab_id)
-
-    def _filter_tabs(self, tabs, filters):
-        for field, value in filters.items():
-            if field not in ('id', 'modified', 'sortindex'):
-                continue
-
-            operator, values = value
-
-            # removing entries
-            for tab_id, tab_value in tabs.items():
-                if ((operator == 'in' and tab_id not in values) or
-                    (operator == '>' and tab_value <= values) or
-                    (operator == '<' and tab_value >= values)):
-
-                    del tabs[tab_id]
-
-    def get_tabs(self, user_id, filters=None):
-        with self._locker:
-            key = _key(user_id, 'tabs')
-            tabs = self.get(key)
-            if tabs is None:
-                # memcached down ?
-                tabs = {}
-            if filters is not None:
-                self._filter_tabs(tabs, filters)
-
-        return tabs
-
-    def set_tabs(self, user_id, tabs, merge=True):
-        with self._locker:
-            key = _key(user_id, 'tabs')
-            if merge:
-                existing_tabs = self.get(key)
-                if existing_tabs is None:
-                    existing_tabs = {}
-            else:
-                existing_tabs = {}
-            for tab_id, tab in tabs.items():
-                existing_tabs[tab_id] = tab
-            self.set(key, existing_tabs)
-
-    def delete_tab(self, user_id, tab_id):
-        with self._locker:
-            key = _key(user_id, 'tabs')
-            tabs = self.get_tabs(user_id)
-            if tab_id in tabs:
-                del tabs[tab_id]
-                self.set(key, tabs)
-
-    def delete_tabs(self, user_id, filters=None):
-        with self._locker:
-            key = _key(user_id, 'tabs')
-            kept = {}
-            tabs = self.get(key)
-            if tabs is None:
-                # memcached down ?
-                tabs = {}
-
-            if filters is not None:
-                if 'id' in filters:
-                    operator, ids = filters['id']
-                    if operator == 'in':
-                        for tab_id in list(tabs.keys()):
-                            if tab_id not in ids:
-                                kept[tab_id] = tabs[tab_id]
-                if 'modified' in filters:
-                    operator, stamp = filters['modified']
-                    if operator == '>':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['modified'] <= stamp:
-                                kept[tab_id] = tabs[tab_id]
-                    elif operator == '<':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['modified'] >= stamp:
-                                kept[tab_id] = tabs[tab_id]
-                if 'sortindex' in filters:
-                    operator, stamp = filters['sortindex']
-                    if operator == '>':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['sortindex'] <= stamp:
-                                kept[tab_id] = tabs[tab_id]
-                    elif operator == '<':
-                        for tab_id, tab in list(tabs.items()):
-                            if tab['sortindex'] >= stamp:
-                                kept[tab_id] = tabs[tab_id]
-            self.set(key, kept)
-
-    def tab_exists(self, user_id, tab_id):
-        tabs = self.get_tabs(user_id)
-        if tabs is None:
-            # memcached down ?
-            return None
-        if tab_id in tabs:
-            return tabs[tab_id]['modified']
-        return None
 
 
 # XXX suboptimal: creates an object on every dump/load call
@@ -278,13 +116,11 @@ class MemcachedSQLStorage(SQLStorage):
     # Cached APIs
     #
     def delete_storage(self, user_id):
-        #self._delete_cache(user_id)
-        # XXX
+        self.cache.flush_user_cache(user_id)
         self.sqlstorage.delete_storage(user_id)
 
     def delete_user(self, user_id):
-        # XXX
-        # self._delete_cache(user_id)
+        self.cache.flush_user_cache(user_id)
         self.sqlstorage.delete_user(user_id)
 
     def item_exists(self, user_id, collection_name, item_id):
@@ -299,7 +135,7 @@ class MemcachedSQLStorage(SQLStorage):
             wbo = self.cache.get(key)
             if wbo is not None:
                 return wbo['modified']
-            return None
+            # going sql..
 
         elif collection_name == 'tabs':
             return self.cache.tab_exists(user_id, item_id)
@@ -343,13 +179,24 @@ class MemcachedSQLStorage(SQLStorage):
 
         return _get_item()
 
+    def _delete_cache(self, user_id):
+        """Removes all cached data."""
+        for key in ('size', 'meta:global', 'tabs'):
+            self.cache.delete(_key(user_id, key))
+
+    def _update_stamp(self, user_id, collection_name, storage_time):
+        # update the stamps cache
+        stamps = self.get_collection_timestamps(user_id)
+        stamps[collection_name] = storage_time
+        self.cache.set(_key(user_id, 'stamps'), stamps)
+
     def _update_cache(self, user_id, collection_name, items, storage_time):
-        # update the total size cache
+        # update the total size cache (bytes)
         total_size = sum([len(item.get('payload', '')) for item in items])
-        try:
-            self.cache.incr(_key(user_id, 'size'), total_size)
-        except NotFound:
-            self.cache.set(_key(user_id, 'size'), total_size)
+        self.cache.incr(_key(user_id, 'size'), total_size)
+
+        # update the stamps cache
+        self._update_stamp(user_id, collection_name, storage_time)
 
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, items[0]['id']):
@@ -360,12 +207,6 @@ class MemcachedSQLStorage(SQLStorage):
         elif collection_name == 'tabs':
             tabs = dict([(item['id'], item) for item in items])
             self.cache.set_tabs(user_id, tabs)
-            # update the timestamp cache
-            key = _key(user_id, 'collections', 'stamp', 'tabs')
-            self.cache.set(key, storage_time)
-
-        # invalidate the stamps cache
-        self.cache.delete(_key(user_id, 'stamps'))
 
     def _update_item(self, item, when):
         if 'payload' in item:
@@ -407,13 +248,16 @@ class MemcachedSQLStorage(SQLStorage):
         return self.sqlstorage.set_items(user_id, collection_name, items,
                                          storage_time=storage_time)
 
-    def delete_item(self, user_id, collection_name, item_id):
+    def delete_item(self, user_id, collection_name, item_id,
+                    storage_time=None):
         """Deletes an item"""
-        # delete the cached size
+        # delete the cached size - will be recalculated
         self.cache.delete(_key(user_id, 'size'))
 
-        # invalidate the stamps cache
-        self.cache.delete(_key(user_id, 'stamps'))
+        # update the stamp cache
+        if storage_time is None:
+            storage_time = round_time()
+        self._update_stamp(user_id, collection_name, storage_time)
 
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, item_id):
@@ -421,19 +265,22 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.delete(key)
         elif collection_name == 'tabs':
             self.cache.delete_tab(user_id, item_id)
-            key = _key(user_id, 'collections', 'stamp', collection_name)
-            self.cache.set(key, time())
             # we don't store tabs in SQL
             return
 
         return self.sqlstorage.delete_item(user_id, collection_name, item_id)
 
     def delete_items(self, user_id, collection_name, item_ids=None,
-                     filters=None, limit=None, offset=None, sort=None):
+                     filters=None, limit=None, offset=None, sort=None,
+                     storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        # delete the cached size and stamps
+        # delete the cached size
         self.cache.delete(_key(user_id, 'size'))
-        self.cache.delete(_key(user_id, 'stamps'))
+
+        # update the stamp cache
+        if storage_time is None:
+            storage_time = round_time()
+        self._update_stamp(user_id, collection_name, storage_time)
 
         # remove the cached values
         if (collection_name == 'meta' and (item_ids is None
@@ -445,66 +292,75 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.delete_tabs(user_id, filters)
 
             # we don't store tabs in SQL
-            # update the timestamp cache
-            key = _key(user_id, 'collections', 'stamp', collection_name)
-            self.cache.set(key, time())
             return
-
         return self.sqlstorage.delete_items(user_id, collection_name,
                                             item_ids, filters,
                                             limit, offset, sort)
 
+    def _set_cached_size(self, user_id, size):
+        key = _key(user_id, 'size')
+        # if this fail it's not a big deal
+        try:
+            # we store the size in bytes in memcached
+            self.cache.set(key, size * _KB)
+        except BackendError:
+            logger.error('Could not write to memcached')
+
+    def _get_cached_size(self, user_id):
+        try:
+            size = self.cache.get(_key(user_id, 'size'))
+            if size != 0 and size is not None:
+                size = size / _KB
+        except BackendError:
+            size = None
+        return size
+
     def get_total_size(self, user_id, recalculate=False):
         """Returns the total size in KB of a user storage"""
-        key = _key(user_id, 'size')
-
         def _get_set_size():
-            size = self.sqlstorage.get_total_size(user_id) * _KB
-            # if this fail it's not a big deal
-            try:
-                self.cache.set(key, size)
-            except BackendError:
-                logger.error('Could not write to memcached')
+            # returns in KB
+            size = self.sqlstorage.get_total_size(user_id)
+
+            # adding the tabs
+            size += self.cache.get_tabs_size(user_id)
+
+            # update the cache
+            self.cache.set_total(user_id, size)
             return size
 
         if recalculate:
             return _get_set_size()
 
-        try:
-            size = self.cache.get(_key(user_id, 'size'))
-        except BackendError:
-            size = None
-
+        size = self.cache.get_total(user_id)
         if not size:    # memcached server seems down or needs a reset
             return _get_set_size()
 
-        return  size / _KB
+        return  size
 
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.
         """
+        # these sizes are not cached
         sizes = self.sqlstorage.get_collection_sizes(user_id)
-        tabs = self.cache.get_tabs(user_id)
-        sizes['tabs'] = sum([len(tab.get('payload', ''))
-              for tab in tabs.values()])
+        sizes['tabs'] = self.cache.get_tabs_size(user_id)
+
+        # we can update the size while we're there, in case it's empty
+        self.cache.set_total(user_id, sum(sizes.values()))
         return sizes
 
     def get_collection_timestamps(self, user_id):
+        """Returns a cached version of the stamps when possible"""
         stamps = self.cache.get(_key(user_id, 'stamps'))
 
         # not cached yet or memcached is down
         if stamps is None:
             stamps = super(MemcachedSQLStorage,
                            self).get_collection_timestamps(user_id)
-
+            # adding the tabs stamp
+            stamps['tabs'] = self.cache.get_tabs_timestamp(user_id)
             # caching it
             self.cache.set(_key(user_id, 'stamps'), stamps)
 
-        # we also need to add the tabs timestamp
-        key = _key(user_id, 'collections', 'stamp', 'tabs')
-        tabs_stamp = self.cache.get(key)
-        if tabs_stamp is not None:  # memcached down ?
-            stamps['tabs'] = tabs_stamp
         return stamps
 
     def get_collection_max_timestamp(self, user_id, collection_name):

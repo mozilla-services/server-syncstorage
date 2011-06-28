@@ -43,7 +43,7 @@ try:
 except ImportError:
     MEMCACHED = False
 from syncstorage.storage import SyncStorage
-from services.util import BackendError
+from services.util import BackendError, round_time
 
 _UID = 1
 _PLD = '*' * 500
@@ -60,7 +60,8 @@ if MEMCACHED:
                   'quota_size': 5120,
                   'create_tables': True}
 
-            self.storage = SyncStorage.get('memcached', **kw)
+            self.fn = 'syncstorage.storage.memcachedsql.MemcachedSQLStorage'
+            self.storage = SyncStorage.get(self.fn, **kw)
 
             # make sure we have the standard collections in place
             for name in ('client', 'crypto', 'forms', 'history'):
@@ -180,12 +181,21 @@ if MEMCACHED:
             # make sure we get the right size
             if not self._is_up():  # no memcached == no size
                 return
+
+            # storing 2 WBOs
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
+
+            # value in KB (around 1K)
             wanted = len(_PLD) * 2 / 1024.
+            self.assertEquals(self.storage.get_total_size(_UID), wanted)
+
+            # removing the size in memcache to check that we
+            # get back the right value
+            self.storage.cache.delete('%d:size' % _UID)
             self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
         def test_collection_stamps(self):
@@ -202,8 +212,8 @@ if MEMCACHED:
 
             stamps = self.storage.get_collection_timestamps(_UID)  # pump cache
             if self._is_up():
-                tabstamps = self.storage.cache.get('1:collections:stamp:tabs')
-                self.assertEquals(stamps['tabs'], tabstamps)
+                cached_stamps = self.storage.cache.get('1:stamps')
+                self.assertEquals(stamps['tabs'], cached_stamps['tabs'])
 
             stamps2 = self.storage.get_collection_timestamps(_UID)
             self.assertEquals(len(stamps), len(stamps2))
@@ -215,28 +225,41 @@ if MEMCACHED:
             # checking the stamps
             if self._is_up():
                 stamps = self.storage.cache.get('1:stamps')
-                self.assertEquals(stamps.keys(), ['foo'])
+                keys = stamps.keys()
+                keys.sort()
+                self.assertEquals(keys, ['foo', 'tabs'])
 
-            # adding a new item should invalidate the stamps cache
-            self.storage.set_item(_UID, 'baz', '2', payload=_PLD * 200)
+            # adding a new item should modify the stamps cache
+            now = round_time()
+            self.storage.set_item(_UID, 'baz', '2', payload=_PLD * 200,
+                                  storage_time=now)
 
             # checking the stamps
             if self._is_up():
                 stamps = self.storage.cache.get('1:stamps')
-                self.assertEqual(stamps, None)
+                self.assertEqual(stamps['baz'], now)
 
             stamps = self.storage.get_collection_timestamps(_UID)
             if self._is_up():
                 _stamps = self.storage.cache.get('1:stamps')
                 keys = _stamps.keys()
                 keys.sort()
-                self.assertEquals(keys, ['baz', 'foo'])
+                self.assertEquals(keys, ['baz', 'foo', 'tabs'])
 
             # deleting the item should also update the stamp
             time.sleep(0.2)    # to make sure the stamps differ
-            self.storage.delete_item(_UID, 'baz', '2')
+            now = round_time()
+            self.storage.delete_item(_UID, 'baz', '2', storage_time=now)
             stamps = self.storage.get_collection_timestamps(_UID)
-            self.assertFalse('baz' in stamps)
+            self.assertEqual(stamps['baz'], now)
+
+            # and that kills the size cache
+            self.assertTrue(self.storage.cache.get('1:size') is None)
+
+            # until we asked for it again
+            size = self.storage.get_collection_sizes(1)
+            self.assertEqual(self.storage.cache.get('1:size') / 1024,
+                             sum(size.values()))
 
         def test_collection_sizes(self):
             if not self._is_up():  # no memcached
@@ -246,17 +269,16 @@ if MEMCACHED:
                   'quota_size': 5120,
                   'create_tables': True}
 
-            storage = SyncStorage.get('memcached', **kw)
+            storage = SyncStorage.get(self.fn, **kw)
 
             # setting the tabs in memcache
             tabs = {'mCwylprUEiP5':
-                     {'payload': '*' * 500,
+                     {'payload': '*' * 1024,
                       'id': 'mCwylprUEiP5',
                       'modified': Decimal('1299142695.76')}}
             storage.cache.set_tabs(1, tabs)
-
             size = storage.get_collection_sizes(1)
-            self.assertEqual(size['tabs'], 500)
+            self.assertEqual(size['tabs'], 1.)
 
 
 def test_suite():

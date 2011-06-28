@@ -673,11 +673,11 @@ class SQLStorage(object):
                   'modified = values(modified), payload = values(payload),'
                   'payload_size = values(payload_size),'
                   'ttl = values(ttl)')
-
         res = safe_execute(self._engine, sqltext(query), **values)
         return res.rowcount
 
-    def delete_item(self, user_id, collection_name, item_id):
+    def delete_item(self, user_id, collection_name, item_id,
+                    storage_time=None):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
         query = self._get_query('DELETE_SOME_USER_WBO', user_id)
@@ -687,7 +687,8 @@ class SQLStorage(object):
         return res.rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
-                     filters=None, limit=None, offset=None, sort=None):
+                     filters=None, limit=None, offset=None, sort=None,
+                     storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
         wbo = self._get_wbo_table(user_id)

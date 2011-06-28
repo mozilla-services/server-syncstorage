@@ -308,7 +308,8 @@ class SyncStorage(PluginRegistry):
         """
 
     @abc.abstractmethod
-    def delete_item(self, user_id, collection_name, item_id):
+    def delete_item(self, user_id, collection_name, item_id,
+                    storage_time=None):
         """Deletes an item
 
         Args:
@@ -316,13 +317,15 @@ class SyncStorage(PluginRegistry):
             - collection_name: name of the collection.
             - item_id: string identifying the item
             - values: mapping containing the values.
-
+            - storage_time: time of the storage, if none provided, use current
+              time
         Returns:
             None
         """
 
     @abc.abstractmethod
-    def delete_items(self, user_id, collection_name, item_ids=None):
+    def delete_items(self, user_id, collection_name, item_ids=None,
+                     storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided.
 
         Args:
@@ -330,7 +333,8 @@ class SyncStorage(PluginRegistry):
             - collection_name: name of the collection.
             - item_ids: if provided, its the ids of the items to be removed.
               all items will be removed if not provided.
-
+            - storage_time: time of the storage, if none provided, use current
+              time
         Returns:
             None
         """
