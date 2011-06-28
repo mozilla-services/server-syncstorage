@@ -70,13 +70,13 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms Routes --version=1.12.3
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms SQLAlchemy --version=0.6.6
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms WSGIProxy --version=0.2.2
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pylibmc
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pylibmc --version=1.1.1
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pymysql_sa --version=1.0
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms gevent --version=0.13.6
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms greenlet --version=0.3.1
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms python-memcached --version=1.47
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms MySQL-python --version=1.2.3
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms PyMySQL
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pymysql_sa
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms gevent
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms greenlet
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms python-memcached
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms MySQL-python
 
 mock: build build_rpms
 	mock init
