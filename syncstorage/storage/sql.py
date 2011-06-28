@@ -372,8 +372,7 @@ class SQLStorage(object):
         """return the collection names for a given user"""
         query = 'COLLECTION_STAMPS'
         query = self._get_query(query, user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=_int_now())
+        res = safe_execute(self._engine, query, user_id=user_id)
         try:
             return dict([(self._collid2name(user_id, coll_id),
                         bigint2time(stamp)) for coll_id, stamp in res])
@@ -420,7 +419,7 @@ class SQLStorage(object):
         query = self._get_query('COLLECTION_MAX_STAMPS', user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_id=collection_id, ttl=_int_now())
+                           collection_id=collection_id)
         res = res.fetchone()
         stamp = res[0]
         if stamp is None:

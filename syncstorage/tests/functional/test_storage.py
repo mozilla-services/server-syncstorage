@@ -665,6 +665,11 @@ class TestStorage(support.TestWsgiApp):
         wbo = {'payload': _PLD, 'ttl': 1}
         wbo = json.dumps(wbo)
         self.app.put(self.root + '/storage/col2/123456', params=wbo)
+
+        # it should exists now
+        res = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(len(res.json), 1)
+
         # trying a second put again
         self.app.put(self.root + '/storage/col2/123456', params=wbo)
 

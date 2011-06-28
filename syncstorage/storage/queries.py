@@ -85,9 +85,9 @@ def get_query(name, user_id=None):
                        wbo_alias.c.modified.desc()).limit(1).as_scalar()
     elif name == 'COLLECTION_STAMPS':
         return select([table.c.collection, func.max(table.c.modified)],
-             and_(table.c.username == bindparam('user_id'),
-                  table.c.ttl > bindparam('ttl'))).group_by(table.c.username,
-                                                            table.c.collection)
+                      table.c.username ==
+                        bindparam('user_id')).group_by(table.c.username,
+                                                       table.c.collection)
     elif name == 'COLLECTION_COUNTS':
         return select([table.c.collection, func.count(table.c.collection)],
            and_(table.c.username == bindparam('user_id'),
@@ -95,8 +95,7 @@ def get_query(name, user_id=None):
     elif name == 'COLLECTION_MAX_STAMPS':
         return select([func.max(table.c.modified)],
             and_(table.c.collection == bindparam('collection_id'),
-                 table.c.username == bindparam('user_id'),
-                 table.c.ttl > bindparam('ttl')))
+                 table.c.username == bindparam('user_id')))
     elif name == 'ITEM_ID_COL_USER':
         return and_(table.c.collection == bindparam('collection_id'),
                     table.c.username == bindparam('user_id'),
