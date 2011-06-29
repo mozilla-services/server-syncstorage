@@ -170,11 +170,14 @@ class SQLStorage(object):
             self._engine = create_engine(sqluri, poolclass=NullPool,
                                          logging_name='syncserver')
         else:
-            sqlkw = {'pool_size': int(pool_size),
-                     'pool_recycle': int(pool_recycle),
-                     'logging_name': 'syncserver',
-                     'pool_timeout': int(pool_timeout),
-                     'max_overflow': int(pool_max_overflow)}
+            if self.driver == 'sqlite':
+                sqlkw = {'logging_name': 'syncserver'}
+            else:
+                sqlkw = {'pool_size': int(pool_size),
+                         'pool_recycle': int(pool_recycle),
+                         'logging_name': 'syncserver',
+                         'pool_timeout': int(pool_timeout),
+                         'max_overflow': int(pool_max_overflow)}
 
             if self.driver in ('mysql', 'pymsql',
                                'mysql+mysqlconnector'):
