@@ -36,6 +36,7 @@
 """
 SQL backend
 """
+import urlparse
 from time import time
 from collections import defaultdict
 
@@ -157,16 +158,30 @@ class SQLStorage(object):
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=60, reset_on_return=True, create_tables=False,
-                 shard=False, shardsize=100, **kw):
+                 shard=False, shardsize=100,
+                 pool_max_overflow=10, no_pool=False,
+                 pool_timeout=30, **kw):
+
         self.sqluri = sqluri
-        sqlkw = {'pool_size': int(pool_size),
-                 'pool_recycle': int(pool_recycle),
-                 'logging_name': 'syncserver'}
+        self.driver = urlparse.urlparse(sqluri).scheme
 
-        if self.sqluri.startswith('mysql'):
-            sqlkw['reset_on_return'] = reset_on_return
+        if no_pool:
+            from sqlalchemy.pool import NullPool
+            self._engine = create_engine(sqluri, poolclass=NullPool,
+                                         logging_name='syncserver')
+        else:
+            sqlkw = {'pool_size': int(pool_size),
+                     'pool_recycle': int(pool_recycle),
+                     'logging_name': 'syncserver',
+                     'pool_timeout': int(pool_timeout),
+                     'max_overflow': int(pool_max_overflow)}
 
-        self._engine = create_engine(sqluri, **sqlkw)
+            if self.driver in ('mysql', 'pymsql',
+                               'mysql+mysqlconnector'):
+                sqlkw['reset_on_return'] = reset_on_return
+
+            self._engine = create_engine(sqluri, **sqlkw)
+
         for table in tables:
             table.metadata.bind = self._engine
             if create_tables:
