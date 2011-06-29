@@ -88,7 +88,10 @@ class MemcachedSQLStorage(SQLStorage):
                  create_tables=False, shard=False, shardsize=100,
                  memcached_json=False, **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
-        self.sqlstorage.__init__(sqluri, **kw)
+        self.sqlstorage.__init__(sqluri, standard_collections,
+                                 use_quota, quota_size, pool_size,
+                                 pool_recycle, create_tables=create_tables,
+                                 shard=shard, shardsize=shardsize, **kw)
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
         elif cache_servers is None:
