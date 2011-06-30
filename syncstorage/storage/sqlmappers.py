@@ -75,7 +75,7 @@ class WBO(_Base):
     sortindex = Column(Integer(11))
     modified = Column(BigInteger(20))
     payload = Column(Text)
-    payload_size = Column(Integer(11))
+    payload_size = Column(Integer(11), nullable=False, default=0)
     ttl = Column(Integer(11), default=MAX_TTL)
 
 
@@ -93,7 +93,7 @@ class _WBOBase(object):
     sortindex = Column(Integer(11))
     modified = Column(BigInteger(20))
     payload = Column(Text)
-    payload_size = Column(Integer(11))
+    payload_size = Column(Integer(11), nullable=False, default=0)
     ttl = Column(Integer(11), default=MAX_TTL)
 
 
