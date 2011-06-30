@@ -1,3 +1,19 @@
+1.7 - 2011-06-30
+================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.2
+
+Relevant changes:
+
+- Bug 668564 - Getting Quota values of 0 on Stage
+
 1.6 - 2011-06-30
 ================
 
