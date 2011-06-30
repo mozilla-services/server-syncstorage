@@ -449,8 +449,6 @@ class SQLStorage(object):
 
         The size is the sum of stored payloads.
         """
-        if not self.use_quota:
-            return dict()
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
                            ttl=_int_now())
@@ -577,7 +575,7 @@ class SQLStorage(object):
 
         modified = self.item_exists(user_id, collection_name, item_id)
 
-        if self.use_quota and 'payload' in values:
+        if 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
         collection_id = self._get_collection_id(user_id,
@@ -678,7 +676,7 @@ class SQLStorage(object):
             else:
                 values['ttl%d' % num] += int(storage_time)
 
-            if self.use_quota and 'payload%d' % num in values:
+            if 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
                 values['payload_size%d' % num] = size
 
@@ -763,9 +761,6 @@ class SQLStorage(object):
 
         The size is the sum of stored payloads.
         """
-        if not self.use_quota:
-            return 0.0
-
         query = self._get_query('USER_STORAGE_SIZE', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
                            ttl=_int_now())
