@@ -186,6 +186,8 @@ class MemcachedSQLStorage(SQLStorage):
 
     def _update_stamp(self, user_id, collection_name, storage_time):
         # update the stamps cache
+        if storage_time is None:
+            storage_time = round_time()
         stamps = self.get_collection_timestamps(user_id)
         stamps[collection_name] = storage_time
         self.cache.set(_key(user_id, 'stamps'), stamps)
@@ -254,21 +256,21 @@ class MemcachedSQLStorage(SQLStorage):
         # delete the cached size - will be recalculated
         self.cache.delete(_key(user_id, 'size'))
 
-        # update the stamp cache
-        if storage_time is None:
-            storage_time = round_time()
-        self._update_stamp(user_id, collection_name, storage_time)
-
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, item_id):
             key = _key(user_id, 'meta', 'global')
             self.cache.delete(key)
         elif collection_name == 'tabs':
-            self.cache.delete_tab(user_id, item_id)
-            # we don't store tabs in SQL
-            return
+            # tabs are not stored at all in SQL
+            if self.cache.delete_tab(user_id, item_id):
+                self._update_stamp(user_id, 'tabs', storage_time)
+                return True
+            return False
 
-        return self.sqlstorage.delete_item(user_id, collection_name, item_id)
+        res = self.sqlstorage.delete_item(user_id, collection_name, item_id)
+        if res:
+            self._update_stamp(user_id, collection_name, storage_time)
+        return res
 
     def delete_items(self, user_id, collection_name, item_ids=None,
                      filters=None, limit=None, offset=None, sort=None,
@@ -277,11 +279,6 @@ class MemcachedSQLStorage(SQLStorage):
         # delete the cached size
         self.cache.delete(_key(user_id, 'size'))
 
-        # update the stamp cache
-        if storage_time is None:
-            storage_time = round_time()
-        self._update_stamp(user_id, collection_name, storage_time)
-
         # remove the cached values
         if (collection_name == 'meta' and (item_ids is None
             or 'global' in item_ids)):
@@ -289,13 +286,17 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.delete(key)
         elif collection_name == 'tabs':
             # tabs are not stored at all in SQL
-            self.cache.delete_tabs(user_id, filters)
+            if self.cache.delete_tabs(user_id, filters):
+                self._update_stamp(user_id, 'tabs', storage_time)
+                return True
+            return False
 
-            # we don't store tabs in SQL
-            return
-        return self.sqlstorage.delete_items(user_id, collection_name,
-                                            item_ids, filters,
-                                            limit, offset, sort)
+        res = self.sqlstorage.delete_items(user_id, collection_name,
+                                           item_ids, filters,
+                                           limit, offset, sort)
+        if res:
+            self._update_stamp(user_id, collection_name, storage_time)
+        return res
 
     def _set_cached_size(self, user_id, size):
         key = _key(user_id, 'size')

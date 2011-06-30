@@ -190,6 +190,8 @@ class CacheManager(object):
             if tab_id in tabs:
                 del tabs[tab_id]
                 self.set(key, tabs)
+                return True
+            return False
 
     def delete_tabs(self, user_id, filters=None):
         def _filter(tabs, filters, field, to_keep):
@@ -224,6 +226,7 @@ class CacheManager(object):
                     _filter(tabs, filters, 'sortindex', kept)
 
             self.set(key, kept)
+            return len(kept) < len(tabs)
 
     def tab_exists(self, user_id, tab_id):
         tabs = self.get_tabs(user_id)
