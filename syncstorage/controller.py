@@ -119,11 +119,13 @@ class StorageController(object):
         return response
 
     def get_quota(self, request):
-        if not self._get_storage(request).use_quota:
-            return json_response((0.0, 0))
         user_id = request.sync_info['user_id']
         used = self._get_storage(request).get_total_size(user_id)
-        return json_response((used, self._get_storage(request).quota_size))
+        if not self._get_storage(request).use_quota:
+            limit = None
+        else:
+            limit = self._get_storage(request).quota_size
+        return json_response((used, limit))
 
     def get_collection_usage(self, request):
         user_id = request.sync_info['user_id']
