@@ -662,9 +662,9 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.json, [])
 
-        wbo = {'payload': _PLD, 'ttl': 1}
+        wbo = {'payload': _PLD, 'ttl': 2}
         wbo = json.dumps(wbo)
-        self.app.put(self.root + '/storage/col2/123456', params=wbo)
+        res = self.app.put(self.root + '/storage/col2/123456', params=wbo)
 
         # it should exists now
         res = self.app.get(self.root + '/storage/col2')
@@ -675,7 +675,7 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
-        time.sleep(1.1)
+        time.sleep(2.1)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
