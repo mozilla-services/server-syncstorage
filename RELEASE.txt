@@ -1,3 +1,51 @@
+1.6 - 2011-06-30
+================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 2.2
+
+Relevant changes:
+
+- Bug 668443 - The collection timestamp gets updated on empty DELETEs
+
+
+1.5 - 2011-06-30
+================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 2.2
+
+Relevant changes:
+
+- fixed the option passing (regression)
+
+
+1.4 - 2011-06-29
+================
+
+Impacts:
+
+- Ops
+
+Dependencies:
+
+- python-services: 2.2
+
+Relevant changes:
+
+- expose more options to tweak the pool
+
+
 1.3 - 2011-06-27
 ================
 
