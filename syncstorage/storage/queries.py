@@ -55,8 +55,7 @@ def get_query(name, user_id=None):
     wbo_alias = table.alias()
 
     if name == 'USER_EXISTS':
-        return select([users.c.id], users.c.id == bindparam('user_id')).\
-               with_hint(users, '[queryName=%s]' % name)
+        return select([users.c.id], users.c.id == bindparam('user_id'))
     elif name == 'DELETE_SOME_USER_WBO':
         return delete(table).where( \
                                  and_(table.c.username == bindparam('user_id'),
@@ -64,8 +63,8 @@ def get_query(name, user_id=None):
                                       bindparam('collection_id'),
                                       table.c.id == bindparam('item_id')))
     elif name == 'DELETE_USER_COLLECTIONS':
-        return delete(collections).\
-                where(collections.c.userid == bindparam('user_id'))
+        return delete(collections).where( \
+                                 collections.c.userid == bindparam('user_id'))
     elif name == 'DELETE_USER_COLLECTION':
         return delete(collections).where(_USER_N_COLL)
     elif name == 'DELETE_USER_WBOS':
@@ -73,49 +72,43 @@ def get_query(name, user_id=None):
     elif name == 'DELETE_USER':
         return delete(users, users.c.id == bindparam('user_id'))
     elif name == 'COLLECTION_EXISTS':
-        return select([collections.c.collectionid], _USER_N_COLL).\
-               with_hint(collections, '[queryName=%s]' % name)
+        return select([collections.c.collectionid], _USER_N_COLL)
     elif name == 'COLLECTION_NEXTID':
         return select([func.max(collections.c.collectionid)],
-                      collections.c.userid == bindparam('user_id')).\
-               with_hint(collections, '[queryName=%s]' % name)
+                      collections.c.userid == bindparam('user_id'))
     elif name == 'COLLECTION_MODIFIED':
         return select([wbo_alias.c.modified],
               and_(wbo_alias.c.username == table.c.username,
                    wbo_alias.c.collection == table.c.collection)).\
               order_by(wbo_alias.c.username.desc(),
                        wbo_alias.c.collection.desc(),
-                       wbo_alias.c.modified.desc()).limit(1).as_scalar().\
-              with_hint(wbo_alias, '[queryName=%s]' % name)
+                       wbo_alias.c.modified.desc()).limit(1).as_scalar()
     elif name == 'COLLECTION_STAMPS':
         return select([table.c.collection, func.max(table.c.modified)],
                       table.c.username ==
-                        bindparam('user_id')).\
-               group_by(table.c.username,table.c.collection).\
-               with_hint(table, '[queryName=%s]' % name)
+                        bindparam('user_id')).group_by(table.c.username,
+                                                       table.c.collection)
     elif name == 'COLLECTION_COUNTS':
         return select([table.c.collection, func.count(table.c.collection)],
-                      and_(table.c.username == bindparam('user_id'),
-                      table.c.ttl > bindparam('ttl'))).\
-               group_by(table.c.collection).\
-               with_hint(table, '[queryName=%s]' % name)
+           and_(table.c.username == bindparam('user_id'),
+                table.c.ttl > bindparam('ttl'))).group_by(table.c.collection)
     elif name == 'COLLECTION_MAX_STAMPS':
         return select([func.max(table.c.modified)],
             and_(table.c.collection == bindparam('collection_id'),
-                 table.c.username == bindparam('user_id'))
-                ).with_hint(table, '[queryName=%s]' % name)
+                 table.c.username == bindparam('user_id')))
     elif name == 'ITEM_ID_COL_USER':
         return and_(table.c.collection == bindparam('collection_id'),
                     table.c.username == bindparam('user_id'),
                     table.c.id == bindparam('item_id'),
                     table.c.ttl > bindparam('ttl'))
+
     elif name == 'ITEM_EXISTS':
+
         col_user = and_(table.c.collection == bindparam('collection_id'),
                          table.c.username == bindparam('user_id'),
                          table.c.id == bindparam('item_id'),
                          table.c.ttl > bindparam('ttl'))
-        return select([table.c.modified],
-                      col_user).with_hint(table, '[queryName=%s]' % name)
+        return select([table.c.modified], col_user)
     elif name == 'DELETE_ITEMS':
         return delete(table,
                        and_(table.c.collection == bindparam('collection_id'),
@@ -124,18 +117,15 @@ def get_query(name, user_id=None):
     elif name == 'USER_STORAGE_SIZE':
         return select([func.sum(table.c.payload_size)],
                        and_(table.c.username == bindparam('user_id'),
-                            table.c.ttl > bindparam('ttl'))
-                           ).with_hint(table, '[queryName=%s]' % name)
+                            table.c.ttl > bindparam('ttl')))
     elif name == 'COLLECTIONS_STORAGE_SIZE':
         return select([table.c.collection,
             func.sum(table.c.payload_size)],
             and_(table.c.username == bindparam('user_id'),
-                 table.c.ttl > bindparam('ttl'))).\
-                 group_by(table.c.collection).\
-                 with_hint(table, '[queryName=%s]' % name)
+                 table.c.ttl > bindparam('ttl'))).group_by(table.c.collection)
     elif name == 'USER_COLLECTION_NAMES':
-        return select([collections.c.collectionid, collections.c.name],
-                      collections.c.userid == bindparam('user_id')
-                     ).with_hint(collections, '[queryName=%s]' % name)
+        return select([collections.c.collectionid,
+                       collections.c.name],
+                      collections.c.userid == bindparam('user_id'))
 
     raise ValueError(name)
