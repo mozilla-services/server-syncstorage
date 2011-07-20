@@ -1,3 +1,20 @@
+1.9 - 2011-07-20
+================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.2
+
+Relevant changes:
+
+- Bug 672942 - Making sure the stamps get wiped out on account wipe
+
+
 1.7 - 2011-06-30
 ================
 

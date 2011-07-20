@@ -280,6 +280,38 @@ if MEMCACHED:
             size = storage.get_collection_sizes(1)
             self.assertEqual(size['tabs'], 1.)
 
+        def test_flush_all(self):
+            if not self._is_up():
+                return
+            # just make sure calls goes through
+            self.storage.set_user(_UID, email='tarek@ziade.org')
+            self.storage.set_collection(_UID, 'col1')
+            self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
+
+            # these calls should be cached
+            res = self.storage.get_item(_UID, 'col1', '1')
+            self.assertEquals(res['payload'], _PLD)
+
+            # this should remove the cache
+            self.storage.delete_items(_UID, 'col1')
+            items = self.storage.get_items(_UID, 'col1')
+            self.assertEquals(len(items), 0)
+
+            self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
+            self.storage.set_item(_UID, 'col1', '2', payload=_PLD)
+            self.storage.set_item(_UID, 'col1', '3', payload=_PLD)
+            self.storage.set_item(_UID, 'col2', '4', payload=_PLD)
+
+            items = self.storage.get_items(_UID, 'col1')
+            self.assertEquals(len(items), 3)
+
+            self.storage.delete_storage(_UID)
+            items = self.storage.get_items(_UID, 'col1')
+            self.assertEquals(len(items), 0)
+
+            stamps = self.storage.get_collection_timestamps(_UID)
+            self.assertEquals(len(stamps), 0)
+
 
 def test_suite():
     suite = unittest.TestSuite()

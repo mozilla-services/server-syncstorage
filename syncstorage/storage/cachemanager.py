@@ -242,7 +242,7 @@ class CacheManager(object):
     #
     def flush_user_cache(self, user_id):
         """Removes all cached data."""
-        for key in ('size', 'meta:global', 'tabs'):
+        for key in ('size', 'meta:global', 'tabs', 'stamps'):
             self.delete(_key(user_id, key))
 
     #

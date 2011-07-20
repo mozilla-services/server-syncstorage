@@ -357,8 +357,12 @@ class MemcachedSQLStorage(SQLStorage):
         if stamps is None:
             stamps = super(MemcachedSQLStorage,
                            self).get_collection_timestamps(user_id)
+
             # adding the tabs stamp
-            stamps['tabs'] = self.cache.get_tabs_timestamp(user_id)
+            tabs_stamps = self.cache.get_tabs_timestamp(user_id)
+            if tabs_stamps is not None:
+                stamps['tabs'] = tabs_stamps
+
             # caching it
             self.cache.set(_key(user_id, 'stamps'), stamps)
 
