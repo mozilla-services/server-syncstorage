@@ -34,6 +34,9 @@
 #
 # ***** END LICENSE BLOCK *****
 from setuptools import setup, find_packages
+import os
+import re
+
 
 install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson', 'cef',
@@ -48,5 +51,15 @@ main = syncstorage.wsgiapp:make_app
 main = paste.script.appinstall:Installer
 """
 
-setup(name='SyncStorage', version='1.10', packages=find_packages(),
+# extracting the version number from the .spec file
+here = os.path.dirname(__file__)
+spec = os.path.join(here, 'SyncStorage.spec')
+with open(spec) as f:
+    spec = f.read()
+
+_VERSION = re.compile('^%define version (.*)$', re.M)
+version = _VERSION.findall(spec)[0]
+
+
+setup(name='SyncStorage', version=version, packages=find_packages(),
       install_requires=install_requires, entry_points=entry_points)

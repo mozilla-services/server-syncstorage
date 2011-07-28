@@ -1,14 +1,13 @@
 %define name python26-syncstorage
 %define pythonname SyncStorage
 %define version 1.10
-%define unmangled_version 1.10
 %define release 1
 
 Summary: Sync Storage server
 Name: %{name}
 Version: %{version}
 Release: %{release}
-Source0: %{pythonname}-%{unmangled_version}.tar.gz
+Source0: %{pythonname}-%{version}.tar.gz
 License: MPL
 Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
@@ -29,7 +28,7 @@ This is the Python implementation of the Storage Server.
 
 
 %prep
-%setup -n %{pythonname}-%{unmangled_version} -n %{pythonname}-%{unmangled_version}
+%setup -n %{pythonname}-%{version} -n %{pythonname}-%{version}
 
 %build
 python2.6 setup.py build
