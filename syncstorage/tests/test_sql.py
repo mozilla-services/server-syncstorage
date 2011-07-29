@@ -287,6 +287,14 @@ class TestSQLStorage(unittest.TestCase):
         res = storage._engine.execute('select count(*) from wbo1')
         self.assertEqual(res.fetchall()[0][0], 2)
 
+    def test_nopool(self):
+        # make sure the pool is forced to NullPool when sqlite is used.
+        testsdir = os.path.dirname(__file__)
+        conf = os.path.join(testsdir, 'tests2.ini')
+
+        appdir, config, storage, auth = initenv(conf)
+        self.assertEqual(storage._engine.pool.__class__.__name__, 'NullPool')
+
 
 def test_suite():
     suite = unittest.TestSuite()
