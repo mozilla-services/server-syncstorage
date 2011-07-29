@@ -159,4 +159,5 @@ class StorageServerApp(SyncServerApp):
         return res
 
 
-make_app = set_app(urls, controllers, klass=StorageServerApp)
+make_app = set_app(urls, controllers, klass=StorageServerApp,
+                   auth_class=Authentication)
