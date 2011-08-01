@@ -66,8 +66,16 @@ class TestSQLStorage(unittest.TestCase):
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
             self.storage.set_collection(_UID, name)
 
+        self._cfiles = []
+
     def tearDown(self):
         self._del_db()
+        for file_ in self._cfiles:
+            if os.path.exists(file_):
+                os.remove(file_)
+
+    def _add_cleanup(self, path):
+        self._cfiles.append(path)
 
     def _del_db(self):
         if os.path.exists(self.sqlfile):
@@ -263,6 +271,8 @@ class TestSQLStorage(unittest.TestCase):
         storage.set_user(_UID, email='tarek@ziade.org')
 
     def test_shard(self):
+        self._add_cleanup(os.path.join('/tmp', 'tests2.db'))
+
         # make shure we do shard
         testsdir = os.path.dirname(__file__)
         conf = os.path.join(testsdir, 'tests2.ini')
