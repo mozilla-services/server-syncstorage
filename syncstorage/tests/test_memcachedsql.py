@@ -36,6 +36,8 @@
 import unittest
 import time
 from decimal import Decimal
+from tempfile import mkstemp
+import os
 
 try:
     from syncstorage.storage.memcachedsql import MemcachedSQLStorage
@@ -55,21 +57,28 @@ if MEMCACHED:
     class TestMemcachedSQLStorage(unittest.TestCase):
 
         def setUp(self):
-            kw = {'sqluri': 'sqlite:///:memory:',
+            fd, self.dbfile = mkstemp()
+            os.close(fd)
+
+            kw = {'sqluri': 'sqlite:///%s' % self.dbfile,
                   'use_quota': True,
                   'quota_size': 5120,
                   'create_tables': True}
 
             self.fn = 'syncstorage.storage.memcachedsql.MemcachedSQLStorage'
+
             self.storage = SyncStorage.get(self.fn, **kw)
 
             # make sure we have the standard collections in place
+
             for name in ('client', 'crypto', 'forms', 'history'):
                 self.storage.set_collection(_UID, name)
 
         def tearDown(self):
             self.storage.cache.flush_all()
             self.storage.delete_user(_UID)
+            if os.path.exists(self.dbfile):
+                os.remove(self.dbfile)
 
         def _is_up(self):
             try:
