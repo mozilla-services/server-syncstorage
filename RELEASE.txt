@@ -1,3 +1,21 @@
+1.10 - 2011-08-01
+=================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.6
+
+Relevant changes:
+
+- Bug 672642 - Convert static queries to string format
+- Bug 672655 - Move to a single version number for packaging
+- Bug 672970 - missing dependencies: libevent-devel, libmemcached-devel
+
 1.9 - 2011-07-20
 ================
 
