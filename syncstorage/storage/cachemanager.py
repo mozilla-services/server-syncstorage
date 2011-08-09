@@ -52,6 +52,8 @@ from services.events import REQUEST_ENDS, subscribe
 
 from syncstorage.storage.sql import _KB
 
+USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
+
 
 def _key(*args):
     return ':'.join([str(arg) for arg in args])
@@ -242,7 +244,7 @@ class CacheManager(object):
     #
     def flush_user_cache(self, user_id):
         """Removes all cached data."""
-        for key in ('size', 'meta:global', 'tabs', 'stamps'):
+        for key in USER_KEYS:
             try:
                 self.delete(_key(user_id, key))
             except BackendError:
