@@ -95,13 +95,13 @@ class StorageController(object):
         # to mark the logs for stats. We also want to send a CEF log when
         # this happens
         if metrics != {}:
-            username = request.sync_info['username']
+            username = request.user['username']
             values = ['%s=%s' % (key, value)
                       for key, value in metrics.items()]
             log_cef('Daily metric call', 5, request.environ, self.app.config,
                     username=username, msg=','.join(values))
 
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         storage = self._get_storage(request)
         collections = storage.get_collection_timestamps(user_id)
         response = convert_response(request, collections)
@@ -112,14 +112,14 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         counts = self._get_storage(request).get_collection_counts(user_id)
         response = convert_response(request, counts)
         response.headers['X-Weave-Records'] = str(len(counts))
         return response
 
     def get_quota(self, request):
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         used = self._get_storage(request).get_total_size(user_id)
         if not self._get_storage(request).use_quota:
             limit = None
@@ -128,7 +128,7 @@ class StorageController(object):
         return json_response((used, limit))
 
     def get_collection_usage(self, request):
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         storage = self._get_storage(request)
         return json_response(storage.get_collection_sizes(user_id))
 
@@ -208,7 +208,7 @@ class StorageController(object):
         """Returns a list of the WBO ids contained in a collection."""
         kw = self._convert_args(kw)
         collection_name = request.sync_info['collection']
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         full = kw['full']
 
         if not full:
@@ -232,7 +232,7 @@ class StorageController(object):
         """Returns a single WBO object."""
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         fields = _WBO_FIELDS
         storage = self._get_storage(request)
         res = storage.get_item(user_id, collection_name, item_id,
@@ -248,7 +248,7 @@ class StorageController(object):
         If under the treshold, adds a header
         If the quota is reached, issues a 400
         """
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         storage = self._get_storage(request)
         left = storage.get_size_left(user_id)
         if left < _ONE_MEG:
@@ -265,7 +265,7 @@ class StorageController(object):
         else:
             left = 0.
 
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
 
@@ -297,7 +297,7 @@ class StorageController(object):
         collection_name = request.sync_info['collection']
         item_id = request.sync_info['item']
 
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -307,7 +307,7 @@ class StorageController(object):
 
         if collection_name == 'crypto' and item_id == 'keys':
             msg = 'Crypto keys deleted'
-            username = request.sync_info['username']
+            username = request.user['username']
             log_cef(msg, 5, request.environ, self.app.config,
                     username=username)
 
@@ -316,7 +316,7 @@ class StorageController(object):
     def set_collection(self, request):
         """Sets a batch of WBO objects into a collection."""
 
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         collection_name = request.sync_info['collection']
 
         if self._was_modified(request, user_id, collection_name):
@@ -397,7 +397,7 @@ class StorageController(object):
         """
         kw = self._convert_args(kw)
         collection_name = request.sync_info['collection']
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -419,6 +419,6 @@ class StorageController(object):
         """
         if 'X-Confirm-Delete' not in request.headers:
             raise HTTPJsonBadRequest(WEAVE_INVALID_WRITE)
-        user_id = request.sync_info['user_id']
+        user_id = request.user['userid']
         self._get_storage(request).delete_storage(user_id)  # XXX failures ?
         return json_response(True)
