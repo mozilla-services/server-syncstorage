@@ -17,4 +17,4 @@ pylibmc == 1.1.1
 pymysql_sa == 1.0
 gevent == 0.13.6
 greenlet == 0.3.1
-PyMySQL
+PyMySQL == 0.4.2
