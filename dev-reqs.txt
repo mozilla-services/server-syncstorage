@@ -1,0 +1,20 @@
+cef
+WebOb == 1.0.7
+Paste
+PasteDeploy
+PasteScript
+Mako
+MarkupSafe
+Beaker
+python-memcached
+simplejson
+Routes
+SQLAlchemy
+MySQL-python
+WSGIProxy
+recaptcha-client
+pylibmc
+pymysql_sa
+gevent
+greenlet
+PyMySQL
