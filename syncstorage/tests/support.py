@@ -19,6 +19,7 @@
 #
 # Contributor(s):
 #   Tarek Ziade (tarek@mozilla.com)
+#   Rob Miller (rmiller@mozilla.com)
 #
 # Alternatively, the contents of this file may be used under the terms of
 # either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -33,46 +34,25 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from ConfigParser import RawConfigParser
 import os
-from logging.config import fileConfig
 
 from syncstorage.storage import SyncStorage
 from services.auth import ServicesAuth
-from services.util import convert_config
-
-_DIR = os.path.dirname(__file__)
-
-while True:
-    if 'WEAVE_TESTFILE' in os.environ:
-        _INI_FILE = os.path.join(_DIR, 'tests_%s.ini' % \
-                                 os.environ['WEAVE_TESTFILE'])
-    else:
-        _INI_FILE = os.path.join(_DIR, 'tests.ini')
-
-    if os.path.exists(_INI_FILE):
-        break
-
-    _DIR = os.path.split(_DIR)[0]
-    if _DIR == '/':
-        raise IOError("could not find a test ini")
+from services.tests.support import TestEnv
 
 
-def initenv(config=_INI_FILE):
-    """Reads the config file and instanciates an auth and a storage.
-
-    The WEAVE_TESTFILE=name environment variable can be used to point
-    a particular tests_name.ini file.
+def initenv(config=None):
+    """Reads the config file and instantiates an auth and a storage.
     """
     # pre-registering plugins
     from syncstorage.storage.sql import SQLStorage
     SyncStorage.register(SQLStorage)
-
     try:
         from syncstorage.storage.memcachedsql import MemcachedSQLStorage
         SyncStorage.register(MemcachedSQLStorage)
     except ImportError:
         pass
+
     from services.auth.sql import SQLAuth
     ServicesAuth.register(SQLAuth)
     try:
@@ -83,17 +63,7 @@ def initenv(config=_INI_FILE):
     from services.auth.dummy import DummyAuth
     ServicesAuth.register(DummyAuth)
 
-    cfg = RawConfigParser()
-    cfg.read(config)
-
-    # loading loggers
-    if cfg.has_section('loggers'):
-        fileConfig(_INI_FILE)
-
-    here = {'here': os.path.dirname(os.path.realpath(config))}
-    config = dict([(key, value % here)for key, value in
-                   cfg.items('DEFAULT') + cfg.items('app:main')])
-    config = convert_config(config)
-    storage = SyncStorage.get_from_config(config, 'storage')
-    auth = ServicesAuth.get_from_config(config, 'auth')
-    return _DIR, config, storage, auth
+    mydir = os.path.dirname(__file__)
+    testenv = TestEnv(ini_path=config, ini_dir=mydir,
+                      load_sections=['auth', 'storage'])
+    return testenv.ini_dir, testenv.config, testenv.storage, testenv.auth

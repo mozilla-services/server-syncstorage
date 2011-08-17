@@ -300,7 +300,6 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
-
         # application/json
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.content_type, 'application/json')
