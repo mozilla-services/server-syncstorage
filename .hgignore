@@ -8,3 +8,4 @@ swp$
 html
 doc/build
 \.coverage
+\.git
