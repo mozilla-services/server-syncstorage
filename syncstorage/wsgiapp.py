@@ -64,7 +64,7 @@ def _url(url):
 
 
 urls = [('GET', _url('/_API_/_USERNAME_/info/collections'),
-         'storage', _url('get_collections'), _EXTRAS),
+         'storage', 'get_collections', _EXTRAS),
         ('GET', _url('/_API_/_USERNAME_/info/collection_counts'),
          'storage', 'get_collection_counts', _EXTRAS),
         ('GET', _url('/_API_/_USERNAME_/info/quota'), 'storage', 'get_quota',
