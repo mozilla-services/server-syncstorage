@@ -100,16 +100,20 @@ class StorageServerApp(SyncServerApp):
                  auth_class=Authentication):
         super(StorageServerApp, self).__init__(urls, controllers, config,
                                                auth_class)
-        # collecting the host-specific config and building connectors
-        self.storages = {}
-        hosts = config.get('storage.hosts', ['localhost'])
-        if 'localhost' not in hosts:
-            hosts.append('localhost')
-        for host in hosts:
-            config = self._host_specific(host, config)
-            self.storages[host] = get_storage(config)
-
         self.config = config
+
+        # collecting the host-specific config and building connectors
+        self.storages = {'default': get_storage(config)}
+        host_sections = set()
+        host_token = 'host:'
+        for cfgkey in config:
+            if cfgkey.startswith(host_token):
+                host_sections.add(cfgkey)
+        for host_section in host_sections:
+            hostname = host_section[len(host_token):]
+            host_cfg = self._host_specific(hostname, config)
+            self.storages[hostname] = get_storage(host_cfg)
+
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)
         if self.check_blacklist and Client is not None:
@@ -125,7 +129,7 @@ class StorageServerApp(SyncServerApp):
     def get_storage(self, request):
         host = request.host
         if host not in self.storages:
-            host = 'localhost'
+            host = 'default'
         return self.storages[host]
 
     def _before_call(self, request):
