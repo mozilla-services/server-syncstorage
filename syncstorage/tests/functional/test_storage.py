@@ -921,23 +921,30 @@ class TestStorage(support.TestWsgiApp):
                 raise BackendError()
 
         app = get_app(self.app)
-        storage = MemcachedSQLStorage('sqlite:///:memory:')
-        storage.cache = BadCache()
-        app.storages['localhost'] = storage
+        fd, dbfile = mkstemp()
+        os.close(fd)
 
-        # send two wbos in the 'tabs' collection
-        wbo1 = {'id': 'sure', 'payload': _PLD}
-        wbo2 = {'id': 'thing', 'payload': _PLD}
-        wbos = json.dumps([wbo1, wbo2])
+        try:
+            storage = MemcachedSQLStorage('sqlite:///%s' % dbfile)
+            storage.cache = BadCache()
+            app.storages['default'] = storage
 
-        # on batch, we get back a 200 - but only failures
-        res = self.app.post(self.root + '/storage/tabs', params=wbos)
-        self.assertEqual(len(res.json['failed']), 2)
-        self.assertEqual(len(res.json['success']), 0)
+            # send two wbos in the 'tabs' collection
+            wbo1 = {'id': 'sure', 'payload': _PLD}
+            wbo2 = {'id': 'thing', 'payload': _PLD}
+            wbos = json.dumps([wbo1, wbo2])
 
-        # on single PUT, we get a 503
-        wbo1 = json.dumps(wbo1)
-        self.app.put(self.root + '/storage/tabs/sure', params=wbo1, status=503)
+            # on batch, we get back a 200 - but only failures
+            res = self.app.post(self.root + '/storage/tabs', params=wbos)
+            self.assertEqual(len(res.json['failed']), 2)
+            self.assertEqual(len(res.json['success']), 0)
+
+            # on single PUT, we get a 503
+            wbo1 = json.dumps(wbo1)
+            self.app.put(self.root + '/storage/tabs/sure', params=wbo1,
+                         status=503)
+        finally:
+            os.remove(dbfile)
 
     def test_debug_screen(self):
         # deactivated by default

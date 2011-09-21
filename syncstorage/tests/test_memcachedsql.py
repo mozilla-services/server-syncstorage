@@ -273,21 +273,28 @@ if MEMCACHED:
         def test_collection_sizes(self):
             if not self._is_up():  # no memcached
                 return
-            kw = {'sqluri': 'sqlite:///:memory:',
+
+            fd, dbfile = mkstemp()
+            os.close(fd)
+
+            kw = {'sqluri': 'sqlite:///%s' % dbfile,
                   'use_quota': True,
                   'quota_size': 5120,
                   'create_tables': True}
 
-            storage = SyncStorage.get(self.fn, **kw)
+            try:
+                storage = SyncStorage.get(self.fn, **kw)
 
-            # setting the tabs in memcache
-            tabs = {'mCwylprUEiP5':
-                     {'payload': '*' * 1024,
-                      'id': 'mCwylprUEiP5',
-                      'modified': Decimal('1299142695.76')}}
-            storage.cache.set_tabs(1, tabs)
-            size = storage.get_collection_sizes(1)
-            self.assertEqual(size['tabs'], 1.)
+                # setting the tabs in memcache
+                tabs = {'mCwylprUEiP5':
+                        {'payload': '*' * 1024,
+                        'id': 'mCwylprUEiP5',
+                        'modified': Decimal('1299142695.76')}}
+                storage.cache.set_tabs(1, tabs)
+                size = storage.get_collection_sizes(1)
+                self.assertEqual(size['tabs'], 1.)
+            finally:
+                os.remove(dbfile)
 
         def test_flush_all(self):
             if not self._is_up():
