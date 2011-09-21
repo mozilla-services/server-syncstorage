@@ -44,8 +44,8 @@ import simplejson as json
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
 from cef import log_cef
 
-from services.util import (convert_response, json_response, round_time,
-                           batch, HTTPJsonBadRequest)
+from services.util import round_time, batch, HTTPJsonBadRequest
+from services.formatters import convert_response, json_response
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from services import logger
