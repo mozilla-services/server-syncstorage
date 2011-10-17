@@ -777,42 +777,6 @@ class TestStorage(support.TestWsgiApp):
         self.app.get(self.root + '/info/collections?client=FxHome&v=1.1b2',
                      status=200)
 
-    def test_cef_markers(self):
-        try:
-            import syslog   # NOQA
-        except ImportError:
-            return
-
-        # let's intercept the cef logs
-        app = get_app(self.app)
-        app.config['cef.file'] = filename = mkstemp()[1]
-
-        try:
-            # a call to info/collections with metrics markers should generate
-            # a CEF log
-            self.app.get(self.root +
-                            '/info/collections?client=FxHome&v=1.1b2',
-                         status=200)
-
-            # a call to info/collections with no marker
-            self.app.get(self.root + '/info/collections', status=200)
-
-            # a DELETE on crypto/keys should generate a CEF log
-            self.app.delete(self.root + '/storage/crypto/keys', status=200)
-
-            # checking the results
-            with open(filename) as f:
-                res = f.read().strip()
-
-            # make sure we get only two logs
-            self.assertEqual(len(res.split('\n')), 2)
-
-            for log in ('Daily metric call', 'client\\=FxHome', 'v\\=1.1b2',
-                        'Crypto keys deleted'):
-                self.assertTrue(log in res)
-        finally:
-            os.remove(filename)
-
     def test_rounding(self):
         # make sure the server returns only rounded timestamps
         resp = self.app.get(self.root + '/storage/col2?full=1')

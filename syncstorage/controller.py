@@ -94,12 +94,15 @@ class StorageController(object):
         # metrics are additional parameters used by the various clients
         # to mark the logs for stats. We also want to send a CEF log when
         # this happens
-        if metrics != {}:
-            username = request.user['username']
-            values = ['%s=%s' % (key, value)
-                      for key, value in metrics.items()]
-            log_cef('Daily metric call', 5, request.environ, self.app.config,
-                    username=username, msg=','.join(values))
+        #
+        # Disabled for now, since CEF doesn't need them at the moment
+        #
+        #if metrics != {}:
+        #    username = request.user['username']
+        #    values = ['%s=%s' % (key, value)
+        #              for key, value in metrics.items()]
+        #    log_cef('Daily metric call', 5, request.environ, self.app.config,
+        #            username=username, msg=','.join(values))
 
         user_id = request.user['userid']
         storage = self._get_storage(request)
@@ -305,11 +308,12 @@ class StorageController(object):
                                               item_id,
                                               storage_time=request.server_time)
 
-        if collection_name == 'crypto' and item_id == 'keys':
-            msg = 'Crypto keys deleted'
-            username = request.user['username']
-            log_cef(msg, 5, request.environ, self.app.config,
-                    username=username)
+        # Not logging this event for now. Infrasec may want it again in future
+        #
+        #if collection_name == 'crypto' and item_id == 'keys':
+        #    msg = 'Crypto keys deleted'
+        #    username = request.user['username']
+        #    log_cef(msg, 5, request.environ, self.app.config, username)
 
         return json_response(request.server_time)
 
