@@ -582,6 +582,9 @@ class TestStorage(support.TestWsgiApp):
         # deleting all for real now
         res = self.app.delete(self.root + '/storage/col2',
                               headers=[('X-Confirm-Delete', '1')])
+        res = json.loads(res.body)
+        now = time.time()
+        self.assertTrue(abs(now - float(res)) < 0.2)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 

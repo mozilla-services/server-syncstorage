@@ -409,7 +409,7 @@ class StorageController(object):
                                         sort=kw.get('sort'),
                                         storage_time=request.server_time)
 
-        return json_response(res)
+        return json_response(request.server_time)
 
     def delete_storage(self, request):
         """Deletes all records for the user.
@@ -421,4 +421,4 @@ class StorageController(object):
             raise HTTPJsonBadRequest(WEAVE_INVALID_WRITE)
         user_id = request.user['userid']
         self._get_storage(request).delete_storage(user_id)  # XXX failures ?
-        return json_response(True)
+        return json_response(request.server_time)
