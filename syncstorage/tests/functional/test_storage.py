@@ -681,13 +681,31 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res.json), 0)
 
     def test_batch(self):
-        # makes sure the server handles correctly large batches
-        # those are pushed in the DB in batches of 100
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(250)]
+        # Test that batch uploads are correctly processed.
+        # The test config has max_count=100.
+        # Uploading 70 small objects should succeed with 3 database writes.
+        wbos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
         wbos = json.dumps(wbos)
         res = self.app.post(self.root + '/storage/col2', params=wbos)
         res = res.json
-        self.assertEquals(len(res['success']), 250)
+        self.assertEquals(len(res['success']), 70)
+        self.assertEquals(len(res['failed']), 0)
+        # The test config has max_count=100.
+        # Uploading 105 items should produce five failures.
+        wbos = [{'id': str(i), 'payload': _PLD} for i in range(105)]
+        wbos = json.dumps(wbos)
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
+        res = res.json
+        self.assertEquals(len(res['success']), 100)
+        self.assertEquals(len(res['failed']), 5)
+        # The test config has max_bytes=1M.
+        # Uploading 5 210MB items should produce one failure.
+        wbos = [{'id': str(i), 'payload': "X"*(210*1024)} for i in range(5)]
+        wbos = json.dumps(wbos)
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
+        res = res.json
+        self.assertEquals(len(res['success']), 4)
+        self.assertEquals(len(res['failed']), 1)
 
     def test_blacklisted_nodes(self):
         app = get_app(self.app)

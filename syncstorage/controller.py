@@ -62,6 +62,10 @@ class StorageController(object):
     def __init__(self, app):
         self.app = app
         self.batch_size = app.config.get('storage.batch_size', 100)
+        self.batch_max_count = app.config.get('storage.batch_max_count',
+                                              100)
+        self.batch_max_bytes = app.config.get('storage.batch_max_bytes',
+                                              1024 * 1024)
 
     def _has_modifiers(self, data):
         return 'payload' in data
@@ -344,25 +348,36 @@ class StorageController(object):
 
         res = {'success': [], 'failed': {}}
 
-        # sanity chech
+        # Sanity-check each of the WBOs.
+        # Limit the batch based on both count and payload size.
         kept_wbos = []
-        for wbo in wbos:
+        total_bytes = 0
+        for count, wbo in enumerate(wbos):
             wbo = WBO(wbo)
 
             if 'id' not in wbo:
                 res['failed'][''] = ['invalid id']
                 continue
 
+            consistent, msg = wbo.validate()
+            item_id = wbo['id']
+            if not consistent:
+                res['failed'][item_id] = [msg]
+                continue
+
+            if count >= self.batch_max_count:
+                res['failed'][item_id] = ['retry wbo']
+                continue
+            if 'payload' in wbo:
+                total_bytes += len(wbo['payload'])
+            if total_bytes >= self.batch_max_bytes:
+                res['failed'][item_id] = ['retry bytes']
+                continue
+
             if self._has_modifiers(wbo):
                 wbo['modified'] = request.server_time
 
-            consistent, msg = wbo.validate()
-            item_id = wbo['id']
-
-            if not consistent:
-                res['failed'][item_id] = [msg]
-            else:
-                kept_wbos.append(wbo)
+            kept_wbos.append(wbo)
 
         storage = self._get_storage(request)
         if storage.use_quota:
