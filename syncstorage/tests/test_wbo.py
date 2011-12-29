@@ -85,6 +85,16 @@ class TestWBO(unittest.TestCase):
         result, failure = wbo.validate()
         self.assertTrue(result)
 
+        data = {'payload':  "X" * 30000}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertTrue(result)
+
+        data = {'payload':  "X" * 300000}
+        wbo = WBO(data)
+        result, failure = wbo.validate()
+        self.assertFalse(result)
+
 
 def test_suite():
     suite = unittest.TestSuite()
