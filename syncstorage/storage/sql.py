@@ -58,8 +58,8 @@ from syncstorage.wbo import WBO
 
 
 _KB = float(1024)
-_STANDARD_COLLECTIONS = {1: 'clients', 2: 'crypto', 3: 'forms', 4: 'history',
-                         5: 'keys', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
+_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
+                         5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
                          9: 'tabs', 10: 'passwords'}
 
 STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
