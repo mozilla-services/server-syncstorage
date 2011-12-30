@@ -284,11 +284,14 @@ class StorageController(object):
         except ValueError:
             raise HTTPJsonBadRequest(WEAVE_MALFORMED_JSON)
 
-        wbo = WBO(data)
+        try:
+            wbo = WBO(data)
+        except ValueError:
+            raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
+            
         consistent, msg = wbo.validate()
-
         if not consistent:
-            raise HTTPBadRequest(msg)
+            raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
 
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
@@ -337,9 +340,10 @@ class StorageController(object):
 
         if not isinstance(wbos, (tuple, list)):
             # thats a batch of one
-            if 'id' not in wbos:
+            try:
+                id_ = str(wbos['id'])
+            except (KeyError, TypeError):
                 raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
-            id_ = str(wbos['id'])
             if '/' in id_:
                 raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
 
@@ -353,8 +357,12 @@ class StorageController(object):
         kept_wbos = []
         total_bytes = 0
         for count, wbo in enumerate(wbos):
-            wbo = WBO(wbo)
-
+            try:
+                wbo = WBO(wbo)
+            except ValueError:
+                res['failed'][''] = ['invalid wbo']
+                continue
+                
             if 'id' not in wbo:
                 res['failed'][''] = ['invalid id']
                 continue

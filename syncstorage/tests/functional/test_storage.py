@@ -48,7 +48,7 @@ from tempfile import mkstemp
 
 from syncstorage.tests.functional import support
 
-from services.respcodes import WEAVE_OVER_QUOTA
+from services.respcodes import WEAVE_OVER_QUOTA, WEAVE_INVALID_WBO
 from services.tests.support import get_app
 from services.util import BackendError
 
@@ -947,3 +947,36 @@ class TestStorage(support.TestWsgiApp):
         # check that the batch size is correctly set
         size = get_app(self.app).controllers['storage'].batch_size
         self.assertEqual(size, 25)
+
+    def test_handling_of_invalid_json(self):
+        # Single upload with JSON that's not a WBO.
+        # It should fail with WEAVE_INVALID_WBO
+        wbo = json.dumps("notawbo")
+        res = self.app.put(self.root + '/storage/col2/invalid', params=wbo,
+                           status=400)
+        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        wbo = json.dumps(42)
+        res = self.app.put(self.root + '/storage/col2/invalid', params=wbo,
+                           status=400)
+        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        wbo = json.dumps({'id': ["1", "2"], 'payload': {'3': '4'}})
+        res = self.app.put(self.root + '/storage/col2/invalid', params=wbo,
+                           status=400)
+        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        # Batch upload with JSON that's not a list of WBOs
+        # It should fail with WEAVE_INVALID_WBO
+        wbos = json.dumps("notalist")
+        res = self.app.post(self.root + '/storage/col2', params=wbos,
+                            status=400)
+        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        wbos = json.dumps(42)
+        res = self.app.post(self.root + '/storage/col2', params=wbos,
+                            status=400)
+        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        # Batch upload a list with something that's not a WBO
+        # It should process the good entry and fail for the bad.
+        wbos = json.dumps([{'id': '1', 'payload': 'GOOD'}, "BAD"])
+        res = self.app.post(self.root + '/storage/col2', params=wbos)
+        res = res.json
+        self.assertEquals(len(res['success']), 1)
+        self.assertEquals(len(res['failed']), 1)

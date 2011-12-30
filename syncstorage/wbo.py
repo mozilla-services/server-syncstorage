@@ -56,7 +56,17 @@ class WBO(dict):
         if converters is None:
             converters = {}
 
-        for name, value in data.items():
+        try:
+            data_items = data.items()
+        except AttributeError:
+            msg = "WBO data must be dict-like, not %s"
+            raise ValueError(msg % (type(data),))
+
+        for name, value in data_items:
+            if value is not None:
+                if not isinstance(value, (int, long, float, basestring)):
+                    msg = "WBO fields must be scalar values, not %s"
+                    raise ValueError(msg % (type(value),))
             if name not in _FIELDS:
                 continue
             if name in converters:
@@ -109,9 +119,11 @@ class WBO(dict):
             if self[field] < MIN_SORTINDEX_VALUE:
                 return False, 'invalid %s' % field
 
-        # Check that the payload is not too big.
+        # Check that the payload is a string, and is not too big.
         payload = self.get('payload')
         if payload is not None:
+            if not isinstance(payload, basestring):
+                return False, 'payload not a string'
             if len(payload.encode("utf8")) > MAX_PAYLOAD_SIZE:
                 return False, 'payload too large'
 
