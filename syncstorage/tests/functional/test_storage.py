@@ -700,7 +700,8 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['failed']), 5)
         # The test config has max_bytes=1M.
         # Uploading 5 210MB items should produce one failure.
-        wbos = [{'id': str(i), 'payload': "X"*(210*1024)} for i in range(5)]
+        wbos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
+                for i in range(5)]
         wbos = json.dumps(wbos)
         res = self.app.post(self.root + '/storage/col2', params=wbos)
         res = res.json

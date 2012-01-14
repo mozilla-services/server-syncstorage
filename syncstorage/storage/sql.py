@@ -34,8 +34,24 @@
 #
 # ***** END LICENSE BLOCK *****
 """
-SQL backend
+SQL backend for syncserver.
+
+This module implements an SQL storage plugin for syncserver.  In the simplest
+use case it consists of three database tables:
+
+  users:        user ids and authentication details (imported from server-core)
+  collections:  the names of per-user custom collections
+  wbo:          the individual WBO items stored in each collection
+
+For efficiency when dealing with large datasets, the plugin also supports
+sharding of the WBO items into multiple tables named "wbo0" through "wboN".
+This behaviour is off by default; pass shard=True to enable it.
+
+For details of the database schema, see the file "sqlmappers.py".
+For details of the prepared queries, see the file "queries.py".
+
 """
+
 import urlparse
 from time import time
 from collections import defaultdict
@@ -58,6 +74,15 @@ from syncstorage.wbo import WBO
 
 
 _KB = float(1024)
+
+# For efficiency, it's possible to use fixed pre-determined IDs for
+# common collection names.  This is the canonical list of such names.
+# Non-standard collections will be allocated IDs starting from the
+# highest ID in this collection.
+# XXX: some names here are incorrect; we need to change "client" to "clients"
+# "key" to "keys" at some point.  See Bug 688623
+# XXX: we need to reserve ids 100 and above for custom collections, so
+# that there's room to add new standard collections as needed.
 _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
                          5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
                          9: 'tabs', 10: 'passwords'}
@@ -75,6 +100,12 @@ def _int_now():
 
 
 class _CustomCompiler(SQLCompiler):
+    """SQLAlchemy statement compiler to support DELETE with ORDER BY and LIMIT.
+
+    The visit_delete() method of this class is mostly a verbatim copy of the
+    method from SQLCompiler, but has extra logic to handle ORDER BY and LIMIT
+    clauses on the delete statement.
+    """
 
     def visit_delete(self, delete_stmt):
         self.stack.append({'from': set([delete_stmt.table])})
@@ -107,6 +138,7 @@ class _CustomCompiler(SQLCompiler):
 
 
 class _DeleteOrderBy(Delete):
+    """Custom Delete statement with ORDER BY and LIMIT support."""
 
     def __init__(self, table, whereclause, bind=None, returning=None,
                  order_by=None, limit=None, offset=None, **kwargs):
@@ -154,6 +186,20 @@ def _delete(table, whereclause=None, **kwargs):
 
 
 class SQLStorage(object):
+    """Storage plugin implemented using an SQL database.
+
+    This class implements the storage plugin API using SQLAlchemy.  You
+    must specify the SQLAlchemy database URI string to connect to, and
+    can customize behaviour with the following keyword arguments:
+
+        * standard_collections:  use fixed pre-determined ids for common
+                                 collection names
+        * create_tables:         create the database tables if they don't
+                                 exist at startup
+        * use_quota/quota_size:  limit per-user storage to a specific quota
+        * shard/shardsize:       enable sharding of the WBO table
+
+    """
 
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
@@ -165,6 +211,9 @@ class SQLStorage(object):
         self.sqluri = sqluri
         self.driver = urlparse.urlparse(sqluri).scheme
 
+        # Create the SQLAlchemy engine, using the given parameters for
+        # connection pooling.  Pooling doesn't work properly for sqlite so
+        # it's disabled for that driver regardless of the value of no_pool.
         if no_pool or self.driver == 'sqlite':
             from sqlalchemy.pool import NullPool
             self._engine = create_engine(sqluri, poolclass=NullPool,
@@ -182,6 +231,8 @@ class SQLStorage(object):
 
             self._engine = create_engine(sqluri, **sqlkw)
 
+        # Bind the table metadata to our engine.
+        # This is also a good time to create tables if they're missing.
         for table in tables:
             table.metadata.bind = self._engine
             if create_tables:
@@ -203,17 +254,21 @@ class SQLStorage(object):
             if create_tables:
                 _wbo.create(checkfirst=True)
 
+        # A per-user cache for collection metadata.
+        # This is to avoid looking up the collection name <=> id mapping
+        # in the database on every request.
         self._temp_cache = defaultdict(dict)
 
     @classmethod
     def get_name(cls):
-        """Returns the name of the storage"""
+        """Return the name of the storage plugin"""
         return 'sql'
 
     #
     # Users APIs
     #
     def _get_query(self, name, user_id):
+        """Get the named pre-built query, sharding by user_id if necessary."""
         if self.shard:
             return get_query(name, user_id)
         return get_query(name)
@@ -227,7 +282,8 @@ class SQLStorage(object):
     def set_user(self, user_id, **values):
         """set information for a user. values contains the fields to set.
 
-        If the user doesn't exists, it will be created."""
+        If the user doesn't exists, it will be created.
+        """
         values['id'] = user_id
         if not self.user_exists(user_id):
             query = insert(users).values(**values)
@@ -240,7 +296,7 @@ class SQLStorage(object):
     def get_user(self, user_id, fields=None):
         """Returns user information.
 
-        If fields is provided, its a list of fields to return
+        If fields is provided, it is a list of fields to return
         """
         if fields is None:
             fields = [users]

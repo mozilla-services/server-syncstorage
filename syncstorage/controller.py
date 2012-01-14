@@ -42,7 +42,7 @@ https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
 import simplejson as json
 
 from webob.exc import HTTPBadRequest, HTTPNotFound, HTTPPreconditionFailed
-from cef import log_cef
+#from cef import log_cef
 
 from services.util import round_time, batch, HTTPJsonBadRequest
 from services.formatters import convert_response, json_response
@@ -288,7 +288,7 @@ class StorageController(object):
             wbo = WBO(data)
         except ValueError:
             raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
-            
+
         consistent, msg = wbo.validate()
         if not consistent:
             raise HTTPJsonBadRequest(WEAVE_INVALID_WBO)
@@ -362,7 +362,7 @@ class StorageController(object):
             except ValueError:
                 res['failed'][''] = ['invalid wbo']
                 continue
-                
+
             if 'id' not in wbo:
                 res['failed'][''] = ['invalid id']
                 continue
@@ -428,7 +428,7 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        res = self._get_storage(request).delete_items(user_id,
+        self._get_storage(request).delete_items(user_id,
                                         collection_name,
                                         kw.get('ids'), kw['filters'],
                                         limit=kw.get('limit'),

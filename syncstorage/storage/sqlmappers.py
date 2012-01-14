@@ -45,11 +45,17 @@ _Base = declarative_base()
 tables = []
 MAX_TTL = 2100000000
 
-# mapper defined in services.auth
+# This is the table containing user data, which we import directly
+# from the core authentication routines.
 tables.append(users)
 
 
 class Collections(_Base):
+    """Table mapping (user_id, collection_name) => collection_id.
+
+    This table provides a per-user namespace for custom collection names.
+    It maps a (user_id, collection_name) pair to a unique collection id.
+    """
     __tablename__ = 'collections'
     # XXX add indexes
     userid = Column(Integer(11), primary_key=True, nullable=False)
@@ -62,6 +68,11 @@ tables.append(collections)
 
 
 class WBO(_Base):
+    """Table for storage of individual Weave Basic Object records.
+
+    This table provides the (non-sharded) storage for WBO records along
+    with their associated metadata.
+    """
     __tablename__ = 'wbo'
     __table_args__ = {'mysql_engine': 'InnoDB',
                       'mysql_charset': 'latin1'}
@@ -84,6 +95,11 @@ wbo = WBO.__table__
 
 # preparing the sharded tables
 class _WBOBase(object):
+    """Column definitions for sharded WBO storage.
+
+    This mixin class defines the columns used for storage of WBO records.
+    It is used to create sharded storage tables on-demand.
+    """
     id = Column(String(64), primary_key=True, autoincrement=False)
     username = Column(Integer(11), primary_key=True, nullable=False)
     collection = Column(Integer(6), primary_key=True, nullable=False,
@@ -96,6 +112,11 @@ class _WBOBase(object):
     payload_size = Column(Integer(11), nullable=False, default=0)
     ttl = Column(Integer(11), default=MAX_TTL)
 
+
+
+#  If the storage controller is doing sharding based on userid,
+#  then it will use the below functions to select a table from "wbo0"
+#  to "wboN" for each userid.
 
 _SHARDS = {}
 
@@ -112,8 +133,18 @@ def get_wbo_table_byindex(index):
 
 
 def get_wbo_table(user_id, shardsize=100):
+    """Get the WBO table definition to use for the given user.
+
+    This function determines the correct shard for the given userid and
+    returns the definition for the matching WBO storage table.
+    """
     return get_wbo_table_byindex(int(user_id) % shardsize)
 
 
 def get_wbo_table_name(user_id, shardsize=100):
+    """Get the name of WBO table to use for the given user.
+
+    This function determines the correct shard for the given userid and
+    returns the name of the matching WBO storage table.
+    """
     return 'wbo%d' % (int(user_id) % shardsize)

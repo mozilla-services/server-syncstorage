@@ -34,8 +34,13 @@
 #
 # ***** END LICENSE BLOCK *****
 """
-Pre-built queries
+Pre-built queries for the SQL storage backend.
+
+This module defines a set of pre-built queries for the SQL storage backend.
+The function get_query(name, user_id) will retrieve the text for the named
+query while taking WBO table sharding into account.
 """
+
 from syncstorage.storage.sqlmappers import collections, wbo, get_wbo_table
 from sqlalchemy.sql import select, bindparam, delete, and_, text
 
@@ -101,6 +106,12 @@ queries = {
 
 
 def get_query(name, user_id=None):
+    """Get the named pre-built query, sharding on user_id if given.
+
+    This is a helper function to return an appropriate pre-built SQL query
+    while taking sharding of the WBO table into account.  Call it with the
+    name of the query and optionally the user_id on which to shard.
+    """
     if user_id is None:
         table = wbo
     else:
