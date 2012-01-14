@@ -67,7 +67,30 @@ collections = Collections.__table__
 tables.append(collections)
 
 
-class WBO(_Base):
+class _WBOBase(object):
+    """Column definitions for sharded WBO storage.
+
+    This mixin class defines the columns used for storage of WBO records.
+    It is used to create either sharded or non-shareded WBO storage tables,
+    depending on the run-time settings of the application.
+    """
+    id = Column(String(64), primary_key=True, autoincrement=False)
+    username = Column(Integer(11), primary_key=True, nullable=False)
+    collection = Column(Integer(6), primary_key=True, nullable=False,
+                        default=0)
+    parentid = Column(String(64))
+    predecessorid = Column(String(64))
+    sortindex = Column(Integer(11))
+    modified = Column(BigInteger(20))
+    payload = Column(Text)
+    payload_size = Column(Integer(11), nullable=False, default=0)
+    ttl = Column(Integer(11), default=MAX_TTL)
+
+
+#  If the storage controller is not doing sharding based on userid,
+#  then it will use the single "wbo" table below for WBO storage.
+
+class WBO(_WBOBase, _Base):
     """Table for storage of individual Weave Basic Object records.
 
     This table provides the (non-sharded) storage for WBO records along
@@ -77,41 +100,7 @@ class WBO(_Base):
     __table_args__ = {'mysql_engine': 'InnoDB',
                       'mysql_charset': 'latin1'}
 
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11), nullable=False, default=0)
-    ttl = Column(Integer(11), default=MAX_TTL)
-
-
 wbo = WBO.__table__
-
-
-# preparing the sharded tables
-class _WBOBase(object):
-    """Column definitions for sharded WBO storage.
-
-    This mixin class defines the columns used for storage of WBO records.
-    It is used to create sharded storage tables on-demand.
-    """
-    id = Column(String(64), primary_key=True, autoincrement=False)
-    username = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
-                        default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
-    payload = Column(Text)
-    payload_size = Column(Integer(11), nullable=False, default=0)
-    ttl = Column(Integer(11), default=MAX_TTL)
-
 
 
 #  If the storage controller is doing sharding based on userid,
