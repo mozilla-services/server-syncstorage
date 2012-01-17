@@ -102,15 +102,19 @@ class StorageServerApp(SyncServerApp):
                                                auth_class)
         self.config = config
 
-        # collecting the host-specific config and building connectors
+        # Collecting the host-specific config and building connectors.
         self.storages = {'default': get_storage(config)}
-        host_sections = set()
+        hostnames = set()
         host_token = 'host:'
         for cfgkey in config:
             if cfgkey.startswith(host_token):
-                host_sections.add(cfgkey)
-        for host_section in host_sections:
-            hostname = host_section[len(host_token):]
+                # Get the hostname from the config key.  This assumes
+                # that host-specific keys have two trailing components
+                # that specify the setting to override.
+                # E.g: "host:localhost.storage.sqluri" => "localhost"
+                hostname = cfgkey[len(host_token):].rsplit(".", 2)[0]
+                hostnames.add(hostname)
+        for hostname in hostnames:
             host_cfg = self._host_specific(hostname, config)
             self.storages[hostname] = get_storage(host_cfg)
 
