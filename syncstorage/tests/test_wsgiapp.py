@@ -37,14 +37,14 @@
 import unittest
 import os
 
-from paste.deploy import loadapp
+from syncstorage.wsgiapp import make_app
 
 
 class TestWSGIApp(unittest.TestCase):
 
     def setUp(self):
-        ini_file = os.path.join(os.path.dirname(__file__), "tests.ini")
-        self.app = loadapp("config:%s" % (ini_file,)).app
+        config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
+        self.app = make_app({"configuration": "file:" + config_file}).app
 
     def test_host_specific_config(self):
         class request:
