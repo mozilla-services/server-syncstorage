@@ -1,3 +1,33 @@
+1.11 - 2012-01-27
+=================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.7
+
+Relevant changes:
+
+A lot.  python-services version 2.7 is a major change and includes the
+following disclaimer in its release notes:
+
+    "Any product that moves to this core should check all functionality
+    to see if anything breaks."
+
+Important bugs include:
+
+- Bug 679502 - Update storage to use the user object
+- Bug 681768 - change host-specific config handling
+- Bug 692695 - returning the timestamp on delete calls
+- Bug 702685 - limit WBO payload to 256KB
+- Bug 692372 - limit batch uploads by num wbos and total size
+- Bug 691717 - fail gracefully if WBO is given wrong datatypes
+
+
 1.10 - 2011-08-01
 =================
 
