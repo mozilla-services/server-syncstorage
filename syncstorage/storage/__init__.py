@@ -3,12 +3,10 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
- users
-   |
-   -- collections
-           |
-           |
-           ---- items
+ collections
+      |
+      |
+      ---- items
 
 """
 import abc
@@ -30,58 +28,6 @@ class SyncStorage(PluginRegistry):
 
         Returns:
             The plugin name
-        """
-
-    #
-    # Users APIs -- the user id is the email
-    #
-    @abc.abstractmethod
-    def user_exists(self, user_id):
-        """Returns True if the user exists.
-
-        Args:
-            user_id: integer identifying the user in the storage.
-
-        Returns:
-            True or False
-        """
-
-    @abc.abstractmethod
-    def set_user(self, user_id, **values):
-        """Sets information for a user.
-
-        If the user doesn't exists, it will be created.
-
-        Args:
-            - user_id: integer identifying the user in the storage.
-            - values: mapping containing the values.
-
-        Returns:
-            None
-        """
-
-    @abc.abstractmethod
-    def get_user(self, user_id, fields=None):
-        """Returns user information.
-
-        Args:
-            - user_id: integer identifying the user in the storage.
-            - fields: if provided, its a list of fields to return,
-              all fields are returns by default.
-
-        Returns:
-            A dict containing the values for the user.
-        """
-
-    @abc.abstractmethod
-    def delete_user(self, user_id):
-        """Remove a user and his data from the storage.
-
-        Args:
-            user_id: integer identifying the user in the storage.
-
-        Returns:
-            None
         """
 
     #
@@ -341,7 +287,7 @@ def get_storage(config):
     """Returns a storage backend instance, given a config.
 
     "config" is a mapping, containing the configuration.
-    All keys that starts with "auth." are used in the function.
+    All keys that starts with "storage." are used in the function.
 
     - "storage.backend" must be present and contain a fully qualified name of a
       backend class to be used, or the name of any backend synccore provides.

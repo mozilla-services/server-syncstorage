@@ -5,9 +5,8 @@
 SQL backend for syncserver.
 
 This module implements an SQL storage plugin for syncserver.  In the simplest
-use case it consists of three database tables:
+use case it consists of two database tables:
 
-  users:        user ids and authentication details (imported from server-core)
   collections:  the names of per-user custom collections
   wbo:          the individual WBO items stored in each collection
 
@@ -32,7 +31,7 @@ from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
 
 from syncstorage.storage.queries import get_query
-from syncstorage.storage.sqlmappers import (tables, users, collections,
+from syncstorage.storage.sqlmappers import (tables, collections,
                                             get_wbo_table_name, MAX_TTL,
                                             get_wbo_table,
                                             get_wbo_table_byindex)
@@ -240,46 +239,6 @@ class SQLStorage(object):
         if self.shard:
             return get_query(name, user_id)
         return get_query(name)
-
-    def user_exists(self, user_id):
-        """Returns true if the user exists."""
-        query = self._get_query('USER_EXISTS', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id).fetchone()
-        return res is not None
-
-    def set_user(self, user_id, **values):
-        """set information for a user. values contains the fields to set.
-
-        If the user doesn't exists, it will be created.
-        """
-        values['id'] = user_id
-        if not self.user_exists(user_id):
-            query = insert(users).values(**values)
-        else:
-            query = update(users).where(users.c.id == user_id)
-            query = query.values(**values)
-
-        safe_execute(self._engine, query)
-
-    def get_user(self, user_id, fields=None):
-        """Returns user information.
-
-        If fields is provided, it is a list of fields to return
-        """
-        if fields is None:
-            fields = [users]
-        else:
-            fields = [getattr(users.c, field) for field in fields]
-
-        query = select(fields, users.c.id == user_id)
-        return safe_execute(self._engine, query).first()
-
-    def delete_user(self, user_id):
-        """Removes a user (and all its data)"""
-        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS',
-                      'DELETE_USER'):
-            query = self._get_query(query, user_id)
-            safe_execute(self._engine, query, user_id=user_id)
 
     def _get_collection_id(self, user_id, collection_name, create=True):
         """Returns a collection id, given the name."""

@@ -18,3 +18,5 @@ pymysql_sa
 gevent
 greenlet
 PyMySQL
+repoze.who
+repoze.who.plugins.vepauth

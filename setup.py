@@ -7,8 +7,8 @@ import re
 
 
 install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
-                    'Routes', 'simplejson', 'cef',
-                    'Services>=1.0']
+                    'Routes', 'simplejson', 'cef', 'repoze.who',
+                    'repoze.who.plugins.vepauth', 'Services>=1.0']
 
 
 entry_points = """

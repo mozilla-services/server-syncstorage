@@ -87,10 +87,6 @@ class MemcachedSQLStorage(SQLStorage):
         self.cache.flush_user_cache(user_id)
         self.sqlstorage.delete_storage(user_id)
 
-    def delete_user(self, user_id):
-        self.cache.flush_user_cache(user_id)
-        self.sqlstorage.delete_user(user_id)
-
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
         def _item_exists():

@@ -44,7 +44,6 @@ if MEMCACHED:
 
         def tearDown(self):
             self.storage.cache.flush_all()
-            self.storage.delete_user(_UID)
             if os.path.exists(self.dbfile):
                 os.remove(self.dbfile)
 
@@ -59,7 +58,6 @@ if MEMCACHED:
             if not self._is_up():
                 return
             # just make sure calls goes through
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'col1')
             self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 
@@ -75,7 +73,6 @@ if MEMCACHED:
         def test_meta_global(self):
             if not self._is_up():
                 return
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'meta')
             self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
 
@@ -125,7 +122,6 @@ if MEMCACHED:
             if not self._is_up():  # no memcached == no tabs
                 return
 
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
 
@@ -160,7 +156,6 @@ if MEMCACHED:
                 return
 
             # storing 2 WBOs
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
@@ -179,7 +174,6 @@ if MEMCACHED:
             if not self._is_up():
                 return
 
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
             self.storage.set_collection(_UID, 'baz')
@@ -268,7 +262,6 @@ if MEMCACHED:
             if not self._is_up():
                 return
             # just make sure calls goes through
-            self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'col1')
             self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 

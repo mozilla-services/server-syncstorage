@@ -16,8 +16,6 @@ _USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
                     collections.c.name == bindparam('collection_name'))
 
 queries = {
-    'USER_EXISTS': 'SELECT id FROM users where id = :user_id',
-
     'DELETE_SOME_USER_WBO': 'DELETE FROM %(wbo)s WHERE username=:user_id AND '
                             'collection=:collection_id AND id=:item_id',
 
@@ -27,8 +25,6 @@ queries = {
     'DELETE_USER_COLLECTION': delete(collections).where(_USER_N_COLL),
 
     'DELETE_USER_WBOS': 'DELETE FROM %(wbo)s WHERE username=:user_id',
-
-    'DELETE_USER': 'DELETE FROM users WHERE id=:user_id',
 
     'COLLECTION_EXISTS': select([collections.c.collectionid], _USER_N_COLL),
 

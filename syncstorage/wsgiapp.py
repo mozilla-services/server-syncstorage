@@ -7,8 +7,9 @@ Application entry point.
 from webob.exc import HTTPServiceUnavailable
 
 from services.baseapp import set_app, SyncServerApp
-from services.wsgiauth import Authentication
+from services.whoauth import WhoAuthentication
 from syncstorage.controller import StorageController
+from syncstorage.tokens import TokenController
 from syncstorage.storage import get_storage
 
 try:
@@ -57,15 +58,18 @@ urls = [('GET', _url('/_API_/_USERNAME_/info/collections'),
         ('DELETE', _url('/_API_/_USERNAME_/storage/_COLLECTION_/_ITEM_'),
          'storage', 'delete_item', _EXTRAS),
         ('DELETE', _url('/_API_/_USERNAME_/storage'), 'storage',
-         'delete_storage', _EXTRAS)]
+         'delete_storage', _EXTRAS),
+        ('GET', _url('/_API_/token'), 'token', 'get_token', {})]
 
-controllers = {'storage': StorageController}
+
+controllers = {'storage': StorageController, 'token': TokenController}
 
 
 class StorageServerApp(SyncServerApp):
     """Storage application"""
     def __init__(self, urls, controllers, config=None,
-                 auth_class=Authentication):
+                 auth_class=WhoAuthentication):
+        self._configure_whoauth(config)
         super(StorageServerApp, self).__init__(urls, controllers, config,
                                                auth_class)
         self.config = config
@@ -135,6 +139,45 @@ class StorageServerApp(SyncServerApp):
             res.append('- sqluri: %s' % storage.sqluri)
         return res
 
+    def _configure_whoauth(self, config):
+        """Add config settings to use auth using vepauth and basicauth.
+
+        This is a temporary hack to get the new auth mechanism up and running.
+        It will go away once we migrate to pyrmiad/cornice/mozsvc, but is here
+        for now so that we can test the new auth flow.
+
+        If you want to customize the authentication, you can add items to
+        the [who.plugin.vepauth] section in the config file.  This method
+        will not override anything you've set in the deployment config.
+        """
+        # Make sure there's a usable config for the "vepauth" plugin.
+        VEPAUTH_DEFAULTS = {
+            "use": "repoze.who.plugins.vepauth:make_plugin",
+            "audiences": "",
+            "token_url": "/1.1/token",
+            "token_manager": "syncstorage.tokens:ServicesTokenManager",
+        }
+        for key, value in VEPAUTH_DEFAULTS.iteritems():
+            config.setdefault("who.plugin.vepauth." + key, value)
+        # Make sure there's a usable config for the "basicauth" plugin.
+        BASICAUTH_DEFAULTS = {
+            "use": "repoze.who.plugins.basicauth:make_plugin",
+            "realm": "Sync",
+        }
+        for key, value in BASICAUTH_DEFAULTS.iteritems():
+            config.setdefault("who.plugin.basicauth." + key, value)
+        # Make sure there's a usable config for the "testauth" plugin.
+        TESTAUTH_DEFAULTS = {
+            "use": "syncstorage.tokens:TestingAuthenticator",
+        }
+        for key, value in TESTAUTH_DEFAULTS.iteritems():
+            config.setdefault("who.plugin.testauth." + key, value)
+        # Set vepauth + basicauth as the default identifier, authenticator
+        # and challenger combo.
+        config.setdefault("who.identifiers.plugins", "vepauth basicauth")
+        config.setdefault("who.authenticators.plugins", "vepauth testauth")
+        config.setdefault("who.challengers.plugins", "vepauth basicauth")
+
 
 make_app = set_app(urls, controllers, klass=StorageServerApp,
-                   auth_class=Authentication)
+                   auth_class=WhoAuthentication)

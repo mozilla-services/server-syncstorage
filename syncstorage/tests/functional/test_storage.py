@@ -5,7 +5,6 @@
 Basic tests to verify that the dispatching mechanism works.
 """
 import os
-import base64
 import time
 import struct
 import random
@@ -15,6 +14,9 @@ from decimal import Decimal
 from tempfile import mkstemp
 
 from syncstorage.tests.functional import support
+
+import vep
+from repoze.who.plugins.vepauth.utils import sign_request
 
 from services.respcodes import WEAVE_OVER_QUOTA, WEAVE_INVALID_WBO
 from services.tests.support import get_app
@@ -33,11 +35,21 @@ class TestStorage(support.TestWsgiApp):
 
     def setUp(self):
         super(TestStorage, self).setUp()
-        # user auth token
-        token = base64.encodestring('%s:%s' % (self.user_name, self.password))
-        environ = {'HTTP_AUTHORIZATION': 'Basic %s' % token}
-        self.app.extra_environ = environ
-        self.root = '/1.0/%s' % self.user_name
+
+        # Exchange a BID assertion for an auth token.
+        assertion = vep.DummyVerifier.make_assertion(self.user_email,
+                                                     "http://localhost")
+        headers = {"Authorization": "Browser-ID " + assertion}
+        credentials = self.app.get("/1.1/token", headers=headers).json
+
+        # Monkey-patch the app to sign all requests with that token.
+        def new_do_request(req, *args, **kwds):
+            sign_request(req, credentials["id"], credentials["key"])
+            return orig_do_request(req, *args, **kwds)
+        orig_do_request = self.app.do_request
+        self.app.do_request = new_do_request
+
+        self.root = '/1.1/%s' % self.user_name
 
         # let's create some collections for our tests
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):

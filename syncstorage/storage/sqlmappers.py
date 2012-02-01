@@ -3,7 +3,6 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 """ SQL Mappers
 """
-from services.auth.sqlmappers import users
 
 from sqlalchemy.ext.declarative import declarative_base, Column
 from sqlalchemy import Integer, String, Text, BigInteger
@@ -12,10 +11,6 @@ from sqlalchemy import Integer, String, Text, BigInteger
 _Base = declarative_base()
 tables = []
 MAX_TTL = 2100000000
-
-# This is the table containing user data, which we import directly
-# from the core authentication routines.
-tables.append(users)
 
 
 class Collections(_Base):

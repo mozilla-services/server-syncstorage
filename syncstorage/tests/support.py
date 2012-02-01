@@ -4,12 +4,11 @@
 import os
 
 from syncstorage.storage import SyncStorage
-from services.auth import ServicesAuth
 from services.tests.support import TestEnv
 
 
 def initenv(config=None):
-    """Reads the config file and instantiates an auth and a storage.
+    """Reads the config file and instantiates a storage.
     """
     # pre-registering plugins
     from syncstorage.storage.sql import SQLStorage
@@ -20,17 +19,7 @@ def initenv(config=None):
     except ImportError:
         pass
 
-    from services.auth.sql import SQLAuth
-    ServicesAuth.register(SQLAuth)
-    try:
-        from services.auth.ldapsql import LDAPAuth
-        ServicesAuth.register(LDAPAuth)
-    except ImportError:
-        pass
-    from services.auth.dummy import DummyAuth
-    ServicesAuth.register(DummyAuth)
-
     mydir = os.path.dirname(__file__)
     testenv = TestEnv(ini_path=config, ini_dir=mydir,
-                      load_sections=['auth', 'storage'])
-    return testenv.ini_dir, testenv.config, testenv.storage, testenv.auth
+                      load_sections=['storage'])
+    return testenv.ini_dir, testenv.config, testenv.storage

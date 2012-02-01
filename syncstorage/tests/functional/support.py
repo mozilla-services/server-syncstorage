@@ -11,29 +11,27 @@ from webtest import TestApp
 
 from syncstorage.tests.support import initenv
 from syncstorage.wsgiapp import make_app
+from syncstorage.tokens import ServicesTokenManager
 
 
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
         # loading the app
-        self.appdir, self.config, self.storage, self.auth = initenv()
+        self.appdir, self.config, self.storage = initenv()
         # we don't support other storages for this test
         assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
         self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         self.app = TestApp(make_app(self.config))
 
         # adding a user if needed
-        self.user_name = 'test_user_%d' % random.randint(1, 100000)
-        self.password = 'x' * 9
-        self.auth.create_user(self.user_name, self.password,
-                              'tarek@mozilla.com')
-        self.user_id = self.auth.get_user_id(self.user_name)
+        self.user_email = "test_%d@example.com" % random.randint(1, 100000)
+        user = ServicesTokenManager.get_user_data(self.user_email)
+        self.user_name = user["username"]
+        self.user_id = user["userid"]
 
     def tearDown(self):
         self.storage.delete_storage(self.user_id)
-        if not self.auth.delete_user(self.user_id, self.password):
-            raise ValueError('Could not remove user "%s"' % self.user_name)
 
         cef_logs = os.path.join(self.appdir, 'test_cef.log')
         if os.path.exists(cef_logs):
@@ -42,6 +40,5 @@ class TestWsgiApp(unittest.TestCase):
         if os.path.exists(self.sqlfile):
             os.remove(self.sqlfile)
         else:
-            self.auth._engine.execute('truncate users')
-            self.auth._engine.execute('truncate collections')
-            self.auth._engine.execute('truncate wbo')
+            self.storage._engine.execute('truncate collections')
+            self.storage._engine.execute('truncate wbo')

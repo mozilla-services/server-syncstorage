@@ -12,18 +12,6 @@ class IAmAValidStorage(object):
         """Returns the name of the storage"""
         return 'valid'
 
-    def user_exists(self, user_name):
-        ''
-
-    def set_user(self, user_email, **values):
-        ''
-
-    def get_user(self, user_name, fields=None):
-        ''
-
-    def delete_user(self, user_name):
-        ''
-
     def delete_collection(self, user_name, collection_name):
         ''
 
