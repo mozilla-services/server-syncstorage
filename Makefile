@@ -41,7 +41,7 @@ endif
 
 INSTALL += $(INSTALLOPTIONS)
 
-.PHONY: all build test build_rpms mach update
+.PHONY: all build test cover build_rpms mach update
 
 all:	build
 
@@ -49,6 +49,7 @@ build:
 	$(VIRTUALENV) --no-site-packages --distribute .
 	$(INSTALL) MoPyTools
 	$(INSTALL) nose
+	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
 
@@ -57,6 +58,9 @@ update:
 
 test:
 	$(NOSE) $(TESTS)
+
+cover:
+	$(NOSE) --with-coverage --cover-html --cover-package=syncstorage $(TESTS)
 
 build_rpms:
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)

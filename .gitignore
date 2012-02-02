@@ -18,3 +18,4 @@ _build.py.bak*
 test
 nosetests.xml
 build
+cover

@@ -7,5 +7,7 @@ SyncStorage.egg-info
 swp$
 html
 doc/build
+cover
+nosetests.xml
 \.coverage
 \.git
