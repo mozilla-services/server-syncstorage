@@ -41,8 +41,6 @@ class _BSOBase(object):
     userid = Column(Integer(11), primary_key=True, nullable=False)
     collection = Column(Integer(6), primary_key=True, nullable=False,
                         default=0)
-    parentid = Column(String(64))
-    predecessorid = Column(String(64))
     sortindex = Column(Integer(11))
     modified = Column(BigInteger(20))
     payload = Column(Text)

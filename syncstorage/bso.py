@@ -4,8 +4,7 @@
 """ BSO object -- used for (de)serialization
 """
 
-_FIELDS = set(('id', 'collection', 'parentid',
-               'predecessorid', 'sortindex', 'modified',
+_FIELDS = set(('id', 'collection', 'sortindex', 'modified',
                'payload', 'payload_size', 'ttl'))
 
 MAX_TTL = 31536000
@@ -48,7 +47,7 @@ class BSO(dict):
         """Validates the values the BSO has."""
 
         # Check that refs to other BSOs are well-formed.
-        for field in ('parentid', 'id', 'predecessorid'):
+        for field in ('id',):
             if field not in self:
                 continue
             value = str(self[field])

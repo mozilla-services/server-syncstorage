@@ -648,8 +648,8 @@ class SQLStorage(object):
 
         # XXX See if SQLAlchemy knows how to do batch inserts
         # that's quite specific to mysql
-        fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
-                  'payload', 'payload_size', 'ttl')
+        fields = ('id', 'sortindex', 'modified', 'payload',
+                  'payload_size', 'ttl')
 
         table = self._get_bso_table_name(user_id)
         query = 'insert into %s (userid, collection, %s) values ' \
@@ -691,9 +691,7 @@ class SQLStorage(object):
         query += ','.join(lines)
 
         # allowing updates as well
-        query += (' on duplicate key update parentid = values(parentid),'
-                  'predecessorid = values(predecessorid),'
-                  'sortindex = values(sortindex),'
+        query += (' on duplicate key update sortindex = values(sortindex),'
                   'modified = values(modified), payload = values(payload),'
                   'payload_size = values(payload_size),'
                   'ttl = values(ttl)')

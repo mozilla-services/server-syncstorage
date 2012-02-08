@@ -100,7 +100,7 @@ class TestStorage(support.TestWsgiApp):
 
         # 2. add a new collection + stuff
         self.storage.set_collection(self.user_id, 'xxxx')
-        bso = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
+        bso = {'id': '125', 'payload': _PLD}
         self.app.put_json(self.root + '/storage/xxxx/125', bso)
 
         # 3. get collection info again, should find the new ones
@@ -125,35 +125,6 @@ class TestStorage(support.TestWsgiApp):
         res = res.json
         res.sort()
         self.assertEquals(res, ['1', '3'])
-
-        # "predecessorid"
-        # Returns the ids for objects in the collection that
-        # are directly preceded by the id given. Usually only returns one
-        # result.
-        bso1 = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
-        bsos = [bso1]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-        #self.storage.set_item(self.user_id, 'col2', '125',
-        #                      predecessorid='XXXX')
-        res = self.app.get(self.root + '/storage/col2?predecessorid=XXXX')
-        res = res.json
-        self.assertEquals(res, ['125'])
-
-        # "parentid"
-        # Returns the ids for objects in the collection that are the children
-        # of the parent id given.
-        bso1 = {'id': '126', 'payload': 'x', 'parentid': 'papa'}
-        bso2 = {'id': '127', 'payload': 'x', 'parentid': 'papa'}
-        bsos = [bso1, bso2]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-        #self.storage.set_item(self.user_id, 'col2', '126', parentid='papa',
-        #                      payload='x')
-        #self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
-        #                      payload='x')
-        res = self.app.get(self.root + '/storage/col2?parentid=papa')
-        res = res.json
-        res.sort()
-        self.assertEquals(res, ['126', '127'])
 
         # "older"
         # Returns only ids for objects in the collection that have been last
@@ -435,31 +406,19 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
-        # "parentid"
-        # Only deletes objects in the collection that are the
-        # children of the parent id given.
-        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
-        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
-        bsos = [bso1, bso2, bso3]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-        self.app.delete(self.root + '/storage/col2?parentid=1')
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 1)
-
         # "older"
         # Only deletes objects in the collection that have been last
         # modified before the date given
         self.app.delete(self.root + '/storage/col2')
-        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
         time.sleep(.1)
         now = time.time()
         time.sleep(.1)
-        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
+        bso3 = {'id': 14, 'payload': _PLD}
         bsos = [bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
@@ -471,14 +430,14 @@ class TestStorage(support.TestWsgiApp):
         # Only deletes objects in the collection that have been last modified
         # since the date given.
         self.app.delete(self.root + '/storage/col2')
-        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
         now = time.time()
         time.sleep(.3)
-        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
+        bso3 = {'id': 14, 'payload': _PLD}
         bsos = [bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
 

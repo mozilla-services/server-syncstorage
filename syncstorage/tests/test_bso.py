@@ -14,41 +14,40 @@ class TestBSO(unittest.TestCase):
         self.assertTrue('boooo' not in bso)
 
     def test_validation(self):
-        data = {'parentid': 'bigid' * 30}
+        data = {'id': 'bigid' * 30}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
 
-        data = {'parentid': 'id', 'sortindex': 9999999999}
+        data = {'sortindex': 9999999999}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
 
-        data = {'parentid': 'id', 'sortindex': '9999.1'}
+        data = {'sortindex': '9999.1'}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertTrue(result)
         self.assertTrue(bso['sortindex'], 9999)
 
-        data = {'parentid': 'id', 'sortindex': 'ok'}
+        data = {'sortindex': 'ok'}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
 
-        data = {'parentid':  33, 'sortindex': '12'}
+        data = {'sortindex': '12'}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertTrue(result)
-        self.assertEquals(bso['parentid'], '33')
         self.assertEquals(bso['sortindex'], 12)
 
         for bad_ttl in ('bouh', -1, 31537000):
-            data = {'parentid':  33, 'ttl': bad_ttl}
+            data = {'ttl': bad_ttl}
             bso = BSO(data)
             result, failure = bso.validate()
             self.assertFalse(result)
 
-        data = {'parentid':  33, 'ttl': 3600}
+        data = {'ttl': 3600}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertTrue(result)

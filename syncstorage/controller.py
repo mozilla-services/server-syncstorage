@@ -23,8 +23,8 @@ from syncstorage.bso import BSO
 from syncstorage.storage import get_storage
 
 
-_BSO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
-               'payload']
+_BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
+
 _ONE_MEG = 1024
 
 
@@ -162,12 +162,6 @@ class StorageController(object):
 
         if offset is not None and limit is not None:
             args['offset'] = offset
-
-        for arg in ('predecessorid', 'parentid'):
-            value = kw.get(arg)
-            if value is None:
-                continue
-            filters[arg] = '=', value
 
         # XXX should we control id lengths ?
         for arg in ('ids',):
