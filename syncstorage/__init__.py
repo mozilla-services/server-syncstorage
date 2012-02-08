@@ -19,7 +19,7 @@ def includeme(config):
     VEPAUTH_DEFAULTS = {
         "use": "repoze.who.plugins.vepauth:make_plugin",
         "audiences": "",
-        "token_url": "/1.1/token",
+        "token_url": "/2.0/token",
         "token_manager": "syncstorage.tokens:ServicesTokenManager",
     }
     for key, value in VEPAUTH_DEFAULTS.iteritems():

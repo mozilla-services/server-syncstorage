@@ -42,7 +42,7 @@ class TestStorage(support.TestWsgiApp):
         assertion = vep.DummyVerifier.make_assertion(self.user_email,
                                                      "http://localhost")
         headers = {"Authorization": "Browser-ID " + assertion}
-        credentials = self.app.get("/1.1/token", headers=headers).json
+        credentials = self.app.get("/2.0/token", headers=headers).json
 
         # Monkey-patch the app to sign all requests with that token.
         def new_do_request(req, *args, **kwds):
@@ -51,7 +51,7 @@ class TestStorage(support.TestWsgiApp):
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request
 
-        self.root = '/1.1/%s' % self.user_name
+        self.root = '/2.0/%s' % self.user_name
 
         # let's create some collections for our tests
         self.storage = get_storage(make_request(self.config))

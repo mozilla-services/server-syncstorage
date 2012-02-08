@@ -71,7 +71,7 @@ class SyncStorageService(Service):
         path = path.replace("{collection}", "{collection:[a-zA-Z0-9._-]+}")
         path = path.replace("{item}", "{item:[a-zA-Z0-9._-]+}")
         # Add path prefix for the API version number and username.
-        path = "/{api:1|1.0|1.1}/{username:[a-zA-Z0-9]+}" + path
+        path = "/{api:2.0}/{username:[a-zA-Z0-9]+}" + path
         return path
 
 

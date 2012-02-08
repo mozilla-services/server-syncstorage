@@ -4,7 +4,7 @@
 """
 Storage controller. Implements all info, user APIs from:
 
-https://wiki.mozilla.org/Labs/Weave/Sync/1.0/API
+http://docs.services.mozilla.com/storage/apis-2.0.html
 
 """
 import simplejson as json
