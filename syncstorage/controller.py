@@ -298,8 +298,15 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
+        # TODO: it would be lovely to support streaming uploads here...
+        content_type = request.content_type
         try:
-            bsos = json.loads(request.body)
+            if content_type in ("application/json", None):
+                bsos = json.loads(request.body)
+            elif content_type == "application/newlines":
+                bsos = [json.loads(ln) for ln in request.body.split("\n")]
+            else:
+                raise HTTPBadRequest("Unknown content-type: %r" % content_type)
         except ValueError:
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 

@@ -360,6 +360,27 @@ class TestStorage(support.TestWsgiApp):
         self.app.post_json(self.root + '/storage/col2', bsos)
         self.app.get(self.root + '/storage/col2/two', status=404)
 
+    def test_set_collection_input_formats(self):
+        self.storage.delete_collection(self.user_id, "col2")
+        # If we send with application/newlines it should work.
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        body = "\n".join(json.dumps(bso) for bso in bsos)
+        self.app.post(self.root + '/storage/col2', body, headers={
+            "Content-Type": "application/newlines"
+        })
+        items = self.storage.get_items(self.user_id, "col2")
+        self.assertEquals(len(items), 2)
+        # If we send an unknown content type, we get an error.
+        self.storage.delete_collection(self.user_id, "col2")
+        body = json.dumps(bsos)
+        self.app.post(self.root + '/storage/col2', body, headers={
+            "Content-Type": "application/octet-stream"
+        }, status=400)
+        items = self.storage.get_items(self.user_id, "col2")
+        self.assertEquals(len(items), 0)
+
     def test_collection_usage(self):
         self.storage.delete_storage(self.user_id)
 
