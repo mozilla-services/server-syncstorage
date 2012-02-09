@@ -181,7 +181,7 @@ class CacheManager(object):
                 return True
             return False
 
-    def delete_tabs(self, user_id, filters=None):
+    def delete_tabs(self, user_id, item_ids=None):
         def _filter(tabs, filters, field, to_keep):
             operator, stamp = filters[field]
             if operator == '>':
@@ -201,18 +201,10 @@ class CacheManager(object):
                 # memcached down ?
                 tabs = {}
 
-            if filters is not None:
-                if 'id' in filters:
-                    operator, ids = filters['id']
-                    if operator == 'in':
-                        for tab_id in list(tabs.keys()):
-                            if tab_id not in ids:
-                                kept[tab_id] = tabs[tab_id]
-                if 'modified' in filters:
-                    _filter(tabs, filters, 'modified', kept)
-                if 'sortindex' in filters:
-                    _filter(tabs, filters, 'sortindex', kept)
-
+            if item_ids is not None:
+                for tab_id in list(tabs.keys()):
+                    if tab_id not in item_ids:
+                        kept[tab_id] = tabs[tab_id]
             self.set(key, kept)
             return len(kept) < len(tabs)
 

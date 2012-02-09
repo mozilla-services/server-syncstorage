@@ -684,7 +684,6 @@ class SQLStorage(object):
         return res.rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
-                     filters=None, limit=None, offset=None, sort=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
@@ -696,38 +695,8 @@ class SQLStorage(object):
         if item_ids is not None:
             where.append(bso.c.id.in_(item_ids))
 
-        if filters is not None:
-            for field, value in filters.items():
-                field = getattr(bso.c, field)
-
-                operator, value = value
-                if isinstance(value, (list, tuple)):
-                    where.append(field.in_(value))
-                else:
-                    if operator == '=':
-                        where.append(field == value)
-                    elif operator == '<':
-                        where.append(field < value)
-                    elif operator == '>':
-                        where.append(field > value)
-
         where = and_(*where)
         query = query.where(where)
-
-        if self.engine_name != 'sqlite':
-            if sort is not None:
-                if sort == 'oldest':
-                    query = query.order_by(bso.c.modified.asc())
-                elif sort == 'newest':
-                    query = query.order_by(bso.c.modified.desc())
-                else:
-                    query = query.order_by(bso.c.sortindex.desc())
-
-            if limit is not None and int(limit) > 0:
-                query = query.limit(int(limit))
-
-            if offset is not None and int(offset) > 0:
-                query = query.offset(int(offset))
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount

@@ -391,9 +391,6 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
-        # now trying deletion with filters
-
-        # "ids"
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
         self.app.post_json(self.root + '/storage/col2', bsos)
@@ -405,86 +402,6 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage/col2?ids=13')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
-
-        # "older"
-        # Only deletes objects in the collection that have been last
-        # modified before the date given
-        self.app.delete(self.root + '/storage/col2')
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
-        bsos = [bso1, bso2]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-
-        time.sleep(.1)
-        now = get_timestamp()
-        time.sleep(.1)
-        bso3 = {'id': 14, 'payload': _PLD}
-        bsos = [bso3]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-
-        self.app.delete(self.root + '/storage/col2?older=%d' % now)
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 1)
-
-        # "newer"
-        # Only deletes objects in the collection that have been last modified
-        # since the date given.
-        self.app.delete(self.root + '/storage/col2')
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
-        bsos = [bso1, bso2]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-
-        now = get_timestamp()
-        time.sleep(.3)
-        bso3 = {'id': 14, 'payload': _PLD}
-        bsos = [bso3]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-
-        self.app.delete(self.root + '/storage/col2?newer=%d' % now)
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 2)
-
-        # "index_above"
-        # Only delete objects with a higher sortindex than the value
-        # specified
-        self.app.delete(self.root + '/storage/col2')
-        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
-        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
-        res = self.app.delete(self.root + '/storage/col2?index_above=10')
-        res = self.app.get(self.root + '/storage/col2')
-        res = res.json
-        self.assertEquals(res, ['131'])
-
-        # "index_below"
-        # Only delete objects with a lower sortindex than the value
-        # specified.
-        self.app.delete(self.root + '/storage/col2')
-        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
-        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
-        res = self.app.delete(self.root + '/storage/col2?index_below=10')
-        res = self.app.get(self.root + '/storage/col2')
-        res = res.json
-        self.assertEquals(res, ['130'])
-
-        # "limit"
-        # Sets the maximum number of objects that will be deleted.
-        # xxx see how to activate this under sqlite
-
-        #self.app.delete(self.root + '/storage/col2')
-        #bsos = [bso1, bso2, bso3]
-        #self.app.post_json(self.root + '/storage/col2', bsos)
-        #self.app.delete(self.root + '/storage/col2?limit=2')
-        #res = self.app.get(self.root + '/storage/col2')
-        #self.assertEquals(len(res.json), 1)
-
-        # "sort"
-        #   'oldest' - Orders by modification date (oldest first)
-        #   'newest' - Orders by modification date (newest first)
-        #   'index' - Orders by the sortindex (ordered lists)
-
-        # sort is used only if limit is used.
-        # check this with toby
 
     def test_delete_item(self):
         self.storage.delete_items(self.user_id, 'col2')

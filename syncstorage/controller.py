@@ -386,18 +386,16 @@ class StorageController(object):
         Additional request parameters may modify the selection of which
         items to delete.
         """
-        kw = self._convert_args(kw)
+        ids = kw.get("ids")
+        if ids is not None:
+            ids = ids.split(",")
         collection_name = request.matchdict['collection']
         user_id = request.user['userid']
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
         self._get_storage(request).delete_items(user_id,
-                                        collection_name,
-                                        kw.get('ids'), kw['filters'],
-                                        limit=kw.get('limit'),
-                                        offset=kw.get('offset'),
-                                        sort=kw.get('sort'),
+                                        collection_name, ids,
                                         storage_time=request.server_time)
 
         return request.server_time

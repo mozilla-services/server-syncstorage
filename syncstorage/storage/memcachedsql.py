@@ -238,7 +238,6 @@ class MemcachedSQLStorage(SQLStorage):
         return res
 
     def delete_items(self, user_id, collection_name, item_ids=None,
-                     filters=None, limit=None, offset=None, sort=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         # delete the cached size
@@ -251,14 +250,13 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.delete(key)
         elif collection_name == 'tabs':
             # tabs are not stored at all in SQL
-            if self.cache.delete_tabs(user_id, filters):
+            if self.cache.delete_tabs(user_id, item_ids):
                 self._update_stamp(user_id, 'tabs', storage_time)
                 return True
             return False
 
         res = self.sqlstorage.delete_items(user_id, collection_name,
-                                           item_ids, filters,
-                                           limit, offset, sort)
+                                           item_ids, storage_time)
         if res:
             self._update_stamp(user_id, collection_name, storage_time)
         return res
