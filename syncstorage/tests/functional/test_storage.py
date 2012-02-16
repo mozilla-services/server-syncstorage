@@ -2,7 +2,16 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-Basic tests to verify that the dispatching mechanism works.
+Functional tests for the SyncStorage server protocol.
+
+This file runs tests to ensure the correct operation of the server
+as specified in:
+
+    http://docs.services.mozilla.com/storage/apis-2.0.html
+
+If there's an aspect of that spec that's not covered by a test in this file,
+consider it a bug.
+
 """
 import os
 import time
@@ -779,12 +788,7 @@ class TestStorage(support.TestWsgiApp):
                     self.config.registry[key] = self.storage
             os.remove(dbfile)
 
-    def test_batch_size(self):
-        # check that the batch size is correctly set
-        size = self.config.registry["syncstorage.controller"].batch_size
-        self.assertEqual(size, 25)
-
-    def test_handling_of_invalid_json(self):
+    def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.
         # It should fail with ERROR_INVALID_OBJECT
         bso = "notabso"
@@ -814,3 +818,55 @@ class TestStorage(support.TestWsgiApp):
         res = res.json
         self.assertEquals(len(res['success']), 1)
         self.assertEquals(len(res['failed']), 1)
+
+    def test_handling_of_invalid_bso_fields(self):
+        coll_url = self.root + "/storage/col2"
+        # Invalid ID - unacceptable characters.
+        bso = {"id": "A,B", "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        # Invalid ID - empty string is not acceptable.
+        bso = {"id": "", "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        # Invalid ID - too long
+        bso = {"id": "X" * 65, "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid sortindex - not an integer
+        bso = {"id": "TEST", "payload": "testing", "sortindex": "meh"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid sortindex - not an integer
+        bso = {"id": "TEST", "payload": "testing", "sortindex": "2.6"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid sortindex - larger than max value
+        bso = {"id": "TEST", "payload": "testing", "sortindex": "1" + "0" * 9}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid payload - not a string
+        bso = {"id": "TEST", "payload": 42}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid ttl - not an integer
+        bso = {"id": "TEST", "payload": "testing", "ttl": "eh?"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Invalid ttl - not an integer
+        bso = {"id": "TEST", "payload": "testing", "ttl": "4.2"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)

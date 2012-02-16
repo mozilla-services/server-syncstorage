@@ -17,6 +17,11 @@ class TestWSGIApp(unittest.TestCase):
     def _make_request(self, *args, **kwds):
         return make_request(self.config, *args, **kwds)
 
+    def test_batch_size(self):
+        # check that the batch size is correctly set
+        size = self.config.registry["syncstorage.controller"].batch_size
+        self.assertEqual(size, 25)
+
     def test_host_specific_config(self):
         req = self._make_request(environ={"HTTP_HOST": "localhost"})
         self.assertEquals(get_storage(req).sqluri,

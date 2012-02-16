@@ -4,6 +4,8 @@
 """ BSO object -- used for (de)serialization
 """
 
+import re
+
 _FIELDS = set(('id', 'collection', 'sortindex', 'modified',
                'payload', 'payload_size', 'ttl'))
 
@@ -12,6 +14,7 @@ MAX_ID_SIZE = 64
 MAX_PAYLOAD_SIZE = 256 * 1024
 MAX_SORTINDEX_VALUE = 999999999
 MIN_SORTINDEX_VALUE = -999999999
+VALID_ID_REGEX = re.compile("^[a-zA-Z0-9._-]+$")
 
 
 class BSO(dict):
@@ -46,12 +49,14 @@ class BSO(dict):
     def validate(self):
         """Validates the values the BSO has."""
 
-        # Check that refs to other BSOs are well-formed.
+        # Check that id fields are well-formed.
         for field in ('id',):
             if field not in self:
                 continue
             value = str(self[field])
             if len(value) > MAX_ID_SIZE:
+                return False, 'invalid %s' % field
+            if not VALID_ID_REGEX.match(value):
                 return False, 'invalid %s' % field
             self[field] = value
 
@@ -74,13 +79,7 @@ class BSO(dict):
             try:
                 self[field] = int(self[field])
             except ValueError:
-                try:
-                    new = float(self[field])
-                except ValueError:
-                    return False, 'invalid %s' % field
-
-                self[field] = int(new)
-
+                return False, 'invalid %s' % field
             if self[field] > MAX_SORTINDEX_VALUE:
                 return False, 'invalid %s' % field
             if self[field] < MIN_SORTINDEX_VALUE:
