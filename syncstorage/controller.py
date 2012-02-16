@@ -12,7 +12,8 @@ import itertools
 
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
-                                    HTTPPreconditionFailed)
+                                    HTTPPreconditionFailed,
+                                    HTTPNoContent)
 
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_INVALID_WRITE, ERROR_OVER_QUOTA)
@@ -269,10 +270,12 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
-        res = storage.set_item(user_id, collection_name, item_id, **bso)
+        storage.set_item(user_id, collection_name, item_id, **bso)
+
+        response = HTTPNoContent()
         if storage.use_quota and left <= _ONE_MEG:
-            request.response.headers['X-Quota-Remaining'] = str(left)
-        return res
+            response.headers['X-Quota-Remaining'] = str(left)
+        return response
 
     def delete_item(self, request):
         """Deletes a single BSO object."""
@@ -287,7 +290,7 @@ class StorageController(object):
                                               item_id,
                                               storage_time=request.server_time)
 
-        return request.server_time
+        return HTTPNoContent()
 
     def set_collection(self, request):
         """Sets a batch of BSO objects into a collection."""
@@ -404,7 +407,7 @@ class StorageController(object):
                                         collection_name, ids,
                                         storage_time=request.server_time)
 
-        return request.server_time
+        return HTTPNoContent()
 
     def delete_storage(self, request):
         """Deletes all records for the user.
@@ -416,4 +419,4 @@ class StorageController(object):
             raise HTTPJsonBadRequest(ERROR_INVALID_WRITE)
         user_id = request.user['userid']
         self._get_storage(request).delete_storage(user_id)  # XXX failures ?
-        return request.server_time
+        return HTTPNoContent()

@@ -130,25 +130,19 @@ class TestStorage(support.TestWsgiApp):
         # Returns only ids for objects in the collection that have been last
         # modified before the date given.
 
-        #self.storage.delete_items(self.user_id, 'col2')
         self.app.delete(self.root + '/storage/col2')
 
         bso = {'id': '128', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/128', bso)
-        ts = res.json
+        ts = int(res.headers["X-Timestamp"])
 
-        #ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
-        fts = json.dumps(ts)
         time.sleep(.3)
 
         bso = {'id': '129', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/129', bso)
-        ts2 = res.json
+        ts2 = int(res.headers["X-Timestamp"])
 
-        #ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
-        fts2 = json.dumps(ts2)
-
-        self.assertTrue(fts < fts2)
+        self.assertTrue(ts < ts2)
 
         res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
         res = res.json
@@ -462,9 +456,8 @@ class TestStorage(support.TestWsgiApp):
         # deleting all for real now
         res = self.app.delete(self.root + '/storage/col2',
                               headers=[('X-Confirm-Delete', '1')])
-        res = json.loads(res.body)
         now = get_timestamp()
-        self.assertTrue(abs(now - int(res)) < 200)
+        self.assertTrue(abs(now - int(res.headers["X-Timestamp"])) < 200)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
@@ -492,8 +485,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_ifunmodifiedsince(self):
         bso = {'payload': _PLD}
-        ts = self.app.put_json(self.root + '/storage/col2/12345', bso)
-        ts = json.loads(ts.body) - 1000
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso)
+        ts = int(res.headers["X-Timestamp"]) - 1000
         self.app.put_json(self.root + '/storage/col2/12345', bso,
                      headers=[('X-If-Unmodified-Since', str(ts))],
                      status=412)
