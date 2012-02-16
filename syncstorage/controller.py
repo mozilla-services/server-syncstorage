@@ -107,7 +107,10 @@ class StorageController(object):
             limit = None
         else:
             limit = self._get_storage(request).quota_size
-        return used, limit
+        return {
+            "usage": used,
+            "quota": limit,
+        }
 
     def get_collection_usage(self, request):
         user_id = request.user['userid']

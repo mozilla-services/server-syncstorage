@@ -562,11 +562,11 @@ class TestStorage(support.TestWsgiApp):
 
     def test_quota(self):
         res = self.app.get(self.root + '/info/quota')
-        old_used, quota = res.json
+        old_used = res.json["usage"]
         bso = {'payload': _PLD}
         self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/info/quota')
-        used, quota = res.json
+        used = res.json["usage"]
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
