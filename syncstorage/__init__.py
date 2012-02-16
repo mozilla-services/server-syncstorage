@@ -46,7 +46,6 @@ def includeme(config):
     config.include("mozsvc")
     config.include("mozsvc.user.whoauth")
     # Add in the stuff we define ourselves.
-    config.add_renderer("whoisi", "syncstorage.views:WhoisiRenderer")
     config.add_renderer("newlines", "syncstorage.views:NewlinesRenderer")
     config.include("syncstorage.tweens")
     config.include("syncstorage.storage")

@@ -6,7 +6,6 @@ Basic tests to verify that the dispatching mechanism works.
 """
 import os
 import time
-import struct
 import random
 import string
 import simplejson as json
@@ -261,26 +260,6 @@ class TestStorage(support.TestWsgiApp):
         res = [json.loads(line) for line in res.body.strip().split('\n')]
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
-
-        # application/whoisi
-        res = self.app.get(self.root + '/storage/col2',
-                           headers=[('Accept', 'application/whoisi')])
-        self.assertEquals(res.content_type, 'application/whoisi')
-
-        lines = []
-        pos = 0
-        while pos < len(res.body):
-            # getting the 32bits value
-            size = res.body[pos:pos + 4]
-            size = struct.unpack('!I', size)[0]
-
-            # extracting the line
-            line = res.body[pos + 4:pos + size + 4]
-            lines.append(json.loads(line))
-            pos = pos + size + 4
-
-        lines.sort()
-        self.assertEquals(lines, ['0', '1', '2', '3', '4'])
 
         # unspecified format defaults to json
         res = self.app.get(self.root + '/storage/col2')

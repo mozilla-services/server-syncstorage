@@ -2,32 +2,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import struct
 import simplejson as json
 
 from pyramid.security import Authenticated, Allow
 
 from cornice.service import Service
-
-
-class WhoisiRenderer(object):
-    """Pyramid renderer producing lists in application/whoisi format."""
-
-    def __init__(self, info):
-        pass  # pyramid always calls the factory with a single argument
-
-    def __call__(self, value, system):
-        request = system.get('request')
-        if request is not None:
-            response = request.response
-            if response.content_type == response.default_content_type:
-                response.content_type = "application/whoisi"
-        data = []
-        for line in value:
-            line = json.dumps(line, use_decimal=True)
-            size = struct.pack('!I', len(line))
-            data.append('%s%s' % (size, line))
-        return ''.join(data)
 
 
 class NewlinesRenderer(object):
@@ -127,7 +106,6 @@ def delete_storage(request):
 
 @collection.get(accept="application/json", renderer="simplejson")
 @collection.get(accept="application/newlines", renderer="newlines")
-@collection.get(accept="application/whoisi", renderer="whoisi")
 def get_collection(request):
     return _ctrl(request).get_collection(request, **request.GET)
 
