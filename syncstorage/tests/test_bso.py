@@ -3,70 +3,70 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 import unittest
 
-from syncstorage.wbo import WBO
+from syncstorage.bso import BSO
 
 
-class TestWBO(unittest.TestCase):
+class TestBSO(unittest.TestCase):
 
     def test_basic(self):
-        wbo = WBO()
-        wbo = WBO({'boooo': ''})
-        self.assertTrue('boooo' not in wbo)
+        bso = BSO()
+        bso = BSO({'boooo': ''})
+        self.assertTrue('boooo' not in bso)
 
     def test_validation(self):
         data = {'parentid': 'bigid' * 30}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertFalse(result)
 
         data = {'parentid': 'id', 'sortindex': 9999999999}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertFalse(result)
 
         data = {'parentid': 'id', 'sortindex': '9999.1'}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertTrue(result)
-        self.assertTrue(wbo['sortindex'], 9999)
+        self.assertTrue(bso['sortindex'], 9999)
 
         data = {'parentid': 'id', 'sortindex': 'ok'}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertFalse(result)
 
         data = {'parentid':  33, 'sortindex': '12'}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertTrue(result)
-        self.assertEquals(wbo['parentid'], '33')
-        self.assertEquals(wbo['sortindex'], 12)
+        self.assertEquals(bso['parentid'], '33')
+        self.assertEquals(bso['sortindex'], 12)
 
         for bad_ttl in ('bouh', -1, 31537000):
             data = {'parentid':  33, 'ttl': bad_ttl}
-            wbo = WBO(data)
-            result, failure = wbo.validate()
+            bso = BSO(data)
+            result, failure = bso.validate()
             self.assertFalse(result)
 
         data = {'parentid':  33, 'ttl': 3600}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertTrue(result)
 
         data = {'payload':  "X" * 30000}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertTrue(result)
 
         data = {'payload':  "X" * 300000}
-        wbo = WBO(data)
-        result, failure = wbo.validate()
+        bso = BSO(data)
+        result, failure = bso.validate()
         self.assertFalse(result)
 
 
 def test_suite():
     suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestWBO))
+    suite.addTest(unittest.makeSuite(TestBSO))
     return suite
 
 if __name__ == "__main__":

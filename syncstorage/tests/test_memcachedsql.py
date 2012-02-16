@@ -83,8 +83,8 @@ if MEMCACHED:
             self.assertEquals(res['payload'], _PLD)
 
             # we should find in the cache these items:
-            #   - the "global" wbo for the "meta" collection
-            #   - the size of all wbos
+            #   - the "global" bso for the "meta" collection
+            #   - the size of all bsos
             if self._is_up():
                 meta = self.storage.cache.get('1:meta:global')
                 self.assertEquals(meta['id'], 'global')
@@ -157,7 +157,7 @@ if MEMCACHED:
             if not self._is_up():  # no memcached == no size
                 return
 
-            # storing 2 WBOs
+            # storing 2 BSOs
             self.storage.set_collection(_UID, 'tabs')
             self.storage.set_collection(_UID, 'foo')
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD)

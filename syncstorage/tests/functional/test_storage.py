@@ -22,7 +22,7 @@ import vep
 from repoze.who.plugins.vepauth.utils import sign_request
 
 from mozsvc.exceptions import BackendError
-from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_WBO
+from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_OBJECT
 
 
 _PLD = '*' * 500
@@ -75,7 +75,7 @@ class TestStorage(support.TestWsgiApp):
         res = resp.json
         keys = res.keys()
         self.assertTrue(len(keys), 2)
-        self.assertEquals(int(resp.headers['X-Weave-Records']), len(keys))
+        self.assertEquals(int(resp.headers['X-Num-Records']), len(keys))
 
         # XXX need to test collections timestamps here
 
@@ -86,7 +86,7 @@ class TestStorage(support.TestWsgiApp):
         values = res.values()
         values.sort()
         self.assertEquals(values, [3, 5])
-        self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
+        self.assertEquals(int(resp.headers['X-Num-Records']), 2)
 
     def test_bad_cache(self):
         # fixes #637332
@@ -100,8 +100,8 @@ class TestStorage(support.TestWsgiApp):
 
         # 2. add a new collection + stuff
         self.storage.set_collection(self.user_id, 'xxxx')
-        wbo = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
-        self.app.put_json(self.root + '/storage/xxxx/125', wbo)
+        bso = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
+        self.app.put_json(self.root + '/storage/xxxx/125', bso)
 
         # 3. get collection info again, should find the new ones
         resp = self.app.get(self.root + '/info/collections')
@@ -114,7 +114,7 @@ class TestStorage(support.TestWsgiApp):
         res = resp.json
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
-        self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
+        self.assertEquals(int(resp.headers['X-Num-Records']), 5)
 
         # trying various filters
 
@@ -130,9 +130,9 @@ class TestStorage(support.TestWsgiApp):
         # Returns the ids for objects in the collection that
         # are directly preceded by the id given. Usually only returns one
         # result.
-        wbo1 = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
-        wbos = [wbo1]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
+        bsos = [bso1]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         #self.storage.set_item(self.user_id, 'col2', '125',
         #                      predecessorid='XXXX')
         res = self.app.get(self.root + '/storage/col2?predecessorid=XXXX')
@@ -142,10 +142,10 @@ class TestStorage(support.TestWsgiApp):
         # "parentid"
         # Returns the ids for objects in the collection that are the children
         # of the parent id given.
-        wbo1 = {'id': '126', 'payload': 'x', 'parentid': 'papa'}
-        wbo2 = {'id': '127', 'payload': 'x', 'parentid': 'papa'}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': '126', 'payload': 'x', 'parentid': 'papa'}
+        bso2 = {'id': '127', 'payload': 'x', 'parentid': 'papa'}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         #self.storage.set_item(self.user_id, 'col2', '126', parentid='papa',
         #                      payload='x')
         #self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
@@ -162,16 +162,16 @@ class TestStorage(support.TestWsgiApp):
         #self.storage.delete_items(self.user_id, 'col2')
         self.app.delete(self.root + '/storage/col2')
 
-        wbo = {'id': '128', 'payload': 'x'}
-        res = self.app.put_json(self.root + '/storage/col2/128', wbo)
+        bso = {'id': '128', 'payload': 'x'}
+        res = self.app.put_json(self.root + '/storage/col2/128', bso)
         ts = res.json
 
         #ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
         fts = json.dumps(ts)
         time.sleep(.3)
 
-        wbo = {'id': '129', 'payload': 'x'}
-        res = self.app.put_json(self.root + '/storage/col2/129', wbo)
+        bso = {'id': '129', 'payload': 'x'}
+        res = self.app.put_json(self.root + '/storage/col2/129', bso)
         ts2 = res.json
 
         #ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
@@ -195,7 +195,7 @@ class TestStorage(support.TestWsgiApp):
             pass
 
         # "full"
-        # If defined, returns the full WBO, rather than just the id.
+        # If defined, returns the full BSO, rather than just the id.
         res = self.app.get(self.root + '/storage/col2?full=1')
         res = res.json
         keys = res[0].keys()
@@ -210,10 +210,10 @@ class TestStorage(support.TestWsgiApp):
         # "index_above"
         # If defined, only returns items with a higher sortindex than the
         # value specified.
-        wbo1 = {'id': '130', 'payload': 'x', 'sortindex': 11}
-        wbo2 = {'id': '131', 'payload': 'x', 'sortindex': 9}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': '130', 'payload': 'x', 'sortindex': 11}
+        bso2 = {'id': '131', 'payload': 'x', 'sortindex': 9}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/storage/col2?index_above=10')
         res = res.json
@@ -230,11 +230,11 @@ class TestStorage(support.TestWsgiApp):
         # Sets the maximum number of ids that will be returned
         self.app.delete(self.root + '/storage/col2')
 
-        wbos = []
+        bsos = []
         for i in range(10):
-            wbo = {'id': str(i), 'payload': 'x'}
-            wbos.append(wbo)
-        self.app.post_json(self.root + '/storage/col2', wbos)
+            bso = {'id': str(i), 'payload': 'x'}
+            bsos.append(bso)
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/storage/col2?limit=2')
         res = res.json
@@ -262,8 +262,8 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage/col2')
 
         for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
-            wbo = {'id': index, 'payload': 'x', 'sortindex': sortindex}
-            self.app.post_json(self.root + '/storage/col2', wbo)
+            bso = {'id': index, 'payload': 'x', 'sortindex': sortindex}
+            self.app.post_json(self.root + '/storage/col2', bso)
             time.sleep(0.1)
 
         res = self.app.get(self.root + '/storage/col2?sort=oldest')
@@ -339,25 +339,25 @@ class TestStorage(support.TestWsgiApp):
 
     def test_set_item(self):
         # let's create an object
-        wbo = {'payload': _PLD}
-        self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        bso = {'payload': _PLD}
+        self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/storage/col2/12345')
         res = res.json
         self.assertEquals(res['payload'], _PLD)
 
         # now let's update it
-        wbo = {'payload': 'YYY'}
-        self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        bso = {'payload': 'YYY'}
+        self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/storage/col2/12345')
         res = res.json
         self.assertEquals(res['payload'], 'YYY')
 
     def test_set_collection(self):
-        # sending two wbos
-        wbo1 = {'id': 12, 'payload': _PLD}
-        wbo2 = {'id': 13, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        # sending two bsos
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/12')
@@ -368,10 +368,10 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['payload'], _PLD)
 
         # one more time, with changes
-        wbo1 = {'id': 13, 'payload': 'XyX'}
-        wbo2 = {'id': 14, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 13, 'payload': 'XyX'}
+        bso2 = {'id': 14, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/14')
@@ -381,37 +381,37 @@ class TestStorage(support.TestWsgiApp):
         res = res.json
         self.assertEquals(res['payload'], 'XyX')
 
-        # sending two wbos with one bad sortindex
-        wbo1 = {'id': 'one', 'payload': _PLD}
-        wbo2 = {'id': 'two', 'payload': _PLD,
+        # sending two bsos with one bad sortindex
+        bso1 = {'id': 'one', 'payload': _PLD}
+        bso2 = {'id': 'two', 'payload': _PLD,
                 'sortindex': 'FAIL'}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_collection_usage(self):
         self.storage.delete_storage(self.user_id)
 
-        wbo1 = {'id': 13, 'payload': 'XyX'}
-        wbo2 = {'id': 14, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 13, 'payload': 'XyX'}
+        bso2 = {'id': 14, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/info/collection_usage')
         usage = res.json
         col2_size = usage['col2']
-        wanted = len(wbo1['payload']) + len(wbo2['payload'])
+        wanted = len(bso1['payload']) + len(bso2['payload'])
         self.assertEqual(col2_size, wanted / 1024.)
 
     def test_delete_collection(self):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': _PLD}
-        wbo2 = {'id': 13, 'payload': _PLD}
-        wbo3 = {'id': 14, 'payload': _PLD}
-        wbos = [wbo1, wbo2, wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bso3 = {'id': 14, 'payload': _PLD}
+        bsos = [bso1, bso2, bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
@@ -425,7 +425,7 @@ class TestStorage(support.TestWsgiApp):
         # "ids"
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
         self.app.delete(self.root + '/storage/col2?ids=12,14')
@@ -438,11 +438,11 @@ class TestStorage(support.TestWsgiApp):
         # "parentid"
         # Only deletes objects in the collection that are the
         # children of the parent id given.
-        wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
-        wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
-        wbos = [wbo1, wbo2, wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
+        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
+        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
+        bsos = [bso1, bso2, bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         self.app.delete(self.root + '/storage/col2?parentid=1')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
@@ -451,17 +451,17 @@ class TestStorage(support.TestWsgiApp):
         # Only deletes objects in the collection that have been last
         # modified before the date given
         self.app.delete(self.root + '/storage/col2')
-        wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
+        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         time.sleep(.1)
         now = time.time()
         time.sleep(.1)
-        wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
-        wbos = [wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
+        bsos = [bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         self.app.delete(self.root + '/storage/col2?older=%f' % now)
         res = self.app.get(self.root + '/storage/col2')
@@ -471,16 +471,16 @@ class TestStorage(support.TestWsgiApp):
         # Only deletes objects in the collection that have been last modified
         # since the date given.
         self.app.delete(self.root + '/storage/col2')
-        wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
-        wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
-        wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
+        bso2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
+        bsos = [bso1, bso2]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         now = time.time()
         time.sleep(.3)
-        wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
-        wbos = [wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
+        bsos = [bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
 
         self.app.delete(self.root + '/storage/col2?newer=%f' % now)
         res = self.app.get(self.root + '/storage/col2')
@@ -513,8 +513,8 @@ class TestStorage(support.TestWsgiApp):
         # xxx see how to activate this under sqlite
 
         #self.app.delete(self.root + '/storage/col2')
-        #wbos = [wbo1, wbo2, wbo3]
-        #self.app.post_json(self.root + '/storage/col2', wbos)
+        #bsos = [bso1, bso2, bso3]
+        #self.app.post_json(self.root + '/storage/col2', bsos)
         #self.app.delete(self.root + '/storage/col2?limit=2')
         #res = self.app.get(self.root + '/storage/col2')
         #self.assertEquals(len(res.json), 1)
@@ -531,11 +531,11 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': _PLD}
-        wbo2 = {'id': 13, 'payload': _PLD}
-        wbo3 = {'id': 14, 'payload': _PLD}
-        wbos = [wbo1, wbo2, wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bso3 = {'id': 14, 'payload': _PLD}
+        bsos = [bso1, bso2, bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
@@ -551,11 +551,11 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        wbo1 = {'id': 12, 'payload': _PLD}
-        wbo2 = {'id': 13, 'payload': _PLD}
-        wbo3 = {'id': 14, 'payload': _PLD}
-        wbos = [wbo1, wbo2, wbo3]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bso3 = {'id': 14, 'payload': _PLD}
+        bsos = [bso1, bso2, bso3]
+        self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
@@ -571,75 +571,75 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
-    def test_x_weave_timestamp(self):
+    def test_x_timestamp_header(self):
         now = time.time()
         res = self.app.get(self.root + '/storage/col2')
         self.assertTrue(abs(now -
-                float(res.headers['X-Weave-Timestamp'])) < 0.1)
+                float(res.headers['X-Timestamp'])) < 0.1)
 
         # getting the timestamp with a PUT
-        wbo = {'payload': _PLD}
+        bso = {'payload': _PLD}
         now = time.time()
-        res = self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         self.assertTrue(abs(now -
-                        float(res.headers['X-Weave-Timestamp'])) < 0.2)
+                        float(res.headers['X-Timestamp'])) < 0.2)
 
         # getting the timestamp with a POST
-        wbo1 = {'id': 12, 'payload': _PLD}
-        wbo2 = {'id': 13, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
+        bso1 = {'id': 12, 'payload': _PLD}
+        bso2 = {'id': 13, 'payload': _PLD}
+        bsos = [bso1, bso2]
         now = time.time()
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         self.assertTrue(abs(now -
-                        float(res.headers['X-Weave-Timestamp'])) < 0.2)
+                        float(res.headers['X-Timestamp'])) < 0.2)
 
     def test_ifunmodifiedsince(self):
-        wbo = {'payload': _PLD}
-        ts = self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        bso = {'payload': _PLD}
+        ts = self.app.put_json(self.root + '/storage/col2/12345', bso)
         ts = json.loads(ts.body) - 1000
-        self.app.put_json(self.root + '/storage/col2/12345', wbo,
+        self.app.put_json(self.root + '/storage/col2/12345', bso,
                      headers=[('X-If-Unmodified-Since', str(ts))],
                      status=412)
 
     def test_quota(self):
         res = self.app.get(self.root + '/info/quota')
         old_used, quota = res.json
-        wbo = {'payload': _PLD}
-        self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        bso = {'payload': _PLD}
+        self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/info/quota')
         used, quota = res.json
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
         self.storage.quota_size = 0.1
-        wbo = {'payload': _PLD}
-        res = self.app.put_json(self.root + '/storage/col2/12345', wbo)
-        self.assertEquals(res.headers['X-Weave-Quota-Remaining'], '0.0765625')
+        bso = {'payload': _PLD}
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso)
+        self.assertEquals(res.headers['X-Quota-Remaining'], '0.0765625')
 
         self.storage.quota_size = 0
-        wbo = {'payload': _PLD}
-        res = self.app.put_json(self.root + '/storage/col2/12345', wbo,
+        bso = {'payload': _PLD}
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
         self.assertEquals(res.headers['Content-Type'], 'application/json')
         self.assertEquals(res.json, ERROR_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
         self.app.delete(self.root + '/storage/col2')
-        wbo = {'payload': _PLD, 'ttl': 0}
-        res = self.app.put_json(self.root + '/storage/col2/12345', wbo)
+        bso = {'payload': _PLD, 'ttl': 0}
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         time.sleep(1.1)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.json, [])
 
-        wbo = {'payload': _PLD, 'ttl': 2}
-        res = self.app.put_json(self.root + '/storage/col2/123456', wbo)
+        bso = {'payload': _PLD, 'ttl': 2}
+        res = self.app.put_json(self.root + '/storage/col2/123456', bso)
 
         # it should exists now
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
 
         # trying a second put again
-        self.app.put_json(self.root + '/storage/col2/123456', wbo)
+        self.app.put_json(self.root + '/storage/col2/123456', bso)
 
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
@@ -651,23 +651,23 @@ class TestStorage(support.TestWsgiApp):
         # Test that batch uploads are correctly processed.
         # The test config has max_count=100.
         # Uploading 70 small objects should succeed with 3 database writes.
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        bsos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 70)
         self.assertEquals(len(res['failed']), 0)
         # The test config has max_count=100.
         # Uploading 105 items should produce five failures.
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(105)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        bsos = [{'id': str(i), 'payload': _PLD} for i in range(105)]
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 100)
         self.assertEquals(len(res['failed']), 5)
         # The test config has max_bytes=1M.
         # Uploading 5 210MB items should produce one failure.
-        wbos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
+        bsos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
                 for i in range(5)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 4)
         self.assertEquals(len(res['failed']), 1)
@@ -684,11 +684,11 @@ class TestStorage(support.TestWsgiApp):
             if not cache.set('TEST', 1):
                 return   # memcached server is probably down
 
-            # "backoff:server" will add a X-Weave-Backoff header
+            # "backoff:server" will add a X-Backoff header
             cache.set('backoff:localhost:80', 2)
             try:
                 resp = self.app.get(self.root + '/info/collections')
-                self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
+                self.assertEquals(resp.headers['X-Backoff'], '2')
             finally:
                 cache.delete('backoff:localhost:80')
 
@@ -705,8 +705,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_weird_args(self):
         # pushing some data in col2
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        bsos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
 
         # trying weird args and make sure the server returns 400s
@@ -727,9 +727,9 @@ class TestStorage(support.TestWsgiApp):
 
     def test_guid_deletion(self):
         # pushing some data in col2
-        wbos = [{'id': '{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i,
+        bsos = [{'id': '{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i,
                  'payload': _PLD} for i in range(5)]
-        res = self.app.post_json(self.root + '/storage/passwords', wbos)
+        res = self.app.post_json(self.root + '/storage/passwords', bsos)
         res = res.json
 
         # now deleting some of them
@@ -760,13 +760,13 @@ class TestStorage(support.TestWsgiApp):
 
         # it's up to the client json deserializer to do the right
         # thing then - e.g. like converting it into a decimal 2 digit
-        wbos = json.loads(resp.body, use_decimal=True)
+        bsos = json.loads(resp.body, use_decimal=True)
 
         # check how the timestamps look - we need two digits stuff
         stamps = []
         two_place = Decimal('1.00')
-        for wbo in wbos:
-            stamp = wbo['modified']
+        for bso in bsos:
+            stamp = bso['modified']
             try:
                 self.assertEqual(stamp, stamp.quantize(two_place))
             except:
@@ -796,47 +796,47 @@ class TestStorage(support.TestWsgiApp):
             raise AssertionError(msg)
 
     def test_strict_newer(self):
-        # send two wbos in the 'meh' collection
-        wbo1 = {'id': 1, 'payload': _PLD}
-        wbo2 = {'id': 2, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
-        res = self.app.post_json(self.root + '/storage/meh', wbos)
+        # send two bsos in the 'meh' collection
+        bso1 = {'id': 1, 'payload': _PLD}
+        bso2 = {'id': 2, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        res = self.app.post_json(self.root + '/storage/meh', bsos)
         ts = json.loads(res.body, use_decimal=True)['modified']
 
         # wait a bit
         time.sleep(0.2)
 
-        # send two more wbos
-        wbo3 = {'id': 3, 'payload': _PLD}
-        wbo4 = {'id': 4, 'payload': _PLD}
-        wbos = [wbo3, wbo4]
-        res = self.app.post_json(self.root + '/storage/meh', wbos)
+        # send two more bsos
+        bso3 = {'id': 3, 'payload': _PLD}
+        bso4 = {'id': 4, 'payload': _PLD}
+        bsos = [bso3, bso4]
+        res = self.app.post_json(self.root + '/storage/meh', bsos)
 
-        # asking for wbos using newer=ts where newer is the timestamps
-        # of wbo 1 and 2, should not return them
+        # asking for bsos using newer=ts where newer is the timestamps
+        # of bso 1 and 2, should not return them
         res = self.app.get(self.root + '/storage/meh?newer=%s' % ts)
         res = res.json
         self.assertEquals(res, ['3', '4'])
 
     def test_strict_newer_tabs(self):
-        # send two wbos in the 'tabs' collection
-        wbo1 = {'id': 1, 'payload': _PLD}
-        wbo2 = {'id': 2, 'payload': _PLD}
-        wbos = [wbo1, wbo2]
-        res = self.app.post_json(self.root + '/storage/tabs', wbos)
+        # send two bsos in the 'tabs' collection
+        bso1 = {'id': 1, 'payload': _PLD}
+        bso2 = {'id': 2, 'payload': _PLD}
+        bsos = [bso1, bso2]
+        res = self.app.post_json(self.root + '/storage/tabs', bsos)
         ts = json.loads(res.body, use_decimal=True)['modified']
 
         # wait a bit
         time.sleep(0.2)
 
-        # send two more wbos
-        wbo3 = {'id': 3, 'payload': _PLD}
-        wbo4 = {'id': 4, 'payload': _PLD}
-        wbos = [wbo3, wbo4]
-        self.app.post_json(self.root + '/storage/tabs', wbos)
+        # send two more bsos
+        bso3 = {'id': 3, 'payload': _PLD}
+        bso4 = {'id': 4, 'payload': _PLD}
+        bsos = [bso3, bso4]
+        self.app.post_json(self.root + '/storage/tabs', bsos)
 
-        # asking for wbos using newer=ts where newer is the timestamps
-        # of wbo 1 and 2, should not return them
+        # asking for bsos using newer=ts where newer is the timestamps
+        # of bso 1 and 2, should not return them
         res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
         res = res.json
         self.assertEquals(res, ['3', '4'])
@@ -878,18 +878,18 @@ class TestStorage(support.TestWsgiApp):
                 if key.startswith("syncstorage:storage:"):
                     self.config.registry[key] = storage
 
-            # send two wbos in the 'tabs' collection
-            wbo1 = {'id': 'sure', 'payload': _PLD}
-            wbo2 = {'id': 'thing', 'payload': _PLD}
-            wbos = [wbo1, wbo2]
+            # send two bsos in the 'tabs' collection
+            bso1 = {'id': 'sure', 'payload': _PLD}
+            bso2 = {'id': 'thing', 'payload': _PLD}
+            bsos = [bso1, bso2]
 
             # on batch, we get back a 200 - but only failures
-            res = self.app.post_json(self.root + '/storage/tabs', wbos)
+            res = self.app.post_json(self.root + '/storage/tabs', bsos)
             self.assertEqual(len(res.json['failed']), 2)
             self.assertEqual(len(res.json['success']), 0)
 
             # on single PUT, we get a 503
-            self.app.put_json(self.root + '/storage/tabs/sure', wbo1,
+            self.app.put_json(self.root + '/storage/tabs/sure', bso1,
                          status=503)
         finally:
             for key in self.config.registry:
@@ -903,32 +903,32 @@ class TestStorage(support.TestWsgiApp):
         self.assertEqual(size, 25)
 
     def test_handling_of_invalid_json(self):
-        # Single upload with JSON that's not a WBO.
-        # It should fail with ERROR_INVALID_WBO
-        wbo = "notawbo"
-        res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
+        # Single upload with JSON that's not a BSO.
+        # It should fail with ERROR_INVALID_OBJECT
+        bso = "notabso"
+        res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
-        wbo = 42
-        res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        bso = 42
+        res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
-        wbo = {'id': ["1", "2"], 'payload': {'3': '4'}}
-        res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        bso = {'id': ["1", "2"], 'payload': {'3': '4'}}
+        res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
-        # Batch upload with JSON that's not a list of WBOs
-        # It should fail with ERROR_INVALID_WBO
-        wbos = "notalist"
-        res = self.app.post_json(self.root + '/storage/col2', wbos, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
-        wbos = 42
-        res = self.app.post_json(self.root + '/storage/col2', wbos, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
-        # Batch upload a list with something that's not a WBO
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Batch upload with JSON that's not a list of BSOs
+        # It should fail with ERROR_INVALID_OBJECT
+        bsos = "notalist"
+        res = self.app.post_json(self.root + '/storage/col2', bsos, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        bsos = 42
+        res = self.app.post_json(self.root + '/storage/col2', bsos, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        # Batch upload a list with something that's not a BSO
         # It should process the good entry and fail for the bad.
-        wbos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
+        bsos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 1)
         self.assertEquals(len(res['failed']), 1)

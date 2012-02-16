@@ -48,7 +48,7 @@ class TestWsgiApp(unittest.TestCase):
             storage.delete_storage(self.user_id)
             if "mysql" in storage.sqluri:
                 storage._engine.execute('truncate collections')
-                storage._engine.execute('truncate wbo')
+                storage._engine.execute('truncate bso')
 
         for sqlfile in self.sqlfiles:
             if os.path.exists(sqlfile):

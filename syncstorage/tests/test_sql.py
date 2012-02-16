@@ -8,7 +8,7 @@ import time
 from mozsvc.plugin import load_and_register
 from mozsvc.tests.support import get_test_configurator
 
-from syncstorage.storage.sqlmappers import get_wbo_table_name
+from syncstorage.storage.sqlmappers import get_bso_table_name
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
 SyncStorage.register(SQLStorage)
@@ -56,7 +56,7 @@ class TestSQLStorage(unittest.TestCase):
             if not key.startswith("storage:"):
                 continue
             storage._engine.execute('truncate collections')
-            storage._engine.execute('truncate wbo')
+            storage._engine.execute('truncate bso')
         for sqlfile in self.sqlfiles:
             if os.path.exists(sqlfile):
                 os.remove(sqlfile)
@@ -226,7 +226,7 @@ class TestSQLStorage(unittest.TestCase):
         config = get_test_configurator(__file__, 'tests2.ini')
         storage = load_and_register("storage", config)
 
-        res = storage._engine.execute('select count(*) from wbo1')
+        res = storage._engine.execute('select count(*) from bso1')
         self.assertEqual(res.fetchall()[0][0], 0)
 
         # doing a few things on the DB
@@ -238,9 +238,9 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(len(storage.get_items(_UID, 'col1')), 2)
 
         # now making sure we did that in the right table
-        table = get_wbo_table_name(_UID)
-        self.assertEqual(table, 'wbo1')
-        res = storage._engine.execute('select count(*) from wbo1')
+        table = get_bso_table_name(_UID)
+        self.assertEqual(table, 'bso1')
+        res = storage._engine.execute('select count(*) from bso1')
         self.assertEqual(res.fetchall()[0][0], 2)
 
     def test_nopool(self):

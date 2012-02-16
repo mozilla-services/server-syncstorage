@@ -1,7 +1,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-""" WBO object -- used for (de)serialization
+""" BSO object -- used for (de)serialization
 """
 
 _FIELDS = set(('id', 'username', 'collection', 'parentid',
@@ -15,8 +15,8 @@ MAX_SORTINDEX_VALUE = 999999999
 MIN_SORTINDEX_VALUE = -999999999
 
 
-class WBO(dict):
-    """Holds WBO info"""
+class BSO(dict):
+    """Holds BSO info"""
 
     def __init__(self, data=None, converters=None):
         if data is None:
@@ -27,13 +27,13 @@ class WBO(dict):
         try:
             data_items = data.items()
         except AttributeError:
-            msg = "WBO data must be dict-like, not %s"
+            msg = "BSO data must be dict-like, not %s"
             raise ValueError(msg % (type(data),))
 
         for name, value in data_items:
             if value is not None:
                 if not isinstance(value, (int, long, float, basestring)):
-                    msg = "WBO fields must be scalar values, not %s"
+                    msg = "BSO fields must be scalar values, not %s"
                     raise ValueError(msg % (type(value),))
             if name not in _FIELDS:
                 continue
@@ -45,9 +45,9 @@ class WBO(dict):
             self[name] = value
 
     def validate(self):
-        """Validates the values the WBO has."""
+        """Validates the values the BSO has."""
 
-        # Check that refs to other WBOs are well-formed.
+        # Check that refs to other BSOs are well-formed.
         for field in ('parentid', 'id', 'predecessorid'):
             if field not in self:
                 continue

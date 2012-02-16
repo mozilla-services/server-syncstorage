@@ -6,7 +6,7 @@ Memcached + SQL backend
 
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
-- The meta/global wbo is stored in "user_id"
+- The meta/global bso is stored in "user_id"
 """
 import simplejson as json
 
@@ -17,13 +17,13 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage import logger
 from syncstorage.storage.sql import SQLStorage, _KB
-from syncstorage.storage.sqlmappers import wbo
+from syncstorage.storage.sqlmappers import bso
 from syncstorage.storage.cachemanager import CacheManager
 
 
-_COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
-                           func.count(wbo)],
-            wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
+_COLLECTION_LIST = select([bso.c.collection, func.max(bso.c.modified),
+                           func.count(bso)],
+            bso.c.username == bindparam('user_id')).group_by(bso.c.collection)
 
 
 def _key(*args):
@@ -97,9 +97,9 @@ class MemcachedSQLStorage(SQLStorage):
         # returning cached values when possible
         if self._is_meta_global(collection_name, item_id):
             key = _key(user_id, 'meta', 'global')
-            wbo = self.cache.get(key)
-            if wbo is not None:
-                return wbo['modified']
+            bso = self.cache.get(key)
+            if bso is not None:
+                return bso['modified']
             # going sql..
 
         elif collection_name == 'tabs':

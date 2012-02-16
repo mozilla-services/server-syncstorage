@@ -8,10 +8,10 @@ This module implements an SQL storage plugin for syncserver.  In the simplest
 use case it consists of two database tables:
 
   collections:  the names of per-user custom collections
-  wbo:          the individual WBO items stored in each collection
+  bso:          the individual BSO items stored in each collection
 
 For efficiency when dealing with large datasets, the plugin also supports
-sharding of the WBO items into multiple tables named "wbo0" through "wboN".
+sharding of the BSO items into multiple tables named "bso0" through "bsoN".
 This behaviour is off by default; pass shard=True to enable it.
 
 For details of the database schema, see the file "sqlmappers.py".
@@ -38,13 +38,13 @@ from mozsvc.util import round_time
 from mozsvc.exceptions import BackendError
 
 from syncstorage import logger
-from syncstorage.wbo import WBO
+from syncstorage.bso import BSO
 from syncstorage.storage.queries import get_query
-from syncstorage.storage.sqlmappers import wbo as _wbo
+from syncstorage.storage.sqlmappers import bso as _bso
 from syncstorage.storage.sqlmappers import (tables, collections,
-                                            get_wbo_table_name, MAX_TTL,
-                                            get_wbo_table,
-                                            get_wbo_table_byindex)
+                                            get_bso_table_name, MAX_TTL,
+                                            get_bso_table,
+                                            get_bso_table_byindex)
 
 
 _KB = float(1024)
@@ -183,7 +183,7 @@ class SQLStorage(object):
         * create_tables:         create the database tables if they don't
                                  exist at startup
         * use_quota/quota_size:  limit per-user storage to a specific quota
-        * shard/shardsize:       enable sharding of the WBO table
+        * shard/shardsize:       enable sharding of the BSO table
 
     """
 
@@ -231,14 +231,14 @@ class SQLStorage(object):
         self.shardsize = shardsize
         if self.shard:
             for index in range(shardsize):
-                table = get_wbo_table_byindex(index)
+                table = get_bso_table_byindex(index)
                 table.metadata.bind = self._engine
                 if create_tables:
                     table.create(checkfirst=True)
         else:
-            _wbo.metadata.bind = self._engine
+            _bso.metadata.bind = self._engine
             if create_tables:
-                _wbo.create(checkfirst=True)
+                _bso.create(checkfirst=True)
 
         # A per-user cache for collection metadata.
         # This is to avoid looking up the collection name <=> id mapping
@@ -284,7 +284,7 @@ class SQLStorage(object):
 
     def delete_storage(self, user_id):
         """Removes all user data"""
-        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS'):
+        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_BSOS'):
             query = self._get_query(query, user_id)
             self._safe_execute(query, user_id=user_id)
         # XXX see if we want to check the rowcount
@@ -481,10 +481,10 @@ class SQLStorage(object):
             return None
         return bigint2time(res[0])
 
-    def _get_wbo_table(self, user_id):
+    def _get_bso_table(self, user_id):
         if self.shard:
-            return get_wbo_table(user_id, self.shardsize)
-        return _wbo
+            return get_bso_table(user_id, self.shardsize)
+        return _bso
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
                   limit=None, offset=None, sort=None):
@@ -496,20 +496,20 @@ class SQLStorage(object):
         It can be a single value, or a list. For the latter the in()
         operator is used. For single values, the operator has to be provided.
         """
-        wbo = self._get_wbo_table(user_id)
+        bso = self._get_bso_table(user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
-            fields = [wbo]
+            fields = [bso]
         else:
-            fields = [getattr(wbo.c, field) for field in fields]
+            fields = [getattr(bso.c, field) for field in fields]
 
         # preparing the where statement
-        where = [wbo.c.username == user_id,
-                 wbo.c.collection == collection_id]
+        where = [bso.c.username == user_id,
+                 bso.c.collection == collection_id]
 
         if filters is not None:
             for field, value in filters.items():
-                field = getattr(wbo.c, field)
+                field = getattr(bso.c, field)
 
                 operator, value = value
                 if field.name == 'modified':
@@ -526,18 +526,18 @@ class SQLStorage(object):
                         where.append(field > value)
 
         if filters is None or 'ttl' not in filters:
-            where.append(wbo.c.ttl > _int_now())
+            where.append(bso.c.ttl > _int_now())
 
         where = and_(*where)
         query = select(fields, where)
 
         if sort is not None:
             if sort == 'oldest':
-                query = query.order_by(wbo.c.modified.asc())
+                query = query.order_by(bso.c.modified.asc())
             elif sort == 'newest':
-                query = query.order_by(wbo.c.modified.desc())
+                query = query.order_by(bso.c.modified.desc())
             else:
-                query = query.order_by(wbo.c.sortindex.desc())
+                query = query.order_by(bso.c.sortindex.desc())
 
         if limit is not None and int(limit) > 0:
             query = query.limit(int(limit))
@@ -547,16 +547,16 @@ class SQLStorage(object):
 
         res = self._safe_execute(query)
         converters = {'modified': bigint2time}
-        return [WBO(line, converters) for line in res]
+        return [BSO(line, converters) for line in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
-        wbo = self._get_wbo_table(user_id)
+        bso = self._get_bso_table(user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
         if fields is None:
-            fields = [wbo]
+            fields = [bso]
         else:
-            fields = [getattr(wbo.c, field) for field in fields]
+            fields = [getattr(bso.c, field) for field in fields]
         where = self._get_query('ITEM_ID_COL_USER', user_id)
         query = select(fields, where)
         res = self._safe_execute(query, user_id=user_id,
@@ -565,11 +565,11 @@ class SQLStorage(object):
         if res is None:
             return None
 
-        return WBO(res, {'modified': bigint2time})
+        return BSO(res, {'modified': bigint2time})
 
     def _set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
-        wbo = self._get_wbo_table(user_id)
+        bso = self._get_bso_table(user_id)
 
         if 'modified' in values:
             values['modified'] = _roundedbigint(values['modified'])
@@ -593,13 +593,13 @@ class SQLStorage(object):
             values['collection'] = collection_id
             values['id'] = item_id
             values['username'] = user_id
-            query = insert(wbo).values(**values)
+            query = insert(bso).values(**values)
         else:
             if 'id' in values:
                 del values['id']
-            key = and_(wbo.c.id == item_id, wbo.c.username == user_id,
-                       wbo.c.collection == collection_id)
-            query = update(wbo).where(key).values(**values)
+            key = and_(bso.c.id == item_id, bso.c.username == user_id,
+                       bso.c.collection == collection_id)
+            query = update(bso).where(key).values(**values)
 
         self._safe_execute(query)
 
@@ -619,10 +619,10 @@ class SQLStorage(object):
 
         return self._set_item(user_id, collection_name, item_id, **values)
 
-    def _get_wbo_table_name(self, user_id):
+    def _get_bso_table_name(self, user_id):
         if self.shard:
-            return get_wbo_table_name(user_id)
-        return 'wbo'
+            return get_bso_table_name(user_id)
+        return 'bso'
 
     def set_items(self, user_id, collection_name, items, storage_time=None):
         """Adds or update a batch of items.
@@ -651,7 +651,7 @@ class SQLStorage(object):
         fields = ('id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                   'payload', 'payload_size', 'ttl')
 
-        table = self._get_wbo_table_name(user_id)
+        table = self._get_bso_table_name(user_id)
         query = 'insert into %s (username, collection, %s) values ' \
                     % (table, ','.join(fields))
 
@@ -704,7 +704,7 @@ class SQLStorage(object):
                     storage_time=None):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
-        query = self._get_query('DELETE_SOME_USER_WBO', user_id)
+        query = self._get_query('DELETE_SOME_USER_BSO', user_id)
         res = self._safe_execute(query, user_id=user_id,
                                  collection_id=collection_id,
                                  item_id=item_id)
@@ -715,17 +715,17 @@ class SQLStorage(object):
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
-        wbo = self._get_wbo_table(user_id)
-        query = _delete(wbo)
-        where = [wbo.c.username == bindparam('user_id'),
-                 wbo.c.collection == bindparam('collection_id')]
+        bso = self._get_bso_table(user_id)
+        query = _delete(bso)
+        where = [bso.c.username == bindparam('user_id'),
+                 bso.c.collection == bindparam('collection_id')]
 
         if item_ids is not None:
-            where.append(wbo.c.id.in_(item_ids))
+            where.append(bso.c.id.in_(item_ids))
 
         if filters is not None:
             for field, value in filters.items():
-                field = getattr(wbo.c, field)
+                field = getattr(bso.c, field)
 
                 operator, value = value
                 if field.name == 'modified':
@@ -746,11 +746,11 @@ class SQLStorage(object):
         if self.engine_name != 'sqlite':
             if sort is not None:
                 if sort == 'oldest':
-                    query = query.order_by(wbo.c.modified.asc())
+                    query = query.order_by(bso.c.modified.asc())
                 elif sort == 'newest':
-                    query = query.order_by(wbo.c.modified.desc())
+                    query = query.order_by(bso.c.modified.desc())
                 else:
-                    query = query.order_by(wbo.c.sortindex.desc())
+                    query = query.order_by(bso.c.sortindex.desc())
 
             if limit is not None and int(limit) > 0:
                 query = query.limit(int(limit))

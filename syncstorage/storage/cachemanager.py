@@ -6,7 +6,7 @@ Memcached + SQL backend
 
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
-- The meta/global wbo is stored in "user_id"
+- The meta/global bso is stored in "user_id"
 """
 import threading
 import thread

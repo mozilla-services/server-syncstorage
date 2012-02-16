@@ -14,12 +14,12 @@ except ImportError:
 
 
 def set_x_timestamp_header(handler, registry):
-    """Tween to set the X-Weave-Timestamp header on all responses."""
+    """Tween to set the X-Timestamp header on all responses."""
 
     def set_x_timestamp_header_tween(request):
         request.server_time = round_time()
         response = handler(request)
-        response.headers["X-Weave-Timestamp"] = str(request.server_time)
+        response.headers["X-Timestamp"] = str(request.server_time)
         return response
 
     return set_x_timestamp_header_tween
@@ -51,7 +51,7 @@ def check_for_blacklisted_nodes(handler, registry):
         # Is it backed-off?  We process the request but add a header.
         backoff = cache.get('backoff:%s' % host)
         if backoff is not None:
-            response.headers["X-Weave-Backoff"] = str(backoff)
+            response.headers["X-Backoff"] = str(backoff)
         return response
 
     return check_for_blacklisted_nodes_tween

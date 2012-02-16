@@ -30,11 +30,11 @@ collections = Collections.__table__
 tables.append(collections)
 
 
-class _WBOBase(object):
-    """Column definitions for sharded WBO storage.
+class _BSOBase(object):
+    """Column definitions for sharded BSO storage.
 
-    This mixin class defines the columns used for storage of WBO records.
-    It is used to create either sharded or non-shareded WBO storage tables,
+    This mixin class defines the columns used for storage of BSO records.
+    It is used to create either sharded or non-shareded BSO storage tables,
     depending on the run-time settings of the application.
     """
     id = Column(String(64), primary_key=True, autoincrement=False)
@@ -51,52 +51,52 @@ class _WBOBase(object):
 
 
 #  If the storage controller is not doing sharding based on userid,
-#  then it will use the single "wbo" table below for WBO storage.
+#  then it will use the single "bso" table below for BSO storage.
 
-class WBO(_WBOBase, _Base):
-    """Table for storage of individual Weave Basic Object records.
+class BSO(_BSOBase, _Base):
+    """Table for storage of individual Basic Storage Object records.
 
-    This table provides the (non-sharded) storage for WBO records along
+    This table provides the (non-sharded) storage for BSO records along
     with their associated metadata.
     """
-    __tablename__ = 'wbo'
+    __tablename__ = 'bso'
     __table_args__ = {'mysql_engine': 'InnoDB',
                       'mysql_charset': 'latin1'}
 
-wbo = WBO.__table__
+bso = BSO.__table__
 
 
 #  If the storage controller is doing sharding based on userid,
-#  then it will use the below functions to select a table from "wbo0"
-#  to "wboN" for each userid.
+#  then it will use the below functions to select a table from "bso0"
+#  to "bsoN" for each userid.
 
 _SHARDS = {}
 
 
-def get_wbo_table_byindex(index):
+def get_bso_table_byindex(index):
     if index not in _SHARDS:
-        args = {'__tablename__': 'wbo%d' % index,
+        args = {'__tablename__': 'bso%d' % index,
                 '__table_args__':
                      {'mysql_engine': 'InnoDB',
                       'mysql_charset': 'latin1'}}
-        klass = type('WBO%d' % index, (_WBOBase, _Base), args)
+        klass = type('BSO%d' % index, (_BSOBase, _Base), args)
         _SHARDS[index] = klass.__table__
     return _SHARDS[index]
 
 
-def get_wbo_table(user_id, shardsize=100):
-    """Get the WBO table definition to use for the given user.
+def get_bso_table(user_id, shardsize=100):
+    """Get the BSO table definition to use for the given user.
 
     This function determines the correct shard for the given userid and
-    returns the definition for the matching WBO storage table.
+    returns the definition for the matching BSO storage table.
     """
-    return get_wbo_table_byindex(int(user_id) % shardsize)
+    return get_bso_table_byindex(int(user_id) % shardsize)
 
 
-def get_wbo_table_name(user_id, shardsize=100):
-    """Get the name of WBO table to use for the given user.
+def get_bso_table_name(user_id, shardsize=100):
+    """Get the name of BSO table to use for the given user.
 
     This function determines the correct shard for the given userid and
-    returns the name of the matching WBO storage table.
+    returns the name of the matching BSO storage table.
     """
-    return 'wbo%d' % (int(user_id) % shardsize)
+    return 'bso%d' % (int(user_id) % shardsize)

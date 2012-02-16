@@ -15,15 +15,15 @@ from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPPreconditionFailed)
 
 from mozsvc.util import round_time
-from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_WBO,
+from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_INVALID_WRITE, ERROR_OVER_QUOTA)
 
 from syncstorage import logger
-from syncstorage.wbo import WBO
+from syncstorage.bso import BSO
 from syncstorage.storage import get_storage
 
 
-_WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
+_BSO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
                'payload']
 _ONE_MEG = 1024
 
@@ -85,7 +85,7 @@ class StorageController(object):
         user_id = request.user['userid']
         storage = self._get_storage(request)
         collections = storage.get_collection_timestamps(user_id)
-        request.response.headers['X-Weave-Records'] = str(len(collections))
+        request.response.headers['X-Num-Records'] = str(len(collections))
         return collections
 
     def get_collection_counts(self, request):
@@ -94,7 +94,7 @@ class StorageController(object):
         """
         user_id = request.user['userid']
         counts = self._get_storage(request).get_collection_counts(user_id)
-        request.response.headers['X-Weave-Records'] = str(len(counts))
+        request.response.headers['X-Num-Records'] = str(len(counts))
         return counts
 
     def get_quota(self, request):
@@ -184,7 +184,7 @@ class StorageController(object):
         return args
 
     def get_collection(self, request, **kw):
-        """Returns a list of the WBO ids contained in a collection."""
+        """Returns a list of the BSO ids contained in a collection."""
         kw = self._convert_args(kw)
         collection_name = request.matchdict['collection']
         user_id = request.user['userid']
@@ -193,7 +193,7 @@ class StorageController(object):
         if not full:
             fields = ['id']
         else:
-            fields = _WBO_FIELDS
+            fields = _BSO_FIELDS
 
         storage = self._get_storage(request)
         res = storage.get_items(user_id, collection_name, fields,
@@ -203,15 +203,15 @@ class StorageController(object):
         if not full:
             res = [line['id'] for line in res]
 
-        request.response.headers['X-Weave-Records'] = str(len(res))
+        request.response.headers['X-Num-Records'] = str(len(res))
         return res
 
     def get_item(self, request, full=True):  # always full
-        """Returns a single WBO object."""
+        """Returns a single BSO object."""
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
         user_id = request.user['userid']
-        fields = _WBO_FIELDS
+        fields = _BSO_FIELDS
         storage = self._get_storage(request)
         res = storage.get_item(user_id, collection_name, item_id,
                                fields=fields)
@@ -236,7 +236,7 @@ class StorageController(object):
         return left
 
     def set_item(self, request):
-        """Sets a single WBO object."""
+        """Sets a single BSO object."""
         storage = self._get_storage(request)
         if storage.use_quota:
             left = self._check_quota(request)
@@ -256,24 +256,24 @@ class StorageController(object):
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 
         try:
-            wbo = WBO(data)
+            bso = BSO(data)
         except ValueError:
-            raise HTTPJsonBadRequest(ERROR_INVALID_WBO)
+            raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
 
-        consistent, msg = wbo.validate()
+        consistent, msg = bso.validate()
         if not consistent:
-            raise HTTPJsonBadRequest(ERROR_INVALID_WBO)
+            raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
 
-        if self._has_modifiers(wbo):
-            wbo['modified'] = request.server_time
+        if self._has_modifiers(bso):
+            bso['modified'] = request.server_time
 
-        res = storage.set_item(user_id, collection_name, item_id, **wbo)
+        res = storage.set_item(user_id, collection_name, item_id, **bso)
         if storage.use_quota and left <= _ONE_MEG:
-            request.response.headers['X-Weave-Quota-Remaining'] = str(left)
+            request.response.headers['X-Quota-Remaining'] = str(left)
         return res
 
     def delete_item(self, request):
-        """Deletes a single WBO object."""
+        """Deletes a single BSO object."""
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
 
@@ -288,7 +288,7 @@ class StorageController(object):
         return request.server_time
 
     def set_collection(self, request):
-        """Sets a batch of WBO objects into a collection."""
+        """Sets a batch of BSO objects into a collection."""
 
         user_id = request.user['userid']
         collection_name = request.matchdict['collection']
@@ -297,58 +297,58 @@ class StorageController(object):
             raise HTTPPreconditionFailed(collection_name)
 
         try:
-            wbos = json.loads(request.body)
+            bsos = json.loads(request.body)
         except ValueError:
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 
-        if not isinstance(wbos, (tuple, list)):
+        if not isinstance(bsos, (tuple, list)):
             # thats a batch of one
             try:
-                id_ = str(wbos['id'])
+                id_ = str(bsos['id'])
             except (KeyError, TypeError):
-                raise HTTPJsonBadRequest(ERROR_INVALID_WBO)
+                raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
             if '/' in id_:
-                raise HTTPJsonBadRequest(ERROR_INVALID_WBO)
+                raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
 
             request.matchdict['item'] = id_
             return self.set_item(request)
 
         res = {'success': [], 'failed': {}}
 
-        # Sanity-check each of the WBOs.
+        # Sanity-check each of the BSOs.
         # Limit the batch based on both count and payload size.
-        kept_wbos = []
+        kept_bsos = []
         total_bytes = 0
-        for count, wbo in enumerate(wbos):
+        for count, bso in enumerate(bsos):
             try:
-                wbo = WBO(wbo)
+                bso = BSO(bso)
             except ValueError:
-                res['failed'][''] = ['invalid wbo']
+                res['failed'][''] = ['invalid bso']
                 continue
 
-            if 'id' not in wbo:
+            if 'id' not in bso:
                 res['failed'][''] = ['invalid id']
                 continue
 
-            consistent, msg = wbo.validate()
-            item_id = wbo['id']
+            consistent, msg = bso.validate()
+            item_id = bso['id']
             if not consistent:
                 res['failed'][item_id] = [msg]
                 continue
 
             if count >= self.batch_max_count:
-                res['failed'][item_id] = ['retry wbo']
+                res['failed'][item_id] = ['retry bso']
                 continue
-            if 'payload' in wbo:
-                total_bytes += len(wbo['payload'])
+            if 'payload' in bso:
+                total_bytes += len(bso['payload'])
             if total_bytes >= self.batch_max_bytes:
                 res['failed'][item_id] = ['retry bytes']
                 continue
 
-            if self._has_modifiers(wbo):
-                wbo['modified'] = request.server_time
+            if self._has_modifiers(bso):
+                bso['modified'] = request.server_time
 
-            kept_wbos.append(wbo)
+            kept_bsos.append(bso)
 
         storage = self._get_storage(request)
         if storage.use_quota:
@@ -358,24 +358,24 @@ class StorageController(object):
 
         storage_time = request.server_time
 
-        for wbos in batch(kept_wbos, size=self.batch_size):
-            wbos = list(wbos)   # to avoid exhaustion
+        for bsos in batch(kept_bsos, size=self.batch_size):
+            bsos = list(bsos)   # to avoid exhaustion
             try:
                 storage.set_items(user_id, collection_name,
-                                  wbos, storage_time=storage_time)
+                                  bsos, storage_time=storage_time)
 
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 logger.error('Could not set items')
                 logger.error(str(e))
-                for wbo in wbos:
-                    res['failed'][wbo['id']] = str(e)
+                for bso in bsos:
+                    res['failed'][bso['id']] = str(e)
             else:
-                res['success'].extend([wbo['id'] for wbo in wbos])
+                res['success'].extend([bso['id'] for bso in bsos])
 
         res['modified'] = storage_time
         if storage.use_quota and left <= 1024:
-            request.response.headers['X-Weave-Quota-Remaining'] = str(left)
+            request.response.headers['X-Quota-Remaining'] = str(left)
         return res
 
     def delete_collection(self, request, **kw):
