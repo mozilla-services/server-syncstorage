@@ -382,7 +382,6 @@ class StorageController(object):
             else:
                 res['success'].extend([bso['id'] for bso in bsos])
 
-        res['modified'] = storage_time
         if storage.use_quota and left <= 1024:
             request.response.headers['X-Quota-Remaining'] = str(left)
         return res

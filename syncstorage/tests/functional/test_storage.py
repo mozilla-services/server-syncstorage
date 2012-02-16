@@ -687,7 +687,7 @@ class TestStorage(support.TestWsgiApp):
         bso2 = {'id': 2, 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
-        ts = json.loads(res.body)['modified']
+        ts = int(res.headers["X-Timestamp"])
 
         # wait a bit
         time.sleep(0.2)
@@ -710,7 +710,7 @@ class TestStorage(support.TestWsgiApp):
         bso2 = {'id': 2, 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/tabs', bsos)
-        ts = json.loads(res.body)['modified']
+        ts = int(res.headers["X-Timestamp"])
 
         # wait a bit
         time.sleep(0.2)
