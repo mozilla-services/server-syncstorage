@@ -13,7 +13,8 @@ import itertools
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
                                     HTTPPreconditionFailed,
-                                    HTTPNoContent)
+                                    HTTPNoContent,
+                                    HTTPNotModified)
 
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_INVALID_WRITE, ERROR_OVER_QUOTA)
@@ -199,6 +200,19 @@ class StorageController(object):
             fields = _BSO_FIELDS
 
         storage = self._get_storage(request)
+
+        if_modified = request.headers.get("X-If-Modified-Since")
+        if if_modified is not None:
+            try:
+                if_modified = int(if_modified)
+            except ValueError:
+                msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
+                raise HTTPBadRequest(msg)
+            max = storage.get_collection_max_timestamp(user_id,
+                                                       collection_name)
+            if max is None or max <= if_modified:
+                return HTTPNotModified()
+
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
                                 kw.get('limit'), kw.get('offset'),
@@ -216,10 +230,21 @@ class StorageController(object):
         user_id = request.user['userid']
         fields = _BSO_FIELDS
         storage = self._get_storage(request)
+
         res = storage.get_item(user_id, collection_name, item_id,
                                fields=fields)
         if res is None:
             raise HTTPNotFound()
+
+        if_modified = request.headers.get("X-If-Modified-Since")
+        if if_modified is not None:
+            try:
+                if_modified = int(if_modified)
+            except ValueError:
+                msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
+                raise HTTPBadRequest(msg)
+            if res["modified"] <= if_modified:
+                return HTTPNotModified()
 
         return res
 

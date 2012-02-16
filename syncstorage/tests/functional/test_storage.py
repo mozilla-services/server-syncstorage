@@ -269,6 +269,18 @@ class TestStorage(support.TestWsgiApp):
         self.app.get(self.root + '/storage/col2', headers=[('Accept', 'x/yy')],
                      status=406)
 
+    def test_set_collection_with_if_modified_since(self):
+        res = self.app.get(self.root + '/storage/col2?full=true').json
+        self.assertEquals(len(res), 5)
+        timestamps = sorted([r["modified"] for r in res])
+
+        self.app.get(self.root + "/storage/col2", headers={
+            "X-If-Modified-Since": str(timestamps[0])
+        }, status=200)
+        self.app.get(self.root + "/storage/col2", headers={
+            "X-If-Modified-Since": str(timestamps[-1])
+        }, status=304)
+
     def test_get_item(self):
         # grabbing object 1 from col2
         res = self.app.get(self.root + '/storage/col2/1')
@@ -280,6 +292,18 @@ class TestStorage(support.TestWsgiApp):
 
         # unexisting object
         self.app.get(self.root + '/storage/col2/99', status=404)
+
+        # using x-if-modified-since header.
+        self.app.get(self.root + '/storage/col2/1', headers={
+            "X-If-Modified-Since": str(res["modified"])
+        }, status=304)
+        self.app.get(self.root + '/storage/col2/1', headers={
+            "X-If-Modified-Since": str(res["modified"] + 10)
+        }, status=304)
+        res = self.app.get(self.root + '/storage/col2/1', headers={
+            "X-If-Modified-Since": str(res["modified"] - 10)
+        })
+        self.assertEquals(res.json['id'], '1')
 
     def test_set_item(self):
         # let's create an object
