@@ -12,10 +12,10 @@ import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
 
-from mozsvc.util import round_time
 from mozsvc.exceptions import BackendError
 
 from syncstorage import logger
+from syncstorage.util import get_timestamp
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import bso
 from syncstorage.storage.cachemanager import CacheManager
@@ -41,7 +41,7 @@ class _JSONDumper(object):
         self.file = file
 
     def dump(self, val):
-        self.file.write(json.dumps(val, use_decimal=True))
+        self.file.write(json.dumps(val))
 
     def load(self):
         return json.loads(self.file.read())
@@ -152,7 +152,7 @@ class MemcachedSQLStorage(SQLStorage):
     def _update_stamp(self, user_id, collection_name, storage_time):
         # update the stamps cache
         if storage_time is None:
-            storage_time = round_time()
+            storage_time = get_timestamp()
         stamps = self.get_collection_timestamps(user_id)
         stamps[collection_name] = storage_time
         self.cache.set(_key(user_id, 'stamps'), stamps)
@@ -184,7 +184,7 @@ class MemcachedSQLStorage(SQLStorage):
         """Adds or update an item"""
         values['id'] = item_id
         if storage_time is None:
-            storage_time = round_time()
+            storage_time = get_timestamp()
 
         self._update_item(values, storage_time)
         self._update_cache(user_id, collection_name, [values], storage_time)
@@ -202,7 +202,7 @@ class MemcachedSQLStorage(SQLStorage):
         Returns a list of success or failures.
         """
         if storage_time is None:
-            storage_time = round_time()
+            storage_time = get_timestamp()
 
         for item in items:
             self._update_item(item, storage_time)

@@ -4,7 +4,7 @@
 
 from pyramid.httpexceptions import HTTPServiceUnavailable
 
-from mozsvc.util import round_time
+from syncstorage.util import get_timestamp
 
 
 try:
@@ -17,7 +17,7 @@ def set_x_timestamp_header(handler, registry):
     """Tween to set the X-Timestamp header on all responses."""
 
     def set_x_timestamp_header_tween(request):
-        request.server_time = round_time()
+        request.server_time = get_timestamp()
         response = handler(request)
         response.headers["X-Timestamp"] = str(request.server_time)
         return response

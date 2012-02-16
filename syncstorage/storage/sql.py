@@ -22,7 +22,6 @@ For details of the prepared queries, see the file "queries.py".
 import urlparse
 from time import time
 from collections import defaultdict
-from decimal import Decimal
 import traceback
 
 from sqlalchemy import create_engine
@@ -34,11 +33,11 @@ from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.exc import OperationalError, TimeoutError
 
 
-from mozsvc.util import round_time
 from mozsvc.exceptions import BackendError
 
 from syncstorage import logger
 from syncstorage.bso import BSO
+from syncstorage.util import get_timestamp, from_timestamp
 from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import bso as _bso
 from syncstorage.storage.sqlmappers import (tables, collections,
@@ -63,22 +62,6 @@ _STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
 
 STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
                                    _STANDARD_COLLECTIONS.items())
-
-
-def bigint2time(value, precision=2):
-    """Decodes a big int into a timestamp.
-
-    The returned timestamp is a 2 digits Decimal.
-    """
-    if value is None:   # unexistant
-        return None
-    res = Decimal(value) / 100
-    digits = '0' * precision
-    return res.quantize(Decimal('1.' + digits))
-
-
-def _roundedbigint(value):
-    return int((round_time(value)) * 100)
 
 
 def _int_now():
@@ -400,8 +383,8 @@ class SQLStorage(object):
         query = self._get_query(query, user_id)
         res = self._safe_execute(query, user_id=user_id)
         try:
-            return dict([(self._collid2name(user_id, coll_id),
-                        bigint2time(stamp)) for coll_id, stamp in res])
+            return dict([(self._collid2name(user_id, coll_id), stamp)
+                         for coll_id, stamp in res])
         finally:
             self._purge_cache(user_id)
 
@@ -448,9 +431,7 @@ class SQLStorage(object):
                                  collection_id=collection_id)
         res = res.fetchone()
         stamp = res[0]
-        if stamp is None:
-            return None
-        return bigint2time(stamp)
+        return stamp
 
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.
@@ -479,7 +460,7 @@ class SQLStorage(object):
         res = res.fetchone()
         if res is None:
             return None
-        return bigint2time(res[0])
+        return res[0]
 
     def _get_bso_table(self, user_id):
         if self.shard:
@@ -512,8 +493,6 @@ class SQLStorage(object):
                 field = getattr(bso.c, field)
 
                 operator, value = value
-                if field.name == 'modified':
-                    value = _roundedbigint(value)
 
                 if isinstance(value, (list, tuple)):
                     where.append(field.in_(value))
@@ -546,8 +525,7 @@ class SQLStorage(object):
             query = query.offset(int(offset))
 
         res = self._safe_execute(query)
-        converters = {'modified': bigint2time}
-        return [BSO(line, converters) for line in res]
+        return [BSO(line) for line in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
@@ -565,14 +543,11 @@ class SQLStorage(object):
         if res is None:
             return None
 
-        return BSO(res, {'modified': bigint2time})
+        return BSO(res)
 
     def _set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
         bso = self._get_bso_table(user_id)
-
-        if 'modified' in values:
-            values['modified'] = _roundedbigint(values['modified'])
 
         if 'ttl' not in values:
             values['ttl'] = MAX_TTL
@@ -604,7 +579,7 @@ class SQLStorage(object):
         self._safe_execute(query)
 
         if 'modified' in values:
-            return bigint2time(values['modified'])
+            return values['modified']
 
         return modified
 
@@ -612,7 +587,7 @@ class SQLStorage(object):
                  **values):
         """Adds or update an item"""
         if storage_time is None:
-            storage_time = round_time()
+            storage_time = get_timestamp()
 
         if 'payload' in values and 'modified' not in values:
             values['modified'] = storage_time
@@ -633,7 +608,7 @@ class SQLStorage(object):
             self.set_collection(user_id, collection_name)
 
         if storage_time is None:
-            storage_time = round_time()
+            storage_time = get_timestamp()
 
         if self.engine_name in ('sqlite', 'postgresql'):
             count = 0
@@ -672,17 +647,17 @@ class SQLStorage(object):
                 if value is None:
                     continue
                 if field == 'modified' and value is not None:
-                    value = _roundedbigint(storage_time)
+                    value = storage_time
                 values['%s%d' % (field, num)] = value
 
             if ('payload%d' % num in values and
                 'modified%d' % num not in values):
-                values['modified%d' % num] = _roundedbigint(storage_time)
+                values['modified%d' % num] = storage_time
 
             if values.get('ttl%d' % num) is None:
                 values['ttl%d' % num] = 2100000000
             else:
-                values['ttl%d' % num] += int(storage_time)
+                values['ttl%d' % num] += int(from_timestamp(storage_time))
 
             if 'payload%d' % num in values:
                 size = len(values['payload%d' % num])
@@ -726,8 +701,6 @@ class SQLStorage(object):
                 field = getattr(bso.c, field)
 
                 operator, value = value
-                if field.name == 'modified':
-                    value = _roundedbigint(value)
                 if isinstance(value, (list, tuple)):
                     where.append(field.in_(value))
                 else:

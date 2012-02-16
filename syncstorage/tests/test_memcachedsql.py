@@ -3,7 +3,6 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 import unittest
 import time
-from decimal import Decimal
 from tempfile import mkstemp
 import os
 
@@ -13,9 +12,10 @@ try:
 except ImportError:
     MEMCACHED = False
 
-from mozsvc.util import round_time
 from mozsvc.exceptions import BackendError
 from mozsvc.plugin import load_from_settings
+
+from syncstorage.util import get_timestamp
 
 _UID = 1
 _PLD = '*' * 500
@@ -203,7 +203,7 @@ if MEMCACHED:
                 self.assertEquals(keys, ['foo', 'tabs'])
 
             # adding a new item should modify the stamps cache
-            now = round_time()
+            now = get_timestamp()
             self.storage.set_item(_UID, 'baz', '2', payload=_PLD * 200,
                                   storage_time=now)
 
@@ -221,7 +221,7 @@ if MEMCACHED:
 
             # deleting the item should also update the stamp
             time.sleep(0.2)    # to make sure the stamps differ
-            now = round_time()
+            now = get_timestamp()
             self.storage.delete_item(_UID, 'baz', '2', storage_time=now)
             stamps = self.storage.get_collection_timestamps(_UID)
             self.assertEqual(stamps['baz'], now)
@@ -241,7 +241,7 @@ if MEMCACHED:
             tabs = {'mCwylprUEiP5':
                     {'payload': '*' * 1024,
                     'id': 'mCwylprUEiP5',
-                    'modified': Decimal('1299142695.76')}}
+                    'modified': 1299142695760}}
             self.storage.cache.set_tabs(1, tabs)
             size = self.storage.get_collection_sizes(1)
             self.assertEqual(size['tabs'], 1.)

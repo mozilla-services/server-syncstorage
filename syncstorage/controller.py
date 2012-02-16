@@ -14,7 +14,6 @@ from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
                                     HTTPPreconditionFailed)
 
-from mozsvc.util import round_time
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_INVALID_WRITE, ERROR_OVER_QUOTA)
 
@@ -65,7 +64,11 @@ class StorageController(object):
         unmodified = request.headers.get('X-If-Unmodified-Since')
         if unmodified is None:
             return False
-        unmodified = round_time(unmodified)
+        try:
+            unmodified = int(unmodified)
+        except ValueError:
+            msg = 'Invalid value for "X-If-Unmodified-Since": %r'
+            raise HTTPBadRequest(msg % (unmodified,))
         storage = self._get_storage(request)
         max = storage.get_collection_max_timestamp(user_id,
                                                    collection_name)
@@ -131,11 +134,12 @@ class StorageController(object):
                 continue
             try:
                 if arg in ('older', 'newer'):
-                    value = round_time(value)
+                    value = int(value)
                 else:
                     value = float(value)
             except ValueError:
-                raise HTTPBadRequest('Invalid value for "%s"' % arg)
+                msg = 'Invalid value for "%s": %r' % (arg, value)
+                raise HTTPBadRequest(msg)
             if arg in ('older', 'index_below'):
                 filters[convert_name[arg]] = '<', value
             else:
@@ -150,7 +154,8 @@ class StorageController(object):
             try:
                 value = int(value)
             except ValueError:
-                raise HTTPBadRequest('Invalid value for "%s"' % arg)
+                msg = 'Invalid value for "%s": %r' % (arg, value)
+                raise HTTPBadRequest(msg)
             if arg == 'limit':
                 limit = value
             else:

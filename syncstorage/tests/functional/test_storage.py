@@ -10,11 +10,11 @@ import struct
 import random
 import string
 import simplejson as json
-from decimal import Decimal
 from tempfile import mkstemp
 
 from mozsvc.tests.support import make_request
 
+from syncstorage.util import get_timestamp
 from syncstorage.storage import get_storage
 from syncstorage.tests.functional import support
 
@@ -416,13 +416,13 @@ class TestStorage(support.TestWsgiApp):
         self.app.post_json(self.root + '/storage/col2', bsos)
 
         time.sleep(.1)
-        now = time.time()
+        now = get_timestamp()
         time.sleep(.1)
         bso3 = {'id': 14, 'payload': _PLD}
         bsos = [bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
-        self.app.delete(self.root + '/storage/col2?older=%f' % now)
+        self.app.delete(self.root + '/storage/col2?older=%d' % now)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
 
@@ -435,13 +435,13 @@ class TestStorage(support.TestWsgiApp):
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
-        now = time.time()
+        now = get_timestamp()
         time.sleep(.3)
         bso3 = {'id': 14, 'payload': _PLD}
         bsos = [bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
-        self.app.delete(self.root + '/storage/col2?newer=%f' % now)
+        self.app.delete(self.root + '/storage/col2?newer=%d' % now)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 2)
 
@@ -525,32 +525,32 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.delete(self.root + '/storage/col2',
                               headers=[('X-Confirm-Delete', '1')])
         res = json.loads(res.body)
-        now = time.time()
-        self.assertTrue(abs(now - float(res)) < 0.2)
+        now = get_timestamp()
+        self.assertTrue(abs(now - int(res)) < 200)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
     def test_x_timestamp_header(self):
-        now = time.time()
+        now = get_timestamp()
         res = self.app.get(self.root + '/storage/col2')
         self.assertTrue(abs(now -
-                float(res.headers['X-Timestamp'])) < 0.1)
+                int(res.headers['X-Timestamp'])) < 100)
 
         # getting the timestamp with a PUT
         bso = {'payload': _PLD}
-        now = time.time()
+        now = get_timestamp()
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         self.assertTrue(abs(now -
-                        float(res.headers['X-Timestamp'])) < 0.2)
+                        int(res.headers['X-Timestamp'])) < 200)
 
         # getting the timestamp with a POST
         bso1 = {'id': 12, 'payload': _PLD}
         bso2 = {'id': 13, 'payload': _PLD}
         bsos = [bso1, bso2]
-        now = time.time()
+        now = get_timestamp()
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         self.assertTrue(abs(now -
-                        float(res.headers['X-Timestamp'])) < 0.2)
+                        int(res.headers['X-Timestamp'])) < 200)
 
     def test_ifunmodifiedsince(self):
         bso = {'payload': _PLD}
@@ -713,33 +713,22 @@ class TestStorage(support.TestWsgiApp):
         finally:
             tweens.Client = old_client
 
-    def test_rounding(self):
-        # make sure the server returns only rounded timestamps
+    def test_timestamps_are_integers(self):
+        # make sure the server returns only integer timestamps
         resp = self.app.get(self.root + '/storage/col2?full=1')
-
-        # it's up to the client json deserializer to do the right
-        # thing then - e.g. like converting it into a decimal 2 digit
-        bsos = json.loads(resp.body, use_decimal=True)
+        bsos = json.loads(resp.body)
 
         # check how the timestamps look - we need two digits stuff
         stamps = []
-        two_place = Decimal('1.00')
         for bso in bsos:
             stamp = bso['modified']
-            try:
-                self.assertEqual(stamp, stamp.quantize(two_place))
-            except:
-                # XXX more info to track down this issue
-                msg = 'could not quantize '
-                msg += resp.body
-                raise AssertionError(msg)
-
+            self.assertEqual(stamp, long(stamp))
             stamps.append(stamp)
 
         stamps.sort()
 
         # try a newer filter now, to get the last two objects
-        ts = float(stamps[-3])
+        ts = int(stamps[-3])
 
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
@@ -760,7 +749,7 @@ class TestStorage(support.TestWsgiApp):
         bso2 = {'id': 2, 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
-        ts = json.loads(res.body, use_decimal=True)['modified']
+        ts = json.loads(res.body)['modified']
 
         # wait a bit
         time.sleep(0.2)
@@ -783,7 +772,7 @@ class TestStorage(support.TestWsgiApp):
         bso2 = {'id': 2, 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/tabs', bsos)
-        ts = json.loads(res.body, use_decimal=True)['modified']
+        ts = json.loads(res.body)['modified']
 
         # wait a bit
         time.sleep(0.2)
