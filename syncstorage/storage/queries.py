@@ -16,7 +16,7 @@ _USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
                     collections.c.name == bindparam('collection_name'))
 
 queries = {
-    'DELETE_SOME_USER_BSO': 'DELETE FROM %(bso)s WHERE username=:user_id AND '
+    'DELETE_SOME_USER_BSO': 'DELETE FROM %(bso)s WHERE userid=:user_id AND '
                             'collection=:collection_id AND id=:item_id',
 
     'DELETE_USER_COLLECTIONS': 'DELETE FROM collections WHERE '
@@ -24,7 +24,7 @@ queries = {
 
     'DELETE_USER_COLLECTION': delete(collections).where(_USER_N_COLL),
 
-    'DELETE_USER_BSOS': 'DELETE FROM %(bso)s WHERE username=:user_id',
+    'DELETE_USER_BSOS': 'DELETE FROM %(bso)s WHERE userid=:user_id',
 
     'COLLECTION_EXISTS': select([collections.c.collectionid], _USER_N_COLL),
 
@@ -32,36 +32,36 @@ queries = {
                          'WHERE userid=:user_id',
 
     'COLLECTION_MODIFIED': 'SELECT bso_a.modified FROM %(bso)s AS bso_a, '
-                           '%(bso)s WHERE bso_a.username=%(bso)s.username '
+                           '%(bso)s WHERE bso_a.userid=%(bso)s.userid '
                            'AND bso_a.collection=%(bso)s.collection '
-                           'ORDER BY bso_a.username DESC, '
+                           'ORDER BY bso_a.userid DESC, '
                            'bso_a.collection DESC, bso_a.modified DESC '
                            'LIMIT 1',
 
     'COLLECTION_STAMPS': 'SELECT collection, MAX(modified) FROM %(bso)s '
-                         'WHERE username=:user_id GROUP BY username, '
+                         'WHERE userid=:user_id GROUP BY userid, '
                          'collection',
 
     'COLLECTION_COUNTS': 'SELECT collection, COUNT(collection) FROM %(bso)s '
-                         'WHERE username=:user_id AND ttl>:ttl '
+                         'WHERE userid=:user_id AND ttl>:ttl '
                          'GROUP BY collection',
 
     'COLLECTION_MAX_STAMPS': 'SELECT MAX(modified) FROM %(bso)s WHERE '
                              'collection=:collection_id AND '
-                             'username=:user_id',
+                             'userid=:user_id',
 
     'ITEM_EXISTS': 'SELECT modified FROM %(bso)s WHERE '
-                   'collection=:collection_id AND username=:user_id '
+                   'collection=:collection_id AND userid=:user_id '
                    'AND id=:item_id AND ttl>:ttl',
 
     'DELETE_ITEMS': 'DELETE FROM %(bso)s WHERE collection=:collection_id AND '
-                    'username=:user_id AND ttl>:ttl',
+                    'userid=:user_id AND ttl>:ttl',
 
     'USER_STORAGE_SIZE': 'SELECT SUM(payload_size) FROM %(bso)s WHERE '
-                         'username=:user_id AND ttl>:ttl',
+                         'userid=:user_id AND ttl>:ttl',
 
     'COLLECTIONS_STORAGE_SIZE': 'SELECT collection, SUM(payload_size) '
-                                'FROM %(bso)s WHERE username=:user_id AND '
+                                'FROM %(bso)s WHERE userid=:user_id AND '
                                 'ttl>:ttl GROUP BY collection',
 
     'USER_COLLECTION_NAMES': 'SELECT collectionid, name FROM collections '
@@ -83,7 +83,7 @@ def get_query(name, user_id=None):
 
     queries['ITEM_ID_COL_USER'] = and_(
         table.c.collection == bindparam('collection_id'),
-        table.c.username == bindparam('user_id'),
+        table.c.userid == bindparam('user_id'),
         table.c.id == bindparam('item_id'),
         table.c.ttl > bindparam('ttl'))
 

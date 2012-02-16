@@ -38,7 +38,6 @@ class TestWsgiApp(unittest.TestCase):
         # adding a user if needed
         self.user_email = "test_%d@example.com" % random.randint(1, 100000)
         user = ServicesTokenManager.get_user_data(self.user_email)
-        self.user_name = user["username"]
         self.user_id = user["userid"]
 
     def tearDown(self):

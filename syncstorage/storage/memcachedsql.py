@@ -23,7 +23,7 @@ from syncstorage.storage.cachemanager import CacheManager
 
 _COLLECTION_LIST = select([bso.c.collection, func.max(bso.c.modified),
                            func.count(bso)],
-            bso.c.username == bindparam('user_id')).group_by(bso.c.collection)
+            bso.c.userid == bindparam('user_id')).group_by(bso.c.collection)
 
 
 def _key(*args):
@@ -168,7 +168,7 @@ class MemcachedSQLStorage(SQLStorage):
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, items[0]['id']):
             item = items[0]
-            item['username'] = user_id
+            item['userid'] = user_id
             key = _key(user_id, 'meta', 'global')
             self.cache.set(key, item)
         elif collection_name == 'tabs':

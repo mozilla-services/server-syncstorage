@@ -504,7 +504,7 @@ class SQLStorage(object):
             fields = [getattr(bso.c, field) for field in fields]
 
         # preparing the where statement
-        where = [bso.c.username == user_id,
+        where = [bso.c.userid == user_id,
                  bso.c.collection == collection_id]
 
         if filters is not None:
@@ -592,12 +592,12 @@ class SQLStorage(object):
         if modified is None:   # does not exists
             values['collection'] = collection_id
             values['id'] = item_id
-            values['username'] = user_id
+            values['userid'] = user_id
             query = insert(bso).values(**values)
         else:
             if 'id' in values:
                 del values['id']
-            key = and_(bso.c.id == item_id, bso.c.username == user_id,
+            key = and_(bso.c.id == item_id, bso.c.userid == user_id,
                        bso.c.collection == collection_id)
             query = update(bso).where(key).values(**values)
 
@@ -652,7 +652,7 @@ class SQLStorage(object):
                   'payload', 'payload_size', 'ttl')
 
         table = self._get_bso_table_name(user_id)
-        query = 'insert into %s (username, collection, %s) values ' \
+        query = 'insert into %s (userid, collection, %s) values ' \
                     % (table, ','.join(fields))
 
         values = {}
@@ -717,7 +717,7 @@ class SQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
         bso = self._get_bso_table(user_id)
         query = _delete(bso)
-        where = [bso.c.username == bindparam('user_id'),
+        where = [bso.c.userid == bindparam('user_id'),
                  bso.c.collection == bindparam('collection_id')]
 
         if item_ids is not None:

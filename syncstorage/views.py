@@ -70,8 +70,8 @@ class SyncStorageService(Service):
         # TODO: decide on the allowable characters for this, and document.
         path = path.replace("{collection}", "{collection:[a-zA-Z0-9._-]+}")
         path = path.replace("{item}", "{item:[a-zA-Z0-9._-]+}")
-        # Add path prefix for the API version number and username.
-        path = "/{api:2.0}/{username:[a-zA-Z0-9]+}" + path
+        # Add path prefix for the API version number.
+        path = "/{api:2.0}" + path
         return path
 
 

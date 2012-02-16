@@ -38,7 +38,7 @@ class _BSOBase(object):
     depending on the run-time settings of the application.
     """
     id = Column(String(64), primary_key=True, autoincrement=False)
-    username = Column(Integer(11), primary_key=True, nullable=False)
+    userid = Column(Integer(11), primary_key=True, nullable=False)
     collection = Column(Integer(6), primary_key=True, nullable=False,
                         default=0)
     parentid = Column(String(64))

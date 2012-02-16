@@ -4,7 +4,7 @@
 """ BSO object -- used for (de)serialization
 """
 
-_FIELDS = set(('id', 'username', 'collection', 'parentid',
+_FIELDS = set(('id', 'collection', 'parentid',
                'predecessorid', 'sortindex', 'modified',
                'payload', 'payload_size', 'ttl'))
 
