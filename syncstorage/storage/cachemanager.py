@@ -14,10 +14,11 @@ import thread
 from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
-from services.util import BackendError
-from services import logger
-from services.events import REQUEST_ENDS, subscribe
+from pyramid.events import subscriber, NewRequest
 
+from mozsvc.exceptions import BackendError
+
+from syncstorage import logger
 from syncstorage.storage.sql import _KB
 
 USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
@@ -25,6 +26,23 @@ USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
 
 def _key(*args):
     return ':'.join([str(arg) for arg in args])
+
+
+# Global list of CacheManager instances, so we can easily hook
+# them up to pyramid events via a subscriber.
+_instances = []
+
+
+@subscriber(NewRequest)
+def cleanup_pool_when_request_ends(event):
+    """Whenever a request completes, clear the memcahed client pool.
+
+    Unfortunately pyramid doesn't have a "RequestFinished" event.  Instead
+    you are expected to subscribe to NewRequest and then add tasks to the
+    list of "finished callbacks" for that each request as it is created.
+    """
+    for instance in _instances:
+        event.request.add_finished_callback(instance._cleanup_pool)
 
 
 class CacheManager(object):
@@ -37,9 +55,9 @@ class CacheManager(object):
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
-        subscribe(REQUEST_ENDS, self._cleanup_pool)
+        _instances.append(self)
 
-    def _cleanup_pool(self, response):
+    def _cleanup_pool(self, request):
         self.pool.pop(thread.get_ident(), None)
 
     def flush_all(self):

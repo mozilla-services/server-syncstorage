@@ -7,13 +7,12 @@ import re
 
 
 install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
-                    'Routes', 'simplejson', 'cef', 'repoze.who',
-                    'repoze.who.plugins.vepauth', 'Services>=1.0']
-
-
+                    'Routes', 'simplejson', 'cef', 'mozsvc', 'cornice',
+                    'repoze.who', 'repoze.who.plugins.vepauth']
+                    
 entry_points = """
 [paste.app_factory]
-main = syncstorage.wsgiapp:make_app
+main = syncstorage:main
 
 [paste.app_install]
 main = paste.script.appinstall:Installer

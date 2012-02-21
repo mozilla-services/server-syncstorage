@@ -1,51 +1,50 @@
-# ***** BEGIN LICENSE BLOCK *****
-# Version: MPL 1.1/GPL 2.0/LGPL 2.1
-#
-# The contents of this file are subject to the Mozilla Public License Version
-# 1.1 (the "License"); you may not use this file except in compliance with
-# the License. You may obtain a copy of the License at
-# http://www.mozilla.org/MPL/
-#
-# Software distributed under the License is distributed on an "AS IS" basis,
-# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
-# for the specific language governing rights and limitations under the
-# License.
-#
-# The Original Code is Sync Server
-#
-# The Initial Developer of the Original Code is Mozilla Foundation.
-# Portions created by the Initial Developer are Copyright (C) 2010
-# the Initial Developer. All Rights Reserved.
-#
-# Contributor(s):
-#   Tarek Ziade (tarek@mozilla.com)
-#
-# Alternatively, the contents of this file may be used under the terms of
-# either the GNU General Public License Version 2 or later (the "GPL"), or
-# the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
-# in which case the provisions of the GPL or the LGPL are applicable instead
-# of those above. If you wish to allow use of your version of this file only
-# under the terms of either the GPL or the LGPL, and not to allow others to
-# use your version of this file under the terms of the MPL, indicate your
-# decision by deleting the provisions above and replace them with the notice
-# and other provisions required by the GPL or the LGPL. If you do not delete
-# the provisions above, a recipient may use your version of this file under
-# the terms of any one of the MPL, the GPL or the LGPL.
-#
-# ***** END LICENSE BLOCK *****
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-Token controller. A stub until the tokenserver is ready to test against.
+Token controller.  A stub until the tokenserver is ready to test against.
 """
 
 import hashlib
-
-from webob.exc import HTTPNotFound
+import base64
+import urllib2
 
 from zope.interface import implements
 from repoze.who.interfaces import IAuthenticator
 from repoze.who.plugins.vepauth import SignedTokenManager
 
-from services.user import extract_username
+
+#  These are copy-pasted from server-core, and are here only
+#  while we're still using basic-auth and requiring a username.
+
+def email_to_idn(addr):
+    """ Convert an UTF-8 encoded email address to it's IDN (punycode)
+        equivalent
+
+        this method can raise the following:
+        UnicodeError -- the passed string is not Unicode valid or BIDI
+        compliant
+          Be sure to examine the exception cause to determine the final error.
+    """
+    # decode the string if passed as MIME (some MIME encodes @)
+    addr = urllib2.unquote(addr).decode('utf-8')
+    if '@' not in addr:
+        return addr
+    prefix, suffix = addr.split('@', 1)
+    return "%s@%s" % (prefix.encode('idna'), suffix.encode('idna'))
+
+
+def extract_username(username):
+    """Extracts the user name.
+
+    Takes the username and if it is an email address, munges it down
+    to the corresponding 32-character username
+    """
+    if '@' not in username:
+        return username
+    username = email_to_idn(username).lower()
+    hashed = hashlib.sha1(username).digest()
+    return base64.b32encode(hashed).lower()
 
 
 class ServicesTokenManager(SignedTokenManager):
@@ -84,28 +83,3 @@ class TestingAuthenticator(object):
             return None
         identity.update(ServicesTokenManager.get_user_data(username))
         return username
-
-
-class TokenController(object):
-    """Stub controller for provisioning auth tokens.
-
-    This will eventually go away, replaced by the tokenserver.  For now
-    it's here as a stub to let repoze.who.plugins.vepauth provision tokens.
-    """
-
-    def __init__(self, app):
-        self.app = app
-
-    def get_token(self, request):
-        # This is a little yuck, because services.whoauth doesn't support
-        # environ["repoze.who.application"].  We need to catch the failed
-        # auth and return it ourselves.  When we migrate to pyramid this
-        # will be handled automatically.
-        try:
-            self.app.auth.check(request, {"auth": "True"})
-        except Exception:
-            if "repoze.who.application" not in request.environ:
-                raise
-            return request.environ["repoze.who.application"]
-        else:
-            return HTTPNotFound()

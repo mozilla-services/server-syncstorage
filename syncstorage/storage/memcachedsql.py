@@ -12,9 +12,10 @@ import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
 
-from services.util import BackendError, round_time
-from services import logger
+from mozsvc.util import round_time
+from mozsvc.exceptions import BackendError
 
+from syncstorage import logger
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 from syncstorage.storage.cachemanager import CacheManager

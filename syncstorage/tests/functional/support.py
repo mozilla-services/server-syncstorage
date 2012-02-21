@@ -3,26 +3,37 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 """ Base test class, with an instanciated app.
 """
+
 import os
 import unittest
+import urlparse
 import random
 
 from webtest import TestApp
 
-from syncstorage.tests.support import initenv
-from syncstorage.wsgiapp import make_app
+from mozsvc.tests.support import get_test_configurator
+
 from syncstorage.tokens import ServicesTokenManager
 
 
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
-        # loading the app
-        self.appdir, self.config, self.storage = initenv()
-        # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
-        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
-        self.app = TestApp(make_app(self.config))
+        self.config = get_test_configurator(__file__)
+        self.config.include("syncstorage")
+
+        # We only support mysql and sqlite databases.
+        # Check that the config keys match this expectation.
+        # Also get a list of temp database files to delete on cleanup.
+        self.sqlfiles = []
+        for key, value in self.config.registry.settings.iteritems():
+            if key.endswith(".sqluri"):
+                sqluri = urlparse.urlparse(value)
+                assert sqluri.scheme in ('mysql',  'sqlite')
+                if sqluri.scheme == 'sqlite':
+                    self.sqlfiles.append(sqluri.path)
+
+        self.app = TestApp(self.config.make_wsgi_app())
 
         # adding a user if needed
         self.user_email = "test_%d@example.com" % random.randint(1, 100000)
@@ -31,14 +42,14 @@ class TestWsgiApp(unittest.TestCase):
         self.user_id = user["userid"]
 
     def tearDown(self):
-        self.storage.delete_storage(self.user_id)
+        for key, storage in self.config.registry.iteritems():
+            if not key.startswith("storage:"):
+                continue
+            storage.delete_storage(self.user_id)
+            if "mysql" in storage.sqluri:
+                storage._engine.execute('truncate collections')
+                storage._engine.execute('truncate wbo')
 
-        cef_logs = os.path.join(self.appdir, 'test_cef.log')
-        if os.path.exists(cef_logs):
-            os.remove(cef_logs)
-
-        if os.path.exists(self.sqlfile):
-            os.remove(self.sqlfile)
-        else:
-            self.storage._engine.execute('truncate collections')
-            self.storage._engine.execute('truncate wbo')
+        for sqlfile in self.sqlfiles:
+            if os.path.exists(sqlfile):
+                os.remove(sqlfile)

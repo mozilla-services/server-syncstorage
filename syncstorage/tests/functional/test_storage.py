@@ -13,14 +13,16 @@ import simplejson as json
 from decimal import Decimal
 from tempfile import mkstemp
 
+from mozsvc.tests.support import make_request
+
+from syncstorage.storage import get_storage
 from syncstorage.tests.functional import support
 
 import vep
 from repoze.who.plugins.vepauth.utils import sign_request
 
-from services.respcodes import WEAVE_OVER_QUOTA, WEAVE_INVALID_WBO
-from services.tests.support import get_app
-from services.util import BackendError
+from mozsvc.exceptions import BackendError
+from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_WBO
 
 
 _PLD = '*' * 500
@@ -52,6 +54,8 @@ class TestStorage(support.TestWsgiApp):
         self.root = '/1.1/%s' % self.user_name
 
         # let's create some collections for our tests
+        self.storage = get_storage(make_request(self.config))
+
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
             self.storage.set_collection(self.user_id, name)
 
@@ -276,7 +280,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_alternative_formats(self):
         # application/json
-        res = self.app.get(self.root + '/storage/col2')
+        res = self.app.get(self.root + '/storage/col2',
+                           headers=[('Accept', 'application/json')])
         self.assertEquals(res.content_type, 'application/json')
 
         res = res.json
@@ -312,10 +317,13 @@ class TestStorage(support.TestWsgiApp):
         lines.sort()
         self.assertEquals(lines, ['0', '1', '2', '3', '4'])
 
-        # unkown format defaults to json
-        res = self.app.get(self.root + '/storage/col2',
-                        headers=[('Accept', 'application/xxx')])
+        # unspecified format defaults to json
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.content_type, 'application/json')
+
+        # unkown format gets a 406
+        self.app.get(self.root + '/storage/col2', headers=[('Accept', 'x/yy')],
+                     status=406)
 
     def test_get_item(self):
         # grabbing object 1 from col2
@@ -418,6 +426,8 @@ class TestStorage(support.TestWsgiApp):
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
         self.app.post_json(self.root + '/storage/col2', wbos)
+        res = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(len(res.json), 3)
         self.app.delete(self.root + '/storage/col2?ids=12,14')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
@@ -601,26 +611,17 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
-
-        def _set_quota(size):
-            class FakeReq:
-                host = 'localhost'
-            req = FakeReq()
-            app = get_app(self.app)
-            app.get_storage(req).quota_size = size
-
-        _set_quota(0.1)
+        self.storage.quota_size = 0.1
         wbo = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', wbo)
         self.assertEquals(res.headers['X-Weave-Quota-Remaining'], '0.0765625')
 
-        _set_quota(0)
+        self.storage.quota_size = 0
         wbo = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', wbo,
-                           status=400)
-        # the body should be 14
+                                status=400)
         self.assertEquals(res.headers['Content-Type'], 'application/json')
-        self.assertEquals(res.json, WEAVE_OVER_QUOTA)
+        self.assertEquals(res.json, ERROR_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
         self.app.delete(self.root + '/storage/col2')
@@ -672,34 +673,35 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['failed']), 1)
 
     def test_blacklisted_nodes(self):
-        app = get_app(self.app)
-        old = app.config.get('storage.check_blacklisted_nodes', False)
-        app.config['storage.check_blacklisted_nodes'] = True
+        settings = self.config.registry.settings
+        old = settings.get('storage.check_blacklisted_nodes', False)
+        settings['storage.check_blacklisted_nodes'] = True
         try:
-            if app.cache is None:
+            cache = self.config.registry.get("cache")
+            if cache is None:
                 return   # memcached is probably not installed
 
-            if not app.cache.set('TEST', 1):
+            if not cache.set('TEST', 1):
                 return   # memcached server is probably down
 
             # "backoff:server" will add a X-Weave-Backoff header
-            app.cache.set('backoff:localhost:80', 2)
+            cache.set('backoff:localhost:80', 2)
             try:
                 resp = self.app.get(self.root + '/info/collections')
                 self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
             finally:
-                app.cache.delete('backoff:localhost:80')
+                cache.delete('backoff:localhost:80')
 
             # "down:server" will make the node unavailable
-            app.cache.set('down:localhost:80', 1)
+            cache.set('down:localhost:80', 1)
             try:
                 resp = self.app.get(self.root + '/info/collections',
                                     status=503)
                 self.assertTrue("Server Problem Detected" in resp.body)
             finally:
-                app.cache.delete('down:localhost:80')
+                cache.delete('down:localhost:80')
         finally:
-            app.config['storage.check_blacklisted_nodes'] = old
+            settings['storage.check_blacklisted_nodes'] = old
 
     def test_weird_args(self):
         # pushing some data in col2
@@ -740,22 +742,17 @@ class TestStorage(support.TestWsgiApp):
         self.assertEqual(res.json, [])
 
     def test_dependant_options(self):
-        config = dict(self.config)
-        config['storage.check_blacklisted_nodes'] = True
-        from syncstorage import wsgiapp
-        old_client = wsgiapp.Client
-        wsgiapp.Client = None
+        settings = self.config.registry.settings.copy()
+        settings['storage.check_blacklisted_nodes'] = True
+        from syncstorage import main, tweens
+        old_client = tweens.Client
+        tweens.Client = None
         # make sure the app cannot be initialized if it's asked
         # to check for blacklisted node and memcached is not present
         try:
-            self.assertRaises(ValueError, support.make_app, config)
+            self.assertRaises(ValueError, main, {}, **settings)
         finally:
-            wsgiapp.Client = old_client
-
-    def test_metrics(self):
-        # make sure we support any metrics marker on info/collections
-        self.app.get(self.root + '/info/collections?client=FxHome&v=1.1b2',
-                     status=200)
+            tweens.Client = old_client
 
     def test_rounding(self):
         # make sure the server returns only rounded timestamps
@@ -864,17 +861,22 @@ class TestStorage(support.TestWsgiApp):
             def get(*args, **kw):
                 return None
 
+            def get_tabs_timestamp(*args, **kw):
+                return 0
+
             def set_tabs(*args, **kw):
                 raise BackendError()
 
-        app = get_app(self.app)
         fd, dbfile = mkstemp()
         os.close(fd)
 
         try:
-            storage = MemcachedSQLStorage('sqlite:///%s' % dbfile)
+            storage = MemcachedSQLStorage('sqlite:///%s' % dbfile,
+                                          create_tables=True)
             storage.cache = BadCache()
-            app.storages['default'] = storage
+            for key in self.config.registry:
+                if key.startswith("syncstorage:storage:"):
+                    self.config.registry[key] = storage
 
             # send two wbos in the 'tabs' collection
             wbo1 = {'id': 'sure', 'payload': _PLD}
@@ -890,48 +892,39 @@ class TestStorage(support.TestWsgiApp):
             self.app.put_json(self.root + '/storage/tabs/sure', wbo1,
                          status=503)
         finally:
+            for key in self.config.registry:
+                if key.startswith("storage:"):
+                    self.config.registry[key] = self.storage
             os.remove(dbfile)
-
-    def test_debug_screen(self):
-        # deactivated by default
-        self.app.get(self.root + '/__debug__', status=404)
-
-        # let's activate it
-        app = get_app(self.app)
-        app.debug_page = '__debug__'
-
-        # what do we have ?
-        res = self.app.get('/__debug__')
-        self.assertTrue('- backend: sql' in res.body)
 
     def test_batch_size(self):
         # check that the batch size is correctly set
-        size = get_app(self.app).controllers['storage'].batch_size
+        size = self.config.registry["syncstorage.controller"].batch_size
         self.assertEqual(size, 25)
 
     def test_handling_of_invalid_json(self):
         # Single upload with JSON that's not a WBO.
-        # It should fail with WEAVE_INVALID_WBO
+        # It should fail with ERROR_INVALID_WBO
         wbo = "notawbo"
         res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
                            status=400)
-        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
         wbo = 42
         res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
                            status=400)
-        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
         wbo = {'id': ["1", "2"], 'payload': {'3': '4'}}
         res = self.app.put_json(self.root + '/storage/col2/invalid', wbo,
                            status=400)
-        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
         # Batch upload with JSON that's not a list of WBOs
-        # It should fail with WEAVE_INVALID_WBO
+        # It should fail with ERROR_INVALID_WBO
         wbos = "notalist"
         res = self.app.post_json(self.root + '/storage/col2', wbos, status=400)
-        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
         wbos = 42
         res = self.app.post_json(self.root + '/storage/col2', wbos, status=400)
-        self.assertEquals(int(res.body), WEAVE_INVALID_WBO)
+        self.assertEquals(int(res.body), ERROR_INVALID_WBO)
         # Batch upload a list with something that's not a WBO
         # It should process the good entry and fail for the bad.
         wbos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]

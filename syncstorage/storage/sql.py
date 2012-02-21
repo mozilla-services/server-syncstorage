@@ -22,6 +22,8 @@ For details of the prepared queries, see the file "queries.py".
 import urlparse
 from time import time
 from collections import defaultdict
+from decimal import Decimal
+import traceback
 
 from sqlalchemy import create_engine
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
@@ -29,15 +31,20 @@ from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
 from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
+from sqlalchemy.exc import OperationalError, TimeoutError
 
+
+from mozsvc.util import round_time
+from mozsvc.exceptions import BackendError
+
+from syncstorage import logger
+from syncstorage.wbo import WBO
 from syncstorage.storage.queries import get_query
+from syncstorage.storage.sqlmappers import wbo as _wbo
 from syncstorage.storage.sqlmappers import (tables, collections,
                                             get_wbo_table_name, MAX_TTL,
                                             get_wbo_table,
                                             get_wbo_table_byindex)
-from syncstorage.storage.sqlmappers import wbo as _wbo
-from services.util import time2bigint, bigint2time, safe_execute, round_time
-from syncstorage.wbo import WBO
 
 
 _KB = float(1024)
@@ -58,8 +65,20 @@ STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
                                    _STANDARD_COLLECTIONS.items())
 
 
+def bigint2time(value, precision=2):
+    """Decodes a big int into a timestamp.
+
+    The returned timestamp is a 2 digits Decimal.
+    """
+    if value is None:   # unexistant
+        return None
+    res = Decimal(value) / 100
+    digits = '0' * precision
+    return res.quantize(Decimal('1.' + digits))
+
+
 def _roundedbigint(value):
-    return time2bigint(round_time(value))
+    return int((round_time(value)) * 100)
 
 
 def _int_now():
@@ -231,6 +250,15 @@ class SQLStorage(object):
         """Return the name of the storage plugin"""
         return 'sql'
 
+    def _safe_execute(self, *args, **kwds):
+        """Execute an sqlalchemy query, raise BackendError on failure."""
+        try:
+            return self._engine.execute(*args, **kwds)
+        except (OperationalError, TimeoutError), exc:
+            err = traceback.format_exc()
+            logger.error(err)
+            raise BackendError(str(exc))
+
     #
     # Users APIs
     #
@@ -258,7 +286,7 @@ class SQLStorage(object):
         """Removes all user data"""
         for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS'):
             query = self._get_query(query, user_id)
-            safe_execute(self._engine, query, user_id=user_id)
+            self._safe_execute(query, user_id=user_id)
         # XXX see if we want to check the rowcount
         return True
 
@@ -276,14 +304,14 @@ class SQLStorage(object):
 
         # then the collection
         query = self._get_query('DELETE_USER_COLLECTION', user_id)
-        return safe_execute(self._engine, query, user_id=user_id,
-                            collection_name=collection_name)
+        return self._safe_execute(query, user_id=user_id,
+                                  collection_name=collection_name)
 
     def collection_exists(self, user_id, collection_name):
         """Returns True if the collection exists"""
         query = self._get_query('COLLECTION_EXISTS', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_name=collection_name)
+        res = self._safe_execute(query, user_id=user_id,
+                                 collection_name=collection_name)
         res = res.fetchone()
         return res is not None
 
@@ -309,7 +337,7 @@ class SQLStorage(object):
         next_id = -1
         while next_id < min_id:
             query = self._get_query('COLLECTION_NEXTID', user_id)
-            max_ = safe_execute(self._engine, query, user_id=user_id).first()
+            max_ = self._safe_execute(query, user_id=user_id).first()
             if max_[0] is None:
                 next_id = min_id
             else:
@@ -318,7 +346,7 @@ class SQLStorage(object):
         # insertion
         values['collectionid'] = next_id
         query = insert(collections).values(**values)
-        safe_execute(self._engine, query, **values)
+        self._safe_execute(query, **values)
         return next_id
 
     def get_collection(self, user_id, collection_name, fields=None,
@@ -333,7 +361,7 @@ class SQLStorage(object):
 
         query = select(fields, and_(collections.c.userid == user_id,
                                     collections.c.name == collection_name))
-        res = safe_execute(self._engine, query).first()
+        res = self._safe_execute(query).first()
 
         # the collection is created
         if res is None and create:
@@ -358,19 +386,19 @@ class SQLStorage(object):
             fields = [getattr(collections.c, field) for field in fields]
 
         query = select(fields, collections.c.userid == user_id)
-        return safe_execute(self._engine, query).fetchall()
+        return self._safe_execute(query).fetchall()
 
     def get_collection_names(self, user_id):
         """return the collection names for a given user"""
         query = self._get_query('USER_COLLECTION_NAMES', user_id)
-        names = safe_execute(self._engine, query, user_id=user_id)
+        names = self._safe_execute(query, user_id=user_id)
         return [(res[0], res[1]) for res in names.fetchall()]
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
         query = 'COLLECTION_STAMPS'
         query = self._get_query(query, user_id)
-        res = safe_execute(self._engine, query, user_id=user_id)
+        res = self._safe_execute(query, user_id=user_id)
         try:
             return dict([(self._collid2name(user_id, coll_id),
                         bigint2time(stamp)) for coll_id, stamp in res])
@@ -404,8 +432,8 @@ class SQLStorage(object):
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
         query = self._get_query('COLLECTION_COUNTS', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=_int_now())
+        res = self._safe_execute(query, user_id=user_id,
+                                 ttl=_int_now())
         try:
             return dict([(self._collid2name(user_id, collid), count)
                           for collid, count in res])
@@ -416,8 +444,8 @@ class SQLStorage(object):
         """Returns the max timestamp of a collection."""
         query = self._get_query('COLLECTION_MAX_STAMPS', user_id)
         collection_id = self._get_collection_id(user_id, collection_name)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_id=collection_id)
+        res = self._safe_execute(query, user_id=user_id,
+                                 collection_id=collection_id)
         res = res.fetchone()
         stamp = res[0]
         if stamp is None:
@@ -430,8 +458,8 @@ class SQLStorage(object):
         The size is the sum of stored payloads.
         """
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=_int_now())
+        res = self._safe_execute(query, user_id=user_id,
+                                 ttl=_int_now())
         try:
             return dict([(self._collid2name(user_id, col[0]),
                         int(col[1]) / _KB) for col in res])
@@ -445,9 +473,9 @@ class SQLStorage(object):
         """Returns a timestamp if an item exists."""
         collection_id = self._get_collection_id(user_id, collection_name)
         query = self._get_query('ITEM_EXISTS', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           item_id=item_id,
-                           collection_id=collection_id, ttl=_int_now())
+        res = self._safe_execute(query, user_id=user_id,
+                                 item_id=item_id, ttl=_int_now(),
+                                 collection_id=collection_id)
         res = res.fetchone()
         if res is None:
             return None
@@ -517,7 +545,7 @@ class SQLStorage(object):
         if offset is not None and int(offset) > 0:
             query = query.offset(int(offset))
 
-        res = safe_execute(self._engine, query)
+        res = self._safe_execute(query)
         converters = {'modified': bigint2time}
         return [WBO(line, converters) for line in res]
 
@@ -531,7 +559,7 @@ class SQLStorage(object):
             fields = [getattr(wbo.c, field) for field in fields]
         where = self._get_query('ITEM_ID_COL_USER', user_id)
         query = select(fields, where)
-        res = safe_execute(self._engine, query, user_id=user_id,
+        res = self._safe_execute(query, user_id=user_id,
                            item_id=item_id, collection_id=collection_id,
                            ttl=_int_now()).first()
         if res is None:
@@ -573,7 +601,7 @@ class SQLStorage(object):
                        wbo.c.collection == collection_id)
             query = update(wbo).where(key).values(**values)
 
-        safe_execute(self._engine, query)
+        self._safe_execute(query)
 
         if 'modified' in values:
             return bigint2time(values['modified'])
@@ -669,7 +697,7 @@ class SQLStorage(object):
                   'modified = values(modified), payload = values(payload),'
                   'payload_size = values(payload_size),'
                   'ttl = values(ttl)')
-        res = safe_execute(self._engine, sqltext(query), **values)
+        res = self._safe_execute(sqltext(query), **values)
         return res.rowcount
 
     def delete_item(self, user_id, collection_name, item_id,
@@ -677,9 +705,9 @@ class SQLStorage(object):
         """Deletes an item"""
         collection_id = self._get_collection_id(user_id, collection_name)
         query = self._get_query('DELETE_SOME_USER_WBO', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_id=collection_id,
-                           item_id=item_id)
+        res = self._safe_execute(query, user_id=user_id,
+                                 collection_id=collection_id,
+                                 item_id=item_id)
         return res.rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
@@ -732,8 +760,8 @@ class SQLStorage(object):
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           collection_id=collection_id)
+        res = self._safe_execute(query, user_id=user_id,
+                                 collection_id=collection_id)
         return res.rowcount > 0
 
     def get_total_size(self, user_id, recalculate=False):
@@ -742,8 +770,8 @@ class SQLStorage(object):
         The size is the sum of stored payloads.
         """
         query = self._get_query('USER_STORAGE_SIZE', user_id)
-        res = safe_execute(self._engine, query, user_id=user_id,
-                           ttl=_int_now())
+        res = self._safe_execute(query, user_id=user_id,
+                                 ttl=_int_now())
         res = res.fetchone()
         if res is None or res[0] is None:
             return 0.0

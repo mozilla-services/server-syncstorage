@@ -5,13 +5,15 @@ import unittest
 import os
 import time
 
-from syncstorage.tests.support import initenv
+from mozsvc.plugin import load_and_register
+from mozsvc.tests.support import get_test_configurator
+
 from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
 SyncStorage.register(SQLStorage)
 
-from services.util import BackendError
+from mozsvc.exceptions import BackendError
 
 _UID = 1
 _PLD = '*' * 500
@@ -20,12 +22,19 @@ _PLD = '*' * 500
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
-        self.appdir, self.config, self.storage = initenv()
-        # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite',
-                                                      'pymysql')
+        self.config = get_test_configurator(__file__)
 
-        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
+        # We only support mysql and sqlite databases.
+        # Check that the config keys match this expectation.
+        # Also get a list of temp database files to delete on cleanup.
+        self.sqlfiles = []
+        for key, value in self.config.registry.settings.iteritems():
+            if key.endswith(".sqluri"):
+                assert value.split(':/')[0] in ('mysql', 'sqlite')
+                self.sqlfiles.append(value.split('sqlite:///')[-1])
+
+        self.storage = load_and_register("storage", self.config)
+
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
@@ -43,11 +52,14 @@ class TestSQLStorage(unittest.TestCase):
         self._cfiles.append(path)
 
     def _del_db(self):
-        if os.path.exists(self.sqlfile):
-            os.remove(self.sqlfile)
-        else:
-            self.storage._engine.execute('truncate collections')
-            self.storage._engine.execute('truncate wbo')
+        for key, storage in self.config.registry.iteritems():
+            if not key.startswith("storage:"):
+                continue
+            storage._engine.execute('truncate collections')
+            storage._engine.execute('truncate wbo')
+        for sqlfile in self.sqlfiles:
+            if os.path.exists(sqlfile):
+                os.remove(sqlfile)
 
     def test_collections(self):
         self.assertFalse(self.storage.collection_exists(_UID, 'My collection'))
@@ -181,18 +193,15 @@ class TestSQLStorage(unittest.TestCase):
 
     def test_no_create(self):
         # testing the create_tables option
-        testsdir = os.path.dirname(__file__)
-
-        # when not provided it is not created
-        conf = os.path.join(testsdir, 'tests3.ini')
-        appdir, config, storage = initenv(conf)
+        config = get_test_configurator(__file__, 'tests3.ini')
+        storage = load_and_register("storage", config)
 
         # this should fail because the table is absent
         self.assertRaises(BackendError, storage.set_collection, _UID, "test")
 
         # create_table = false
-        conf = os.path.join(testsdir, 'tests4.ini')
-        appdir, config, storage = initenv(conf)
+        config = get_test_configurator(__file__, 'tests4.ini')
+        storage = load_and_register("storage", config)
         sqlfile = storage.sqluri.split('sqlite:///')[-1]
         try:
             # this should fail because the table is absent
@@ -204,8 +213,8 @@ class TestSQLStorage(unittest.TestCase):
                 os.remove(sqlfile)
 
         # create_table = true
-        conf = os.path.join(testsdir, 'tests2.ini')
-        appdir, config, storage = initenv(conf)
+        config = get_test_configurator(__file__, 'tests2.ini')
+        storage = load_and_register("storage", config)
 
         # this should work because the table is no longer absent
         storage.set_collection(_UID, "test")
@@ -214,10 +223,8 @@ class TestSQLStorage(unittest.TestCase):
         self._add_cleanup(os.path.join('/tmp', 'tests2.db'))
 
         # make shure we do shard
-        testsdir = os.path.dirname(__file__)
-        conf = os.path.join(testsdir, 'tests2.ini')
-
-        appdir, config, storage = initenv(conf)
+        config = get_test_configurator(__file__, 'tests2.ini')
+        storage = load_and_register("storage", config)
 
         res = storage._engine.execute('select count(*) from wbo1')
         self.assertEqual(res.fetchall()[0][0], 0)
@@ -238,10 +245,8 @@ class TestSQLStorage(unittest.TestCase):
 
     def test_nopool(self):
         # make sure the pool is forced to NullPool when sqlite is used.
-        testsdir = os.path.dirname(__file__)
-        conf = os.path.join(testsdir, 'tests2.ini')
-
-        appdir, config, storage = initenv(conf)
+        config = get_test_configurator(__file__, 'tests2.ini')
+        storage = load_and_register("storage", config)
         self.assertEqual(storage._engine.pool.__class__.__name__, 'NullPool')
 
 

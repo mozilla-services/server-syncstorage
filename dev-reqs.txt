@@ -20,3 +20,5 @@ greenlet
 PyMySQL
 repoze.who
 repoze.who.plugins.vepauth
+mozsvc
+cornice

@@ -8,19 +8,20 @@ from tempfile import mkstemp
 import os
 
 try:
-    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage # NOQA
     MEMCACHED = True
 except ImportError:
     MEMCACHED = False
-from syncstorage.storage import SyncStorage
-from services.util import BackendError, round_time
+
+from mozsvc.util import round_time
+from mozsvc.exceptions import BackendError
+from mozsvc.plugin import load_from_settings
 
 _UID = 1
 _PLD = '*' * 500
 
 # manual registration
 if MEMCACHED:
-    SyncStorage.register(MemcachedSQLStorage)
 
     class TestMemcachedSQLStorage(unittest.TestCase):
 
@@ -28,14 +29,15 @@ if MEMCACHED:
             fd, self.dbfile = mkstemp()
             os.close(fd)
 
-            kw = {'sqluri': 'sqlite:///%s' % self.dbfile,
-                  'use_quota': True,
-                  'quota_size': 5120,
-                  'create_tables': True}
-
             self.fn = 'syncstorage.storage.memcachedsql.MemcachedSQLStorage'
 
-            self.storage = SyncStorage.get(self.fn, **kw)
+            settings = {'storage.backend': self.fn,
+                        'storage.sqluri': 'sqlite:///%s' % self.dbfile,
+                        'storage.use_quota': True,
+                        'storage.quota_size': 5120,
+                        'storage.create_tables': True}
+
+            self.storage = load_from_settings("storage", settings)
 
             # make sure we have the standard collections in place
 
@@ -235,28 +237,14 @@ if MEMCACHED:
         def test_collection_sizes(self):
             if not self._is_up():  # no memcached
                 return
-
-            fd, dbfile = mkstemp()
-            os.close(fd)
-
-            kw = {'sqluri': 'sqlite:///%s' % dbfile,
-                  'use_quota': True,
-                  'quota_size': 5120,
-                  'create_tables': True}
-
-            try:
-                storage = SyncStorage.get(self.fn, **kw)
-
-                # setting the tabs in memcache
-                tabs = {'mCwylprUEiP5':
-                        {'payload': '*' * 1024,
-                        'id': 'mCwylprUEiP5',
-                        'modified': Decimal('1299142695.76')}}
-                storage.cache.set_tabs(1, tabs)
-                size = storage.get_collection_sizes(1)
-                self.assertEqual(size['tabs'], 1.)
-            finally:
-                os.remove(dbfile)
+            # setting the tabs in memcache
+            tabs = {'mCwylprUEiP5':
+                    {'payload': '*' * 1024,
+                    'id': 'mCwylprUEiP5',
+                    'modified': Decimal('1299142695.76')}}
+            self.storage.cache.set_tabs(1, tabs)
+            size = self.storage.get_collection_sizes(1)
+            self.assertEqual(size['tabs'], 1.)
 
         def test_flush_all(self):
             if not self._is_up():

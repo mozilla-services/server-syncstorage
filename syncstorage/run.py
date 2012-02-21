@@ -13,13 +13,18 @@ from ConfigParser import NoSectionError
 # setting up the egg cache to a place where apache can write
 os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 
-# setting up logging
-ini_file = os.path.join('/etc', 'sync', 'production.ini')
-try:
-    fileConfig(ini_file)
-except NoSectionError:
-    pass
+# the ini file is grabbed at its production place
+# unless force via an environ variable
+ini_file = os.path.join('/etc', 'syncserver', 'production.ini')
+ini_file = os.path.abspath(os.environ.get('SYNCSTORAGE_INI_FILE', ini_file))
 
 # running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s' % ini_file)
+if __name__ == '__main__':
+    # setting up logging
+    try:
+        fileConfig(ini_file)
+    except NoSectionError:
+        pass
+
+    from paste.deploy import loadapp
+    application = loadapp('config:%s' % ini_file)

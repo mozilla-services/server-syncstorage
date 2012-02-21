@@ -2,25 +2,28 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 import unittest
-import os
 
-from syncstorage.wsgiapp import make_app
+from mozsvc.tests.support import get_test_configurator, make_request
+
+from syncstorage.storage import get_storage
 
 
 class TestWSGIApp(unittest.TestCase):
 
     def setUp(self):
-        config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
-        self.app = make_app({"configuration": "file:" + config_file}).app
+        self.config = get_test_configurator(__file__)
+        self.config.include("syncstorage")
+
+    def _make_request(self, *args, **kwds):
+        return make_request(self.config, *args, **kwds)
 
     def test_host_specific_config(self):
-        class request:
-            host = "localhost"
-        self.assertEquals(self.app.get_storage(request).sqluri,
+        req = self._make_request(environ={"HTTP_HOST": "localhost"})
+        self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/tests.db")
-        request.host = "some-test-host"
-        self.assertEquals(self.app.get_storage(request).sqluri,
+        req = self._make_request(environ={"HTTP_HOST": "some-test-host"})
+        self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/some-test-host.db")
-        request.host = "another-test-host"
-        self.assertEquals(self.app.get_storage(request).sqluri,
+        req = self._make_request(environ={"HTTP_HOST": "another-test-host"})
+        self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/another-test-host.db")

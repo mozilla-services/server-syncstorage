@@ -1,21 +1,15 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-"""
 
- collections
-      |
-      |
-      ---- items
-
-"""
 import abc
-from services.pluginreg import PluginRegistry
+
+from mozsvc.plugin import load_from_settings
 
 
-class SyncStorage(PluginRegistry):
-    """Abstract Base Class for the storage."""
-    plugin_type = 'storage'
+class SyncStorage(object):
+    """Abstract Base Class for storage backends."""
+    __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
     def get_name(self):
@@ -283,17 +277,46 @@ class SyncStorage(PluginRegistry):
         """
 
 
-def get_storage(config):
-    """Returns a storage backend instance, given a config.
+def get_storage(request):
+    """Returns a storage backend instance, given a request object.
 
-    "config" is a mapping, containing the configuration.
-    All keys that starts with "storage." are used in the function.
-
-    - "storage.backend" must be present and contain a fully qualified name of a
-      backend class to be used, or the name of any backend synccore provides.
-      "sql" or "memcachedsql".
-
-    - other keys that starts with "storage." are passed to the backend
-      constructor -- with the prefix stripped.
+    This function retrieves the appropriate storage backend instance to
+    use for a given request.  It will use a host-specific backend if one
+    is available, or fall back to the default backend if not.
     """
-    return SyncStorage.get_from_config(config, 'storage')
+    try:
+        return request.registry["syncstorage:storage:host:" + request.host]
+    except KeyError:
+        return request.registry["syncstorage:storage:default"]
+
+
+def includeme(config):
+    """Load the storage backends for use by the given configurator.
+
+    This function finds all storage backend declarations in the given
+    configurator, creates the corresponding objects and caches them in
+    the registry.  The backend to use for a specific request can then
+    be looked up by calling get_storage(request).
+    """
+    settings = config.registry.settings
+    # Find all the hostnames that have custom storage backend settings.
+    hostnames = set()
+    host_token = "host."
+    for cfgkey in settings:
+        if cfgkey.startswith(host_token):
+            # Get the hostname from the config key. This assumes
+            # that host-specific keys have two trailing components
+            # that specify the setting to override.
+            # E.g: "host:localhost.storage.sqluri" => "localhost"
+            hostname = cfgkey[len(host_token):].rsplit(".", 2)[0]
+            hostnames.add(hostname)
+    # Create and cache the backend for each such host.
+    for hostname in hostnames:
+        host_cache_key = "syncstorage:storage:host:" + hostname
+        host_settings = settings.getsection(host_token + hostname)
+        host_settings.setdefaults(settings)
+        storage = load_from_settings("storage", host_settings)
+        config.registry[host_cache_key] = storage
+    # Create the default backend to be used by all other hosts.
+    storage = load_from_settings("storage", settings)
+    config.registry["syncstorage:storage:default"] = storage
