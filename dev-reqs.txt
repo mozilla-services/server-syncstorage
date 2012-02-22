@@ -1,5 +1,5 @@
 cef
-WebOb == 1.0.7
+WebOb
 Paste
 PasteDeploy
 PasteScript
