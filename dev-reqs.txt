@@ -20,5 +20,5 @@ greenlet
 PyMySQL
 repoze.who
 repoze.who.plugins.vepauth
-mozsvc
-cornice
+git+https://github.com/mozilla-services/mozservices.git
+git+https://github.com/mozilla-services/cornice.git
