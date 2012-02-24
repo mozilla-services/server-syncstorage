@@ -5,46 +5,46 @@
 """
 
 import os
-import unittest
 import urlparse
 import random
 
-from webtest import TestApp
-
-from mozsvc.tests.support import get_test_configurator
+from mozsvc.tests.support import FunctionalTestCase
 
 
-class TestWsgiApp(unittest.TestCase):
+class StorageFunctionalTestCase(FunctionalTestCase):
 
     def setUp(self):
-        self.config = get_test_configurator(__file__)
+        super(StorageFunctionalTestCase, self).setUp()
+
         self.config.include("syncstorage")
+        self.config.commit()
 
         # We only support mysql and sqlite databases.
         # Check that the config keys match this expectation.
         # Also get a list of temp database files to delete on cleanup.
-        self.sqlfiles = []
-        for key, value in self.config.registry.settings.iteritems():
-            if key.endswith(".sqluri"):
-                sqluri = urlparse.urlparse(value)
-                assert sqluri.scheme in ('mysql',  'sqlite')
-                if sqluri.scheme == 'sqlite':
-                    self.sqlfiles.append(sqluri.path)
-
-        self.app = TestApp(self.config.make_wsgi_app())
+        if not self.distant:
+            self.sqlfiles = []
+            for key, value in self.config.registry.settings.iteritems():
+                if key.endswith(".sqluri"):
+                    sqluri = urlparse.urlparse(value)
+                    assert sqluri.scheme in ('mysql',  'sqlite')
+                    if sqluri.scheme == 'sqlite':
+                        self.sqlfiles.append(sqluri.path)
 
         # adding a user if needed
         self.user_id = random.randint(1, 100000)
 
     def tearDown(self):
-        for key, storage in self.config.registry.iteritems():
-            if not key.startswith("storage:"):
-                continue
-            storage.delete_storage(self.user_id)
-            if "mysql" in storage.sqluri:
-                storage._engine.execute('truncate collections')
-                storage._engine.execute('truncate bso')
+        if not self.distant:
+            for key, storage in self.config.registry.iteritems():
+                if not key.startswith("syncstorage:storage:"):
+                    continue
+                if "mysql" in storage.sqluri:
+                    storage._engine.execute('truncate collections')
+                    storage._engine.execute('truncate bso')
 
-        for sqlfile in self.sqlfiles:
-            if os.path.exists(sqlfile):
-                os.remove(sqlfile)
+            for sqlfile in self.sqlfiles:
+                if os.path.exists(sqlfile):
+                    os.remove(sqlfile)
+
+        super(StorageFunctionalTestCase, self).tearDown()

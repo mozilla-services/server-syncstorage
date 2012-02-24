@@ -32,3 +32,16 @@ class TestWSGIApp(unittest.TestCase):
         req = self._make_request(environ={"HTTP_HOST": "another-test-host"})
         self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/another-test-host.db")
+
+    def test_dependant_options(self):
+        # make sure the app cannot be initialized if it's asked
+        # to check for blacklisted node and memcached is not present
+        settings = self.config.registry.settings.copy()
+        settings['storage.check_blacklisted_nodes'] = True
+        from syncstorage import main, tweens
+        old_client = tweens.Client
+        tweens.Client = None
+        try:
+            self.assertRaises(ValueError, main, {}, **settings)
+        finally:
+            tweens.Client = old_client
