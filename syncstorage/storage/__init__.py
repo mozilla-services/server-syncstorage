@@ -2,9 +2,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import sys
 import abc
 
 from mozsvc.plugin import load_from_settings
+
+from syncstorage import logger
 
 
 class SyncStorage(object):
@@ -320,3 +323,13 @@ def includeme(config):
     # Create the default backend to be used by all other hosts.
     storage = load_from_settings("storage", settings)
     config.registry["syncstorage:storage:default"] = storage
+    # Scan for additional config from any storage plugins.
+    # Some might fail to import, use the onerror callback to ignore them.
+    config.scan("syncstorage.storage", onerror=_ignore_import_errors)
+
+
+def _ignore_import_errors(name):
+    """Venusian scan callback that will ignore any ImportError instances."""
+    if not issubclass(sys.exc_info()[0], ImportError):
+        raise
+    logger.exception("Error while scanning package %r" % (name,))

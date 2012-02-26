@@ -50,10 +50,6 @@ def includeme(config):
     config.include("syncstorage.tweens")
     config.include("syncstorage.storage")
     config.scan("syncstorage.views")
-    try:
-        config.scan("syncstorage.storage")
-    except ImportError:
-        pass
     # Create a "controller" object.  This is a vestiage of the
     # pre-pyramid codebase and will probably go away in the future.
     config.registry["syncstorage.controller"] = StorageController(config)
