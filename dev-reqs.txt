@@ -19,6 +19,8 @@ gevent
 greenlet
 PyMySQL
 repoze.who
-repoze.who.plugins.vepauth
+repoze.who.plugins.macauth
+macauthlib
+git+git://github.com/mozilla-services/tokenlib.git
 git+git://github.com/mozilla-services/mozservices.git
 git+git://github.com/mozilla-services/cornice.git

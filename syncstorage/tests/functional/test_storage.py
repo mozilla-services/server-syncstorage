@@ -26,11 +26,11 @@ from syncstorage.util import get_timestamp
 from syncstorage.storage import get_storage
 from syncstorage.tests.functional import support
 
-import vep
-from repoze.who.plugins.vepauth.utils import sign_request
+import macauthlib
 
 from mozsvc.exceptions import BackendError
 from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_OBJECT
+from mozsvc.user.whoauth import SagradaMACAuthPlugin
 
 
 _PLD = '*' * 500
@@ -48,15 +48,17 @@ class TestStorage(support.TestWsgiApp):
 
         self.root = '/2.0'
 
-        # Exchange a BID assertion for an auth token.
-        assertion = vep.DummyVerifier.make_assertion(self.user_email,
-                                                     "http://localhost")
-        headers = {"Authorization": "Browser-ID " + assertion}
-        credentials = self.app.get(self.root + "/token", headers=headers).json
+        # Create a SagradaMACAuthPlugin from our deployment settings,
+        # so that we can generate valid authentication tokens.
+        settings = self.config.registry.settings
+        macauth_settings = settings.getsection("who.plugin.macauth")
+        macauth_settings.pop("use", None)
+        auth_plugin = SagradaMACAuthPlugin(**macauth_settings)
 
-        # Monkey-patch the app to sign all requests with that token.
+        # Monkey-patch the app to sign all requests with a macauth token.
         def new_do_request(req, *args, **kwds):
-            sign_request(req, credentials["id"], credentials["key"])
+            id, key = auth_plugin.encode_mac_id(req, {"userid": self.user_id})
+            macauthlib.sign_request(req, id, key)
             return orig_do_request(req, *args, **kwds)
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request

@@ -8,7 +8,7 @@ import re
 
 install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson', 'cef', 'mozsvc', 'cornice',
-                    'repoze.who', 'repoze.who.plugins.vepauth']
+                    'repoze.who', 'repoze.who.plugins.macauth', 'macauthlib']
                     
 entry_points = """
 [paste.app_factory]

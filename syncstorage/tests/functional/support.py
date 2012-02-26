@@ -13,8 +13,6 @@ from webtest import TestApp
 
 from mozsvc.tests.support import get_test_configurator
 
-from syncstorage.tokens import ServicesTokenManager
-
 
 class TestWsgiApp(unittest.TestCase):
 
@@ -36,9 +34,7 @@ class TestWsgiApp(unittest.TestCase):
         self.app = TestApp(self.config.make_wsgi_app())
 
         # adding a user if needed
-        self.user_email = "test_%d@example.com" % random.randint(1, 100000)
-        user = ServicesTokenManager.get_user_data(self.user_email)
-        self.user_id = user["userid"]
+        self.user_id = random.randint(1, 100000)
 
     def tearDown(self):
         for key, storage in self.config.registry.iteritems():
