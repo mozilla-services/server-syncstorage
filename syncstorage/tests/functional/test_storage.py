@@ -67,7 +67,7 @@ class TestStorage(support.TestWsgiApp):
         self.storage = get_storage(make_request(self.config))
 
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.storage.set_collection(self.user_id, name)
+            self.storage.set_items(self.user_id, name, [])
 
         for item in range(3):
             self.storage.set_item(self.user_id, 'col1', str(item),
@@ -109,7 +109,6 @@ class TestStorage(support.TestWsgiApp):
         numcols = len(resp.json)
 
         # 2. add a new collection + stuff
-        self.storage.set_collection(self.user_id, 'xxxx')
         bso = {'id': '125', 'payload': _PLD}
         self.app.put_json(self.root + '/storage/xxxx/125', bso)
 
@@ -369,7 +368,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_set_collection_input_formats(self):
-        self.storage.delete_collection(self.user_id, "col2")
+        self.storage.delete_items(self.user_id, "col2")
         # If we send with application/newlines it should work.
         bso1 = {'id': 12, 'payload': _PLD}
         bso2 = {'id': 13, 'payload': _PLD}
@@ -381,7 +380,7 @@ class TestStorage(support.TestWsgiApp):
         items = self.storage.get_items(self.user_id, "col2")
         self.assertEquals(len(items), 2)
         # If we send an unknown content type, we get an error.
-        self.storage.delete_collection(self.user_id, "col2")
+        self.storage.delete_items(self.user_id, "col2")
         body = json.dumps(bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
@@ -403,7 +402,7 @@ class TestStorage(support.TestWsgiApp):
         wanted = len(bso1['payload']) + len(bso2['payload'])
         self.assertEqual(col2_size, wanted / 1024.)
 
-    def test_delete_collection(self):
+    def test_delete_collection_items(self):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three

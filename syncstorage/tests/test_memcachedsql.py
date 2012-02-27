@@ -42,7 +42,7 @@ if MEMCACHED:
             # make sure we have the standard collections in place
 
             for name in ('client', 'crypto', 'forms', 'history'):
-                self.storage.set_collection(_UID, name)
+                self.storage.set_items(_UID, name, [])
 
         def tearDown(self):
             self.storage.cache.flush_all()
@@ -60,7 +60,6 @@ if MEMCACHED:
             if not self._is_up():
                 return
             # just make sure calls goes through
-            self.storage.set_collection(_UID, 'col1')
             self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 
             # these calls should be cached
@@ -75,7 +74,6 @@ if MEMCACHED:
         def test_meta_global(self):
             if not self._is_up():
                 return
-            self.storage.set_collection(_UID, 'meta')
             self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
 
             # these calls should be cached
@@ -124,7 +122,6 @@ if MEMCACHED:
             if not self._is_up():  # no memcached == no tabs
                 return
 
-            self.storage.set_collection(_UID, 'tabs')
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
 
             # these calls should be cached
@@ -158,8 +155,6 @@ if MEMCACHED:
                 return
 
             # storing 2 BSOs
-            self.storage.set_collection(_UID, 'tabs')
-            self.storage.set_collection(_UID, 'foo')
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
 
@@ -175,10 +170,6 @@ if MEMCACHED:
         def test_collection_stamps(self):
             if not self._is_up():
                 return
-
-            self.storage.set_collection(_UID, 'tabs')
-            self.storage.set_collection(_UID, 'foo')
-            self.storage.set_collection(_UID, 'baz')
 
             self.storage.set_item(_UID, 'tabs', '1', payload=_PLD * 200)
             self.storage.set_item(_UID, 'foo', '1', payload=_PLD * 200)
@@ -250,7 +241,6 @@ if MEMCACHED:
             if not self._is_up():
                 return
             # just make sure calls goes through
-            self.storage.set_collection(_UID, 'col1')
             self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 
             # these calls should be cached

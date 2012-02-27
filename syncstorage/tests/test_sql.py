@@ -38,7 +38,7 @@ class TestSQLStorage(unittest.TestCase):
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
-            self.storage.set_collection(_UID, name)
+            self.storage.set_items(_UID, name, [])
 
         self._cfiles = []
 
@@ -61,49 +61,7 @@ class TestSQLStorage(unittest.TestCase):
             if os.path.exists(sqlfile):
                 os.remove(sqlfile)
 
-    def test_collections(self):
-        self.assertFalse(self.storage.collection_exists(_UID, 'My collection'))
-        self.storage.set_collection(_UID, 'My collection')
-        self.assertTrue(self.storage.collection_exists(_UID, 'My collection'))
-
-        res = dict(self.storage.get_collection(_UID, 'My collection').items())
-        self.assertEqual(res['name'], 'My collection')
-        self.assertEqual(res['userid'], _UID)
-        res = self.storage.get_collection(_UID, 'My collection',
-                                          fields=['name'])
-        self.assertEquals(res, {'name': 'My collection'})
-
-        res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 11)
-        res = dict(res[-1].items())
-        self.assertEqual(res['name'], 'My collection')
-        self.assertEqual(res['userid'], _UID)
-
-        res = self.storage.get_collections(_UID, fields=['name'])
-        res = [line[0] for line in res]
-        self.assertTrue('My collection' in res)
-
-        # adding a new collection
-        self.storage.set_collection(_UID, 'My collection 2')
-        res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 12)
-
-        names = self.storage.get_collection_names(_UID)
-        self.assertEquals([name[1] for name in names[-2:]],
-                          ['My collection', 'My collection 2'])
-
-        # removing a collection
-        self.storage.delete_collection(_UID, 'My collection 2')
-        res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 11)
-
-        # removing *all*
-        self.storage.delete_storage(_UID)
-        res = self.storage.get_collections(_UID)
-        self.assertEquals(len(res), 0)
-
     def test_items(self):
-        self.storage.set_collection(_UID, 'col')
         self.assertFalse(self.storage.item_exists(_UID, 'col', 1))
         self.assertEquals(self.storage.get_items(_UID, 'col'), [])
 
@@ -130,8 +88,6 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEquals(res['payload'], _PLD)
 
     def test_get_collection_timestamps(self):
-        self.storage.set_collection(_UID, 'col1')
-        self.storage.set_collection(_UID, 'col2')
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
         self.storage.set_item(_UID, 'col2', 1, payload=_PLD)
 
@@ -146,10 +102,8 @@ class TestSQLStorage(unittest.TestCase):
         # still returns the same timestamps for the first user
         # which differs from the second user
         time.sleep(1.)
-        self.storage.set_collection(2, 'col1')
-        self.storage.set_collection(2, 'col2')
-        self.storage.set_item(2, 'col1', 1, payload=_PLD)
-        self.storage.set_item(2, 'col2', 1, payload=_PLD)
+        self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
+        self.storage.set_item(_UID, 'col2', 1, payload=_PLD)
 
         user1_timestamps = self.storage.get_collection_timestamps(_UID)
         user1_timestamps = user1_timestamps.items()
@@ -163,14 +117,12 @@ class TestSQLStorage(unittest.TestCase):
 
     def test_storage_size(self):
         before = self.storage.get_total_size(_UID)
-        self.storage.set_collection(_UID, 'col1')
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
         self.storage.set_item(_UID, 'col1', 2, payload=_PLD)
         wanted = len(_PLD) * 2 / 1024.
         self.assertEquals(self.storage.get_total_size(_UID) - before, wanted)
 
     def test_ttl(self):
-        self.storage.set_collection(_UID, 'col1')
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
         self.storage.set_item(_UID, 'col1', 2, payload=_PLD, ttl=0)
         time.sleep(1.1)
@@ -180,7 +132,6 @@ class TestSQLStorage(unittest.TestCase):
                                                 2)
 
     def test_dashed_ids(self):
-        self.storage.set_collection(_UID, 'col1')
         id1 = '{ec1b7457-003a-45a9-bf1c-c34e37225ad7}'
         id2 = '{339f52e1-deed-497c-837a-1ab25a655e37}'
         self.storage.set_item(_UID, 'col1', id1, payload=_PLD)
@@ -196,8 +147,10 @@ class TestSQLStorage(unittest.TestCase):
         config = get_test_configurator(__file__, 'tests3.ini')
         storage = load_and_register("storage", config)
 
+        bsos = [{"id": "TEST", "payload": _PLD}]
         # this should fail because the table is absent
-        self.assertRaises(BackendError, storage.set_collection, _UID, "test")
+        self.assertRaises(BackendError,
+                          storage.set_items, _UID, "test", bsos)
 
         # create_table = false
         config = get_test_configurator(__file__, 'tests4.ini')
@@ -205,8 +158,8 @@ class TestSQLStorage(unittest.TestCase):
         sqlfile = storage.sqluri.split('sqlite:///')[-1]
         try:
             # this should fail because the table is absent
-            self.assertRaises(BackendError, storage.set_collection,
-                              _UID, "test")
+            self.assertRaises(BackendError,
+                              storage.set_items, _UID, "test", bsos)
         finally:
             # removing the db created
             if os.path.exists(sqlfile):
@@ -217,7 +170,7 @@ class TestSQLStorage(unittest.TestCase):
         storage = load_and_register("storage", config)
 
         # this should work because the table is no longer absent
-        storage.set_collection(_UID, "test")
+        storage.set_items(_UID, "test", [])
 
     def test_shard(self):
         self._add_cleanup(os.path.join('/tmp', 'tests2.db'))
@@ -230,7 +183,6 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEqual(res.fetchall()[0][0], 0)
 
         # doing a few things on the DB
-        storage.set_collection(_UID, 'col1')
         id1 = '{ec1b7457-003a-45a9-bf1c-c34e37225ad7}'
         id2 = '{339f52e1-deed-497c-837a-1ab25a655e37}'
         storage.set_item(_UID, 'col1', id1, payload=_PLD)

@@ -83,7 +83,7 @@ class StorageController(object):
         # XXX returns a 400 if the root is called
         raise HTTPBadRequest()
 
-    def get_collections(self, request, **metrics):
+    def get_collection_timestamps(self, request):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """

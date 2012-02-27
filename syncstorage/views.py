@@ -81,7 +81,7 @@ def _ctrl(request):
 
 @info_modified.get()
 def get_info_modified(request):
-    return _ctrl(request).get_collections(request)
+    return _ctrl(request).get_collection_timestamps(request)
 
 
 @info_counts.get()

@@ -9,46 +9,30 @@ The function get_query(name, user_id) will retrieve the text for the named
 query while taking BSO table sharding into account.
 """
 
-from syncstorage.storage.sqlmappers import collections, bso, get_bso_table
-from sqlalchemy.sql import select, bindparam, delete, and_, text
-
-_USER_N_COLL = and_(collections.c.userid == bindparam('user_id'),
-                    collections.c.name == bindparam('collection_name'))
+from syncstorage.storage.sqlmappers import bso, get_bso_table
+from sqlalchemy.sql import bindparam, and_, text
 
 queries = {
     'DELETE_SOME_USER_BSO': 'DELETE FROM %(bso)s WHERE userid=:user_id AND '
                             'collection=:collection_id AND id=:item_id',
 
-    'DELETE_USER_COLLECTIONS': 'DELETE FROM collections WHERE '
-                               'userid=:user_id',
-
-    'DELETE_USER_COLLECTION': delete(collections).where(_USER_N_COLL),
-
     'DELETE_USER_BSOS': 'DELETE FROM %(bso)s WHERE userid=:user_id',
 
-    'COLLECTION_EXISTS': select([collections.c.collectionid], _USER_N_COLL),
+    'COLLECTIONS_MAX_STAMPS': 'SELECT collection, MAX(modified) FROM %(bso)s '
+                              'WHERE userid=:user_id GROUP BY userid, '
+                              'collection',
 
-    'COLLECTION_NEXTID': 'SELECT MAX(collectionid) FROM collections '
-                         'WHERE userid=:user_id',
+    'COLLECTIONS_COUNTS': 'SELECT collection, COUNT(collection) FROM %(bso)s '
+                          'WHERE userid=:user_id AND ttl>:ttl '
+                          'GROUP BY collection',
 
-    'COLLECTION_MODIFIED': 'SELECT bso_a.modified FROM %(bso)s AS bso_a, '
-                           '%(bso)s WHERE bso_a.userid=%(bso)s.userid '
-                           'AND bso_a.collection=%(bso)s.collection '
-                           'ORDER BY bso_a.userid DESC, '
-                           'bso_a.collection DESC, bso_a.modified DESC '
-                           'LIMIT 1',
+    'COLLECTIONS_STORAGE_SIZE': 'SELECT collection, SUM(payload_size) '
+                                'FROM %(bso)s WHERE userid=:user_id AND '
+                                'ttl>:ttl GROUP BY collection',
 
-    'COLLECTION_STAMPS': 'SELECT collection, MAX(modified) FROM %(bso)s '
-                         'WHERE userid=:user_id GROUP BY userid, '
-                         'collection',
-
-    'COLLECTION_COUNTS': 'SELECT collection, COUNT(collection) FROM %(bso)s '
-                         'WHERE userid=:user_id AND ttl>:ttl '
-                         'GROUP BY collection',
-
-    'COLLECTION_MAX_STAMPS': 'SELECT MAX(modified) FROM %(bso)s WHERE '
-                             'collection=:collection_id AND '
-                             'userid=:user_id',
+    'COLLECTION_MAX_STAMP': 'SELECT MAX(modified) FROM %(bso)s WHERE '
+                            'collection=:collection_id AND '
+                            'userid=:user_id',
 
     'ITEM_EXISTS': 'SELECT modified FROM %(bso)s WHERE '
                    'collection=:collection_id AND userid=:user_id '
@@ -59,13 +43,6 @@ queries = {
 
     'USER_STORAGE_SIZE': 'SELECT SUM(payload_size) FROM %(bso)s WHERE '
                          'userid=:user_id AND ttl>:ttl',
-
-    'COLLECTIONS_STORAGE_SIZE': 'SELECT collection, SUM(payload_size) '
-                                'FROM %(bso)s WHERE userid=:user_id AND '
-                                'ttl>:ttl GROUP BY collection',
-
-    'USER_COLLECTION_NAMES': 'SELECT collectionid, name FROM collections '
-                             'WHERE userid=:user_id',
     }
 
 

@@ -7,7 +7,7 @@ SQL backend for syncserver.
 This module implements an SQL storage plugin for syncserver.  In the simplest
 use case it consists of two database tables:
 
-  collections:  the names of per-user custom collections
+  collections:  the names and ids of any custom collections
   bso:          the individual BSO items stored in each collection
 
 For efficiency when dealing with large datasets, the plugin also supports
@@ -21,11 +21,10 @@ For details of the prepared queries, see the file "queries.py".
 
 import urlparse
 from time import time
-from collections import defaultdict
 import traceback
 
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError, TimeoutError
+from sqlalchemy.exc import OperationalError, TimeoutError, IntegrityError
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             delete, and_)
 
@@ -49,16 +48,11 @@ _KB = float(1024)
 # common collection names.  This is the canonical list of such names.
 # Non-standard collections will be allocated IDs starting from the
 # highest ID in this collection.
-# XXX: some names here are incorrect; we need to change "client" to "clients"
-# "key" to "keys" at some point.  See Bug 688623
-# XXX: we need to reserve ids 100 and above for custom collections, so
-# that there's room to add new standard collections as needed.
-_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
-                         5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
-                         9: 'tabs', 10: 'passwords'}
+STANDARD_COLLECTIONS = {1: 'clients', 2: 'crypto', 3: 'forms', 4: 'history',
+                        5: 'keys', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
+                        9: 'tabs', 10: 'passwords'}
 
-STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
-                                   _STANDARD_COLLECTIONS.items())
+FIRST_CUSTOM_COLLECTION_ID = 100
 
 
 def _int_now():
@@ -133,11 +127,22 @@ class SQLStorage(object):
             _bso.metadata.bind = self._engine
             if create_tables:
                 _bso.create(checkfirst=True)
+        # There doesn't seem to be a reliable cross-database way to set the
+        # initial value of an autoincrement column.  Fake it by inserting
+        # a row into the table at the desired start id.
+        if self.standard_collections and create_tables:
+            zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
+            query = insert(collections).values(colletionid=zeroth_id, name="")
+            self._safe_execute(query)
 
-        # A per-user cache for collection metadata.
-        # This is to avoid looking up the collection name <=> id mapping
-        # in the database on every request.
-        self._temp_cache = defaultdict(dict)
+        # A cache for the collection_name => collection_id mapping.
+        # XXX: need to prevent this growing without bound.
+        self._collections_by_name = {}
+        self._collections_by_id = {}
+        if self.standard_collections:
+            for id, name in STANDARD_COLLECTIONS:
+                self._collections_by_name[name] = id
+                self._collections_by_id[id] = name
 
     @classmethod
     def get_name(cls):
@@ -156,31 +161,17 @@ class SQLStorage(object):
     #
     # Users APIs
     #
+
     def _get_query(self, name, user_id):
         """Get the named pre-built query, sharding by user_id if necessary."""
         if self.shard:
             return get_query(name, user_id)
         return get_query(name)
 
-    def _get_collection_id(self, user_id, collection_name, create=True):
-        """Returns a collection id, given the name."""
-        if (self.standard_collections and
-            collection_name in STANDARD_COLLECTIONS_NAMES):
-            return STANDARD_COLLECTIONS_NAMES[collection_name]
-
-        # custom collection
-        data = self.get_collection(user_id, collection_name,
-                                   ['collectionid'], create)
-        if data is None:
-            return None
-
-        return data['collectionid']
-
     def delete_storage(self, user_id):
         """Removes all user data"""
-        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_BSOS'):
-            query = self._get_query(query, user_id)
-            self._safe_execute(query, user_id=user_id)
+        query = self._get_query('DELETE_USER_BSOS', user_id)
+        self._safe_execute(query, user_id=user_id)
         # XXX see if we want to check the rowcount
         return True
 
@@ -188,156 +179,107 @@ class SQLStorage(object):
     # Collections APIs
     #
 
-    def delete_collection(self, user_id, collection_name):
-        """deletes a collection"""
-        if not self.collection_exists(user_id, collection_name):
-            return
+    def _get_collection_id(self, collection_name, create=True):
+        """Returns a collection id, given the name.
 
-        # removing items first
-        self.delete_items(user_id, collection_name)
+        By default new collections will be created on demand.  To prevent
+        auto-creation pass create=False.
+        """
+        # Grab it from the cache if we can.
+        try:
+            return self._collections_by_name[collection_name]
+        except KeyError:
+            pass
 
-        # then the collection
-        query = self._get_query('DELETE_USER_COLLECTION', user_id)
-        return self._safe_execute(query, user_id=user_id,
-                                  collection_name=collection_name)
-
-    def collection_exists(self, user_id, collection_name):
-        """Returns True if the collection exists"""
-        query = self._get_query('COLLECTION_EXISTS', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 collection_name=collection_name)
-        res = res.fetchone()
-        return res is not None
-
-    def set_collection(self, user_id, collection_name, **values):
-        """Creates a collection"""
-        # XXX values is not used for now because there are no values besides
-        # the name
-        if self.collection_exists(user_id, collection_name):
-            return
-
-        values['userid'] = user_id
-        values['name'] = collection_name
-
-        if self.standard_collections:
-            ids = _STANDARD_COLLECTIONS.keys()
-            min_id = max(ids) + 1
+        # Try to look it up in the database.
+        query = select([collections.c.collectionid])
+        query = query.where(collections.c.name == collection_name)
+        res = self._safe_execute(query).fetchone()
+        if res is not None:
+            collection_id = res[0]
         else:
-            min_id = 0
-
-        # getting the max collection_id
-        # XXX why don't we have an autoinc here ?
-        # see https://bugzilla.mozilla.org/show_bug.cgi?id=579096
-        next_id = -1
-        while next_id < min_id:
-            query = self._get_query('COLLECTION_NEXTID', user_id)
-            max_ = self._safe_execute(query, user_id=user_id).first()
-            if max_[0] is None:
-                next_id = min_id
+            # Shall we auto-create it?
+            if not create:
+                return None
+            # Insert it into the database.  This might raise a conflict
+            # if it was inserted concurrently by someone else.
+            query = insert(collections)
+            try:
+              
+                self._safe_execute(query, name=collection_name)
+            except IntegrityError:
+                # Read the id that was created concurrently.
+                collection_id = self._get_collection_id(collection_name, False)
+                if collection_id is None:
+                    raise
             else:
-                next_id = max_[0] + 1
+                # Read the id that we just created.
+                # XXX: cross-database way to get last inserted id?
+                collection_id = self._get_collection_id(collection_name, False)
 
-        # insertion
-        values['collectionid'] = next_id
-        query = insert(collections).values(**values)
-        self._safe_execute(query, **values)
-        return next_id
+        # Sanity-check that we're not trampling standard collection ids.
+        if self.standard_collections:
+            assert collection_id >= FIRST_CUSTOM_COLLECTION_ID
 
-    def get_collection(self, user_id, collection_name, fields=None,
-                       create=True):
-        """Return information about a collection."""
-        if fields is None:
-            fields = [collections]
-            field_names = collections.columns.keys()
-        else:
-            field_names = fields
-            fields = [getattr(collections.c, field) for field in fields]
+        self._collections_by_name[collection_name] = collection_id
+        self._collections_by_id[collection_id] = collection_name
+        return collection_id
 
-        query = select(fields, and_(collections.c.userid == user_id,
-                                    collections.c.name == collection_name))
-        res = self._safe_execute(query).first()
+    def _get_collection_name(self, collection_id):
+        try:
+            return self._collections_by_id[collection_id]
+        except KeyError:
+            pass
 
-        # the collection is created
-        if res is None and create:
-            collid = self.set_collection(user_id, collection_name)
-            res = {'userid': user_id, 'collectionid': collid,
-                   'name': collection_name}
-            if fields is not None:
-                for key in res.keys():
-                    if key not in field_names:
-                        del res[key]
-        else:
-            # make this a single step
-            res = dict([(key, value) for key, value in res.items()
-                         if value is not None])
-        return res
+        query = select([collections.c.name],
+                       collections.c.collectionid == collection_id)
+        res = self._safe_execute(query).fetchone()
+        if res is None:
+            return None
 
-    def get_collections(self, user_id, fields=None):
-        """returns the collections information """
-        if fields is None:
-            fields = [collections]
-        else:
-            fields = [getattr(collections.c, field) for field in fields]
+        self._collections_by_id[collection_id] = res[0]
+        self._collections_by_name[res[0]] = collection_id
+        return res[0]
 
-        query = select(fields, collections.c.userid == user_id)
-        return self._safe_execute(query).fetchall()
+    def _load_collection_names(self, collection_ids):
+        """Load any uncached names for the given collection ids.
 
-    def get_collection_names(self, user_id):
-        """return the collection names for a given user"""
-        query = self._get_query('USER_COLLECTION_NAMES', user_id)
-        names = self._safe_execute(query, user_id=user_id)
-        return [(res[0], res[1]) for res in names.fetchall()]
+        If you have a list of collection ids and you want all their names,
+        use this method to prime the internal name cache.  Otherwise you'll
+        cause _get_collection_name() to do a separate database query for
+        each collection id, which is very inefficient.
+        """
+        uncached_ids = [id for id in collection_ids
+                        if id not in self._collections_by_name]
+        if uncached_ids:
+            is_uncached = collections.c.collectionid.in_(uncached_ids)
+            query = select([collections]).where(is_uncached)
+            for res in self._safe_execute(query):
+                self._collections_by_id[res[0]] = res[1]
+                self._collections_by_name[res[1]] = res[0]
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
-        query = 'COLLECTION_STAMPS'
-        query = self._get_query(query, user_id)
-        res = self._safe_execute(query, user_id=user_id)
-        try:
-            return dict([(self._collid2name(user_id, coll_id), stamp)
-                         for coll_id, stamp in res])
-        finally:
-            self._purge_cache(user_id)
-
-    def _cache(self, user_id, name, func):
-        user_cache = self._temp_cache[user_id]
-        if name in user_cache:
-            return user_cache[name]
-        data = func()
-        user_cache[name] = data
-        return data
-
-    def _purge_cache(self, user_id):
-        self._temp_cache[user_id].clear()
-
-    def _collid2name(self, user_id, collection_id):
-        if (self.standard_collections and
-            collection_id in _STANDARD_COLLECTIONS):
-            return _STANDARD_COLLECTIONS[collection_id]
-
-        # custom collections
-        def _coll():
-            data = self.get_collection_names(user_id)
-            return dict(data)
-
-        collections = self._cache(user_id, 'collection_names', _coll)
-        return collections[collection_id]
+        query = self._get_query('COLLECTIONS_MAX_STAMPS', user_id)
+        res = list(self._safe_execute(query, user_id=user_id))
+        collection_ids = [collection_id for collection_id, stamp in res]
+        self._load_collection_names(collection_ids)
+        return dict([(self._get_collection_name(collection_id), stamp)
+                     for collection_id, stamp in res])
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
-        query = self._get_query('COLLECTION_COUNTS', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 ttl=_int_now())
-        try:
-            return dict([(self._collid2name(user_id, collid), count)
-                          for collid, count in res])
-        finally:
-            self._purge_cache(user_id)
+        query = self._get_query('COLLECTIONS_COUNTS', user_id)
+        res = list(self._safe_execute(query, user_id=user_id, ttl=_int_now()))
+        collection_ids = [collection_id for collection_id, count in res]
+        self._load_collection_names(collection_ids)
+        return dict([(self._get_collection_name(collection_id), count)
+                      for collection_id, count in res])
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
-        query = self._get_query('COLLECTION_MAX_STAMPS', user_id)
-        collection_id = self._get_collection_id(user_id, collection_name)
+        query = self._get_query('COLLECTION_MAX_STAMP', user_id)
+        collection_id = self._get_collection_id(collection_name)
         res = self._safe_execute(query, user_id=user_id,
                                  collection_id=collection_id)
         res = res.fetchone()
@@ -350,20 +292,18 @@ class SQLStorage(object):
         The size is the sum of stored payloads.
         """
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 ttl=_int_now())
-        try:
-            return dict([(self._collid2name(user_id, col[0]),
-                        int(col[1]) / _KB) for col in res])
-        finally:
-            self._purge_cache(user_id)
+        res = list(self._safe_execute(query, user_id=user_id, ttl=_int_now()))
+        collection_ids = [collection_id for collection_id, size in res]
+        self._load_collection_names(collection_ids)
+        return dict([(self._get_collection_name(col[0]),
+                    int(col[1]) / _KB) for col in res])
 
     #
     # Items APIs
     #
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(collection_name)
         query = self._get_query('ITEM_EXISTS', user_id)
         res = self._safe_execute(query, user_id=user_id,
                                  item_id=item_id, ttl=_int_now(),
@@ -389,7 +329,7 @@ class SQLStorage(object):
         operator is used. For single values, the operator has to be provided.
         """
         bso = self._get_bso_table(user_id)
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(collection_name)
         if fields is None:
             fields = [bso]
         else:
@@ -441,7 +381,7 @@ class SQLStorage(object):
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
         bso = self._get_bso_table(user_id)
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(collection_name)
         if fields is None:
             fields = [bso]
         else:
@@ -472,8 +412,7 @@ class SQLStorage(object):
         if 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
-        collection_id = self._get_collection_id(user_id,
-                                                collection_name)
+        collection_id = self._get_collection_id(collection_name)
 
         if modified is None:   # does not exists
             values['collection'] = collection_id
@@ -515,9 +454,6 @@ class SQLStorage(object):
 
         Returns a list of success or failures.
         """
-        if not self.standard_collections:
-            self.set_collection(user_id, collection_name)
-
         if storage_time is None:
             storage_time = get_timestamp()
 
@@ -542,8 +478,7 @@ class SQLStorage(object):
                     % (table, ','.join(fields))
 
         values = {}
-        values['collection'] = self._get_collection_id(user_id,
-                                                       collection_name)
+        values['collection'] = self._get_collection_id(collection_name)
         values['user_id'] = user_id
 
         # building the values batch
@@ -587,7 +522,7 @@ class SQLStorage(object):
     def delete_item(self, user_id, collection_name, item_id,
                     storage_time=None):
         """Deletes an item"""
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(collection_name)
         query = self._get_query('DELETE_SOME_USER_BSO', user_id)
         res = self._safe_execute(query, user_id=user_id,
                                  collection_id=collection_id,
@@ -597,7 +532,7 @@ class SQLStorage(object):
     def delete_items(self, user_id, collection_name, item_ids=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(collection_name)
         bso = self._get_bso_table(user_id)
         query = delete(bso)
         where = [bso.c.userid == bindparam('user_id'),

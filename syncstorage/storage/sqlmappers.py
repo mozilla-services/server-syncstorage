@@ -14,16 +14,16 @@ MAX_TTL = 2100000000
 
 
 class Collections(_Base):
-    """Table mapping (user_id, collection_name) => collection_id.
+    """Table mapping collection_name => collection_id.
 
-    This table provides a per-user namespace for custom collection names.
-    It maps a (user_id, collection_name) pair to a unique collection id.
+    This table holds the names and corresponding ids of the collections in
+    use on the storage node.
     """
     __tablename__ = 'collections'
     # XXX add indexes
-    userid = Column(Integer(11), primary_key=True, nullable=False)
-    collectionid = Column(Integer(6), primary_key=True, nullable=False)
-    name = Column(String(32), nullable=False)
+    collectionid = Column(Integer(6), primary_key=True, nullable=False,
+                          autoincrement=True)
+    name = Column(String(32), nullable=False, unique=True)
 
 
 collections = Collections.__table__

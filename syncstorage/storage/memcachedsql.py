@@ -207,7 +207,9 @@ class MemcachedSQLStorage(SQLStorage):
         for item in items:
             self._update_item(item, storage_time)
 
-        self._update_cache(user_id, collection_name, items, storage_time)
+        if items:
+            self._update_cache(user_id, collection_name, items, storage_time)
+
         if collection_name == 'tabs':
             # return now : we don't store tabs in sql
             return len(items)
