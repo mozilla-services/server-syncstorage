@@ -25,12 +25,9 @@ from collections import defaultdict
 import traceback
 
 from sqlalchemy import create_engine
-from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
-                            and_)
-from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
-from sqlalchemy import util
-from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.exc import OperationalError, TimeoutError
+from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
+                            delete, and_)
 
 
 from mozsvc.exceptions import BackendError
@@ -66,92 +63,6 @@ STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
 
 def _int_now():
     return int(time())
-
-
-class _CustomCompiler(SQLCompiler):
-    """SQLAlchemy statement compiler to support DELETE with ORDER BY and LIMIT.
-
-    The visit_delete() method of this class is mostly a verbatim copy of the
-    method from SQLCompiler, but has extra logic to handle ORDER BY and LIMIT
-    clauses on the delete statement.
-    """
-
-    def visit_delete(self, delete_stmt):
-        self.stack.append({'from': set([delete_stmt.table])})
-        self.isdelete = True
-
-        text = "DELETE FROM " + self.preparer.format_table(delete_stmt.table)
-
-        if delete_stmt._returning:
-            self.returning = delete_stmt._returning
-            if self.returning_precedes_values:
-                text += " " + self.returning_clause(delete_stmt,
-                                                    delete_stmt._returning)
-
-        if delete_stmt._whereclause is not None:
-            text += " WHERE " + self.process(delete_stmt._whereclause)
-
-        if len(delete_stmt._order_by_clause) > 0:
-            text += " ORDER BY " + self.process(delete_stmt._order_by_clause)
-
-        if delete_stmt._limit is not None or delete_stmt._offset is not None:
-            text += self.limit_clause(delete_stmt)
-
-        if self.returning and not self.returning_precedes_values:
-            text += " " + self.returning_clause(delete_stmt,
-                                                delete_stmt._returning)
-
-        self.stack.pop(-1)
-
-        return text
-
-
-class _DeleteOrderBy(Delete):
-    """Custom Delete statement with ORDER BY and LIMIT support."""
-
-    def __init__(self, table, whereclause, bind=None, returning=None,
-                 order_by=None, limit=None, offset=None, **kwargs):
-        Delete.__init__(self, table, whereclause, bind, returning, **kwargs)
-        self._order_by_clause = ClauseList(*util.to_list(order_by) or [])
-        self._limit = limit
-        self._offset = offset
-
-    @_generative
-    def order_by(self, *clauses):
-        self.append_order_by(*clauses)
-
-    def append_order_by(self, *clauses):
-        if len(clauses) == 1 and clauses[0] is None:
-            self._order_by_clause = ClauseList()
-        else:
-            if getattr(self, '_order_by_clause', None) is not None:
-                clauses = list(self._order_by_clause) + list(clauses)
-            self._order_by_clause = ClauseList(*clauses)
-
-    @_generative
-    def limit(self, limit):
-        self._limit = limit
-
-    @_generative
-    def offset(self, offset):
-        self._offset = offset
-
-    def _copy_internals(self, clone=_clone):
-        self._whereclause = clone(self._whereclause)
-        for attr in ('_order_by_clause',):
-            if getattr(self, attr) is not None:
-                setattr(self, attr, clone(getattr(self, attr)))
-
-    def get_children(self, column_collections=True, **kwargs):
-        children = Delete.get_children(column_collections, **kwargs)
-        return children + [self._order_by_clause]
-
-    def _compiler(self, dialect, **kw):
-        return _CustomCompiler(dialect, self, **kw)
-
-
-def _delete(table, whereclause=None, **kwargs):
-    return _DeleteOrderBy(table, whereclause, **kwargs)
 
 
 class SQLStorage(object):
@@ -688,7 +599,7 @@ class SQLStorage(object):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(user_id, collection_name)
         bso = self._get_bso_table(user_id)
-        query = _delete(bso)
+        query = delete(bso)
         where = [bso.c.userid == bindparam('user_id'),
                  bso.c.collection == bindparam('collection_id')]
 
