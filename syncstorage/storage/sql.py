@@ -50,7 +50,7 @@ _KB = float(1024)
 # highest ID in this collection.
 STANDARD_COLLECTIONS = {1: 'clients', 2: 'crypto', 3: 'forms', 4: 'history',
                         5: 'keys', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
-                        9: 'tabs', 10: 'passwords'}
+                        9: 'tabs', 10: 'passwords', 11: 'addons'}
 
 FIRST_CUSTOM_COLLECTION_ID = 100
 
