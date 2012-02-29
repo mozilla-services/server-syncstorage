@@ -868,3 +868,9 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        # Invalid BSO - unknown field
+        bso = {"id": "TEST", "unexpected": "spanish-inquisition"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)

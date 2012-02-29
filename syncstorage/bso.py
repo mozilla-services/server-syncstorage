@@ -38,7 +38,7 @@ class BSO(dict):
                     msg = "BSO fields must be scalar values, not %s"
                     raise ValueError(msg % (type(value),))
             if name not in _FIELDS:
-                continue
+                raise ValueError("Unknown BSO field %r" % (name,))
             if name in converters:
                 value = converters[name](value)
             if value is None:
@@ -50,15 +50,13 @@ class BSO(dict):
         """Validates the values the BSO has."""
 
         # Check that id fields are well-formed.
-        for field in ('id',):
-            if field not in self:
-                continue
-            value = str(self[field])
+        if 'id' in self:
+            value = str(self['id'])
             if len(value) > MAX_ID_SIZE:
-                return False, 'invalid %s' % field
+                return False, 'invalid id'
             if not VALID_ID_REGEX.match(value):
-                return False, 'invalid %s' % field
-            self[field] = value
+                return False, 'invalid id'
+            self['id'] = value
 
         # Check that the ttl is an int, and less than one year.
         if 'ttl' in self:
@@ -73,17 +71,15 @@ class BSO(dict):
 
         # Check that sorting fields are valid integers.
         # Convert from other types as necessary.
-        for field in ('sortindex',):
-            if field not in self:
-                continue
+        if 'sortindex' in self:
             try:
-                self[field] = int(self[field])
+                self['sortindex'] = int(self['sortindex'])
             except ValueError:
-                return False, 'invalid %s' % field
-            if self[field] > MAX_SORTINDEX_VALUE:
-                return False, 'invalid %s' % field
-            if self[field] < MIN_SORTINDEX_VALUE:
-                return False, 'invalid %s' % field
+                return False, 'invalid sortindex'
+            if self['sortindex'] > MAX_SORTINDEX_VALUE:
+                return False, 'invalid sortindex'
+            if self['sortindex'] < MIN_SORTINDEX_VALUE:
+                return False, 'invalid sortindex'
 
         # Check that the payload is a string, and is not too big.
         payload = self.get('payload')

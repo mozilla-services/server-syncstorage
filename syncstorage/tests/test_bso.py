@@ -8,12 +8,19 @@ from syncstorage.bso import BSO
 
 class TestBSO(unittest.TestCase):
 
-    def test_basic(self):
-        bso = BSO()
-        bso = BSO({'boooo': ''})
-        self.assertTrue('boooo' not in bso)
+    def test_test_nonscalar_values_are_rejected(self):
+        self.assertRaises(ValueError,
+                          BSO, {'payload': ('non', 'scalar', 'value')})
 
+    def test_that_unknown_fields_are_rejected(self):
+        self.assertRaises(ValueError, BSO, {'boooo': ''})
+        self.assertRaises(ValueError, BSO, {42: '17'})
+                          
     def test_validation(self):
+        bso = BSO()
+        result, failure = bso.validate()
+        self.assertTrue(result)
+
         data = {'id': 'bigid' * 30}
         bso = BSO(data)
         result, failure = bso.validate()

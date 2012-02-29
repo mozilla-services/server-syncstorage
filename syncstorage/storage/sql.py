@@ -376,7 +376,7 @@ class SQLStorage(object):
             query = query.offset(int(offset))
 
         res = self._safe_execute(query)
-        return [BSO(line) for line in res]
+        return [self._row_to_bso(row) for row in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
@@ -393,8 +393,14 @@ class SQLStorage(object):
                            ttl=_int_now()).first()
         if res is None:
             return None
+        return self._row_to_bso(res)
 
-        return BSO(res)
+    def _row_to_bso(self, row):
+        """Convert a database table row into a BSO object."""
+        item = dict(row)
+        for key in ("userid", "collection", "payload_size"):
+            item.pop(key, None)
+        return BSO(item)
 
     def _set_item(self, user_id, collection_name, item_id, **values):
         """Adds or update an item"""
