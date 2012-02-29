@@ -26,6 +26,11 @@ class TestBSO(unittest.TestCase):
         result, failure = bso.validate()
         self.assertFalse(result)
 
+        data = {'id': u'I AM A \N{SNOWMAN}'}
+        bso = BSO(data)
+        result, failure = bso.validate()
+        self.assertFalse(result)
+
         data = {'sortindex': 9999999999}
         bso = BSO(data)
         result, failure = bso.validate()

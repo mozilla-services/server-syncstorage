@@ -49,12 +49,22 @@ class BSO(dict):
     def validate(self):
         """Validates the values the BSO has."""
 
-        # Check that id fields are well-formed.
+        # Check that id field is well-formed.
         if 'id' in self:
+            value = self['id']
+            # Check that it's base64url-compliant.
+            # Doing the regex match first has the nice side-effect of
+            # erroring out if the value is not a string or unicode object.
+            # This avoids accidentally coercing other types to a string.
+            try:
+                if not VALID_ID_REGEX.match(value):
+                    return False, 'invalid id'
+            except TypeError:
+                return False, 'invalid id'
+            # Make sure it's stored as a bytestring, not a unicode object.
+            # This won't fail because we've checked for valid chars above.
             value = str(self['id'])
             if len(value) > MAX_ID_SIZE:
-                return False, 'invalid id'
-            if not VALID_ID_REGEX.match(value):
                 return False, 'invalid id'
             self['id'] = value
 
@@ -64,12 +74,11 @@ class BSO(dict):
                 ttl = int(self['ttl'])
             except ValueError:
                 return False, 'invalid ttl'
-
             if ttl < 0 or ttl > MAX_TTL:
                 return False, 'invalid ttl'
             self['ttl'] = ttl
 
-        # Check that sorting fields are valid integers.
+        # Check that the sortindex is a valid integer.
         # Convert from other types as necessary.
         if 'sortindex' in self:
             try:

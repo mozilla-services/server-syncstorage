@@ -332,8 +332,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_set_collection(self):
         # sending two bsos
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
@@ -346,8 +346,8 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res['payload'], _PLD)
 
         # one more time, with changes
-        bso1 = {'id': 13, 'payload': 'XyX'}
-        bso2 = {'id': 14, 'payload': _PLD}
+        bso1 = {'id': '13', 'payload': 'XyX'}
+        bso2 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
@@ -370,8 +370,8 @@ class TestStorage(support.TestWsgiApp):
     def test_set_collection_input_formats(self):
         self.storage.delete_items(self.user_id, "col2")
         # If we send with application/newlines it should work.
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
         body = "\n".join(json.dumps(bso) for bso in bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
@@ -391,8 +391,8 @@ class TestStorage(support.TestWsgiApp):
     def test_collection_usage(self):
         self.storage.delete_storage(self.user_id)
 
-        bso1 = {'id': 13, 'payload': 'XyX'}
-        bso2 = {'id': 14, 'payload': _PLD}
+        bso1 = {'id': '13', 'payload': 'XyX'}
+        bso2 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2]
         self.app.post_json(self.root + '/storage/col2', bsos)
 
@@ -406,9 +406,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
-        bso3 = {'id': 14, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
+        bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
@@ -435,9 +435,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
-        bso3 = {'id': 14, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
+        bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
@@ -455,9 +455,9 @@ class TestStorage(support.TestWsgiApp):
         self.storage.delete_items(self.user_id, 'col2')
 
         # creating a collection of three
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
-        bso3 = {'id': 14, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
+        bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
@@ -485,8 +485,8 @@ class TestStorage(support.TestWsgiApp):
                         int(res.headers['X-Timestamp'])) < 200)
 
         # getting the timestamp with a POST
-        bso1 = {'id': 12, 'payload': _PLD}
-        bso2 = {'id': 13, 'payload': _PLD}
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
         now = get_timestamp()
         res = self.app.post_json(self.root + '/storage/col2', bsos)
@@ -686,8 +686,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_strict_newer(self):
         # send two bsos in the 'meh' collection
-        bso1 = {'id': 1, 'payload': _PLD}
-        bso2 = {'id': 2, 'payload': _PLD}
+        bso1 = {'id': '1', 'payload': _PLD}
+        bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
         ts = int(res.headers["X-Timestamp"])
@@ -696,8 +696,8 @@ class TestStorage(support.TestWsgiApp):
         time.sleep(0.2)
 
         # send two more bsos
-        bso3 = {'id': 3, 'payload': _PLD}
-        bso4 = {'id': 4, 'payload': _PLD}
+        bso3 = {'id': '3', 'payload': _PLD}
+        bso4 = {'id': '4', 'payload': _PLD}
         bsos = [bso3, bso4]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
 
@@ -709,8 +709,8 @@ class TestStorage(support.TestWsgiApp):
 
     def test_strict_newer_tabs(self):
         # send two bsos in the 'tabs' collection
-        bso1 = {'id': 1, 'payload': _PLD}
-        bso2 = {'id': 2, 'payload': _PLD}
+        bso1 = {'id': '1', 'payload': _PLD}
+        bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/tabs', bsos)
         ts = int(res.headers["X-Timestamp"])
@@ -719,8 +719,8 @@ class TestStorage(support.TestWsgiApp):
         time.sleep(0.2)
 
         # send two more bsos
-        bso3 = {'id': 3, 'payload': _PLD}
-        bso4 = {'id': 4, 'payload': _PLD}
+        bso3 = {'id': '3', 'payload': _PLD}
+        bso4 = {'id': '4', 'payload': _PLD}
         bsos = [bso3, bso4]
         self.app.post_json(self.root + '/storage/tabs', bsos)
 
