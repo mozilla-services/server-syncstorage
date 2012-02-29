@@ -339,16 +339,7 @@ class StorageController(object):
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 
         if not isinstance(bsos, (tuple, list)):
-            # thats a batch of one
-            try:
-                id_ = str(bsos['id'])
-            except (KeyError, TypeError):
-                raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
-            if '/' in id_:
-                raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
-
-            request.matchdict['item'] = id_
-            return self.set_item(request)
+            raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
 
         res = {'success': [], 'failed': {}}
 

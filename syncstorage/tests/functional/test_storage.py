@@ -238,7 +238,7 @@ class TestStorage(support.TestWsgiApp):
 
         for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
             bso = {'id': index, 'payload': 'x', 'sortindex': sortindex}
-            self.app.post_json(self.root + '/storage/col2', bso)
+            self.app.post_json(self.root + '/storage/col2', [bso])
             time.sleep(0.1)
 
         res = self.app.get(self.root + '/storage/col2?sort=oldest')
