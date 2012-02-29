@@ -426,13 +426,7 @@ class StorageController(object):
         return HTTPNoContent()
 
     def delete_storage(self, request):
-        """Deletes all records for the user.
-
-        Will return a precondition error unless an X-Confirm-Delete header
-        is included.
-        """
-        if 'X-Confirm-Delete' not in request.headers:
-            raise HTTPJsonBadRequest(ERROR_INVALID_WRITE)
+        """Deletes all records for the user."""
         user_id = request.user['userid']
         self._get_storage(request).delete_storage(user_id)  # XXX failures ?
         return HTTPNoContent()

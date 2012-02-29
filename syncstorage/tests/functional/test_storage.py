@@ -464,12 +464,9 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
-        # deleting all with no confirmation
-        self.app.delete(self.root + '/storage', status=400)
-
-        # deleting all for real now
-        res = self.app.delete(self.root + '/storage/col2',
-                              headers=[('X-Confirm-Delete', '1')])
+        # deleting all
+        self.app.delete(self.root + '/storage')
+        res = self.app.delete(self.root + '/storage/col2')
         now = get_timestamp()
         self.assertTrue(abs(now - int(res.headers["X-Timestamp"])) < 200)
         res = self.app.get(self.root + '/storage/col2')
