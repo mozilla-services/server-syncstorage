@@ -17,12 +17,13 @@ from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotModified)
 
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
-                               ERROR_INVALID_WRITE, ERROR_OVER_QUOTA)
+                               ERROR_OVER_QUOTA)
 
-from syncstorage import logger
+from mozsvc.metrics import get_metlog_client
 from syncstorage.bso import BSO
 from syncstorage.storage import get_storage
 
+logger = get_metlog_client()
 
 _BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
 

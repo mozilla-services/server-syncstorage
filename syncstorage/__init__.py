@@ -3,9 +3,10 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from mozsvc.config import get_configurator
-from mozsvc.metrics import setup_metlog
-
+from mozsvc.metrics import setup_metlog, get_metlog_client
 from syncstorage.controller import StorageController
+
+logger = get_metlog_client()
 
 
 def includeme(config):

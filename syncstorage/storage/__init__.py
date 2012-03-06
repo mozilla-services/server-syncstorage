@@ -5,9 +5,10 @@
 import sys
 import abc
 
+from mozsvc.metrics import get_metlog_client
 from mozsvc.plugin import load_from_settings
 
-from syncstorage import logger
+logger = get_metlog_client()
 
 
 class SyncStorage(object):
