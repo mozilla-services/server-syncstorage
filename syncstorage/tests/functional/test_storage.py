@@ -13,18 +13,19 @@ If there's an aspect of that spec that's not covered by a test in this file,
 consider it a bug.
 
 """
+
+import unittest2
+
 import os
+import sys
 import time
 import random
 import string
 import simplejson as json
 from tempfile import mkstemp
 
-from mozsvc.tests.support import make_request
-
 from syncstorage.util import get_timestamp
-from syncstorage.storage import get_storage
-from syncstorage.tests.functional import support
+from syncstorage.tests.functional.support import StorageFunctionalTestCase
 
 import macauthlib
 
@@ -41,7 +42,12 @@ def randtext(size=10):
     return ''.join([random.choice(_ASCII) for i in range(size)])
 
 
-class TestStorage(support.TestWsgiApp):
+class TestStorage(StorageFunctionalTestCase):
+    """Storage testcases that only use the web API.
+
+    These tests are suitable for running against both in-process and live
+    external web servers.
+    """
 
     def setUp(self):
         super(TestStorage, self).setUp()
@@ -63,34 +69,32 @@ class TestStorage(support.TestWsgiApp):
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request
 
-        # let's create some collections for our tests
-        self.storage = get_storage(make_request(self.config))
+        # Reset the storage to a known state.
+        self.app.delete(self.root + "/storage",
+                        headers={"X-Confirm-Delete": "1"})
 
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.storage.set_items(self.user_id, name, [])
-
+            self.app.post(self.root + "/storage/" + name, "[]",
+                          content_type="application/json")
         for item in range(3):
-            self.storage.set_item(self.user_id, 'col1', str(item),
-                                  payload='xxx')
+            self.app.put_json(self.root + "/storage/col1/%s" % (item,),
+                              {"payload": "xxx"})
             time.sleep(0.02)   # make sure we have different timestamps
 
         for item in range(5):
-            self.storage.set_item(self.user_id, 'col2', str(item),
-                                  payload='xxx')
+            self.app.put_json(self.root + "/storage/col2/%s" % (item,),
+                              {"payload": "xxx"})
             time.sleep(0.02)   # make sure we have different timestamps
 
     def test_get_collections(self):
-
         resp = self.app.get(self.root + '/info/collections')
         res = resp.json
         keys = res.keys()
         self.assertTrue(len(keys), 2)
         self.assertEquals(int(resp.headers['X-Num-Records']), len(keys))
-
         # XXX need to test collections timestamps here
 
     def test_get_collection_count(self):
-
         resp = self.app.get(self.root + '/info/collection_counts')
         res = resp.json
         values = res.values()
@@ -368,7 +372,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_set_collection_input_formats(self):
-        self.storage.delete_items(self.user_id, "col2")
+        self.app.delete(self.root + "/storage/col2")
         # If we send with application/newlines it should work.
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
@@ -377,19 +381,20 @@ class TestStorage(support.TestWsgiApp):
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/newlines"
         })
-        items = self.storage.get_items(self.user_id, "col2")
+        items = self.app.get(self.root + "/storage/col2").json
         self.assertEquals(len(items), 2)
         # If we send an unknown content type, we get an error.
-        self.storage.delete_items(self.user_id, "col2")
+        self.app.delete(self.root + "/storage/col2")
         body = json.dumps(bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
         }, status=400)
-        items = self.storage.get_items(self.user_id, "col2")
+        items = self.app.get(self.root + "/storage/col2").json
         self.assertEquals(len(items), 0)
 
     def test_collection_usage(self):
-        self.storage.delete_storage(self.user_id)
+        self.app.delete(self.root + "/storage",
+                        headers={"X-Confirm-Delete": "1"})
 
         bso1 = {'id': '13', 'payload': 'XyX'}
         bso2 = {'id': '14', 'payload': _PLD}
@@ -403,7 +408,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEqual(col2_size, wanted / 1024.)
 
     def test_delete_collection_items(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + "/storage/col2")
 
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
@@ -432,7 +437,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res.json), 0)
 
     def test_delete_item(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + '/storage/col2')
 
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
@@ -452,7 +457,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage/col2/12982')
 
     def test_delete_storage(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + '/storage/col2')
 
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
@@ -473,25 +478,26 @@ class TestStorage(support.TestWsgiApp):
 
     def test_x_timestamp_header(self):
         now = get_timestamp()
+        time.sleep(0.001)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertTrue(abs(now -
-                int(res.headers['X-Timestamp'])) < 100)
+        self.assertTrue(now < int(res.headers['X-Timestamp']))
 
         # getting the timestamp with a PUT
-        bso = {'payload': _PLD}
         now = get_timestamp()
+        time.sleep(0.001)
+        bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
+        self.assertTrue(now < int(res.headers['X-Timestamp']))
         self.assertTrue(abs(now -
                         int(res.headers['X-Timestamp'])) < 200)
 
         # getting the timestamp with a POST
+        now = get_timestamp()
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
-        now = get_timestamp()
         res = self.app.post_json(self.root + '/storage/col2', bsos)
-        self.assertTrue(abs(now -
-                        int(res.headers['X-Timestamp'])) < 200)
+        self.assertTrue(now < int(res.headers['X-Timestamp']))
 
     def test_ifunmodifiedsince(self):
         bso = {'payload': _PLD}
@@ -511,12 +517,20 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
-        self.storage.quota_size = 0.1
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
+        for key in self.config.registry:
+            if key.startswith("syncstorage:storage:"):
+                self.config.registry[key].quota_size = 0.1
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         self.assertEquals(res.headers['X-Quota-Remaining'], '0.0765625')
 
-        self.storage.quota_size = 0
+        for key in self.config.registry:
+            if key.startswith("syncstorage:storage:"):
+                self.config.registry[key].quota_size = 0
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
@@ -573,6 +587,10 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['failed']), 1)
 
     def test_blacklisted_nodes(self):
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
         settings = self.config.registry.settings
         old = settings.get('storage.check_blacklisted_nodes', False)
         settings['storage.check_blacklisted_nodes'] = True
@@ -640,19 +658,6 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
         self.assertEqual(res.json, [])
-
-    def test_dependant_options(self):
-        settings = self.config.registry.settings.copy()
-        settings['storage.check_blacklisted_nodes'] = True
-        from syncstorage import main, tweens
-        old_client = tweens.Client
-        tweens.Client = None
-        # make sure the app cannot be initialized if it's asked
-        # to check for blacklisted node and memcached is not present
-        try:
-            self.assertRaises(ValueError, main, {}, **settings)
-        finally:
-            tweens.Client = old_client
 
     def test_timestamps_are_integers(self):
         # make sure the server returns only integer timestamps
@@ -731,6 +736,10 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res, ['3', '4'])
 
     def test_write_tabs_503(self):
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
         # make sure a tentative to write in tabs w/ memcached leads to a 503
         try:
             from syncstorage.storage.memcachedsql import MemcachedSQLStorage
@@ -760,11 +769,13 @@ class TestStorage(support.TestWsgiApp):
         os.close(fd)
 
         try:
+            old_storages = {}
             storage = MemcachedSQLStorage('sqlite:///%s' % dbfile,
                                           create_tables=True)
             storage.cache = BadCache()
             for key in self.config.registry:
                 if key.startswith("syncstorage:storage:"):
+                    old_storages[key] = self.config.registry[key]
                     self.config.registry[key] = storage
 
             # send two bsos in the 'tabs' collection
@@ -781,9 +792,8 @@ class TestStorage(support.TestWsgiApp):
             self.app.put_json(self.root + '/storage/tabs/sure', bso1,
                          status=503)
         finally:
-            for key in self.config.registry:
-                if key.startswith("storage:"):
-                    self.config.registry[key] = self.storage
+            for key in old_storages:
+                self.config.registry[key] = old_storages[key]
             os.remove(dbfile)
 
     def test_handling_of_invalid_json_in_bso_uploads(self):
@@ -874,3 +884,21 @@ class TestStorage(support.TestWsgiApp):
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
         self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+
+
+if __name__ == "__main__":
+    # When run as a script, this file will execute the
+    # functional tests against a live webserver.
+
+    if not 2 <= len(sys.argv) <= 3:
+        print>>sys.stderr, "USAGE: test_storage.py <server-url> [<ini-file>]"
+        sys.exit(1)
+
+    os.environ["MOZSVC_TEST_REMOTE"] = sys.argv[1]
+    if len(sys.argv) > 2:
+        os.environ["MOZSVC_TEST_INI_FILE"] = sys.argv[2]
+
+    suite = unittest2.TestSuite()
+    suite.addTest(unittest2.makeSuite(TestStorage))
+    res = unittest2.TextTestRunner().run(suite)
+    sys.exit(res)
