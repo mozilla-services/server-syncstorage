@@ -8,6 +8,7 @@ import os
 import urlparse
 import random
 
+from mozsvc.metrics import setup_metlog
 from mozsvc.tests.support import FunctionalTestCase
 
 
@@ -15,6 +16,7 @@ class StorageFunctionalTestCase(FunctionalTestCase):
 
     def setUp(self):
         super(StorageFunctionalTestCase, self).setUp()
+        setup_metlog(self.config.registry.settings.getsection('metlog'))
 
         self.config.include("syncstorage")
         self.config.commit()
