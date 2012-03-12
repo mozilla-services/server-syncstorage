@@ -16,9 +16,6 @@ class StorageFunctionalTestCase(FunctionalTestCase):
     def setUp(self):
         super(StorageFunctionalTestCase, self).setUp()
 
-        self.config.include("syncstorage")
-        self.config.commit()
-
         # We only support mysql and sqlite databases.
         # Check that the config keys match this expectation.
         # Also get a list of temp database files to delete on cleanup.
@@ -48,3 +45,8 @@ class StorageFunctionalTestCase(FunctionalTestCase):
                     os.remove(sqlfile)
 
         super(StorageFunctionalTestCase, self).tearDown()
+
+    def get_test_configurator(self):
+        config = super(StorageFunctionalTestCase, self).get_test_configurator()
+        config.include("syncstorage")
+        return config
