@@ -493,6 +493,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # getting the timestamp with a POST
         now = get_timestamp()
+        time.sleep(0.001)
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
