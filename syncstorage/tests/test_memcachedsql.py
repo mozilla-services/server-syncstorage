@@ -1,7 +1,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-import unittest
+import unittest2
 import time
 from tempfile import mkstemp
 import os
@@ -20,12 +20,13 @@ from syncstorage.util import get_timestamp
 _UID = 1
 _PLD = '*' * 500
 
-# manual registration
-if MEMCACHED:
 
-    class TestMemcachedSQLStorage(unittest.TestCase):
+class TestMemcachedSQLStorage(unittest2.TestCase):
 
         def setUp(self):
+            if not MEMCACHED:
+                raise unittest2.SkipTest
+
             fd, self.dbfile = mkstemp()
             os.close(fd)
 
@@ -269,10 +270,10 @@ if MEMCACHED:
 
 
 def test_suite():
-    suite = unittest.TestSuite()
+    suite = unittest2.TestSuite()
     if MEMCACHED:
-        suite.addTest(unittest.makeSuite(TestMemcachedSQLStorage))
+        suite.addTest(unittest2.makeSuite(TestMemcachedSQLStorage))
     return suite
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    unittest2.main(defaultTest="test_suite")
