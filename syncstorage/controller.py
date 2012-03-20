@@ -211,7 +211,7 @@ class StorageController(object):
             max = storage.get_collection_max_timestamp(user_id,
                                                        collection_name)
             if max is None or max <= if_modified:
-                return HTTPNotModified()
+                raise HTTPNotModified()
 
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
@@ -244,7 +244,7 @@ class StorageController(object):
                 msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
                 raise HTTPBadRequest(msg)
             if res["modified"] <= if_modified:
-                return HTTPNotModified()
+                raise HTTPNotModified()
 
         return res
 
