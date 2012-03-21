@@ -127,7 +127,7 @@ class SyncStorage(object):
             - values: mapping containing the values.
 
         Returns:
-            A dict containing the information for the item
+            The last-modified time of the item, or None if it did not exist.
         """
 
     @abc.abstractmethod

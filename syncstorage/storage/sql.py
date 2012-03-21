@@ -413,14 +413,14 @@ class SQLStorage(object):
             # to the current timestamp
             values['ttl'] += _int_now()
 
-        modified = self.item_exists(user_id, collection_name, item_id)
+        last_modified = self.item_exists(user_id, collection_name, item_id)
 
         if 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
         collection_id = self._get_collection_id(collection_name)
 
-        if modified is None:   # does not exists
+        if last_modified is None:   # does not exists
             values['collection'] = collection_id
             values['id'] = item_id
             values['userid'] = user_id
@@ -433,11 +433,7 @@ class SQLStorage(object):
             query = update(bso).where(key).values(**values)
 
         self._safe_execute(query)
-
-        if 'modified' in values:
-            return values['modified']
-
-        return modified
+        return last_modified
 
     def set_item(self, user_id, collection_name, item_id, storage_time=None,
                  **values):

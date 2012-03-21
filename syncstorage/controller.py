@@ -13,6 +13,7 @@ import itertools
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
                                     HTTPPreconditionFailed,
+                                    HTTPCreated,
                                     HTTPNoContent,
                                     HTTPNotModified)
 
@@ -295,9 +296,14 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
-        storage.set_item(user_id, collection_name, item_id, **bso)
+        modified = storage.set_item(user_id, collection_name, item_id, **bso)
 
-        response = HTTPNoContent()
+        if modified:
+            response = HTTPNoContent()
+        else:
+            response = HTTPCreated()
+            response.headers['Location'] = request.path
+
         if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
