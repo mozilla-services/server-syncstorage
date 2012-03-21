@@ -157,7 +157,7 @@ class SyncStorage(object):
             - storage_time: time of the storage, if none provided, use current
               time
         Returns:
-            None
+            True if an item was deleted, False otherwise.
         """
 
     @abc.abstractmethod

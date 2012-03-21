@@ -317,10 +317,12 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        self._get_storage(request).delete_item(user_id, collection_name,
-                                              item_id,
-                                              storage_time=request.server_time)
+        storage = self._get_storage(request)
+        deleted = storage.delete_item(user_id, collection_name, item_id,
+                                      storage_time=request.server_time)
 
+        if not deleted:
+            raise HTTPNotFound()
         return HTTPNoContent()
 
     def set_collection(self, request):

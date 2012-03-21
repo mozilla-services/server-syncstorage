@@ -453,8 +453,8 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 2)
 
-        # unexisting item should return a 200
-        self.app.delete(self.root + '/storage/col2/12982')
+        # unexisting item should return a 404
+        self.app.delete(self.root + '/storage/col2/12982', status=404)
 
     def test_delete_storage(self):
         self.app.delete(self.root + '/storage/col2')
