@@ -2,12 +2,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import logging
-logger = logging.getLogger('syncserver')
-
 from mozsvc.config import get_configurator
-
+from mozsvc.plugin import load_from_settings
+from mozsvc.metrics import get_metlog_client
 from syncstorage.controller import StorageController
+
+logger = get_metlog_client()
 
 
 def includeme(config):
@@ -27,5 +27,6 @@ def includeme(config):
 
 def main(global_config, **settings):
     config = get_configurator(global_config, **settings)
+    load_from_settings('metlog', config.registry.settings)
     config.include(includeme)
     return config.make_wsgi_app()
