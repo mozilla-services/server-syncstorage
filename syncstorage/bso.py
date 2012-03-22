@@ -14,7 +14,7 @@ MAX_ID_SIZE = 64
 MAX_PAYLOAD_SIZE = 256 * 1024
 MAX_SORTINDEX_VALUE = 999999999
 MIN_SORTINDEX_VALUE = -999999999
-VALID_ID_REGEX = re.compile("^[a-zA-Z0-9._-]+$")
+VALID_ID_REGEX = re.compile("^[a-zA-Z0-9_-]+$")
 
 
 class BSO(dict):

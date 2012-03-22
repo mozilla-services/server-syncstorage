@@ -54,8 +54,8 @@ class SyncStorageService(MetricsService):
         """Helper method to apply default configuration of the service path."""
         # Insert pattern-matching regexes into the path
         # TODO: decide on the allowable characters for this, and document.
-        path = path.replace("{collection}", "{collection:[a-zA-Z0-9._-]+}")
-        path = path.replace("{item}", "{item:[a-zA-Z0-9._-]+}")
+        path = path.replace("{collection}", "{collection:[a-zA-Z0-9_-]+}")
+        path = path.replace("{item}", "{item:[a-zA-Z0-9_-]+}")
         # Add path prefix for the API version number.
         path = "/{api:2.0}" + path
         return path
