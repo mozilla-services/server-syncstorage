@@ -8,6 +8,7 @@ import os
 import urlparse
 import random
 
+from mozsvc.metrics import setup_metlog, teardown_metlog
 from mozsvc.tests.support import FunctionalTestCase
 
 
@@ -44,9 +45,12 @@ class StorageFunctionalTestCase(FunctionalTestCase):
                 if os.path.exists(sqlfile):
                     os.remove(sqlfile)
 
+        teardown_metlog()
+
         super(StorageFunctionalTestCase, self).tearDown()
 
     def get_test_configurator(self):
         config = super(StorageFunctionalTestCase, self).get_test_configurator()
+        setup_metlog(config.registry.settings.getsection('metlog'))
         config.include("syncstorage")
         return config

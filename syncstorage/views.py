@@ -6,7 +6,7 @@ import simplejson as json
 
 from pyramid.security import Authenticated, Allow
 
-from cornice.service import Service
+from mozsvc.metrics import MetricsService
 
 
 class NewlinesRenderer(object):
@@ -28,7 +28,7 @@ class NewlinesRenderer(object):
         return '\n'.join(data)
 
 
-class SyncStorageService(Service):
+class SyncStorageService(MetricsService):
     """Custom Service class to assist DRY in the SyncStorage project.
 
     This Service subclass provides useful defaults for SyncStorage service

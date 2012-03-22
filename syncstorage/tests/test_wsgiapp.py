@@ -3,6 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 import unittest
 
+from mozsvc.metrics import setup_metlog, teardown_metlog
 from mozsvc.tests.support import get_test_configurator, make_request
 
 from syncstorage.storage import get_storage
@@ -12,7 +13,11 @@ class TestWSGIApp(unittest.TestCase):
 
     def setUp(self):
         self.config = get_test_configurator(__file__)
+        setup_metlog(self.config.registry.settings.getsection('metlog'))
         self.config.include("syncstorage")
+
+    def tearDown(self):
+        teardown_metlog()
 
     def _make_request(self, *args, **kwds):
         return make_request(self.config, *args, **kwds)
