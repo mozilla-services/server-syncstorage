@@ -453,8 +453,8 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 2)
 
-        # unexisting item should return a 200
-        self.app.delete(self.root + '/storage/col2/12982')
+        # unexisting item should return a 404
+        self.app.delete(self.root + '/storage/col2/12982', status=404)
 
     def test_delete_storage(self):
         self.app.delete(self.root + '/storage/col2')
@@ -885,6 +885,16 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
         self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+
+    def test_generation_of_201_and_204_response_codes(self):
+        bso = {"id": "TEST", "payload": "testing"}
+        # If a new BSO is created, the return code should be 201.
+        r = self.app.put_json(self.root + "/storage/col2/TEST", bso,
+                              status=201)
+        self.assertTrue(r.headers["Location"].endswith("/storage/col2/TEST"))
+        # If an existing BSO is updated, the return code should be 204.
+        bso["payload"] = "testing_again"
+        self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
 
 
 if __name__ == "__main__":

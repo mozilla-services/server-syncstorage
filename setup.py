@@ -6,7 +6,7 @@ import os
 import re
 
 
-install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
+install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb', 'unittest2',
                     'Routes', 'simplejson', 'cef', 'mozsvc', 'cornice',
                     'repoze.who', 'repoze.who.plugins.macauth', 'macauthlib']
                     

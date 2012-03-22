@@ -107,7 +107,15 @@ def delete_storage(request):
 @collection.get(accept="application/json", renderer="simplejson")
 @collection.get(accept="application/newlines", renderer="newlines")
 def get_collection(request):
-    return _ctrl(request).get_collection(request, **request.GET)
+    # Pull out only the GET parameters of interest.
+    # They are passed to the controller as kwd args.
+    kwds = {}
+    kwd_names = ("ids", "older", "newer", "full", "index_above",
+                 "index_below", "limit", "offset", "sort")
+    for name in kwd_names:
+        if name in request.GET:
+            kwds[name] = request.GET[name]
+    return _ctrl(request).get_collection(request, **kwds)
 
 
 @collection.post()
@@ -117,7 +125,8 @@ def post_collection(request):
 
 @collection.delete()
 def delete_collection(request):
-    return _ctrl(request).delete_collection(request, **request.GET)
+    ids = request.GET.get("ids")
+    return _ctrl(request).delete_collection(request, ids=ids)
 
 
 @item.get()

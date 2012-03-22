@@ -13,6 +13,7 @@ import itertools
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
                                     HTTPPreconditionFailed,
+                                    HTTPCreated,
                                     HTTPNoContent,
                                     HTTPNotModified)
 
@@ -212,7 +213,7 @@ class StorageController(object):
             max = storage.get_collection_max_timestamp(user_id,
                                                        collection_name)
             if max is None or max <= if_modified:
-                return HTTPNotModified()
+                raise HTTPNotModified()
 
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
@@ -245,7 +246,7 @@ class StorageController(object):
                 msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
                 raise HTTPBadRequest(msg)
             if res["modified"] <= if_modified:
-                return HTTPNotModified()
+                raise HTTPNotModified()
 
         return res
 
@@ -296,9 +297,14 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
-        storage.set_item(user_id, collection_name, item_id, **bso)
+        modified = storage.set_item(user_id, collection_name, item_id, **bso)
 
-        response = HTTPNoContent()
+        if modified:
+            response = HTTPNoContent()
+        else:
+            response = HTTPCreated()
+            response.headers['Location'] = request.path
+
         if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
@@ -312,10 +318,12 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        self._get_storage(request).delete_item(user_id, collection_name,
-                                              item_id,
-                                              storage_time=request.server_time)
+        storage = self._get_storage(request)
+        deleted = storage.delete_item(user_id, collection_name, item_id,
+                                      storage_time=request.server_time)
 
+        if not deleted:
+            raise HTTPNotFound()
         return HTTPNoContent()
 
     def set_collection(self, request):
