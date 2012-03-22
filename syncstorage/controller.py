@@ -30,6 +30,9 @@ _BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
 
 _ONE_MEG = 1024
 
+# The maximum number of ids that can be deleted in a single batch operation.
+MAX_IDS_PER_BATCH = 100
+
 
 def HTTPJsonBadRequest(data, **kwds):
     kwds.setdefault("content_type", "application/json")
@@ -412,6 +415,10 @@ class StorageController(object):
         ids = kw.get("ids")
         if ids is not None:
             ids = ids.split(",")
+            if len(ids) > MAX_IDS_PER_BATCH:
+                msg = 'Cannot delete more than %s BSOs at a time'
+                raise HTTPBadRequest(msg % (MAX_IDS_PER_BATCH,))
+                
         collection_name = request.matchdict['collection']
         user_id = request.user['userid']
         if self._was_modified(request, user_id, collection_name):

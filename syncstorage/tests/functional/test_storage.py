@@ -26,6 +26,7 @@ from tempfile import mkstemp
 
 from syncstorage.util import get_timestamp
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
+from syncstorage.controller import MAX_IDS_PER_BATCH
 
 import macauthlib
 
@@ -883,6 +884,14 @@ class TestStorage(StorageFunctionalTestCase):
         # If an existing BSO is updated, the return code should be 204.
         bso["payload"] = "testing_again"
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
+
+    def test_that_batch_deletes_are_limited_to_max_number_of_items(self):
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
+        self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
+        self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
+        self.app.delete(self.root + "/storage/col2?ids=" + ids, status=400)
 
 
 if __name__ == "__main__":
