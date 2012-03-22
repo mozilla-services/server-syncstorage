@@ -5,11 +5,9 @@ from setuptools import setup, find_packages
 import os
 import re
 
+install_requires = ['SQLALchemy', 'PasteDeploy', 'unittest2', 'simplejson',
+                    'mozsvc', 'cornice', 'macauthlib']
 
-install_requires = ['SQLAlchemy', 'PasteDeploy', 'WebOb', 'unittest2',
-                    'Routes', 'simplejson', 'cef', 'mozsvc', 'cornice',
-                    'repoze.who', 'repoze.who.plugins.macauth', 'macauthlib']
-                    
 entry_points = """
 [paste.app_factory]
 main = syncstorage:main
@@ -38,4 +36,8 @@ setup(name='SyncStorage',
         "Programming Language :: Python",
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         ],
+      package_data={
+          "syncstorage.tests": ["*.ini"],
+      },
+      include_package_data=True,
 )

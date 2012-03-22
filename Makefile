@@ -19,7 +19,9 @@ PYPI = http://pypi.python.org/simple
 PYPI2RPM = bin/pypi2rpm.py --index=$(PYPI)
 PYPIOPTIONS = -i $(PYPI)
 CHANNEL = dev
-RPM_CHANNEL = prod
+RPM_CHANNEL = dev
+PIP_CACHE = /tmp/pip-cache.${USER}
+BUILD_TMP = /tmp/syncstorage-build.${USER}
 INSTALL = bin/pip install
 INSTALLOPTIONS = -U -i $(PYPI)
 
@@ -63,10 +65,23 @@ cover:
 	$(NOSE) --with-coverage --cover-html --cover-package=syncstorage $(TESTS)
 
 build_rpms:
+	rm -rf rpms
+	mkdir -p  rpms ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	cd /tmp; wget http://pypi.build.mtv1.svc.mozilla.com/extras/PyMySQL-0.4.2.tar.gz
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms /tmp/PyMySQL-0.4.2.tar.gz
-	rm /tmp/PyMySQL-0.4.2.tar.gz
+	# PyZMQ sdist bundles don't play nice with pypi2rpm.
+	# We need to build from a checkout of the tag.
+	wget -O ${BUILD_TMP}/pyzmq-2.1.11.tar.gz https://github.com/zeromq/pyzmq/tarball/v2.1.11
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms ${BUILD_TMP}/pyzmq-2.1.11.tar.gz
+	rm -f ${BUILD_TMP}/pyzmq-2.1.11.tar.gz
+	# The simplejson rpms conflict with a RHEL6 system package.
+	# Do a custom build so that they can overwrite rather than conflict.
+	rm -f $(CURDIR)/rpms/python26-simplejson-2.4.0-1.x86_64.rpm
+	wget -O ${BUILD_TMP}/simplejson-2.4.0.tar.gz http://pypi.python.org/packages/source/s/simplejson/simplejson-2.4.0.tar.gz
+	cd ${BUILD_TMP}; tar -xzvf simplejson-2.4.0.tar.gz
+	cd ${BUILD_TMP}/simplejson-2.4.0; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python-simplejson --dist-dir=$(CURDIR)/rpms
+	rm -rf ${BUILD_TMP}/simplejson-2.4.0
+	rm -f ${BUILD_TMP}/simplejson-2.4.0.tar.gz
+	
 
 mock: build build_rpms
 	mock init
