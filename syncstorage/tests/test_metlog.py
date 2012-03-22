@@ -11,8 +11,8 @@ import unittest
 class TestMetlog(unittest.TestCase):
     def setUp(self):
         self.config = get_test_configurator(__file__)
-        self.config.include('syncstorage')
         setup_metlog(self.config.registry.settings.getsection('metlog'))
+        self.config.include('syncstorage')
         self.client = get_metlog_client()
 
     def tearDown(self):
