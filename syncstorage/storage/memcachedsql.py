@@ -108,7 +108,7 @@ class MemcachedSQLStorage(SQLStorage):
         return self.sqlstorage.item_exists(user_id, collection_name, item_id)
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
-                  limit=None, offset=None, sort=None):
+                  limit=None, sort=None):
         """returns items from a collection
 
         "filter" is a dict used to add conditions to the db query.
@@ -123,7 +123,7 @@ class MemcachedSQLStorage(SQLStorage):
             return self.cache.get_tabs(user_id, filters).values()
 
         return self.sqlstorage.get_items(user_id, collection_name,
-                                         fields, filters, limit, offset, sort)
+                                         fields, filters, limit, sort)
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """Returns one item.

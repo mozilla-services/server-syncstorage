@@ -111,7 +111,7 @@ def get_collection(request):
     # They are passed to the controller as kwd args.
     kwds = {}
     kwd_names = ("ids", "older", "newer", "full", "index_above",
-                 "index_below", "limit", "offset", "sort")
+                 "index_below", "limit", "sort")
     for name in kwd_names:
         if name in request.GET:
             kwds[name] = request.GET[name]

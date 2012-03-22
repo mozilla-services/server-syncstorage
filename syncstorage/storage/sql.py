@@ -319,7 +319,7 @@ class SQLStorage(object):
         return _bso
 
     def get_items(self, user_id, collection_name, fields=None, filters=None,
-                  limit=None, offset=None, sort=None):
+                  limit=None, sort=None):
         """returns items from a collection
 
         "filter" is a dict used to add conditions to the db query.
@@ -371,9 +371,6 @@ class SQLStorage(object):
 
         if limit is not None and int(limit) > 0:
             query = query.limit(int(limit))
-
-        if offset is not None and int(offset) > 0:
-            query = query.offset(int(offset))
 
         res = self._safe_execute(query)
         return [self._row_to_bso(row) for row in res]

@@ -222,17 +222,6 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json
         self.assertTrue(len(res) > 9)
 
-        # "offset"
-        # Skips the first n ids. For use with the limit parameter (required) to
-        # paginate through a result set.
-
-        # let's get 2, 3 and 4
-        res = self.app.get(self.root + '/storage/col2?offset=2&limit=3')
-        res = res.json
-        self.assertEquals(len(res), 3)
-        res.sort()
-        self.assertEquals(res, ['2', '3', '4'])
-
         # "sort"
         #   'oldest' - Orders by modification date (oldest first)
         #   'newest' - Orders by modification date (newest first)
@@ -629,8 +618,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json
 
         # trying weird args and make sure the server returns 400s
-        args = ('older', 'newer', 'index_above', 'index_below', 'limit',
-                'offset')
+        args = ('older', 'newer', 'index_above', 'index_below', 'limit')
         for arg in args:
             self.app.get(self.root + '/storage/col2?%s=%s' % (arg, randtext()),
                          status=400)

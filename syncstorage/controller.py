@@ -151,28 +151,15 @@ class StorageController(object):
             else:
                 filters[convert_name[arg]] = '>', value
 
-        # convert limit and offset
-        limit = offset = None
-        for arg in ('limit', 'offset'):
-            value = kw.get(arg)
-            if value is None:
-                continue
-            try:
-                value = int(value)
-            except ValueError:
-                msg = 'Invalid value for "%s": %r' % (arg, value)
-                raise HTTPBadRequest(msg)
-            if arg == 'limit':
-                limit = value
-            else:
-                offset = value
-
-        # we can't have offset without limit
+        # convert limit
+        limit = kw.get('limit')
         if limit is not None:
+            try:
+                limit = int(limit)
+            except ValueError:
+                msg = 'Invalid value for "limit": %r' % (limit,)
+                raise HTTPBadRequest(msg)
             args['limit'] = limit
-
-        if offset is not None and limit is not None:
-            args['offset'] = offset
 
         # XXX should we control id lengths ?
         for arg in ('ids',):
@@ -216,7 +203,7 @@ class StorageController(object):
 
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
-                                kw.get('limit'), kw.get('offset'),
+                                kw.get('limit'),
                                 kw.get('sort'))
         if not full:
             res = [line['id'] for line in res]
