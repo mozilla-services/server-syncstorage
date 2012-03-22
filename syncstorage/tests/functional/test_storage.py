@@ -122,9 +122,9 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_get_collection(self):
         res = self.app.get(self.root + '/storage/col3')
-        self.assertEquals(res.json, [])
+        self.assertEquals(res.json["items"], [])
         resp = self.app.get(self.root + '/storage/col2')
-        res = resp.json
+        res = resp.json["items"]
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
         self.assertEquals(int(resp.headers['X-Num-Records']), 5)
@@ -135,7 +135,7 @@ class TestStorage(StorageFunctionalTestCase):
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
         res = self.app.get(self.root + '/storage/col2?ids=1,3')
-        res = res.json
+        res = res.json["items"]
         res.sort()
         self.assertEquals(res, ['1', '3'])
 
@@ -158,14 +158,14 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue(ts < ts2)
 
         res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['128'])
 
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
-        res = res.json
+        res = res.json["items"]
         try:
             self.assertEquals(res, ['129'])
         except AssertionError:
@@ -175,14 +175,14 @@ class TestStorage(StorageFunctionalTestCase):
         # "full"
         # If defined, returns the full BSO, rather than just the id.
         res = self.app.get(self.root + '/storage/col2?full=1')
-        res = res.json
+        res = res.json["items"]
         keys = res[0].keys()
         keys.sort()
         wanted = ['id', 'modified', 'payload']
         self.assertEquals(keys, wanted)
 
         res = self.app.get(self.root + '/storage/col2')
-        res = res.json
+        res = res.json["items"]
         self.assertTrue(isinstance(res, list))
 
         # "index_above"
@@ -194,14 +194,14 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/storage/col2?index_above=10')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['130'])
 
         # "index_below"
         # If defined, only returns items with a lower sortindex than the value
         # specified.
         res = self.app.get(self.root + '/storage/col2?index_below=10')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['131'])
 
         # "limit"
@@ -215,11 +215,11 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/storage/col2?limit=2')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(len(res), 2)
 
         res = self.app.get(self.root + '/storage/col2')
-        res = res.json
+        res = res.json["items"]
         self.assertTrue(len(res) > 9)
 
         # "sort"
@@ -234,15 +234,15 @@ class TestStorage(StorageFunctionalTestCase):
             time.sleep(0.1)
 
         res = self.app.get(self.root + '/storage/col2?sort=oldest')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['0', '1', '2'])
 
         res = self.app.get(self.root + '/storage/col2?sort=newest')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['2', '1', '0'])
 
         res = self.app.get(self.root + '/storage/col2?sort=index')
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
@@ -251,7 +251,7 @@ class TestStorage(StorageFunctionalTestCase):
                            headers=[('Accept', 'application/json')])
         self.assertEquals(res.content_type, 'application/json')
 
-        res = res.json
+        res = res.json["items"]
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
@@ -273,7 +273,7 @@ class TestStorage(StorageFunctionalTestCase):
                      status=406)
 
     def test_set_collection_with_if_modified_since(self):
-        res = self.app.get(self.root + '/storage/col2?full=true').json
+        res = self.app.get(self.root + '/storage/col2?full=true').json["items"]
         self.assertEquals(len(res), 5)
         timestamps = sorted([r["modified"] for r in res])
 
@@ -370,7 +370,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/newlines"
         })
-        items = self.app.get(self.root + "/storage/col2").json
+        items = self.app.get(self.root + "/storage/col2").json["items"]
         self.assertEquals(len(items), 2)
         # If we send an unknown content type, we get an error.
         self.app.delete(self.root + "/storage/col2")
@@ -378,7 +378,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
         }, status=400)
-        items = self.app.get(self.root + "/storage/col2").json
+        items = self.app.get(self.root + "/storage/col2").json["items"]
         self.assertEquals(len(items), 0)
 
     def test_collection_usage(self):
@@ -406,24 +406,24 @@ class TestStorage(StorageFunctionalTestCase):
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 3)
+        self.assertEquals(len(res.json["items"]), 3)
 
         # deleting all items
         self.app.delete(self.root + '/storage/col2')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 0)
+        self.assertEquals(len(res.json["items"]), 0)
 
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 3)
+        self.assertEquals(len(res.json["items"]), 3)
         self.app.delete(self.root + '/storage/col2?ids=12,14')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 1)
+        self.assertEquals(len(res.json["items"]), 1)
         self.app.delete(self.root + '/storage/col2?ids=13')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 0)
+        self.assertEquals(len(res.json["items"]), 0)
 
     def test_delete_item(self):
         self.app.delete(self.root + '/storage/col2')
@@ -435,12 +435,12 @@ class TestStorage(StorageFunctionalTestCase):
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 3)
+        self.assertEquals(len(res.json["items"]), 3)
 
         # deleting item 13
         self.app.delete(self.root + '/storage/col2/13')
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 2)
+        self.assertEquals(len(res.json["items"]), 2)
 
         # unexisting item should return a 404
         self.app.delete(self.root + '/storage/col2/12982', status=404)
@@ -455,7 +455,7 @@ class TestStorage(StorageFunctionalTestCase):
         bsos = [bso1, bso2, bso3]
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 3)
+        self.assertEquals(len(res.json["items"]), 3)
 
         # deleting all
         self.app.delete(self.root + '/storage')
@@ -463,7 +463,7 @@ class TestStorage(StorageFunctionalTestCase):
         now = get_timestamp()
         self.assertTrue(abs(now - int(res.headers["X-Timestamp"])) < 200)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 0)
+        self.assertEquals(len(res.json["items"]), 0)
 
     def test_x_timestamp_header(self):
         now = get_timestamp()
@@ -533,23 +533,23 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         time.sleep(1.1)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(res.json, [])
+        self.assertEquals(res.json["items"], [])
 
         bso = {'payload': _PLD, 'ttl': 2}
         res = self.app.put_json(self.root + '/storage/col2/123456', bso)
 
         # it should exists now
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 1)
+        self.assertEquals(len(res.json["items"]), 1)
 
         # trying a second put again
         self.app.put_json(self.root + '/storage/col2/123456', bso)
 
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 1)
+        self.assertEquals(len(res.json["items"]), 1)
         time.sleep(2.1)
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json), 0)
+        self.assertEquals(len(res.json["items"]), 0)
 
     def test_batch(self):
         # Test that batch uploads are correctly processed.
@@ -626,7 +626,7 @@ class TestStorage(StorageFunctionalTestCase):
         # what about a crazy ids= string ?
         ids = ','.join([randtext(100) for i in range(10)])
         res = self.app.get(self.root + '/storage/col2?ids=%s' % ids)
-        self.assertEquals(res.json, [])
+        self.assertEquals(res.json["items"], [])
 
         # trying unexpected args - they should not break
         self.app.get(self.root + '/storage/col2?blabla=1',
@@ -646,12 +646,12 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + '/storage/passwords?ids=%s' % ids)
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
-        self.assertEqual(res.json, [])
+        self.assertEqual(res.json["items"], [])
 
     def test_timestamps_are_integers(self):
         # make sure the server returns only integer timestamps
         resp = self.app.get(self.root + '/storage/col2?full=1')
-        bsos = json.loads(resp.body)
+        bsos = json.loads(resp.body)["items"]
 
         # check how the timestamps look - we need two digits stuff
         stamps = []
@@ -668,7 +668,7 @@ class TestStorage(StorageFunctionalTestCase):
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
-        res = res.json
+        res = res.json["items"]
         try:
             self.assertEquals(res, ['3', '4'])
         except AssertionError:
@@ -698,7 +698,7 @@ class TestStorage(StorageFunctionalTestCase):
         # asking for bsos using newer=ts where newer is the timestamps
         # of bso 1 and 2, should not return them
         res = self.app.get(self.root + '/storage/meh?newer=%s' % ts)
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['3', '4'])
 
     def test_strict_newer_tabs(self):
@@ -721,7 +721,7 @@ class TestStorage(StorageFunctionalTestCase):
         # asking for bsos using newer=ts where newer is the timestamps
         # of bso 1 and 2, should not return them
         res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
-        res = res.json
+        res = res.json["items"]
         self.assertEquals(res, ['3', '4'])
 
     def test_write_tabs_503(self):

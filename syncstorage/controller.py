@@ -210,7 +210,9 @@ class StorageController(object):
             res = [line['id'] for line in res]
 
         request.response.headers['X-Num-Records'] = str(len(res))
-        return res
+        return {
+            "items": res
+        }
 
     def get_item(self, request, full=True):  # always full
         """Returns a single BSO object."""

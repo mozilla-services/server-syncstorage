@@ -21,6 +21,13 @@ class NewlinesRenderer(object):
             response = request.response
             if response.content_type == response.default_content_type:
                 response.content_type = "application/newlines"
+        # If the value to render has an "items" key then use that as the
+        # list of items to render.  Otherwise iterate over it directly.
+        try:
+            value = value["items"]
+        except (KeyError, TypeError):
+            pass
+        # Convert the values to JSON for rendering.
         data = []
         for line in value:
             line = json.dumps(line, use_decimal=True).replace('\n', '\\u000a')
