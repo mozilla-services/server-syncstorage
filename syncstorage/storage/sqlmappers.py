@@ -21,7 +21,7 @@ class Collections(_Base):
     """
     __tablename__ = 'collections'
     # XXX add indexes
-    collectionid = Column(Integer(6), primary_key=True, nullable=False,
+    collectionid = Column(Integer, primary_key=True, nullable=False,
                           autoincrement=True)
     name = Column(String(32), nullable=False, unique=True)
 
@@ -38,14 +38,14 @@ class _BSOBase(object):
     depending on the run-time settings of the application.
     """
     id = Column(String(64), primary_key=True, autoincrement=False)
-    userid = Column(Integer(11), primary_key=True, nullable=False)
-    collection = Column(Integer(6), primary_key=True, nullable=False,
+    userid = Column(Integer, primary_key=True, nullable=False)
+    collection = Column(Integer, primary_key=True, nullable=False,
                         default=0)
-    sortindex = Column(Integer(11))
-    modified = Column(BigInteger(20))
+    sortindex = Column(Integer)
+    modified = Column(BigInteger)
     payload = Column(Text)
-    payload_size = Column(Integer(11), nullable=False, default=0)
-    ttl = Column(Integer(11), default=MAX_TTL)
+    payload_size = Column(Integer, nullable=False, default=0)
+    ttl = Column(Integer, default=MAX_TTL)
 
 
 #  If the storage controller is not doing sharding based on userid,
