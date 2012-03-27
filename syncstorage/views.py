@@ -46,8 +46,8 @@ class SyncStorageService(MetricsService):
         # Configure DRY defaults for the path.
         kwds["path"] = self._configure_the_path(kwds["path"])
         # Ensure all views require authenticated user.
-        kwds.setdefault("permission", "authn")
-        kwds.setdefault("acl", lambda r: [(Allow, Authenticated, "authn")])
+        kwds.setdefault("permission", "owner")
+        kwds.setdefault("acl", self._default_acl)
         super(SyncStorageService, self).__init__(**kwds)
 
     def _configure_the_path(self, path):
@@ -56,9 +56,13 @@ class SyncStorageService(MetricsService):
         # TODO: decide on the allowable characters for this, and document.
         path = path.replace("{collection}", "{collection:[a-zA-Z0-9_-]+}")
         path = path.replace("{item}", "{item:[a-zA-Z0-9_-]+}")
-        # Add path prefix for the API version number.
-        path = "/{api:2.0}" + path
+        # Add path prefix for the API version number and userid.
+        path = "/{api:2.0}/{userid:[0-9]{1,10}}" + path
         return path
+
+    def _default_acl(self, request):
+        """Default ACL: only the owner is allowed access."""
+        return [(Allow, int(request.matchdict["userid"]), "owner")]
 
 
 root = SyncStorageService(name="root", path="/")

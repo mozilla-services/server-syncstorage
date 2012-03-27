@@ -53,7 +53,7 @@ class TestStorage(StorageFunctionalTestCase):
     def setUp(self):
         super(TestStorage, self).setUp()
 
-        self.root = '/2.0'
+        self.root = '/2.0/%d' % (self.user_id,)
 
         # Create a SagradaMACAuthPlugin from our deployment settings,
         # so that we can generate valid authentication tokens.
