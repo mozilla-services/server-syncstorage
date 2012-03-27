@@ -9,7 +9,7 @@ Beaker
 python-memcached
 simplejson
 Routes
-SQLAlchemy <= 0.6.99
+SQLAlchemy
 MySQL-python
 WSGIProxy
 recaptcha-client
