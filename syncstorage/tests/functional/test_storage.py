@@ -64,7 +64,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Monkey-patch the app to sign all requests with a macauth token.
         def new_do_request(req, *args, **kwds):
-            id, key = auth_plugin.encode_mac_id(req, {"userid": self.user_id})
+            id, key = auth_plugin.encode_mac_id(req, {"uid": self.user_id})
             macauthlib.sign_request(req, id, key)
             return orig_do_request(req, *args, **kwds)
         orig_do_request = self.app.do_request

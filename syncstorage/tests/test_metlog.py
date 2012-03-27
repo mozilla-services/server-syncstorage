@@ -21,7 +21,7 @@ class TestMetlog(unittest.TestCase):
 
     def _make_request(self, *args, **kwds):
         req = make_request(self.config, *args, **kwds)
-        req.user = {'userid': 'aa'}
+        req.user = {'uid': 'aa'}
         return req
 
     def test_sender_class(self):

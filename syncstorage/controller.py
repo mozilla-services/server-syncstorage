@@ -92,7 +92,7 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         storage = self._get_storage(request)
         collections = storage.get_collection_timestamps(user_id)
         request.response.headers['X-Num-Records'] = str(len(collections))
@@ -102,13 +102,13 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         counts = self._get_storage(request).get_collection_counts(user_id)
         request.response.headers['X-Num-Records'] = str(len(counts))
         return counts
 
     def get_quota(self, request):
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         used = self._get_storage(request).get_total_size(user_id)
         if not self._get_storage(request).use_quota:
             limit = None
@@ -120,7 +120,7 @@ class StorageController(object):
         }
 
     def get_collection_usage(self, request):
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         storage = self._get_storage(request)
         return storage.get_collection_sizes(user_id)
 
@@ -183,7 +183,7 @@ class StorageController(object):
         """Returns a list of the BSO ids contained in a collection."""
         kw = self._convert_args(kw)
         collection_name = request.matchdict['collection']
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         full = kw['full']
 
         if not full:
@@ -221,7 +221,7 @@ class StorageController(object):
         """Returns a single BSO object."""
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         fields = _BSO_FIELDS
         storage = self._get_storage(request)
 
@@ -248,7 +248,7 @@ class StorageController(object):
         If under the treshold, adds a header
         If the quota is reached, issues a 400
         """
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         storage = self._get_storage(request)
         left = storage.get_size_left(user_id)
         if left < _ONE_MEG:
@@ -265,7 +265,7 @@ class StorageController(object):
         else:
             left = 0.
 
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
 
@@ -306,7 +306,7 @@ class StorageController(object):
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
 
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -321,7 +321,7 @@ class StorageController(object):
     def set_collection(self, request):
         """Sets a batch of BSO objects into a collection."""
 
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
 
         if self._was_modified(request, user_id, collection_name):
@@ -420,7 +420,7 @@ class StorageController(object):
                 raise HTTPBadRequest(msg % (MAX_IDS_PER_BATCH,))
                 
         collection_name = request.matchdict['collection']
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
@@ -432,6 +432,6 @@ class StorageController(object):
 
     def delete_storage(self, request):
         """Deletes all records for the user."""
-        user_id = request.user['userid']
+        user_id = request.user["uid"]
         self._get_storage(request).delete_storage(user_id)  # XXX failures ?
         return HTTPNoContent()
