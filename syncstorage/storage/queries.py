@@ -38,9 +38,6 @@ queries = {
                    'collection=:collection_id AND userid=:user_id '
                    'AND id=:item_id AND ttl>:ttl',
 
-    'DELETE_ITEMS': 'DELETE FROM %(bso)s WHERE collection=:collection_id AND '
-                    'userid=:user_id AND ttl>:ttl',
-
     'USER_STORAGE_SIZE': 'SELECT SUM(payload_size) FROM %(bso)s WHERE '
                          'userid=:user_id AND ttl>:ttl',
     }
