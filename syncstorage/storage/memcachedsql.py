@@ -176,7 +176,7 @@ class MemcachedSQLStorage(SQLStorage):
             self.cache.set_tabs(user_id, tabs)
 
     def _update_item(self, item, when):
-        if 'payload' in item:
+        if 'payload' in item and 'modified' not in item:
             item['modified'] = when
 
     def set_item(self, user_id, collection_name, item_id, storage_time=None,

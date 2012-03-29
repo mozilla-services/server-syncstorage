@@ -289,7 +289,8 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
-        modified = storage.set_item(user_id, collection_name, item_id, **bso)
+        modified = storage.set_item(user_id, collection_name, item_id,
+                                    storage_time=request.server_time, **bso)
 
         if modified:
             response = HTTPNoContent()
