@@ -214,8 +214,10 @@ def get_storage(request):
     use for a given request.  It will use a host-specific backend if one
     is available, or fall back to the default backend if not.
     """
+    # Strip the port if they happened to send it.
+    host_name = request.host.rsplit(":", 1)[0]
     try:
-        return request.registry["syncstorage:storage:host:" + request.host]
+        return request.registry["syncstorage:storage:host:" + host_name]
     except KeyError:
         return request.registry["syncstorage:storage:default"]
 

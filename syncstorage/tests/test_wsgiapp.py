@@ -34,6 +34,9 @@ class TestWSGIApp(unittest.TestCase):
         req = self._make_request(environ={"HTTP_HOST": "some-test-host"})
         self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/some-test-host.db")
+        req = self._make_request(environ={"HTTP_HOST": "some-test-host:8000"})
+        self.assertEquals(get_storage(req).sqluri,
+                          "sqlite:////tmp/some-test-host.db")
         req = self._make_request(environ={"HTTP_HOST": "another-test-host"})
         self.assertEquals(get_storage(req).sqluri,
                           "sqlite:////tmp/another-test-host.db")
