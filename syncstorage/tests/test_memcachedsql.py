@@ -272,6 +272,8 @@ class TestMemcachedSQLStorage(unittest2.TestCase):
     def test_get_max_timestamp_of_empty_collection(self):
         # This tests for the error behind Bug 693893.
         # Max timestamp for an empty collection should be None.
+        if not self._is_up():
+            return
         ts = self.storage.get_collection_max_timestamp(_UID, "meta")
         self.assertEquals(ts, None)
 
