@@ -338,4 +338,4 @@ class MemcachedSQLStorage(SQLStorage):
         stamps = self.get_collection_timestamps(user_id)
         if collection_name == 'tabs' and 'tabs' not in stamps:
             return None
-        return stamps[collection_name]
+        return stamps.get(collection_name)

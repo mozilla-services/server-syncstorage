@@ -268,6 +268,12 @@ class TestMemcachedSQLStorage(unittest2.TestCase):
         stamps = self.storage.get_collection_timestamps(_UID)
         self.assertEquals(len(stamps), 0)
 
+    def test_get_max_timestamp_of_empty_collection(self):
+        # This tests for the error behind Bug 693893.
+        # Max timestamp for an empty collection should be None.
+        ts = self.storage.get_collection_max_timestamp(_UID, "meta")
+        self.assertEquals(ts, None)
+
 
 def test_suite():
     suite = unittest2.TestSuite()
