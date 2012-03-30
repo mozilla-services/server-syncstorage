@@ -1,12 +1,13 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-import unittest
+
+import unittest2
 
 from syncstorage.bso import BSO
 
 
-class TestBSO(unittest.TestCase):
+class TestBSO(unittest2.TestCase):
 
     def test_test_nonscalar_values_are_rejected(self):
         self.assertRaises(ValueError,
@@ -73,12 +74,3 @@ class TestBSO(unittest.TestCase):
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestBSO))
-    return suite
-
-if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")

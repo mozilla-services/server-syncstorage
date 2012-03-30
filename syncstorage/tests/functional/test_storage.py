@@ -71,8 +71,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.do_request = new_do_request
 
         # Reset the storage to a known state.
-        self.app.delete(self.root + "/storage",
-                        headers={"X-Confirm-Delete": "1"})
+        self.app.delete(self.root + "/storage")
 
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
             self.app.post(self.root + "/storage/" + name, "[]",
@@ -383,8 +382,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(items), 0)
 
     def test_collection_usage(self):
-        self.app.delete(self.root + "/storage",
-                        headers={"X-Confirm-Delete": "1"})
+        self.app.delete(self.root + "/storage")
 
         bso1 = {'id': '13', 'payload': 'XyX'}
         bso2 = {'id': '14', 'payload': _PLD}

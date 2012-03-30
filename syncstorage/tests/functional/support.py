@@ -8,49 +8,18 @@ import os
 import urlparse
 import random
 
-from mozsvc.metrics import setup_metlog, teardown_metlog
 from mozsvc.tests.support import FunctionalTestCase
 
+from syncstorage.tests.support import StorageTestCase
 
-class StorageFunctionalTestCase(FunctionalTestCase):
+
+class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
     def setUp(self):
         super(StorageFunctionalTestCase, self).setUp()
-
-        # We only support mysql and sqlite databases.
-        # Check that the config keys match this expectation.
-        # Also get a list of temp database files to delete on cleanup.
-        if not self.distant:
-            self.sqlfiles = []
-            for key, value in self.config.registry.settings.iteritems():
-                if key.endswith(".sqluri"):
-                    sqluri = urlparse.urlparse(value)
-                    assert sqluri.scheme in ('mysql',  'sqlite')
-                    if sqluri.scheme == 'sqlite':
-                        self.sqlfiles.append(sqluri.path)
-
-        # adding a user if needed
         self.user_id = random.randint(1, 100000)
 
-    def tearDown(self):
+    def _cleanup_test_databases(self):
+        # Don't cleanup databases unless we created them ourselves.
         if not self.distant:
-            for key, storage in self.config.registry.iteritems():
-                if not key.startswith("syncstorage:storage:"):
-                    continue
-                if "mysql" in storage.sqluri:
-                    storage._engine.execute('truncate collections')
-                    storage._engine.execute('truncate bso')
-
-            for sqlfile in self.sqlfiles:
-                if os.path.exists(sqlfile):
-                    os.remove(sqlfile)
-
-        teardown_metlog()
-
-        super(StorageFunctionalTestCase, self).tearDown()
-
-    def get_test_configurator(self):
-        config = super(StorageFunctionalTestCase, self).get_test_configurator()
-        setup_metlog(config.registry.settings.getsection('metlog'))
-        config.include("syncstorage")
-        return config
+            super(StorageFunctionalTestCase, self)._cleanup_test_databases()

@@ -1,9 +1,10 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-import unittest
+
 import os
 import time
+import unittest2
 
 from mozsvc.plugin import load_and_register
 from mozsvc.tests.support import get_test_configurator
@@ -11,7 +12,7 @@ from mozsvc.tests.support import get_test_configurator
 from syncstorage.storage.sqlmappers import get_bso_table_name
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import SQLStorage
-SyncStorage.register(SQLStorage)
+from syncstorage.tests.support import StorageTestCase
 
 from mozsvc.exceptions import BackendError
 
@@ -19,19 +20,13 @@ _UID = 1
 _PLD = '*' * 500
 
 
-class TestSQLStorage(unittest.TestCase):
+SyncStorage.register(SQLStorage)
+
+
+class TestSQLStorage(StorageTestCase):
 
     def setUp(self):
-        self.config = get_test_configurator(__file__)
-
-        # We only support mysql and sqlite databases.
-        # Check that the config keys match this expectation.
-        # Also get a list of temp database files to delete on cleanup.
-        self.sqlfiles = []
-        for key, value in self.config.registry.settings.iteritems():
-            if key.endswith(".sqluri"):
-                assert value.split(':/')[0] in ('mysql', 'sqlite')
-                self.sqlfiles.append(value.split('sqlite:///')[-1])
+        super(TestSQLStorage, self).setUp()
 
         self.storage = load_and_register("storage", self.config)
 
@@ -43,23 +38,13 @@ class TestSQLStorage(unittest.TestCase):
         self._cfiles = []
 
     def tearDown(self):
-        self._del_db()
         for file_ in self._cfiles:
             if os.path.exists(file_):
                 os.remove(file_)
+        super(TestSQLStorage, self).tearDown()
 
     def _add_cleanup(self, path):
         self._cfiles.append(path)
-
-    def _del_db(self):
-        for key, storage in self.config.registry.iteritems():
-            if not key.startswith("storage:"):
-                continue
-            storage._engine.execute('truncate collections')
-            storage._engine.execute('truncate bso')
-        for sqlfile in self.sqlfiles:
-            if os.path.exists(sqlfile):
-                os.remove(sqlfile)
 
     def test_items(self):
         self.assertFalse(self.storage.item_exists(_UID, 'col', 1))
@@ -200,12 +185,3 @@ class TestSQLStorage(unittest.TestCase):
         config = get_test_configurator(__file__, 'tests2.ini')
         storage = load_and_register("storage", config)
         self.assertEqual(storage._engine.pool.__class__.__name__, 'NullPool')
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestSQLStorage))
-    return suite
-
-if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")

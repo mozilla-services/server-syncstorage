@@ -1,26 +1,27 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-from metlog.senders import DebugCaptureSender
-from mozsvc.metrics import get_metlog_client
-from mozsvc.metrics import setup_metlog, teardown_metlog
-from mozsvc.tests.support import get_test_configurator, make_request
+
 import json
 import unittest
 
+from metlog.senders import DebugCaptureSender
 
-class TestMetlog(unittest.TestCase):
+from mozsvc.metrics import get_metlog_client
+from mozsvc.metrics import setup_metlog, teardown_metlog
+
+from syncstorage.views import get_info_counts
+from syncstorage.tests.support import StorageTestCase
+
+
+class TestMetlog(StorageTestCase):
+
     def setUp(self):
-        self.config = get_test_configurator(__file__)
-        setup_metlog(self.config.registry.settings.getsection('metlog'))
-        self.config.include('syncstorage')
+        super(TestMetlog, self).setUp()
         self.client = get_metlog_client()
 
-    def tearDown(self):
-        teardown_metlog()
-
-    def _make_request(self, *args, **kwds):
-        req = make_request(self.config, *args, **kwds)
+    def make_request(self, *args, **kwds):
+        req = super(TestMetlog, self).make_request(*args, **kwds)
         req.user = {'uid': 'aa'}
         return req
 
@@ -29,8 +30,7 @@ class TestMetlog(unittest.TestCase):
         self.assertTrue(isinstance(sender, DebugCaptureSender))
 
     def test_service_view_wrappers(self):
-        from syncstorage.views import get_info_counts
-        req = self._make_request(environ={"HTTP_HOST": "localhost"})
+        req = self.make_request(environ={"HTTP_HOST": "localhost"})
         get_info_counts(req)
         msgs = self.client.sender.msgs
         self.assertEqual(len(msgs), 2)

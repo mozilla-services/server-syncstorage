@@ -1,5 +1,5 @@
 APPNAME = server-syncstorage
-DEPS =
+DEPS = https://github.com/mozilla-services/mozservices
 VIRTUALENV = virtualenv
 NOSE = bin/nosetests -s --with-xunit
 TESTS = syncstorage/tests
