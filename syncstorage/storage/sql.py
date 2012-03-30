@@ -44,6 +44,8 @@ from syncstorage.storage.sqlmappers import (tables, collections,
 
 _KB = float(1024)
 
+MAX_COLLECTIONS_CACHE_SIZE = 1000
+
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.
 # Non-standard collections will be allocated IDs starting from the
@@ -221,8 +223,7 @@ class SQLStorage(object):
         if self.standard_collections:
             assert collection_id >= FIRST_CUSTOM_COLLECTION_ID
 
-        self._collections_by_name[collection_name] = collection_id
-        self._collections_by_id[collection_id] = collection_name
+        self._cache_collection_data(collection_id, collection_name)
         return collection_id
 
     def _get_collection_name(self, collection_id):
@@ -237,8 +238,7 @@ class SQLStorage(object):
         if res is None:
             return None
 
-        self._collections_by_id[collection_id] = res[0]
-        self._collections_by_name[res[0]] = collection_id
+        self._cache_collection_data(collection_id, res[0])
         return res[0]
 
     def _load_collection_names(self, collection_ids):
@@ -255,8 +255,15 @@ class SQLStorage(object):
             is_uncached = collections.c.collectionid.in_(uncached_ids)
             query = select([collections]).where(is_uncached)
             for res in self._safe_execute(query):
-                self._collections_by_id[res[0]] = res[1]
-                self._collections_by_name[res[1]] = res[0]
+                self._cache_collection_data(res[0], res[1])
+
+    def _cache_collection_data(self, collection_id, collection_name):
+        if len(self._collections_by_name) > MAX_COLLECTIONS_CACHE_SIZE:
+            msg = "More than %d collections have been created, refusing to cache them all"
+            logger.warn(msg % (MAX_COLLECTIONS_CACHE_SIZE,))
+        else:
+            self._collections_by_name[collection_name] = collection_id
+            self._collections_by_id[collection_id] = collection_name
 
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
