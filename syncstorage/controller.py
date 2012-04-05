@@ -20,11 +20,8 @@ from pyramid.httpexceptions import (HTTPBadRequest,
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
 
-from mozsvc.metrics import get_metlog_client
 from syncstorage.bso import BSO
 from syncstorage.storage import get_storage
-
-logger = get_metlog_client()
 
 _BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
 
@@ -54,6 +51,7 @@ class StorageController(object):
 
     def __init__(self, config):
         settings = config.registry.settings
+        self.logger = config.registry['metlog']
         self.batch_size = settings.get('storage.batch_size', 100)
         self.batch_max_count = settings.get('storage.batch_max_count',
                                             100)
@@ -396,8 +394,8 @@ class StorageController(object):
 
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
-                logger.error('Could not set items')
-                logger.error(str(e))
+                self.logger.error('Could not set items')
+                self.logger.error(str(e))
                 for bso in bsos:
                     res['failed'][bso['id']] = str(e)
             else:

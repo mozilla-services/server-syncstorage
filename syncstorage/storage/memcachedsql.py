@@ -14,7 +14,6 @@ from sqlalchemy.sql import select, bindparam, func
 
 from mozsvc.exceptions import BackendError
 
-from syncstorage import logger
 from syncstorage.util import get_timestamp
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import bso
@@ -270,7 +269,7 @@ class MemcachedSQLStorage(SQLStorage):
             # we store the size in bytes in memcached
             self.cache.set(key, size * _KB)
         except BackendError:
-            logger.error('Could not write to memcached')
+            self.logger.error('Could not write to memcached')
 
     def _get_cached_size(self, user_id):
         try:
