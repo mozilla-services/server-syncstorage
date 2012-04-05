@@ -4,7 +4,7 @@
 
 import simplejson as json
 
-from pyramid.security import Authenticated, Allow
+from pyramid.security import Allow
 
 from mozsvc.metrics import MetricsService
 

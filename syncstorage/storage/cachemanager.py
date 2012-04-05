@@ -15,10 +15,10 @@ from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
 from pyramid.events import subscriber, NewRequest
+from pyramid.threadlocal import get_current_registry
 
 from mozsvc.exceptions import BackendError
 
-from syncstorage import logger
 from syncstorage.storage.sql import _KB
 
 USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
@@ -56,6 +56,7 @@ class CacheManager(object):
         # get/set the cached data
         self._locker = threading.RLock()
         _instances.append(self)
+        self.logger = get_current_registry()['metlog']
 
     def _cleanup_pool(self, request):
         self.pool.pop(thread.get_ident(), None)
@@ -226,7 +227,7 @@ class CacheManager(object):
             try:
                 self.delete(_key(user_id, key))
             except BackendError:
-                logger.error('Could not delete user cache (%s)' % key)
+                self.logger.error('Could not delete user cache (%s)' % key)
 
     #
     # total managment
@@ -238,7 +239,7 @@ class CacheManager(object):
             # we store the size in bytes in memcached
             self.set(key, total * _KB)
         except BackendError:
-            logger.error('Could not write to memcached')
+            self.logger.error('Could not write to memcached')
 
     def get_total(self, user_id):
         try:

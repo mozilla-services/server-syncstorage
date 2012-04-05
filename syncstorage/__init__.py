@@ -4,10 +4,7 @@
 
 from mozsvc.config import get_configurator
 from mozsvc.plugin import load_from_settings
-from mozsvc.metrics import get_metlog_client
 from syncstorage.controller import StorageController
-
-logger = get_metlog_client()
 
 
 def includeme(config):
@@ -27,6 +24,7 @@ def includeme(config):
 
 def main(global_config, **settings):
     config = get_configurator(global_config, **settings)
-    load_from_settings('metlog', config.registry.settings)
+    metlog_wrapper = load_from_settings('metlog', config.registry.settings)
+    config.registry['metlog'] = metlog_wrapper.client
     config.include(includeme)
     return config.make_wsgi_app()
