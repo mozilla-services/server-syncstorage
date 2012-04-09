@@ -29,9 +29,10 @@ from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             delete, and_)
 
 
+from pyramid.threadlocal import get_current_registry
+
 from mozsvc.exceptions import BackendError
 
-from syncstorage import logger
 from syncstorage.bso import BSO
 from syncstorage.util import get_timestamp, from_timestamp
 from syncstorage.storage.queries import get_query
@@ -146,6 +147,8 @@ class SQLStorage(object):
                 self._collections_by_name[name] = id
                 self._collections_by_id[id] = name
 
+        self.logger = get_current_registry()['metlog']
+
     @classmethod
     def get_name(cls):
         """Return the name of the storage plugin"""
@@ -157,7 +160,7 @@ class SQLStorage(object):
             return self._engine.execute(*args, **kwds)
         except (OperationalError, TimeoutError), exc:
             err = traceback.format_exc()
-            logger.error(err)
+            self.logger.error(err)
             raise BackendError(str(exc))
 
     #

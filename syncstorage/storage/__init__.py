@@ -5,10 +5,8 @@
 import sys
 import abc
 
-from mozsvc.metrics import get_metlog_client
 from mozsvc.plugin import load_from_settings
-
-logger = get_metlog_client()
+from pyramid.threadlocal import get_current_registry
 
 
 class SyncStorage(object):
@@ -261,4 +259,5 @@ def _ignore_import_errors(name):
     """Venusian scan callback that will ignore any ImportError instances."""
     if not issubclass(sys.exc_info()[0], ImportError):
         raise
+    logger = get_current_registry()['metlog']
     logger.exception("Error while scanning package %r" % (name,))
