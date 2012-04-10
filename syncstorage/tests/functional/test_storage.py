@@ -891,6 +891,17 @@ class TestStorage(StorageFunctionalTestCase):
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=400)
 
+    def test_that_expired_items_can_be_overwritten_via_PUT(self):
+        # Upload something with a small ttl.
+        bso = {"payload": "XYZ", "ttl": 0}
+        self.app.put_json(self.root + "/storage/col2/TEST", bso)
+        # Wait for it to expire.
+        time.sleep(0.02)
+        self.app.get(self.root + "/storage/col2/TEST", status=404)
+        # Overwriting it should still work.
+        bso = {"payload": "XYZ", "ttl": 42}
+        self.app.put_json(self.root + "/storage/col2/TEST", bso)
+
 
 if __name__ == "__main__":
     # When run as a script, this file will execute the

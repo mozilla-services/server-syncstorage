@@ -80,7 +80,7 @@ class SyncStorage(object):
     #
     @abc.abstractmethod
     def item_exists(self, user_id, collection_name, item_id):
-        """Returns True if an item exists.
+        """Returns True if an item exists in the database (ignoring ttls).
 
         Args:
             - user_id: integer identifying the user in the storage.
@@ -88,7 +88,7 @@ class SyncStorage(object):
             - item_id: string identifying the item
 
         Returns:
-            True or False
+            True if the item exists, False otherwise.
         """
 
     @abc.abstractmethod

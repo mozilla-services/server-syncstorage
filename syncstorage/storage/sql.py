@@ -312,11 +312,10 @@ class SQLStorage(object):
     # Items APIs
     #
     def item_exists(self, user_id, collection_name, item_id):
-        """Returns a timestamp if an item exists."""
+        """Returns a timestamp if an item exists in the database."""
         collection_id = self._get_collection_id(collection_name)
         query = self._get_query('ITEM_EXISTS', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 item_id=item_id, ttl=_int_now(),
+        res = self._safe_execute(query, user_id=user_id, item_id=item_id,
                                  collection_id=collection_id)
         res = res.fetchone()
         if res is None:

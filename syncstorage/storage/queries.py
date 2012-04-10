@@ -36,7 +36,7 @@ queries = {
 
     'ITEM_EXISTS': 'SELECT modified FROM %(bso)s WHERE '
                    'collection=:collection_id AND userid=:user_id '
-                   'AND id=:item_id AND ttl>:ttl',
+                   'AND id=:item_id',
 
     'USER_STORAGE_SIZE': 'SELECT SUM(payload_size) FROM %(bso)s WHERE '
                          'userid=:user_id AND ttl>:ttl',
