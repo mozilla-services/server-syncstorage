@@ -9,6 +9,16 @@ from mozsvc.plugin import load_from_settings
 from pyramid.threadlocal import get_current_registry
 
 
+class StorageError(Exception):
+    """Base class for exceptions raised from the storage backend."""
+    pass
+
+
+class StorageConflictError(StorageError):
+    """Exception raised when attempting a conflicting write."""
+    pass
+
+
 class SyncStorage(object):
     """Abstract Base Class for storage backends."""
     __metaclass__ = abc.ABCMeta

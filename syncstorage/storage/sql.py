@@ -35,6 +35,7 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage.bso import BSO
 from syncstorage.util import get_timestamp, from_timestamp
+from syncstorage.storage import StorageConflictError
 from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import bso as _bso
 from syncstorage.storage.sqlmappers import (tables, collections,
@@ -210,7 +211,6 @@ class SQLStorage(object):
             # if it was inserted concurrently by someone else.
             query = insert(collections)
             try:
-              
                 self._safe_execute(query, name=collection_name)
             except IntegrityError:
                 # Read the id that was created concurrently.
@@ -439,7 +439,10 @@ class SQLStorage(object):
                        bso.c.collection == collection_id)
             query = update(bso).where(key).values(**values)
 
-        self._safe_execute(query)
+        try:
+            self._safe_execute(query)
+        except IntegrityError:
+            raise StorageConflictError()
         return last_modified
 
     def set_item(self, user_id, collection_name, item_id, storage_time=None,

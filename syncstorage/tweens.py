@@ -2,7 +2,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from pyramid.httpexceptions import HTTPServiceUnavailable
+import random
+
+from pyramid.httpexceptions import HTTPException, HTTPServiceUnavailable
 
 from syncstorage.util import get_timestamp
 
@@ -75,8 +77,32 @@ def set_default_accept_header(handler, registry):
     return set_default_accept_header_tween
 
 
+def fuzz_retry_after_header(handler, registry):
+    """Add some random fuzzing to the value of the Retry-After header."""
+
+    def fuzz_response(response):
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is not None:
+            retry_after = int(retry_after) + random.randint(0, 5)
+            response.headers["Retry-After"] = str(retry_after)
+
+    def fuzz_retry_after_header_tween(request):
+        try:
+            response = handler(request)
+        except HTTPException, response:
+            fuzz_response(response)
+            raise
+        else:
+            fuzz_response(response)
+            return response
+
+    return fuzz_retry_after_header_tween
+
+
+
 def includeme(config):
     """Include all the SyncServer tweens into the given config."""
     config.add_tween("syncstorage.tweens.check_for_blacklisted_nodes")
     config.add_tween("syncstorage.tweens.set_x_timestamp_header")
     config.add_tween("syncstorage.tweens.set_default_accept_header")
+    config.add_tween("syncstorage.tweens.fuzz_retry_after_header")

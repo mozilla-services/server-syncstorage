@@ -12,6 +12,7 @@ import itertools
 
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
+                                    HTTPConflict,
                                     HTTPPreconditionFailed,
                                     HTTPCreated,
                                     HTTPNoContent,
@@ -21,7 +22,7 @@ from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
 
 from syncstorage.bso import BSO
-from syncstorage.storage import get_storage
+from syncstorage.storage import get_storage, StorageConflictError
 
 _BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
 
@@ -29,6 +30,9 @@ _ONE_MEG = 1024
 
 # The maximum number of ids that can be deleted in a single batch operation.
 MAX_IDS_PER_BATCH = 100
+
+# How long the client should wait before retrying a conflicting write.
+RETRY_AFTER = 5
 
 
 def HTTPJsonBadRequest(data, **kwds):
@@ -287,8 +291,12 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
-        modified = storage.set_item(user_id, collection_name, item_id,
-                                    storage_time=request.server_time, **bso)
+        try:
+            modified = storage.set_item(user_id, collection_name, item_id,
+                                        storage_time=request.server_time,
+                                        **bso)
+        except StorageConflictError:
+            raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
 
         if modified:
             response = HTTPNoContent()
@@ -392,6 +400,8 @@ class StorageController(object):
                 storage.set_items(user_id, collection_name,
                                   bsos, storage_time=storage_time)
 
+            except StorageConflictError:
+                raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
                 self.logger.error('Could not set items')
@@ -417,7 +427,7 @@ class StorageController(object):
             if len(ids) > MAX_IDS_PER_BATCH:
                 msg = 'Cannot delete more than %s BSOs at a time'
                 raise HTTPBadRequest(msg % (MAX_IDS_PER_BATCH,))
-                
+
         collection_name = request.matchdict['collection']
         user_id = request.user["uid"]
         if self._was_modified(request, user_id, collection_name):
