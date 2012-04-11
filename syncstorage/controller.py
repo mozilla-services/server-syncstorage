@@ -68,23 +68,60 @@ class StorageController(object):
     def _get_storage(self, request):
         return get_storage(request)
 
-    def _was_modified(self, request, user_id, collection_name):
-        """Checks the X-If-Unmodified-Since header."""
-        unmodified = request.headers.get('X-If-Unmodified-Since')
+    def _check_if_unmodified(self, request):
+        """Check the X-If-Unmodified-Since header."""
+        unmodified = request.headers.get("X-If-Unmodified-Since")
         if unmodified is None:
-            return False
+            return None
+
         try:
             unmodified = int(unmodified)
         except ValueError:
             msg = 'Invalid value for "X-If-Unmodified-Since": %r'
             raise HTTPBadRequest(msg % (unmodified,))
-        storage = self._get_storage(request)
-        max = storage.get_collection_max_timestamp(user_id,
-                                                   collection_name)
-        if max is None:
-            return False
 
-        return max > unmodified
+        ts = self._get_resource_timestamp(request)
+        if ts is not None and ts > unmodified:
+            raise HTTPPreconditionFailed()
+
+    def _check_if_modified(self, request):
+        """Check the X-If-Modified-Since header."""
+        modified = request.headers.get("X-If-Modified-Since")
+        if modified is None:
+            return None
+
+        try:
+            modified = int(modified)
+        except ValueError:
+            msg = "Bad value for X-If-Modified-Since: %r" % (modified,)
+            raise HTTPBadRequest(msg)
+
+        ts = self._get_resource_timestamp(request)
+        if ts is not None and ts <= modified:
+            raise HTTPNotModified()
+
+    def _get_resource_timestamp(self, request):
+        """Get last-modified timestamp for the target resource of the request.
+
+        This method retreives the last-modified timestamp of the storage
+        itself, a specific collection in the storage, or a specific item
+        in a collection, depending on what resouce is targeted by the request.
+        """
+        storage = self._get_storage(request)
+        user_id = request.user["uid"]
+        collection_name = request.matchdict.get("collection")
+        # No collection name; return overall storage timestamp.
+        if collection_name is None:
+            return storage.get_storage_timestamp(user_id)
+        item_id = request.matchdict.get("item")
+        # No item id; return timestamp of whole collection.
+        if item_id is None:
+            return storage.get_collection_timestamp(user_id, collection_name)
+        # Otherwise, return timestamp of specific item.
+        item = storage.get_item(user_id, collection_name, item_id)
+        if item is None:
+            return None
+        return item["modified"]
 
     def get_storage(self, request):
         # XXX returns a 400 if the root is called
@@ -94,8 +131,9 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
-        user_id = request.user["uid"]
+        self._check_if_modified(request)
         storage = self._get_storage(request)
+        user_id = request.user["uid"]
         collections = storage.get_collection_timestamps(user_id)
         request.response.headers['X-Num-Records'] = str(len(collections))
         return collections
@@ -104,14 +142,17 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
+        self._check_if_modified(request)
+        storage = self._get_storage(request)
         user_id = request.user["uid"]
-        counts = self._get_storage(request).get_collection_counts(user_id)
+        counts = storage.get_collection_counts(user_id)
         request.response.headers['X-Num-Records'] = str(len(counts))
         return counts
 
     def get_quota(self, request):
-        user_id = request.user["uid"]
+        self._check_if_modified(request)
         storage = self._get_storage(request)
+        user_id = request.user["uid"]
         used = storage.get_total_size(user_id)
         if not storage.use_quota:
             limit = None
@@ -123,8 +164,9 @@ class StorageController(object):
         }
 
     def get_collection_usage(self, request):
-        user_id = request.user["uid"]
+        self._check_if_modified(request)
         storage = self._get_storage(request)
+        user_id = request.user["uid"]
         return storage.get_collection_sizes(user_id)
 
     def _convert_args(self, kw):
@@ -184,6 +226,8 @@ class StorageController(object):
 
     def get_collection(self, request, **kw):
         """Returns a list of the BSO ids contained in a collection."""
+        self._check_if_modified(request)
+
         kw = self._convert_args(kw)
         collection_name = request.matchdict['collection']
         user_id = request.user["uid"]
@@ -195,21 +239,6 @@ class StorageController(object):
             fields = _BSO_FIELDS
 
         storage = self._get_storage(request)
-
-        if_modified = request.headers.get("X-If-Modified-Since")
-        if if_modified is not None:
-            try:
-                if_modified = int(if_modified)
-            except ValueError:
-                msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
-                raise HTTPBadRequest(msg)
-            max = storage.get_collection_max_timestamp(user_id,
-                                                       collection_name)
-            if max is None:
-                raise HTTPNotFound()
-            if max <= if_modified:
-                raise HTTPNotModified()
-
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
                                 kw.get('limit'),
@@ -227,27 +256,14 @@ class StorageController(object):
 
     def get_item(self, request, full=True):  # always full
         """Returns a single BSO object."""
+        self._check_if_modified(request)
+        storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
         user_id = request.user["uid"]
-        fields = _BSO_FIELDS
-        storage = self._get_storage(request)
-
-        res = storage.get_item(user_id, collection_name, item_id,
-                               fields=fields)
+        res = storage.get_item(user_id, collection_name, item_id)
         if res is None:
             raise HTTPNotFound()
-
-        if_modified = request.headers.get("X-If-Modified-Since")
-        if if_modified is not None:
-            try:
-                if_modified = int(if_modified)
-            except ValueError:
-                msg = "Bad value for X-If-Modified-Since: %r" % (if_modified,)
-                raise HTTPBadRequest(msg)
-            if res["modified"] <= if_modified:
-                raise HTTPNotModified()
-
         return res
 
     def _check_quota(self, request):
@@ -265,6 +281,8 @@ class StorageController(object):
 
     def set_item(self, request):
         """Sets a single BSO object."""
+        self._check_if_unmodified(request)
+
         storage = self._get_storage(request)
         if storage.use_quota:
             left = self._check_quota(request)
@@ -274,9 +292,6 @@ class StorageController(object):
         user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
-
-        if self._was_modified(request, user_id, collection_name):
-            raise HTTPPreconditionFailed(collection_name)
 
         try:
             data = json.loads(request.body)
@@ -314,14 +329,11 @@ class StorageController(object):
 
     def delete_item(self, request):
         """Deletes a single BSO object."""
+        self._check_if_unmodified(request)
+        storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
-
         user_id = request.user["uid"]
-        if self._was_modified(request, user_id, collection_name):
-            raise HTTPPreconditionFailed(collection_name)
-
-        storage = self._get_storage(request)
         deleted = storage.delete_item(user_id, collection_name, item_id,
                                       storage_time=request.server_time)
 
@@ -331,12 +343,10 @@ class StorageController(object):
 
     def set_collection(self, request):
         """Sets a batch of BSO objects into a collection."""
+        self._check_if_unmodified(request)
 
         user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
-
-        if self._was_modified(request, user_id, collection_name):
-            raise HTTPPreconditionFailed(collection_name)
 
         # TODO: it would be lovely to support streaming uploads here...
         content_type = request.content_type
@@ -425,6 +435,8 @@ class StorageController(object):
         Additional request parameters may modify the selection of which
         items to delete.
         """
+        self._check_if_unmodified(request)
+
         ids = kw.get("ids")
         if ids is not None:
             ids = ids.split(",")
@@ -432,12 +444,9 @@ class StorageController(object):
                 msg = 'Cannot delete more than %s BSOs at a time'
                 raise HTTPBadRequest(msg % (MAX_IDS_PER_BATCH,))
 
+        storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         user_id = request.user["uid"]
-        if self._was_modified(request, user_id, collection_name):
-            raise HTTPPreconditionFailed(collection_name)
-
-        storage = self._get_storage(request)
         deleted = storage.delete_items(user_id, collection_name, ids,
                                        storage_time=request.server_time)
 
@@ -447,6 +456,8 @@ class StorageController(object):
 
     def delete_storage(self, request):
         """Deletes all records for the user."""
+        self._check_if_unmodified(request)
+        storage = self._get_storage(request)
         user_id = request.user["uid"]
-        self._get_storage(request).delete_storage(user_id)  # XXX failures ?
+        storage.delete_storage(user_id)  # XXX failures ?
         return HTTPNoContent()

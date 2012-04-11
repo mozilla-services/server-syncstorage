@@ -912,6 +912,47 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {"payload": "XYZ", "ttl": 42}
         self.app.put_json(self.root + "/storage/col2/TEST", bso)
 
+    def test_if_modified_since_on_info_views(self):
+        INFO_VIEWS = ("/info/collections", "/info/quota",
+                      "/info/collection_usage", "/info/collection_counts")
+        r = self.app.get(self.root + "/info/collections")
+        ts1 = r.headers["X-Timestamp"]
+        # With X-I-M-S set before latest change, all should give a 200.
+        headers = {"X-If-Modified-Since": "3"}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=200)
+        # With X-I-M-S set to after latest change , all should give a 304.
+        headers = {"X-If-Modified-Since": str(ts1)}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=304)
+        # Change a collection.
+        time.sleep(0.01)
+        bso = {"payload": "TEST"}
+        r = self.app.put_json(self.root + "/storage/col2/TEST", bso)
+        ts2 = r.headers["X-Timestamp"]
+        # Using the previous timestamp should read the updated data.
+        headers = {"X-If-Modified-Since": str(ts1)}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=200)
+        # Using the new timestamp should produce 304s.
+        headers = {"X-If-Modified-Since": str(ts2)}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=304)
+        # XXX TODO: this doesn't work yet because delete timestamps
+        # are not tracked correctly.  Will require some refactoring.
+        # Delete a collection.
+        #time.sleep(0.01)
+        #r = self.app.delete(self.root + "/storage/col2")
+        #ts3 = r.headers["X-Timestamp"]
+        ## Using the previous timestamp should read the updated data.
+        #headers = {"X-If-Modified-Since": str(ts2)}
+        #for view in INFO_VIEWS:
+        #    self.app.get(self.root + view, headers=headers, status=200)
+        ## Using the new timestamp should produce 304s.
+        #headers = {"X-If-Modified-Since": str(ts3)}
+        #for view in INFO_VIEWS:
+        #    self.app.get(self.root + view, headers=headers, status=304)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""

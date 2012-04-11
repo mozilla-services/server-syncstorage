@@ -79,7 +79,7 @@ class TestSQLStorage(StorageTestCase):
         names = timestamps.keys()
         self.assertTrue('col1' in names)
         self.assertTrue('col2' in names)
-        col1 = self.storage.get_collection_max_timestamp(_UID, 'col2')
+        col1 = self.storage.get_collection_timestamp(_UID, 'col2')
         self.assertAlmostEquals(col1, timestamps['col2'])
 
         # check that when we have several users, the method

@@ -303,6 +303,13 @@ class SQLStorage(object):
         return dict([(self._get_collection_name(collection_id), stamp)
                      for collection_id, stamp in res])
 
+    def get_storage_timestamp(self, user_id):
+        """return the last-modified time for the user's entire storage."""
+        stamps = self.get_collection_timestamps(user_id)
+        if not stamps:
+            return None
+        return max(stamps.itervalues())
+
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
         ttl = _int_now()
@@ -313,13 +320,13 @@ class SQLStorage(object):
         return dict([(self._get_collection_name(collection_id), count)
                       for collection_id, count in res])
 
-    def get_collection_max_timestamp(self, user_id, collection_name):
-        """Returns the max timestamp of a collection."""
+    def get_collection_timestamp(self, user_id, collection_name):
+        """Returns the last-modified timestamp of a collection."""
         collection_id = self._get_collection_id(collection_name)
         if collection_id is None:
             return None
 
-        query = self._get_query('COLLECTION_MAX_STAMP', user_id)
+        query = self._get_query('COLLECTION_TIMESTAMP', user_id)
         res = self._do_query_fetchone(query, user_id=user_id,
                                       collection_id=collection_id)
         return res[0]
@@ -420,7 +427,7 @@ class SQLStorage(object):
 
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.
-        if self.get_collection_max_timestamp(user_id, collection_name) is None:
+        if self.get_collection_timestamp(user_id, collection_name) is None:
             return None
         return res
 
@@ -449,7 +456,7 @@ class SQLStorage(object):
     def _row_to_bso(self, row):
         """Convert a database table row into a BSO object."""
         item = dict(row)
-        for key in ("userid", "collection", "payload_size"):
+        for key in ("userid", "collection", "payload_size", "ttl",):
             item.pop(key, None)
         return BSO(item)
 

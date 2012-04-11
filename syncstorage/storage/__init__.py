@@ -41,6 +41,17 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
+    def get_storage_timestamp(self, user_id):
+        """Returns the last-modified timestamp for the entire storage.
+
+        Args:
+            - user_id: integer identifying the user in the storage.
+
+        Returns:
+            The integer timestamp, or None if the user has no storage.
+        """
+
+    @abc.abstractmethod
     def get_collection_timestamps(self, user_id):
         """Returns the collection timestamps for a user.
 
@@ -73,6 +84,18 @@ class SyncStorage(object):
 
         Returns:
             A dict containing the name and size for each collection.
+        """
+
+    @abc.abstractmethod
+    def get_collection_timestamp(self, user_id, collection_name):
+        """Returns the last-modified timestamp for the named collection.
+
+        Args:
+            - user_id: integer identifying the user in the storage.
+            - collection_name: name of the collection.
+
+        Returns:
+            The integer timestamp, or None if the collection doesn't exist.
         """
 
     #

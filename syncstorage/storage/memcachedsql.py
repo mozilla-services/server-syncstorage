@@ -7,6 +7,8 @@ Memcached + SQL backend
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
 - The meta/global bso is stored in "user_id"
+- The last-modified time for the entire storage is stored in user_id:stamp
+- The info/collections timestamp mapping is stored in user_id:stamps
 """
 import time
 import simplejson as json
@@ -150,7 +152,8 @@ class MemcachedSQLStorage(SQLStorage):
 
     def _delete_cache(self, user_id):
         """Removes all cached data."""
-        for key in ('size', 'size:ts', 'meta:global', 'tabs'):
+        KEYS = ('size', 'size:ts', 'meta:global', 'tabs', 'stamps', 'stamp')
+        for key in KEYS:
             self.cache.delete(_key(user_id, key))
 
     def _update_stamp(self, user_id, collection_name, storage_time):
@@ -161,6 +164,16 @@ class MemcachedSQLStorage(SQLStorage):
         else:
             stamps.pop(collection_name, None)
         self.cache.set(_key(user_id, 'stamps'), stamps)
+        self.cache.set(_key(user_id, 'stamp'), storage_time)
+
+    def _clear_stamp(self, user_id, collection_name, storage_time):
+        # remove an item from the stamps cache
+        if storage_time is None:
+            storage_time = get_timestamp()
+        stamps = self.get_collection_timestamps(user_id)
+        stamps.pop(collection_name, None)
+        self.cache.set(_key(user_id, 'stamps'), stamps)
+        self.cache.set(_key(user_id, 'stamp'), storage_time)
 
     def _update_cache(self, user_id, collection_name, items, storage_time):
         # update the total size cache (bytes)
@@ -265,9 +278,10 @@ class MemcachedSQLStorage(SQLStorage):
         res = self.sqlstorage.delete_items(user_id, collection_name,
                                            item_ids, storage_time)
         if res:
-            if item_ids is None:
-                storage_time = None
-            self._update_stamp(user_id, collection_name, storage_time)
+            if item_ids:
+                self._update_stamp(user_id, collection_name, storage_time)
+            else:
+                self._clear_stamp(user_id, collection_name, storage_time)
         return res
 
     def get_total_size(self, user_id):
@@ -323,9 +337,17 @@ class MemcachedSQLStorage(SQLStorage):
 
         return stamps
 
-    def get_collection_max_timestamp(self, user_id, collection_name):
+    def get_collection_timestamp(self, user_id, collection_name):
         # let's get them all, so they get cached
         stamps = self.get_collection_timestamps(user_id)
         if collection_name == 'tabs' and 'tabs' not in stamps:
             return None
         return stamps.get(collection_name)
+
+    def get_storage_timestamp(self, user_id):
+        stamp = self.cache.get(_key(user_id, "stamp"))
+        if stamp is None:
+            stamp = super(MemcachedSQLStorage,
+                          self).get_storage_timestamp(user_id)
+            self.cache.set(_key(user_id, "stamp"), stamp)
+        return stamp

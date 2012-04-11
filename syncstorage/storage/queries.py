@@ -30,7 +30,7 @@ queries = {
                                 'FROM %(bso)s WHERE userid=:user_id AND '
                                 'ttl>:ttl GROUP BY collection',
 
-    'COLLECTION_MAX_STAMP': 'SELECT MAX(modified) FROM %(bso)s WHERE '
+    'COLLECTION_TIMESTAMP': 'SELECT MAX(modified) FROM %(bso)s WHERE '
                             'collection=:collection_id AND '
                             'userid=:user_id',
 
