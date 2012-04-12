@@ -137,7 +137,7 @@ class SQLStorage(object):
         if self.standard_collections and create_tables:
             zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
             query = insert(collections).values(colletionid=zeroth_id, name="")
-            self._safe_execute(query)
+            self._do_query(query)
 
         # A cache for the collection_name => collection_id mapping.
         # XXX: need to prevent this growing without bound.
@@ -164,6 +164,31 @@ class SQLStorage(object):
             self.logger.error(err)
             raise BackendError(str(exc))
 
+    def _do_query(self, *args, **kwds):
+        """Execute a database query, returning the rowcount."""
+        res = self._safe_execute(*args, **kwds)
+        try:
+            return res.rowcount
+        finally:
+            res.close()
+
+    def _do_query_fetchone(self, *args, **kwds):
+        """Execute a database query, returning the first result."""
+        res = self._safe_execute(*args, **kwds)
+        try:
+            return res.fetchone()
+        finally:
+            res.close()
+
+    def _do_query_fetchall(self, *args, **kwds):
+        """Execute a database query, returning iterator over the results."""
+        res = self._safe_execute(*args, **kwds)
+        try:
+            for row in res:
+                yield row
+        finally:
+            res.close()
+
     #
     # Users APIs
     #
@@ -177,7 +202,7 @@ class SQLStorage(object):
     def delete_storage(self, user_id):
         """Removes all user data"""
         query = self._get_query('DELETE_USER_BSOS', user_id)
-        self._safe_execute(query, user_id=user_id)
+        self._do_query(query, user_id=user_id)
         # XXX see if we want to check the rowcount
         return True
 
@@ -200,7 +225,7 @@ class SQLStorage(object):
         # Try to look it up in the database.
         query = select([collections.c.collectionid])
         query = query.where(collections.c.name == collection_name)
-        res = self._safe_execute(query).fetchone()
+        res = self._do_query_fetchone(query)
         if res is not None:
             collection_id = res[0]
         else:
@@ -211,7 +236,7 @@ class SQLStorage(object):
             # if it was inserted concurrently by someone else.
             query = insert(collections)
             try:
-                self._safe_execute(query, name=collection_name)
+                self._do_query(query, name=collection_name)
             except IntegrityError:
                 # Read the id that was created concurrently.
                 collection_id = self._get_collection_id(collection_name, False)
@@ -237,7 +262,7 @@ class SQLStorage(object):
 
         query = select([collections.c.name],
                        collections.c.collectionid == collection_id)
-        res = self._safe_execute(query).fetchone()
+        res = self._do_query_fetchone(query)
         if res is None:
             return None
 
@@ -257,7 +282,7 @@ class SQLStorage(object):
         if uncached_ids:
             is_uncached = collections.c.collectionid.in_(uncached_ids)
             query = select([collections]).where(is_uncached)
-            for res in self._safe_execute(query):
+            for res in self._do_query_fetchall(query):
                 self._cache_collection_data(res[0], res[1])
 
     def _cache_collection_data(self, collection_id, collection_name):
@@ -271,7 +296,7 @@ class SQLStorage(object):
     def get_collection_timestamps(self, user_id):
         """return the collection names for a given user"""
         query = self._get_query('COLLECTIONS_MAX_STAMPS', user_id)
-        res = list(self._safe_execute(query, user_id=user_id))
+        res = list(self._do_query_fetchall(query, user_id=user_id))
         collection_ids = [collection_id for collection_id, stamp in res]
         self._load_collection_names(collection_ids)
         return dict([(self._get_collection_name(collection_id), stamp)
@@ -279,8 +304,9 @@ class SQLStorage(object):
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
+        ttl = _int_now()
         query = self._get_query('COLLECTIONS_COUNTS', user_id)
-        res = list(self._safe_execute(query, user_id=user_id, ttl=_int_now()))
+        res = list(self._do_query_fetchall(query, user_id=user_id, ttl=ttl))
         collection_ids = [collection_id for collection_id, count in res]
         self._load_collection_names(collection_ids)
         return dict([(self._get_collection_name(collection_id), count)
@@ -290,19 +316,18 @@ class SQLStorage(object):
         """Returns the max timestamp of a collection."""
         query = self._get_query('COLLECTION_MAX_STAMP', user_id)
         collection_id = self._get_collection_id(collection_name)
-        res = self._safe_execute(query, user_id=user_id,
-                                 collection_id=collection_id)
-        res = res.fetchone()
-        stamp = res[0]
-        return stamp
+        res = self._do_query_fetchone(query, user_id=user_id,
+                                      collection_id=collection_id)
+        return res[0]
 
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.
 
         The size is the sum of stored payloads.
         """
+        ttl = _int_now()
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
-        res = list(self._safe_execute(query, user_id=user_id, ttl=_int_now()))
+        res = list(self._do_query_fetchall(query, user_id=user_id, ttl=ttl))
         collection_ids = [collection_id for collection_id, size in res]
         self._load_collection_names(collection_ids)
         return dict([(self._get_collection_name(col[0]),
@@ -315,9 +340,8 @@ class SQLStorage(object):
         """Returns a timestamp if an item exists in the database."""
         collection_id = self._get_collection_id(collection_name)
         query = self._get_query('ITEM_EXISTS', user_id)
-        res = self._safe_execute(query, user_id=user_id, item_id=item_id,
-                                 collection_id=collection_id)
-        res = res.fetchone()
+        res = self._do_query_fetchone(query, user_id=user_id, item_id=item_id,
+                                      collection_id=collection_id)
         if res is None:
             return None
         return res[0]
@@ -381,7 +405,7 @@ class SQLStorage(object):
         if limit is not None and int(limit) > 0:
             query = query.limit(int(limit))
 
-        res = self._safe_execute(query)
+        res = self._do_query_fetchall(query)
         return [self._row_to_bso(row) for row in res]
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
@@ -394,9 +418,10 @@ class SQLStorage(object):
             fields = [getattr(bso.c, field) for field in fields]
         where = self._get_query('ITEM_ID_COL_USER', user_id)
         query = select(fields, where)
-        res = self._safe_execute(query, user_id=user_id,
-                           item_id=item_id, collection_id=collection_id,
-                           ttl=_int_now()).first()
+        res = self._do_query_fetchone(query, user_id=user_id,
+                                      item_id=item_id,
+                                      collection_id=collection_id,
+                                      ttl=_int_now())
         if res is None:
             return None
         return self._row_to_bso(res)
@@ -439,7 +464,7 @@ class SQLStorage(object):
             query = update(bso).where(key).values(**values)
 
         try:
-            self._safe_execute(query)
+            self._do_query(query)
         except IntegrityError:
             raise StorageConflictError()
         return last_modified
@@ -527,18 +552,17 @@ class SQLStorage(object):
                   'modified = values(modified), payload = values(payload),'
                   'payload_size = values(payload_size),'
                   'ttl = values(ttl)')
-        res = self._safe_execute(sqltext(query), **values)
-        return res.rowcount
+        return self._do_query(sqltext(query), **values)
 
     def delete_item(self, user_id, collection_name, item_id,
                     storage_time=None):
         """Deletes an item"""
         collection_id = self._get_collection_id(collection_name)
         query = self._get_query('DELETE_SOME_USER_BSO', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 collection_id=collection_id,
-                                 item_id=item_id)
-        return res.rowcount == 1
+        rowcount = self._do_query(query, user_id=user_id,
+                                  collection_id=collection_id,
+                                  item_id=item_id)
+        return rowcount == 1
 
     def delete_items(self, user_id, collection_name, item_ids=None,
                      storage_time=None):
@@ -557,9 +581,9 @@ class SQLStorage(object):
 
         # XXX see if we want to send back more details
         # e.g. by checking the rowcount
-        res = self._safe_execute(query, user_id=user_id,
-                                 collection_id=collection_id)
-        return res.rowcount > 0
+        rowcount = self._do_query(query, user_id=user_id,
+                                  collection_id=collection_id)
+        return rowcount > 0
 
     def get_total_size(self, user_id, recalculate=False):
         """Returns the total size in KB of a user storage.
@@ -567,9 +591,8 @@ class SQLStorage(object):
         The size is the sum of stored payloads.
         """
         query = self._get_query('USER_STORAGE_SIZE', user_id)
-        res = self._safe_execute(query, user_id=user_id,
-                                 ttl=_int_now())
-        res = res.fetchone()
+        res = self._do_query_fetchone(query, user_id=user_id,
+                                      ttl=_int_now())
         if res is None or res[0] is None:
             return 0.0
         return int(res[0]) / _KB
