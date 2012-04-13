@@ -17,14 +17,16 @@ from mozsvc.exceptions import BackendError
 from mozsvc.plugin import load_from_settings
 
 from syncstorage.util import get_timestamp
+from syncstorage.tests.support import StorageTestCase
 
 _UID = 1
 _PLD = '*' * 500
 
 
-class TestMemcachedSQLStorage(unittest2.TestCase):
+class TestMemcachedSQLStorage(StorageTestCase):
 
     def setUp(self):
+        super(TestMemcachedSQLStorage, self).setUp()
         if not MEMCACHED:
             raise unittest2.SkipTest
 
@@ -89,7 +91,7 @@ class TestMemcachedSQLStorage(unittest2.TestCase):
             meta = self.storage.cache.get('1:meta:global')
             self.assertEquals(meta['id'], 'global')
             size = self.storage.cache.get('1:size')
-            self.assertEquals(size, 500)
+            self.assertEquals(size, len(_PLD))
 
         # this should remove the cache for meta global
         self.storage.delete_item(_UID, 'meta', 'global')
@@ -169,6 +171,11 @@ class TestMemcachedSQLStorage(unittest2.TestCase):
         self.storage.cache.delete('%d:size' % _UID)
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
+        # adding an item should increment the cached size.
+        self.storage.set_item(_UID, 'foo', '2', payload=_PLD)
+        wanted += len(_PLD) / 1024.
+        self.assertEquals(self.storage.get_total_size(_UID), wanted)
+
     def test_collection_stamps(self):
         if not self._is_up():
             return
@@ -224,7 +231,7 @@ class TestMemcachedSQLStorage(unittest2.TestCase):
 
         # until we asked for it again
         size = self.storage.get_collection_sizes(1)
-        self.assertEqual(self.storage.cache.get('1:size') / 1024,
+        self.assertEqual(self.storage.cache.get('1:size') / 1024.,
                          sum(size.values()))
 
     def test_collection_sizes(self):

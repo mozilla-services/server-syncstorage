@@ -84,6 +84,7 @@ class CacheManager(object):
                 raise BackendError(str(err))
 
     def incr(self, key, size=1):
+        size = int(size)
         with self.pool.reserve() as mc:
             try:
                 return mc.incr(key, size)
@@ -233,11 +234,12 @@ class CacheManager(object):
     # total managment
     #
     def set_total(self, user_id, total):
+        # we store the size in bytes in memcached
+        total = int(total * _KB)
         key = _key(user_id, 'size')
         # if this fail it's not a big deal
         try:
-            # we store the size in bytes in memcached
-            self.set(key, total * _KB)
+            self.set(key, total)
         except BackendError:
             self.logger.error('Could not write to memcached')
 
