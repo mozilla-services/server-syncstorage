@@ -143,9 +143,8 @@ class CacheManager(object):
             # removing entries
             for tab_id, tab_value in tabs.items():
                 if ((operator == 'in' and tab_id not in values) or
-                    (operator == '>' and tab_value <= values) or
-                    (operator == '<' and tab_value >= values)):
-
+                    (operator == '>' and tab_value[field] <= values) or
+                    (operator == '<' and tab_value[field] >= values)):
                     del tabs[tab_id]
 
     def get_tabs(self, user_id, filters=None):
