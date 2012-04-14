@@ -329,6 +329,8 @@ class SQLStorage(object):
         query = self._get_query('COLLECTION_TIMESTAMP', user_id)
         res = self._do_query_fetchone(query, user_id=user_id,
                                       collection_id=collection_id)
+        if res is None:
+            return None
         return res[0]
 
     def get_collection_sizes(self, user_id):

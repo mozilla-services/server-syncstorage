@@ -85,19 +85,27 @@ class StorageController(object):
             raise HTTPPreconditionFailed()
 
     def _check_if_modified(self, request):
-        """Check the X-If-Modified-Since header."""
-        modified = request.headers.get("X-If-Modified-Since")
-        if modified is None:
-            return None
+        """Check the X-If-Modified-Since header.
 
-        try:
-            modified = int(modified)
-        except ValueError:
-            msg = "Bad value for X-If-Modified-Since: %r" % (modified,)
-            raise HTTPBadRequest(msg)
+        This method checks whether the target resource has been modified
+        since the timestamp given in the X-If-Modified-Since header.  If
+        so a "304 Not Modified" is generated.
+
+        It also has the side-effect of setting X-Last-Modified in the
+        response headers.
+        """
+        modified = request.headers.get("X-If-Modified-Since")
+        if modified is not None:
+            try:
+                modified = int(modified)
+            except ValueError:
+                msg = "Bad value for X-If-Modified-Since: %r" % (modified,)
+                raise HTTPBadRequest(msg)
 
         ts = self._get_resource_timestamp(request)
-        if ts is not None and ts <= modified:
+        request.response.headers["X-Last-Modified"] = str(ts)
+
+        if ts is not None and modified is not None and ts <= modified:
             raise HTTPNotModified()
 
     def _get_resource_timestamp(self, request):
@@ -323,6 +331,7 @@ class StorageController(object):
             response = HTTPCreated()
             response.headers['Location'] = request.path
 
+        response.headers["X-Last-Modified"] = str(request.server_time)
         if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
@@ -425,6 +434,7 @@ class StorageController(object):
             else:
                 res['success'].extend([bso['id'] for bso in bsos])
 
+        request.response.headers["X-Last-Modified"] = str(storage_time)
         if storage.use_quota and left <= 1024:
             request.response.headers['X-Quota-Remaining'] = str(left)
         return res
@@ -449,10 +459,13 @@ class StorageController(object):
         user_id = request.user["uid"]
         deleted = storage.delete_items(user_id, collection_name, ids,
                                        storage_time=request.server_time)
-
         if not deleted:
             raise HTTPNotFound()
-        return HTTPNoContent()
+
+        response = HTTPNoContent()
+        if ids is not None:
+            response.headers["X-Last-Modified"] = str(request.server_time)
+        return response
 
     def delete_storage(self, request):
         """Deletes all records for the user."""

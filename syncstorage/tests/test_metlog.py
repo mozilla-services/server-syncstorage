@@ -14,6 +14,7 @@ class TestMetlog(StorageTestCase):
     def make_request(self, *args, **kwds):
         req = super(TestMetlog, self).make_request(*args, **kwds)
         req.user = {'uid': 'aa'}
+        req.matchdict = {}
         return req
 
     def test_sender_class(self):

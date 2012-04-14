@@ -953,6 +953,16 @@ class TestStorage(StorageFunctionalTestCase):
         #for view in INFO_VIEWS:
         #    self.app.get(self.root + view, headers=headers, status=304)
 
+    def test_that_x_last_modified_is_sent_for_all_get_requests(self):
+        r = self.app.get(self.root + "/info/collections")
+        self.assertTrue("X-Last-Modified" in r.headers)
+        r = self.app.get(self.root + "/info/collection_counts")
+        self.assertTrue("X-Last-Modified" in r.headers)
+        r = self.app.get(self.root + "/storage/col2")
+        self.assertTrue("X-Last-Modified" in r.headers)
+        r = self.app.get(self.root + "/storage/col2/1")
+        self.assertTrue("X-Last-Modified" in r.headers)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
