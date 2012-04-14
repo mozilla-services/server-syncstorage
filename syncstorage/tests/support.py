@@ -4,10 +4,34 @@
 
 import os
 import urlparse
+import functools
 
 from mozsvc.metrics import teardown_metlog
 from mozsvc.plugin import load_from_settings
 from mozsvc.tests.support import TestCase
+
+
+def restore_env(*keys):
+    """Decorator that ensures os.environ gets restored after a test.
+
+    Given a list of environment variable keys, this decorator will save the
+    current values of those environment variables at the start of the call
+    and restore them to those values at the end.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwds):
+            values = [os.environ.get(key) for key in keys]
+            try:
+                return func(*args, **kwds)
+            finally:
+                for key, value in zip(keys, values):
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+        return wrapper
+    return decorator
 
 
 class StorageTestCase(TestCase):

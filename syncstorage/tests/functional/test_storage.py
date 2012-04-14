@@ -21,10 +21,12 @@ import sys
 import time
 import random
 import string
+import webtest
 import simplejson as json
 from tempfile import mkstemp
 
 from syncstorage.util import get_timestamp
+from syncstorage.tests.support import restore_env
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.controller import MAX_IDS_PER_BATCH
 
@@ -901,6 +903,31 @@ class TestStorage(StorageFunctionalTestCase):
         # Overwriting it should still work.
         bso = {"payload": "XYZ", "ttl": 42}
         self.app.put_json(self.root + "/storage/col2/TEST", bso)
+
+
+class TestStorageMemcached(TestStorage):
+    """Storage testcases run against the memcached backend, if available."""
+
+    @restore_env("MOZSVC_TEST_INI_FILE")
+    def setUp(self):
+        # Force use of the memcached-specific config file.
+        # If we can't initialize due to an ImportError or BackendError,
+        # assume that memcache is unavailable and skip the test.
+        os.environ["MOZSVC_TEST_INI_FILE"] = "tests-memcached.ini"
+        try:
+            super(TestStorageMemcached, self).setUp()
+        except (ImportError, BackendError):
+            raise unittest2.SkipTest()
+        except webtest.AppError, e:
+            if "503" not in str(e):
+                raise
+            raise unittest2.SkipTest()
+
+    def _cleanup_test_databases(self):
+        storage = self.config.registry.get("syncstorage:storage:default")
+        if storage:
+            storage.cache.flush_all()
+        super(TestStorageMemcached, self)._cleanup_test_databases()
 
 
 if __name__ == "__main__":
