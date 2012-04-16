@@ -186,21 +186,20 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def get_total_size(self, user_id, recalculate):
+    def get_total_size(self, user_id):
         """Returns the total size in KB of a user storage.
 
         The size is the sum of stored payloads.
 
         Args:
             user_id: integer identifying the user in the storage.
-            recalculate: if True, kill any cache
 
         Returns:
             The size in Kbytes (float)
         """
 
     @abc.abstractmethod
-    def get_size_left(self, user_id, recalculate=False):
+    def get_size_left(self, user_id):
         """Returns the remaining size in KB of a user storage.
 
         The remaining size is calculated by substracting the
@@ -208,7 +207,6 @@ class SyncStorage(object):
 
         Args:
             user_id: integer identifying the user in the storage.
-            recalculate: if True, kill any cache
 
         Returns:
             The remaining size in Kbytes (float)

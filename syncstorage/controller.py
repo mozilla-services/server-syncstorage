@@ -111,11 +111,12 @@ class StorageController(object):
 
     def get_quota(self, request):
         user_id = request.user["uid"]
-        used = self._get_storage(request).get_total_size(user_id)
-        if not self._get_storage(request).use_quota:
+        storage = self._get_storage(request)
+        used = storage.get_total_size(user_id)
+        if not storage.use_quota:
             limit = None
         else:
-            limit = self._get_storage(request).quota_size
+            limit = storage.quota_size
         return {
             "usage": used,
             "quota": limit,
@@ -253,8 +254,6 @@ class StorageController(object):
         user_id = request.user["uid"]
         storage = self._get_storage(request)
         left = storage.get_size_left(user_id)
-        if left < _ONE_MEG:
-            left = storage.get_size_left(user_id, recalculate=True)
         if left <= 0.:  # no space left
             raise HTTPJsonBadRequest(ERROR_OVER_QUOTA)
         return left

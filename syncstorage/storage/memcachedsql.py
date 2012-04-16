@@ -8,6 +8,7 @@ Memcached + SQL backend
 - The total storage size is stored in "user_id:size"
 - The meta/global bso is stored in "user_id"
 """
+import time
 import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
@@ -18,6 +19,14 @@ from syncstorage.util import get_timestamp
 from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import bso
 from syncstorage.storage.cachemanager import CacheManager
+
+
+# Recalculate quota if they have less than 1MB remaining.
+# Note that quotas are reported in KB, so this really is 1MB.
+QUOTA_RECALCULATION_THRESHOLD = 1024
+
+# Recalculate quota at most once per hour.
+QUOTA_RECALCULATION_PERIOD = 60 * 60
 
 
 _COLLECTION_LIST = select([bso.c.collection, func.max(bso.c.modified),
@@ -145,7 +154,7 @@ class MemcachedSQLStorage(SQLStorage):
 
     def _delete_cache(self, user_id):
         """Removes all cached data."""
-        for key in ('size', 'meta:global', 'tabs'):
+        for key in ('size', 'size:ts', 'meta:global', 'tabs'):
             self.cache.delete(_key(user_id, key))
 
     def _update_stamp(self, user_id, collection_name, storage_time):
@@ -262,45 +271,28 @@ class MemcachedSQLStorage(SQLStorage):
             self._update_stamp(user_id, collection_name, storage_time)
         return res
 
-    def _set_cached_size(self, user_id, size):
-        key = _key(user_id, 'size')
-        # if this fail it's not a big deal
-        try:
-            # we store the size in bytes in memcached
-            self.cache.set(key, size * _KB)
-        except BackendError:
-            self.logger.error('Could not write to memcached')
-
-    def _get_cached_size(self, user_id):
-        try:
-            size = self.cache.get(_key(user_id, 'size'))
-            if size != 0 and size is not None:
-                size = size / _KB
-        except BackendError:
-            size = None
-        return size
-
-    def get_total_size(self, user_id, recalculate=False):
+    def get_total_size(self, user_id):
         """Returns the total size in KB of a user storage"""
-        def _get_set_size():
-            # returns in KB
-            size = self.sqlstorage.get_total_size(user_id)
-
-            # adding the tabs
-            size += self.cache.get_tabs_size(user_id)
-
-            # update the cache
-            self.cache.set_total(user_id, size)
-            return size
-
-        if recalculate:
-            return _get_set_size()
-
         size = self.cache.get_total(user_id)
-        if not size:    # memcached server seems down or needs a reset
-            return _get_set_size()
-
+        # If there is no cache entry, recalculate size from the database.
+        if not size:
+            size = self._recalculate_cached_size(user_id)
+        # If they're close to going over quota, ensure cached size is fresh.
+        elif self.quota_size - size < QUOTA_RECALCULATION_THRESHOLD:
+            last_recalc = self.cache.get(_key(user_id, "size", "ts"))
+            if last_recalc is None:
+                size = self._recalculate_cached_size(user_id)
+            elif time.time() - last_recalc > QUOTA_RECALCULATION_PERIOD:
+                size = self._recalculate_cached_size(user_id)
         return  size
+
+    def _recalculate_cached_size(self, user_id):
+        size = self.sqlstorage.get_total_size(user_id)
+        # Tabs are not stored in the database, add their size ourselves.
+        size += self.cache.get_tabs_size(user_id)
+        self.cache.set_total(user_id, size)
+        self.cache.set(_key(user_id, "size", "ts"), time.time())
+        return size
 
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.

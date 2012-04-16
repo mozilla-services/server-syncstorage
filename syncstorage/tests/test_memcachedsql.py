@@ -8,7 +8,9 @@ from tempfile import mkstemp
 import os
 
 try:
-    from syncstorage.storage.memcachedsql import MemcachedSQLStorage # NOQA
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
+    from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_THRESHOLD
     MEMCACHED = True
 except ImportError:
     MEMCACHED = False
@@ -283,6 +285,38 @@ class TestMemcachedSQLStorage(StorageTestCase):
             return
         ts = self.storage.get_collection_max_timestamp(_UID, "meta")
         self.assertEquals(ts, None)
+
+    def test_recalculation_of_cached_quota_usage(self):
+        if not self._is_up():
+            return
+
+        storage = self.storage
+        sqlstorage = self.storage.sqlstorage
+
+        # Create a large BSO, to ensure that it's close to quota size.
+        threshold_size = storage.quota_size - QUOTA_RECALCULATION_THRESHOLD
+        payload = "X" * (threshold_size + 1) * 1024
+        payload_size = len(payload) / 1024.0
+
+        # After writing it, size in memcached and sql should be the same.
+        storage.set_item(_UID, 'foo', '1', payload=payload)
+        self.assertEquals(storage.get_total_size(_UID), payload_size)
+        self.assertEquals(sqlstorage.get_total_size(_UID), payload_size)
+
+        # Deleting the BSO in the database won't adjust the cached size.
+        sqlstorage.delete_item(_UID, 'foo', '1')
+        self.assertEquals(storage.get_total_size(_UID), payload_size)
+        self.assertEquals(sqlstorage.get_total_size(_UID), 0)
+
+        # Adjust the cache to pretend that hasn't been recalculated lately.
+        last_recalc = storage.cache.get("1:size:ts")
+        last_recalc -= QUOTA_RECALCULATION_PERIOD + 1
+        storage.cache.set("1:size:ts", last_recalc)
+
+        # Now it should recalculate when asked for the size.
+        self.assertEquals(storage.get_total_size(_UID), 0)
+        self.assertEquals(sqlstorage.get_total_size(_UID), 0)
+
 
 
 def test_suite():
