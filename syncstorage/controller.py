@@ -205,13 +205,18 @@ class StorageController(object):
                 raise HTTPBadRequest(msg)
             max = storage.get_collection_max_timestamp(user_id,
                                                        collection_name)
-            if max is None or max <= if_modified:
+            if max is None:
+                raise HTTPNotFound()
+            if max <= if_modified:
                 raise HTTPNotModified()
 
         res = storage.get_items(user_id, collection_name, fields,
                                 kw['filters'],
                                 kw.get('limit'),
                                 kw.get('sort'))
+        if res is None:
+            raise HTTPNotFound()
+
         if not full:
             res = [line['id'] for line in res]
 
@@ -432,10 +437,12 @@ class StorageController(object):
         if self._was_modified(request, user_id, collection_name):
             raise HTTPPreconditionFailed(collection_name)
 
-        self._get_storage(request).delete_items(user_id,
-                                        collection_name, ids,
-                                        storage_time=request.server_time)
+        storage = self._get_storage(request)
+        deleted = storage.delete_items(user_id, collection_name, ids,
+                                       storage_time=request.server_time)
 
+        if not deleted:
+            raise HTTPNotFound()
         return HTTPNoContent()
 
     def delete_storage(self, request):

@@ -123,8 +123,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(resp.json), numcols + 1)
 
     def test_get_collection(self):
-        res = self.app.get(self.root + '/storage/col3')
-        self.assertEquals(res.json["items"], [])
         resp = self.app.get(self.root + '/storage/col2')
         res = resp.json["items"]
         res.sort()
@@ -380,8 +378,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
         }, status=400)
-        items = self.app.get(self.root + "/storage/col2").json["items"]
-        self.assertEquals(len(items), 0)
+        self.app.get(self.root + "/storage/col2", status=404)
 
     def test_collection_usage(self):
         self.app.delete(self.root + "/storage")
@@ -411,8 +408,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # deleting all items
         self.app.delete(self.root + '/storage/col2')
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json["items"]), 0)
+        self.app.get(self.root + '/storage/col2', status=404)
 
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
@@ -423,8 +419,11 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json["items"]), 1)
         self.app.delete(self.root + '/storage/col2?ids=13')
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json["items"]), 0)
+        # XXX TODO: this will either return an empty list or a 404,
+        # depending on whether the storage backend tracks deletes properly.
+        res = self.app.get(self.root + '/storage/col2', status=(200, 404))
+        if res.status_int == 200:
+            self.assertEquals(len(res.json["items"]), 0)
 
     def test_delete_item(self):
         self.app.delete(self.root + '/storage/col2')
@@ -460,11 +459,10 @@ class TestStorage(StorageFunctionalTestCase):
 
         # deleting all
         self.app.delete(self.root + '/storage')
-        res = self.app.delete(self.root + '/storage/col2')
+        res = self.app.delete(self.root + '/storage/col2', status=404)
         now = get_timestamp()
         self.assertTrue(abs(now - int(res.headers["X-Timestamp"])) < 200)
-        res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(len(res.json["items"]), 0)
+        self.app.get(self.root + '/storage/col2', status=404)
 
     def test_x_timestamp_header(self):
         now = get_timestamp()
@@ -635,19 +633,22 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_guid_deletion(self):
         # pushing some data in col2
-        bsos = [{'id': '{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i,
+        bsos = [{'id': '6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d' % i,
                  'payload': _PLD} for i in range(5)]
         res = self.app.post_json(self.root + '/storage/passwords', bsos)
         res = res.json
+        self.assertEquals(len(res["success"]), 5)
 
         # now deleting some of them
-        ids = ','.join(['{6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d}' % i
+        ids = ','.join(['6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d' % i
                         for i in range(2)])
 
         self.app.delete(self.root + '/storage/passwords?ids=%s' % ids)
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
-        self.assertEqual(res.json["items"], [])
+        self.assertEqual(len(res.json["items"]), 0)
+        res = self.app.get(self.root + '/storage/passwords')
+        self.assertEqual(len(res.json["items"]), 3)
 
     def test_timestamps_are_integers(self):
         # make sure the server returns only integer timestamps
@@ -886,10 +887,17 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
 
     def test_that_batch_deletes_are_limited_to_max_number_of_items(self):
+        bso = {"id": "1", "payload": "testing"}
+        # Deleting with less than the limit works OK.
+        self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+        # Deleting with equal to the limit works OK.
+        self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+        # Deleting with more than the limit fails.
+        self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=400)
 

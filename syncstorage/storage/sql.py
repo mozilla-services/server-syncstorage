@@ -210,11 +210,11 @@ class SQLStorage(object):
     # Collections APIs
     #
 
-    def _get_collection_id(self, collection_name, create=True):
+    def _get_collection_id(self, collection_name, create=False):
         """Returns a collection id, given the name.
 
-        By default new collections will be created on demand.  To prevent
-        auto-creation pass create=False.
+        If the named collection does not exist then None is returned.  To
+        automatically create collections on deman, pass create=True.
         """
         # Grab it from the cache if we can.
         try:
@@ -239,13 +239,14 @@ class SQLStorage(object):
                 self._do_query(query, name=collection_name)
             except IntegrityError:
                 # Read the id that was created concurrently.
-                collection_id = self._get_collection_id(collection_name, False)
+                collection_id = self._get_collection_id(collection_name)
                 if collection_id is None:
                     raise
             else:
                 # Read the id that we just created.
                 # XXX: cross-database way to get last inserted id?
-                collection_id = self._get_collection_id(collection_name, False)
+                collection_id = self._get_collection_id(collection_name)
+                assert collection_id is not None
 
         # Sanity-check that we're not trampling standard collection ids.
         if self.standard_collections:
@@ -314,8 +315,11 @@ class SQLStorage(object):
 
     def get_collection_max_timestamp(self, user_id, collection_name):
         """Returns the max timestamp of a collection."""
-        query = self._get_query('COLLECTION_MAX_STAMP', user_id)
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return None
+
+        query = self._get_query('COLLECTION_MAX_STAMP', user_id)
         res = self._do_query_fetchone(query, user_id=user_id,
                                       collection_id=collection_id)
         return res[0]
@@ -339,6 +343,9 @@ class SQLStorage(object):
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists in the database."""
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return None
+
         query = self._get_query('ITEM_EXISTS', user_id)
         res = self._do_query_fetchone(query, user_id=user_id, item_id=item_id,
                                       collection_id=collection_id)
@@ -363,6 +370,9 @@ class SQLStorage(object):
         """
         bso = self._get_bso_table(user_id)
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return None
+
         if fields is None:
             fields = [bso]
         else:
@@ -406,18 +416,28 @@ class SQLStorage(object):
             query = query.limit(int(limit))
 
         res = self._do_query_fetchall(query)
-        return [self._row_to_bso(row) for row in res]
+        res = [self._row_to_bso(row) for row in res]
+
+        # If the query returned no results, we don't know whether that's
+        # because it's empty or because it doesn't exist.
+        if self.get_collection_max_timestamp(user_id, collection_name) is None:
+            return None
+        return res
 
     def get_item(self, user_id, collection_name, item_id, fields=None):
         """returns one item"""
-        bso = self._get_bso_table(user_id)
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return None
+
+        bso = self._get_bso_table(user_id)
         if fields is None:
             fields = [bso]
         else:
             fields = [getattr(bso.c, field) for field in fields]
         where = self._get_query('ITEM_ID_COL_USER', user_id)
         query = select(fields, where)
+
         res = self._do_query_fetchone(query, user_id=user_id,
                                       item_id=item_id,
                                       collection_id=collection_id,
@@ -449,7 +469,7 @@ class SQLStorage(object):
         if 'payload' in values:
             values['payload_size'] = len(values['payload'])
 
-        collection_id = self._get_collection_id(collection_name)
+        collection_id = self._get_collection_id(collection_name, create=True)
 
         if last_modified is None:   # does not exists
             values['collection'] = collection_id
@@ -513,8 +533,9 @@ class SQLStorage(object):
         query = 'insert into %s (userid, collection, %s) values ' \
                     % (table, ','.join(fields))
 
+        collection_id = self._get_collection_id(collection_name, create=True)
         values = {}
-        values['collection'] = self._get_collection_id(collection_name)
+        values['collection'] = collection_id
         values['user_id'] = user_id
 
         # building the values batch
@@ -558,6 +579,8 @@ class SQLStorage(object):
                     storage_time=None):
         """Deletes an item"""
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return False
         query = self._get_query('DELETE_SOME_USER_BSO', user_id)
         rowcount = self._do_query(query, user_id=user_id,
                                   collection_id=collection_id,
@@ -568,6 +591,8 @@ class SQLStorage(object):
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
         collection_id = self._get_collection_id(collection_name)
+        if collection_id is None:
+            return False
         bso = self._get_bso_table(user_id)
         query = delete(bso)
         where = [bso.c.userid == bindparam('user_id'),

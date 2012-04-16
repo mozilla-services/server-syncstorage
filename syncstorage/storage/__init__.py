@@ -103,7 +103,8 @@ class SyncStorage(object):
               all fields are returns by default.
 
         Returns:
-            A list of dict containing the information for the items
+            A list of dict containing the information for the items.
+            If the collection does not exist, returns None.
         """
 
     @abc.abstractmethod
@@ -119,6 +120,7 @@ class SyncStorage(object):
 
         Returns:
             A dict containing the information for the item
+            If the item does not exist, returns None.
         """
 
     @abc.abstractmethod
@@ -182,7 +184,7 @@ class SyncStorage(object):
             - storage_time: time of the storage, if none provided, use current
               time
         Returns:
-            None
+            True if the collection existed, False otherwise.
         """
 
     @abc.abstractmethod

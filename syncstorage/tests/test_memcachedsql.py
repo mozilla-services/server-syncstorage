@@ -74,8 +74,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'col1')
-        items = self.storage.get_items(_UID, 'col1')
-        self.assertEquals(len(items), 0)
+        self.assertEquals(self.storage.get_items(_UID, 'col1'), None)
 
     def test_meta_global(self):
         if not self._is_up():
@@ -117,8 +116,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'meta')
-        items = self.storage.get_items(_UID, 'col')
-        self.assertEquals(len(items), 0)
+        self.assertEquals(self.storage.get_items(_UID, 'col'), None)
 
         if self._is_up():
             meta = self.storage.cache.get('1:meta:global')
@@ -260,8 +258,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'col1')
-        items = self.storage.get_items(_UID, 'col1')
-        self.assertEquals(len(items), 0)
+        self.assertEquals(self.storage.get_items(_UID, 'col1'), None)
 
         self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
         self.storage.set_item(_UID, 'col1', '2', payload=_PLD)
@@ -272,8 +269,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.assertEquals(len(items), 3)
 
         self.storage.delete_storage(_UID)
-        items = self.storage.get_items(_UID, 'col1')
-        self.assertEquals(len(items), 0)
+        self.assertEquals(self.storage.get_items(_UID, 'col1'), None)
 
         stamps = self.storage.get_collection_timestamps(_UID)
         self.assertEquals(len(stamps), 0)

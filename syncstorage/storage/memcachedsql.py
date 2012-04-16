@@ -94,14 +94,10 @@ class MemcachedSQLStorage(SQLStorage):
     #
     def delete_storage(self, user_id):
         self.cache.flush_user_cache(user_id)
-        self.sqlstorage.delete_storage(user_id)
+        return self.sqlstorage.delete_storage(user_id)
 
     def item_exists(self, user_id, collection_name, item_id):
         """Returns a timestamp if an item exists."""
-        def _item_exists():
-            return self.sqlstorage.item_exists(user_id, collection_name,
-                                               item_id)
-
         # returning cached values when possible
         if self._is_meta_global(collection_name, item_id):
             key = _key(user_id, 'meta', 'global')
@@ -159,10 +155,11 @@ class MemcachedSQLStorage(SQLStorage):
 
     def _update_stamp(self, user_id, collection_name, storage_time):
         # update the stamps cache
-        if storage_time is None:
-            storage_time = get_timestamp()
         stamps = self.get_collection_timestamps(user_id)
-        stamps[collection_name] = storage_time
+        if storage_time is not None:
+            stamps[collection_name] = storage_time
+        else:
+            stamps.pop(collection_name, None)
         self.cache.set(_key(user_id, 'stamps'), stamps)
 
     def _update_cache(self, user_id, collection_name, items, storage_time):
@@ -268,6 +265,8 @@ class MemcachedSQLStorage(SQLStorage):
         res = self.sqlstorage.delete_items(user_id, collection_name,
                                            item_ids, storage_time)
         if res:
+            if item_ids is None:
+                storage_time = None
             self._update_stamp(user_id, collection_name, storage_time)
         return res
 
