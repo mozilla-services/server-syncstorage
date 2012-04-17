@@ -329,7 +329,6 @@ class StorageController(object):
             response = HTTPNoContent()
         else:
             response = HTTPCreated()
-            response.headers['Location'] = request.path
 
         response.headers["X-Last-Modified"] = str(request.server_time)
         if storage.use_quota and left <= _ONE_MEG:

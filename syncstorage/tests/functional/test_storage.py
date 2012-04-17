@@ -881,7 +881,6 @@ class TestStorage(StorageFunctionalTestCase):
         # If a new BSO is created, the return code should be 201.
         r = self.app.put_json(self.root + "/storage/col2/TEST", bso,
                               status=201)
-        self.assertTrue(r.headers["Location"].endswith("/storage/col2/TEST"))
         # If an existing BSO is updated, the return code should be 204.
         bso["payload"] = "testing_again"
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
