@@ -45,8 +45,14 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         self.storage = load_from_settings("storage", settings)
 
-        # make sure we have the standard collections in place
+        # Check that memcached is actually running.
+        try:
+            self.storage.cache.set('test', 1)
+            assert self.storage.cache.get('test') == 1
+        except BackendError:
+            raise unittest2.SkipTest
 
+        # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history'):
             self.storage.set_items(_UID, name, [])
 
@@ -55,16 +61,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
         if os.path.exists(self.dbfile):
             os.remove(self.dbfile)
 
-    def _is_up(self):
-        try:
-            self.storage.cache.set('test', 1)
-        except BackendError:
-            return False
-        return self.storage.cache.get('test') == 1
-
     def test_basic(self):
-        if not self._is_up():
-            return
         # just make sure calls goes through
         self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 
@@ -77,8 +74,6 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.assertEquals(self.storage.get_items(_UID, 'col1'), None)
 
     def test_meta_global(self):
-        if not self._is_up():
-            return
         self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
 
         # these calls should be cached
@@ -88,20 +83,18 @@ class TestMemcachedSQLStorage(StorageTestCase):
         # we should find in the cache these items:
         #   - the "global" bso for the "meta" collection
         #   - the size of all bsos
-        if self._is_up():
-            meta = self.storage.cache.get('1:meta:global')
-            self.assertEquals(meta['id'], 'global')
-            size = self.storage.cache.get('1:size')
-            self.assertEquals(size, len(_PLD))
+        meta = self.storage.cache.get('1:meta:global')
+        self.assertEquals(meta['id'], 'global')
+        size = self.storage.cache.get('1:size')
+        self.assertEquals(size, len(_PLD))
 
         # this should remove the cache for meta global
         self.storage.delete_item(_UID, 'meta', 'global')
 
-        if self._is_up():
-            meta = self.storage.cache.get('1:meta:global')
-            self.assertEquals(meta, None)
-            size = self.storage.cache.get('1:size')
-            self.assertEquals(size, None)
+        meta = self.storage.cache.get('1:meta:global')
+        self.assertEquals(meta, None)
+        size = self.storage.cache.get('1:size')
+        self.assertEquals(size, None)
 
         # let's store some items in the meta collection
         # and checks that the global object is uploaded
@@ -110,22 +103,17 @@ class TestMemcachedSQLStorage(StorageTestCase):
                 ]
         self.storage.set_items(_UID, 'meta', items)
 
-        if self._is_up():
-            global_ = self.storage.cache.get('1:meta:global')
-            self.assertEquals(global_['payload'], 'xyx')
+        global_ = self.storage.cache.get('1:meta:global')
+        self.assertEquals(global_['payload'], 'xyx')
 
         # this should remove the cache
         self.storage.delete_items(_UID, 'meta')
         self.assertEquals(self.storage.get_items(_UID, 'col'), None)
 
-        if self._is_up():
-            meta = self.storage.cache.get('1:meta:global')
-            self.assertEquals(meta, None)
+        meta = self.storage.cache.get('1:meta:global')
+        self.assertEquals(meta, None)
 
     def test_tabs(self):
-        if not self._is_up():  # no memcached == no tabs
-            return
-
         self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
 
         # these calls should be cached
@@ -154,10 +142,6 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.assertEquals(tabs, {})
 
     def test_size(self):
-        # make sure we get the right size
-        if not self._is_up():  # no memcached == no size
-            return
-
         # storing 2 BSOs
         self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
         self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
@@ -177,30 +161,22 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
     def test_collection_stamps(self):
-        if not self._is_up():
-            return
-
         self.storage.set_item(_UID, 'tabs', '1', payload=_PLD * 200)
         self.storage.set_item(_UID, 'foo', '1', payload=_PLD * 200)
 
         stamps = self.storage.get_collection_timestamps(_UID)  # pump cache
-        if self._is_up():
-            cached_stamps = self.storage.cache.get('1:stamps')
-            self.assertEquals(stamps['tabs'], cached_stamps['tabs'])
+        cached_stamps = self.storage.cache.get('1:stamps')
+        self.assertEquals(stamps['tabs'], cached_stamps['tabs'])
 
         stamps2 = self.storage.get_collection_timestamps(_UID)
         self.assertEquals(len(stamps), len(stamps2))
-        if self._is_up():
-            self.assertEquals(len(stamps), 2)
-        else:
-            self.assertEquals(len(stamps), 1)
+        self.assertEquals(len(stamps), 2)
 
         # checking the stamps
-        if self._is_up():
-            stamps = self.storage.cache.get('1:stamps')
-            keys = stamps.keys()
-            keys.sort()
-            self.assertEquals(keys, ['foo', 'tabs'])
+        stamps = self.storage.cache.get('1:stamps')
+        keys = stamps.keys()
+        keys.sort()
+        self.assertEquals(keys, ['foo', 'tabs'])
 
         # adding a new item should modify the stamps cache
         now = get_timestamp()
@@ -208,16 +184,14 @@ class TestMemcachedSQLStorage(StorageTestCase):
                               storage_time=now)
 
         # checking the stamps
-        if self._is_up():
-            stamps = self.storage.cache.get('1:stamps')
-            self.assertEqual(stamps['baz'], now)
+        stamps = self.storage.cache.get('1:stamps')
+        self.assertEqual(stamps['baz'], now)
 
         stamps = self.storage.get_collection_timestamps(_UID)
-        if self._is_up():
-            _stamps = self.storage.cache.get('1:stamps')
-            keys = _stamps.keys()
-            keys.sort()
-            self.assertEquals(keys, ['baz', 'foo', 'tabs'])
+        _stamps = self.storage.cache.get('1:stamps')
+        keys = _stamps.keys()
+        keys.sort()
+        self.assertEquals(keys, ['baz', 'foo', 'tabs'])
 
         # deleting the item should also update the stamp
         time.sleep(0.2)    # to make sure the stamps differ
@@ -235,8 +209,6 @@ class TestMemcachedSQLStorage(StorageTestCase):
                          sum(size.values()))
 
     def test_collection_sizes(self):
-        if not self._is_up():  # no memcached
-            return
         # setting the tabs in memcache
         tabs = {'mCwylprUEiP5':
                 {'payload': '*' * 1024,
@@ -247,8 +219,6 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.assertEqual(size['tabs'], 1.)
 
     def test_flush_all(self):
-        if not self._is_up():
-            return
         # just make sure calls goes through
         self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
 
@@ -277,15 +247,10 @@ class TestMemcachedSQLStorage(StorageTestCase):
     def test_get_timestamp_of_empty_collection(self):
         # This tests for the error behind Bug 693893.
         # Max timestamp for an empty collection should be None.
-        if not self._is_up():
-            return
         ts = self.storage.get_collection_timestamp(_UID, "meta")
         self.assertEquals(ts, None)
 
     def test_recalculation_of_cached_quota_usage(self):
-        if not self._is_up():
-            return
-
         storage = self.storage
         sqlstorage = self.storage.sqlstorage
 
