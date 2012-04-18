@@ -6,7 +6,7 @@ import os
 import re
 
 install_requires = ['SQLALchemy', 'PasteDeploy', 'unittest2', 'simplejson',
-                    'mozsvc', 'cornice', 'macauthlib']
+                    'mozsvc>=0.3', 'cornice', 'macauthlib']
 
 entry_points = """
 [paste.app_factory]
