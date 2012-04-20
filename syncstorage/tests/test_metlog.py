@@ -24,12 +24,18 @@ class TestMetlog(StorageTestCase):
     def test_service_view_wrappers(self):
         req = self.make_request(environ={"HTTP_HOST": "localhost"})
         get_info_counts(req)
+        # The three most recent msgs should be from processing that request.
+        # There may be more messages due to e.g. warnings at startup.
         msgs = self.metlog.sender.msgs
-        self.assertEqual(len(msgs), 2)
-        timer_msg = json.loads(msgs[0])
-        wsgi_msg = json.loads(msgs[1])
+        self.assertTrue(len(msgs) >= 3)
+        timer_msg = json.loads(msgs[-3])
+        counter_msg = json.loads(msgs[-2])
+        wsgi_msg = json.loads(msgs[-1])
         self.assertEqual(timer_msg['type'], 'timer')
         self.assertEqual(timer_msg['fields']['name'],
+                         'syncstorage.views:get_info_counts')
+        self.assertEqual(counter_msg['type'], 'counter')
+        self.assertEqual(counter_msg['fields']['name'],
                          'syncstorage.views:get_info_counts')
         self.assertEqual(wsgi_msg['type'], 'wsgi')
         self.assertEqual(wsgi_msg['fields']['headers'],
