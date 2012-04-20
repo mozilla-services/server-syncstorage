@@ -44,8 +44,6 @@ from syncstorage.storage.sqlmappers import (tables, collections,
                                             get_bso_table_byindex)
 
 
-_KB = float(1024)
-
 MAX_COLLECTIONS_CACHE_SIZE = 1000
 
 # For efficiency, it's possible to use fixed pre-determined IDs for
@@ -334,17 +332,17 @@ class SQLStorage(object):
         return res[0]
 
     def get_collection_sizes(self, user_id):
-        """Returns the total size in KB for each collection of a user storage.
+        """Returns the total size for each collection of a user storage.
 
-        The size is the sum of stored payloads.
+        The size is the sum of stored payloads sizes, in bytes.
         """
         ttl = _int_now()
         query = self._get_query('COLLECTIONS_STORAGE_SIZE', user_id)
         res = list(self._do_query_fetchall(query, user_id=user_id, ttl=ttl))
         collection_ids = [collection_id for collection_id, size in res]
         self._load_collection_names(collection_ids)
-        return dict([(self._get_collection_name(col[0]),
-                    int(col[1]) / _KB) for col in res])
+        return dict([(self._get_collection_name(col[0]), col[1])
+                     for col in res])
 
     #
     # Items APIs
@@ -620,16 +618,16 @@ class SQLStorage(object):
         return rowcount > 0
 
     def get_total_size(self, user_id):
-        """Returns the total size in KB of a user storage.
+        """Returns the total size of a user's storage.
 
-        The size is the sum of stored payloads.
+        The size is the sum of stored payloads sizes, in bytes.
         """
         query = self._get_query('USER_STORAGE_SIZE', user_id)
         res = self._do_query_fetchone(query, user_id=user_id,
                                       ttl=_int_now())
         if res is None or res[0] is None:
-            return 0.0
-        return int(res[0]) / _KB
+            return 0
+        return res[0]
 
     def get_size_left(self, user_id):
         """Returns the storage left for a user"""

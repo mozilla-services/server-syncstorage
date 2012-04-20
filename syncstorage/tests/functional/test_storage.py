@@ -408,7 +408,7 @@ class TestStorage(StorageFunctionalTestCase):
         usage = res.json
         col2_size = usage['col2']
         wanted = len(bso1['payload']) + len(bso2['payload'])
-        self.assertEqual(col2_size, wanted / 1024.)
+        self.assertEqual(col2_size, wanted)
 
     def test_delete_collection_items(self):
         self.app.delete(self.root + "/storage/col2")
@@ -519,23 +519,30 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/info/quota')
         used = res.json["usage"]
-        self.assertEquals(used - old_used, len(_PLD) / 1024.)
+        self.assertEquals(used - old_used, len(_PLD))
 
     def test_overquota(self):
         # This can't be run against a live server.
         if self.distant:
             raise unittest2.SkipTest
 
+        # Clear out any data that's already in the store.
+        self.app.delete(self.root + "/storage")
+
+        # Set a low quota for the storage.
         for key in self.config.registry:
             if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 0.1
+                self.config.registry[key].quota_size = 700
+
+        # Check the the remaining quota is correctly reported.
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
-        self.assertEquals(res.headers['X-Quota-Remaining'], '0.0765625')
+        self.assertEquals(res.headers['X-Quota-Remaining'], '200')
 
+        # Set the quota so that they're over their limit.
         for key in self.config.registry:
             if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 0
+                self.config.registry[key].quota_size = 10
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
