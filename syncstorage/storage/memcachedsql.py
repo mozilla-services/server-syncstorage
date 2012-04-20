@@ -18,14 +18,13 @@ from sqlalchemy.sql import select, bindparam, func
 from mozsvc.exceptions import BackendError
 
 from syncstorage.util import get_timestamp
-from syncstorage.storage.sql import SQLStorage, _KB
+from syncstorage.storage.sql import SQLStorage
 from syncstorage.storage.sqlmappers import bso
 from syncstorage.storage.cachemanager import CacheManager
 
 
 # Recalculate quota if they have less than 1MB remaining.
-# Note that quotas are reported in KB, so this really is 1MB.
-QUOTA_RECALCULATION_THRESHOLD = 1024
+QUOTA_RECALCULATION_THRESHOLD = 1024 * 1024
 
 # Recalculate quota at most once per hour.
 QUOTA_RECALCULATION_PERIOD = 60 * 60
@@ -285,7 +284,7 @@ class MemcachedSQLStorage(SQLStorage):
         return res
 
     def get_total_size(self, user_id):
-        """Returns the total size in KB of a user storage"""
+        """Returns the total size of a user storage"""
         size = self.cache.get_total(user_id)
         # If there is no cache entry, recalculate size from the database.
         if not size:
@@ -308,7 +307,7 @@ class MemcachedSQLStorage(SQLStorage):
         return size
 
     def get_collection_sizes(self, user_id):
-        """Returns the total size in KB for each collection of a user storage.
+        """Returns the total size for each collection of a user storage.
         """
         # these sizes are not cached
         sizes = self.sqlstorage.get_collection_sizes(user_id)

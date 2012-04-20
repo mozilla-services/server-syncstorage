@@ -19,7 +19,6 @@ from pyramid.threadlocal import get_current_registry
 
 from mozsvc.exceptions import BackendError
 
-from syncstorage.storage.sql import _KB
 
 USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
 
@@ -118,11 +117,9 @@ class CacheManager(object):
         return tabs.get(tab_id)
 
     def get_tabs_size(self, user_id):
-        """Returns the size of the tabs from memcached in KB"""
+        """Returns the size of the tabs from memcached."""
         tabs = self.get_tabs(user_id)
         size = sum([len(tab.get('payload', '')) for tab in tabs.values()])
-        if size != 0:
-            size = size / _KB
         return size
 
     def get_tabs_timestamp(self, user_id):
@@ -233,8 +230,6 @@ class CacheManager(object):
     # total managment
     #
     def set_total(self, user_id, total):
-        # we store the size in bytes in memcached
-        total = int(total * _KB)
         key = _key(user_id, 'size')
         # if this fail it's not a big deal
         try:
@@ -245,8 +240,6 @@ class CacheManager(object):
     def get_total(self, user_id):
         try:
             total = self.get(_key(user_id, 'size'))
-            if total != 0 and total is not None:
-                total = total / _KB
         except BackendError:
             total = None
         return total
