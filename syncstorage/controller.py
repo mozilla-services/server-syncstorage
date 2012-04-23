@@ -144,7 +144,6 @@ class StorageController(object):
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         collections = storage.get_collection_timestamps(user_id)
-        request.response.headers['X-Num-Records'] = str(len(collections))
         return collections
 
     def get_collection_counts(self, request):
@@ -155,7 +154,6 @@ class StorageController(object):
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         counts = storage.get_collection_counts(user_id)
-        request.response.headers['X-Num-Records'] = str(len(counts))
         return counts
 
     def get_quota(self, request):

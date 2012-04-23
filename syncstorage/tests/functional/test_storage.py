@@ -93,7 +93,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = resp.json
         keys = res.keys()
         self.assertTrue(len(keys), 2)
-        self.assertEquals(int(resp.headers['X-Num-Records']), len(keys))
+        self.assertEquals(resp.headers.get('X-Num-Records'), None)
         # XXX need to test collections timestamps here
 
     def test_get_collection_count(self):
@@ -102,7 +102,7 @@ class TestStorage(StorageFunctionalTestCase):
         values = res.values()
         values.sort()
         self.assertEquals(values, [3, 5])
-        self.assertEquals(int(resp.headers['X-Num-Records']), 2)
+        self.assertEquals(resp.headers.get('X-Num-Records'), None)
 
     def test_bad_cache(self):
         # fixes #637332
