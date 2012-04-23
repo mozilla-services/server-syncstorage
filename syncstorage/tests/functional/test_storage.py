@@ -377,8 +377,24 @@ class TestStorage(StorageFunctionalTestCase):
         body = json.dumps(bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
-        }, status=400)
+        }, status=415)
         self.app.get(self.root + "/storage/col2", status=404)
+
+    def test_set_item_input_formats(self):
+        self.app.delete(self.root + "/storage/col2")
+        # If we send with application/json it should work.
+        body = json.dumps({'payload': _PLD})
+        self.app.put(self.root + '/storage/col2/TEST', body, headers={
+            "Content-Type": "application/json"
+        })
+        item = self.app.get(self.root + "/storage/col2/TEST").json
+        self.assertEquals(item["payload"], _PLD)
+        # If we send json with some other content type, it should fail
+        self.app.delete(self.root + "/storage/col2")
+        self.app.put(self.root + '/storage/col2/TEST', body, headers={
+            "Content-Type": "application/octet-stream"
+        }, status=415)
+        self.app.get(self.root + "/storage/col2/TEST", status=404)
 
     def test_collection_usage(self):
         self.app.delete(self.root + "/storage")

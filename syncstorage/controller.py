@@ -16,7 +16,8 @@ from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPPreconditionFailed,
                                     HTTPCreated,
                                     HTTPNoContent,
-                                    HTTPNotModified)
+                                    HTTPNotModified,
+                                    HTTPUnsupportedMediaType)
 
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
@@ -301,6 +302,11 @@ class StorageController(object):
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
 
+        content_type = request.content_type
+        if request.content_type not in ("application/json", None):
+            msg = "Unsupported Media Type: %s" % (content_type,)
+            raise HTTPUnsupportedMediaType(msg)
+
         try:
             data = json.loads(request.body)
         except ValueError:
@@ -364,7 +370,8 @@ class StorageController(object):
             elif content_type == "application/newlines":
                 bsos = [json.loads(ln) for ln in request.body.split("\n")]
             else:
-                raise HTTPBadRequest("Unknown content-type: %r" % content_type)
+                msg = "Unsupported Media Type: %s" % (content_type,)
+                raise HTTPUnsupportedMediaType(msg)
         except ValueError:
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 
