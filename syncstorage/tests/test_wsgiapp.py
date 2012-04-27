@@ -1,12 +1,8 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
-
-from mozsvc.metrics import setup_metlog, teardown_metlog
-
 from syncstorage import main, tweens
 from syncstorage.storage import get_storage
-
 from syncstorage.tests.support import StorageTestCase
 
 
