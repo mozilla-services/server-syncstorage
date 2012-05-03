@@ -28,13 +28,11 @@ from tempfile import mkstemp
 from syncstorage.util import get_timestamp
 from syncstorage.tests.support import restore_env
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
+from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.controller import MAX_IDS_PER_BATCH
-
-import macauthlib
 
 from mozsvc.exceptions import BackendError
 from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_OBJECT
-from mozsvc.user.whoauth import SagradaMACAuthPlugin
 
 
 _PLD = '*' * 500
@@ -56,21 +54,6 @@ class TestStorage(StorageFunctionalTestCase):
         super(TestStorage, self).setUp()
 
         self.root = '/2.0/%d' % (self.user_id,)
-
-        # Create a SagradaMACAuthPlugin from our deployment settings,
-        # so that we can generate valid authentication tokens.
-        settings = self.config.registry.settings
-        macauth_settings = settings.getsection("who.plugin.macauth")
-        macauth_settings.pop("use", None)
-        auth_plugin = SagradaMACAuthPlugin(**macauth_settings)
-
-        # Monkey-patch the app to sign all requests with a macauth token.
-        def new_do_request(req, *args, **kwds):
-            id, key = auth_plugin.encode_mac_id(req, {"uid": self.user_id})
-            macauthlib.sign_request(req, id, key)
-            return orig_do_request(req, *args, **kwds)
-        orig_do_request = self.app.do_request
-        self.app.do_request = new_do_request
 
         # Reset the storage to a known state.
         self.app.delete(self.root + "/storage")
@@ -902,8 +885,7 @@ class TestStorage(StorageFunctionalTestCase):
     def test_generation_of_201_and_204_response_codes(self):
         bso = {"id": "TEST", "payload": "testing"}
         # If a new BSO is created, the return code should be 201.
-        r = self.app.put_json(self.root + "/storage/col2/TEST", bso,
-                              status=201)
+        self.app.put_json(self.root + "/storage/col2/TEST", bso, status=201)
         # If an existing BSO is updated, the return code should be 204.
         bso["payload"] = "testing_again"
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
@@ -1014,16 +996,5 @@ class TestStorageMemcached(TestStorage):
 if __name__ == "__main__":
     # When run as a script, this file will execute the
     # functional tests against a live webserver.
-
-    if not 2 <= len(sys.argv) <= 3:
-        print>>sys.stderr, "USAGE: test_storage.py <server-url> [<ini-file>]"
-        sys.exit(1)
-
-    os.environ["MOZSVC_TEST_REMOTE"] = sys.argv[1]
-    if len(sys.argv) > 2:
-        os.environ["MOZSVC_TEST_INI_FILE"] = sys.argv[2]
-
-    suite = unittest2.TestSuite()
-    suite.addTest(unittest2.makeSuite(TestStorage))
-    res = unittest2.TextTestRunner().run(suite)
+    res = run_live_functional_tests(TestStorage, sys.argv)
     sys.exit(res)

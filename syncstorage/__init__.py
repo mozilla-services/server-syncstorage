@@ -26,5 +26,9 @@ def main(global_config, **settings):
     config = get_configurator(global_config, **settings)
     metlog_wrapper = load_from_settings('metlog', config.registry.settings)
     config.registry['metlog'] = metlog_wrapper.client
-    config.include(includeme)
+    config.begin()
+    try:
+        config.include(includeme)
+    finally:
+        config.end()
     return config.make_wsgi_app()
