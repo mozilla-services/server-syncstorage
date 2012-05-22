@@ -144,16 +144,28 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json["items"]
         self.assertEquals(res, ['128'])
 
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts)
+        res = res.json["items"]
+        self.assertEquals(res, [])
+
+        res = self.app.get(self.root + '/storage/col2?older=%s' % (ts2 + 1))
+        res = res.json["items"]
+        self.assertEquals(sorted(res), ["128", "129"])
+
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
         res = res.json["items"]
-        try:
-            self.assertEquals(res, ['129'])
-        except AssertionError:
-            # XXX not sure why this fails sometimes
-            pass
+        self.assertEquals(res, ['129'])
+
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts2)
+        res = res.json["items"]
+        self.assertEquals(res, [])
+
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % (ts - 1))
+        res = res.json["items"]
+        self.assertEquals(sorted(res), ['128', '129'])
 
         # "full"
         # If defined, returns the full BSO, rather than just the id.
