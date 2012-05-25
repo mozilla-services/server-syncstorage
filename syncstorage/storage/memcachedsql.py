@@ -285,10 +285,26 @@ class MemcachedSQLStorage(SQLStorage):
 
     def get_total_size(self, user_id):
         """Returns the total size of a user storage"""
+        # This only gets called when the user explicitly wants to view their
+        # usage, so it's OK to recalculate missing values from the database.
+        return self._get_cached_size(user_id, recalculate_if_missing=True)
+
+    def get_size_left(self, user_id):
+        """Returns the storage left for a user"""
+        # This gets called to check quota on every write operation,
+        # so don't recalculate from the database unless close to the limit.
+        size = self._get_cached_size(user_id, recalculate_if_missing=False)
+        return self.quota_size - size
+
+    def _get_cached_size(self, user_id, recalculate_if_missing):
+        """Get cached total size, recalculating from database if necessary."""
         size = self.cache.get_total(user_id)
         # If there is no cache entry, recalculate size from the database.
         if not size:
-            size = self._recalculate_cached_size(user_id)
+            if recalculate_if_missing:
+                size = self._recalculate_cached_size(user_id)
+            else:
+                size = 0
         # If they're close to going over quota, ensure cached size is fresh.
         elif self.quota_size - size < QUOTA_RECALCULATION_THRESHOLD:
             last_recalc = self.cache.get(_key(user_id, "size", "ts"))
@@ -296,9 +312,10 @@ class MemcachedSQLStorage(SQLStorage):
                 size = self._recalculate_cached_size(user_id)
             elif time.time() - last_recalc > QUOTA_RECALCULATION_PERIOD:
                 size = self._recalculate_cached_size(user_id)
-        return  size
+        return size
 
     def _recalculate_cached_size(self, user_id):
+        """Re-calculate total size from the database and cache it."""
         size = self.sqlstorage.get_total_size(user_id)
         # Tabs are not stored in the database, add their size ourselves.
         size += self.cache.get_tabs_size(user_id)
