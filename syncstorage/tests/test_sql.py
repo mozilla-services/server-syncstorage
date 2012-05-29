@@ -103,7 +103,7 @@ class TestSQLStorage(StorageTestCase):
         before = self.storage.get_total_size(_UID)
         self.storage.set_item(_UID, 'col1', 1, payload=_PLD)
         self.storage.set_item(_UID, 'col1', 2, payload=_PLD)
-        wanted = len(_PLD) * 2 / 1024.
+        wanted = len(_PLD) * 2
         self.assertEquals(self.storage.get_total_size(_UID) - before, wanted)
 
     def test_ttl(self):

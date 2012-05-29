@@ -16,7 +16,8 @@ from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPPreconditionFailed,
                                     HTTPCreated,
                                     HTTPNoContent,
-                                    HTTPNotModified)
+                                    HTTPNotModified,
+                                    HTTPUnsupportedMediaType)
 
 from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
@@ -26,7 +27,7 @@ from syncstorage.storage import get_storage, StorageConflictError
 
 _BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
 
-_ONE_MEG = 1024
+_ONE_MEG = 1024 * 1024
 
 # The maximum number of ids that can be deleted in a single batch operation.
 MAX_IDS_PER_BATCH = 100
@@ -60,7 +61,7 @@ class StorageController(object):
         self.batch_max_count = settings.get('storage.batch_max_count',
                                             100)
         self.batch_max_bytes = settings.get('storage.batch_max_bytes',
-                                            1024 * 1024)
+                                            _ONE_MEG)
 
     def _has_modifiers(self, data):
         return 'payload' in data
@@ -143,7 +144,6 @@ class StorageController(object):
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         collections = storage.get_collection_timestamps(user_id)
-        request.response.headers['X-Num-Records'] = str(len(collections))
         return collections
 
     def get_collection_counts(self, request):
@@ -154,7 +154,6 @@ class StorageController(object):
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         counts = storage.get_collection_counts(user_id)
-        request.response.headers['X-Num-Records'] = str(len(counts))
         return counts
 
     def get_quota(self, request):
@@ -274,16 +273,21 @@ class StorageController(object):
             raise HTTPNotFound()
         return res
 
-    def _check_quota(self, request):
+    def _check_quota(self, request, new_bsos):
         """Checks the quota.
 
-        If under the treshold, adds a header
-        If the quota is reached, issues a 400
+        If the quota is reached, issues a 400.
         """
         user_id = request.user["uid"]
         storage = self._get_storage(request)
+        if not storage.use_quota:
+            return 0
+
         left = storage.get_size_left(user_id)
-        if left <= 0.:  # no space left
+        for bso in new_bsos:
+            left -= len(bso.get("payload", ""))
+
+        if left <= 0:  # no space left
             raise HTTPJsonBadRequest(ERROR_OVER_QUOTA)
         return left
 
@@ -292,14 +296,14 @@ class StorageController(object):
         self._check_if_unmodified(request)
 
         storage = self._get_storage(request)
-        if storage.use_quota:
-            left = self._check_quota(request)
-        else:
-            left = 0.
-
         user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
+
+        content_type = request.content_type
+        if request.content_type not in ("application/json", None):
+            msg = "Unsupported Media Type: %s" % (content_type,)
+            raise HTTPUnsupportedMediaType(msg)
 
         try:
             data = json.loads(request.body)
@@ -318,6 +322,8 @@ class StorageController(object):
         if self._has_modifiers(bso):
             bso['modified'] = request.server_time
 
+        left = self._check_quota(request, [bso])
+
         try:
             modified = storage.set_item(user_id, collection_name, item_id,
                                         storage_time=request.server_time,
@@ -331,7 +337,7 @@ class StorageController(object):
             response = HTTPCreated()
 
         response.headers["X-Last-Modified"] = str(request.server_time)
-        if storage.use_quota and left <= _ONE_MEG:
+        if 0 < left < _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
 
@@ -353,6 +359,7 @@ class StorageController(object):
         """Sets a batch of BSO objects into a collection."""
         self._check_if_unmodified(request)
 
+        storage = self._get_storage(request)
         user_id = request.user["uid"]
         collection_name = request.matchdict['collection']
 
@@ -364,7 +371,8 @@ class StorageController(object):
             elif content_type == "application/newlines":
                 bsos = [json.loads(ln) for ln in request.body.split("\n")]
             else:
-                raise HTTPBadRequest("Unknown content-type: %r" % content_type)
+                msg = "Unsupported Media Type: %s" % (content_type,)
+                raise HTTPUnsupportedMediaType(msg)
         except ValueError:
             raise HTTPJsonBadRequest(ERROR_MALFORMED_JSON)
 
@@ -408,11 +416,7 @@ class StorageController(object):
 
             kept_bsos.append(bso)
 
-        storage = self._get_storage(request)
-        if storage.use_quota:
-            left = self._check_quota(request)
-        else:
-            left = 0.
+        left = self._check_quota(request, kept_bsos)
 
         storage_time = request.server_time
 
@@ -434,7 +438,7 @@ class StorageController(object):
                 res['success'].extend([bso['id'] for bso in bsos])
 
         request.response.headers["X-Last-Modified"] = str(storage_time)
-        if storage.use_quota and left <= 1024:
+        if 0 < left < _ONE_MEG:
             request.response.headers['X-Quota-Remaining'] = str(left)
         return res
 

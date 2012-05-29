@@ -40,7 +40,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
         settings = {'storage.backend': self.fn,
                     'storage.sqluri': 'sqlite:///%s' % self.dbfile,
                     'storage.use_quota': True,
-                    'storage.quota_size': 5120,
+                    'storage.quota_size': 5242880,
                     'storage.create_tables': True}
 
         self.storage = load_from_settings("storage", settings)
@@ -146,8 +146,7 @@ class TestMemcachedSQLStorage(StorageTestCase):
         self.storage.set_item(_UID, 'foo', '1', payload=_PLD)
         self.storage.set_item(_UID, 'tabs', '1', payload=_PLD)
 
-        # value in KB (around 1K)
-        wanted = len(_PLD) * 2 / 1024.
+        wanted = len(_PLD) * 2
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
         # removing the size in memcache to check that we
@@ -157,8 +156,18 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         # adding an item should increment the cached size.
         self.storage.set_item(_UID, 'foo', '2', payload=_PLD)
-        wanted += len(_PLD) / 1024.
+        wanted += len(_PLD)
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
+
+        # if we suffer a cache clear, then get_size_left should not
+        # fall back to the database, while get_total_size should.
+        quota_size = self.storage.quota_size
+        self.storage.cache.delete('%d:size' % _UID)
+        self.assertEquals(self.storage.get_size_left(_UID), quota_size)
+        self.assertEquals(self.storage.get_total_size(_UID), wanted)
+        # that should have re-populated the cache.
+        self.assertEquals(self.storage.get_size_left(_UID),
+                          quota_size - wanted)
 
     def test_collection_stamps(self):
         self.storage.set_item(_UID, 'tabs', '1', payload=_PLD * 200)
@@ -205,18 +214,18 @@ class TestMemcachedSQLStorage(StorageTestCase):
 
         # until we asked for it again
         size = self.storage.get_collection_sizes(1)
-        self.assertEqual(self.storage.cache.get('1:size') / 1024.,
+        self.assertEqual(self.storage.cache.get('1:size'),
                          sum(size.values()))
 
     def test_collection_sizes(self):
         # setting the tabs in memcache
         tabs = {'mCwylprUEiP5':
-                {'payload': '*' * 1024,
+                {'payload': '*' * 100,
                 'id': 'mCwylprUEiP5',
                 'modified': 1299142695760}}
         self.storage.cache.set_tabs(1, tabs)
         size = self.storage.get_collection_sizes(1)
-        self.assertEqual(size['tabs'], 1.)
+        self.assertEqual(size['tabs'], 100)
 
     def test_flush_all(self):
         # just make sure calls goes through
@@ -255,9 +264,8 @@ class TestMemcachedSQLStorage(StorageTestCase):
         sqlstorage = self.storage.sqlstorage
 
         # Create a large BSO, to ensure that it's close to quota size.
-        threshold_size = storage.quota_size - QUOTA_RECALCULATION_THRESHOLD
-        payload = "X" * (threshold_size + 1) * 1024
-        payload_size = len(payload) / 1024.0
+        payload_size = storage.quota_size - QUOTA_RECALCULATION_THRESHOLD + 1
+        payload = "X" * payload_size
 
         # After writing it, size in memcached and sql should be the same.
         storage.set_item(_UID, 'foo', '1', payload=payload)

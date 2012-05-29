@@ -28,13 +28,11 @@ from tempfile import mkstemp
 from syncstorage.util import get_timestamp
 from syncstorage.tests.support import restore_env
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
+from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.controller import MAX_IDS_PER_BATCH
-
-import macauthlib
 
 from mozsvc.exceptions import BackendError
 from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_OBJECT
-from mozsvc.user.whoauth import SagradaMACAuthPlugin
 
 
 _PLD = '*' * 500
@@ -57,21 +55,6 @@ class TestStorage(StorageFunctionalTestCase):
 
         self.root = '/2.0/%d' % (self.user_id,)
 
-        # Create a SagradaMACAuthPlugin from our deployment settings,
-        # so that we can generate valid authentication tokens.
-        settings = self.config.registry.settings
-        macauth_settings = settings.getsection("who.plugin.macauth")
-        macauth_settings.pop("use", None)
-        auth_plugin = SagradaMACAuthPlugin(**macauth_settings)
-
-        # Monkey-patch the app to sign all requests with a macauth token.
-        def new_do_request(req, *args, **kwds):
-            id, key = auth_plugin.encode_mac_id(req, {"uid": self.user_id})
-            macauthlib.sign_request(req, id, key)
-            return orig_do_request(req, *args, **kwds)
-        orig_do_request = self.app.do_request
-        self.app.do_request = new_do_request
-
         # Reset the storage to a known state.
         self.app.delete(self.root + "/storage")
 
@@ -93,7 +76,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = resp.json
         keys = res.keys()
         self.assertTrue(len(keys), 2)
-        self.assertEquals(int(resp.headers['X-Num-Records']), len(keys))
+        self.assertEquals(resp.headers.get('X-Num-Records'), None)
         # XXX need to test collections timestamps here
 
     def test_get_collection_count(self):
@@ -102,7 +85,7 @@ class TestStorage(StorageFunctionalTestCase):
         values = res.values()
         values.sort()
         self.assertEquals(values, [3, 5])
-        self.assertEquals(int(resp.headers['X-Num-Records']), 2)
+        self.assertEquals(resp.headers.get('X-Num-Records'), None)
 
     def test_bad_cache(self):
         # fixes #637332
@@ -161,16 +144,28 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json["items"]
         self.assertEquals(res, ['128'])
 
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts)
+        res = res.json["items"]
+        self.assertEquals(res, [])
+
+        res = self.app.get(self.root + '/storage/col2?older=%s' % (ts2 + 1))
+        res = res.json["items"]
+        self.assertEquals(sorted(res), ["128", "129"])
+
         # "newer"
         # Returns only ids for objects in the collection that have been
         # last modified since the date given.
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
         res = res.json["items"]
-        try:
-            self.assertEquals(res, ['129'])
-        except AssertionError:
-            # XXX not sure why this fails sometimes
-            pass
+        self.assertEquals(res, ['129'])
+
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts2)
+        res = res.json["items"]
+        self.assertEquals(res, [])
+
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % (ts - 1))
+        res = res.json["items"]
+        self.assertEquals(sorted(res), ['128', '129'])
 
         # "full"
         # If defined, returns the full BSO, rather than just the id.
@@ -377,8 +372,24 @@ class TestStorage(StorageFunctionalTestCase):
         body = json.dumps(bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
-        }, status=400)
+        }, status=415)
         self.app.get(self.root + "/storage/col2", status=404)
+
+    def test_set_item_input_formats(self):
+        self.app.delete(self.root + "/storage/col2")
+        # If we send with application/json it should work.
+        body = json.dumps({'payload': _PLD})
+        self.app.put(self.root + '/storage/col2/TEST', body, headers={
+            "Content-Type": "application/json"
+        })
+        item = self.app.get(self.root + "/storage/col2/TEST").json
+        self.assertEquals(item["payload"], _PLD)
+        # If we send json with some other content type, it should fail
+        self.app.delete(self.root + "/storage/col2")
+        self.app.put(self.root + '/storage/col2/TEST', body, headers={
+            "Content-Type": "application/octet-stream"
+        }, status=415)
+        self.app.get(self.root + "/storage/col2/TEST", status=404)
 
     def test_collection_usage(self):
         self.app.delete(self.root + "/storage")
@@ -392,7 +403,7 @@ class TestStorage(StorageFunctionalTestCase):
         usage = res.json
         col2_size = usage['col2']
         wanted = len(bso1['payload']) + len(bso2['payload'])
-        self.assertEqual(col2_size, wanted / 1024.)
+        self.assertEqual(col2_size, wanted)
 
     def test_delete_collection_items(self):
         self.app.delete(self.root + "/storage/col2")
@@ -503,23 +514,30 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/info/quota')
         used = res.json["usage"]
-        self.assertEquals(used - old_used, len(_PLD) / 1024.)
+        self.assertEquals(used - old_used, len(_PLD))
 
     def test_overquota(self):
         # This can't be run against a live server.
         if self.distant:
             raise unittest2.SkipTest
 
+        # Clear out any data that's already in the store.
+        self.app.delete(self.root + "/storage")
+
+        # Set a low quota for the storage.
         for key in self.config.registry:
             if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 0.1
+                self.config.registry[key].quota_size = 700
+
+        # Check the the remaining quota is correctly reported.
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
-        self.assertEquals(res.headers['X-Quota-Remaining'], '0.0765625')
+        self.assertEquals(res.headers['X-Quota-Remaining'], '200')
 
+        # Set the quota so that they're over their limit.
         for key in self.config.registry:
             if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 0
+                self.config.registry[key].quota_size = 10
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
@@ -879,8 +897,7 @@ class TestStorage(StorageFunctionalTestCase):
     def test_generation_of_201_and_204_response_codes(self):
         bso = {"id": "TEST", "payload": "testing"}
         # If a new BSO is created, the return code should be 201.
-        r = self.app.put_json(self.root + "/storage/col2/TEST", bso,
-                              status=201)
+        self.app.put_json(self.root + "/storage/col2/TEST", bso, status=201)
         # If an existing BSO is updated, the return code should be 204.
         bso["payload"] = "testing_again"
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
@@ -991,16 +1008,5 @@ class TestStorageMemcached(TestStorage):
 if __name__ == "__main__":
     # When run as a script, this file will execute the
     # functional tests against a live webserver.
-
-    if not 2 <= len(sys.argv) <= 3:
-        print>>sys.stderr, "USAGE: test_storage.py <server-url> [<ini-file>]"
-        sys.exit(1)
-
-    os.environ["MOZSVC_TEST_REMOTE"] = sys.argv[1]
-    if len(sys.argv) > 2:
-        os.environ["MOZSVC_TEST_INI_FILE"] = sys.argv[2]
-
-    suite = unittest2.TestSuite()
-    suite.addTest(unittest2.makeSuite(TestStorage))
-    res = unittest2.TextTestRunner().run(suite)
+    res = run_live_functional_tests(TestStorage, sys.argv)
     sys.exit(res)
