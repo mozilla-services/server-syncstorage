@@ -7,7 +7,6 @@ import urlparse
 import functools
 
 from metlog.decorators.base import MetlogDecorator
-#from metlog.holder import CLIENT_HOLDER
 from mozsvc.plugin import load_from_settings
 from mozsvc.tests.support import TestCase
 
