@@ -156,7 +156,17 @@ class SQLStorage(object):
     def _safe_execute(self, *args, **kwds):
         """Execute an sqlalchemy query, raise BackendError on failure."""
         try:
-            return self._engine.execute(*args, **kwds)
+            # It's possible for the backend to raise a "connection invalided"
+            # error if e.g. the server timed out the connection.  SQLAlchemy
+            # purges the the whole connection pool if this happens, so it
+            # suffices to retry the query a single time.
+            try:
+                return self._engine.execute(*args, **kwds)
+            except (OperationalError, TimeoutError), exc:
+                if exc.connection_invalidated:
+                    return self._engine.execute(*args, **kwds)
+                else:
+                    raise
         except (OperationalError, TimeoutError), exc:
             err = traceback.format_exc()
             self.logger.error(err)
