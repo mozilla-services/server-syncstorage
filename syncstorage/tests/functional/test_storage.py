@@ -59,8 +59,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + "/storage")
 
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.app.post(self.root + "/storage/" + name, "[]",
-                          content_type="application/json")
+            self.app.post_json(self.root + "/storage/" + name, [])
         for item in range(3):
             self.app.put_json(self.root + "/storage/col1/%s" % (item,),
                               {"payload": "xxx"})
@@ -244,7 +243,7 @@ class TestStorage(StorageFunctionalTestCase):
         # application/json
         res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/json')])
-        self.assertEquals(res.content_type, 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
         res = res.json["items"]
         res.sort()
@@ -261,7 +260,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # unspecified format defaults to json
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(res.content_type, 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
         # unkown format gets a 406
         self.app.get(self.root + '/storage/col2', headers=[('Accept', 'x/yy')],
@@ -541,7 +540,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
-        self.assertEquals(res.headers['Content-Type'], 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
         self.assertEquals(res.json, ERROR_OVER_QUOTA)
 
     def test_get_collection_ttl(self):

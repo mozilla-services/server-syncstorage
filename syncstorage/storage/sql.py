@@ -296,8 +296,9 @@ class SQLStorage(object):
 
     def _cache_collection_data(self, collection_id, collection_name):
         if len(self._collections_by_name) > MAX_COLLECTIONS_CACHE_SIZE:
-            msg = "More than %d collections have been created, refusing to cache them all"
-            logger.warn(msg % (MAX_COLLECTIONS_CACHE_SIZE,))
+            msg = "More than %d collections have been created, "\
+                  "refusing to cache them all"
+            self.logger.warn(msg % (MAX_COLLECTIONS_CACHE_SIZE,))
         else:
             self._collections_by_name[collection_name] = collection_id
             self._collections_by_id[collection_id] = collection_name

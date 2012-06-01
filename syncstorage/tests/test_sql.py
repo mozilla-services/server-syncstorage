@@ -4,7 +4,6 @@
 
 import os
 import time
-import unittest2
 
 from mozsvc.plugin import load_and_register
 from mozsvc.tests.support import get_test_configurator

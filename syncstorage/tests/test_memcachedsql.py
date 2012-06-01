@@ -8,7 +8,7 @@ from tempfile import mkstemp
 import os
 
 try:
-    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage  # NOQA
     from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
     from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_THRESHOLD
     MEMCACHED = True
@@ -285,7 +285,6 @@ class TestMemcachedSQLStorage(StorageTestCase):
         # Now it should recalculate when asked for the size.
         self.assertEquals(storage.get_total_size(_UID), 0)
         self.assertEquals(sqlstorage.get_total_size(_UID), 0)
-
 
 
 def test_suite():

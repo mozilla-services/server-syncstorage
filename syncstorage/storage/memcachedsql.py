@@ -15,8 +15,6 @@ import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
 
-from mozsvc.exceptions import BackendError
-
 from syncstorage.util import get_timestamp
 from syncstorage.storage.sql import SQLStorage
 from syncstorage.storage.sqlmappers import bso

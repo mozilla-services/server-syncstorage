@@ -16,7 +16,7 @@ class TestBSO(unittest2.TestCase):
     def test_that_unknown_fields_are_rejected(self):
         self.assertRaises(ValueError, BSO, {'boooo': ''})
         self.assertRaises(ValueError, BSO, {42: '17'})
-                          
+
     def test_validation(self):
         bso = BSO()
         result, failure = bso.validate()

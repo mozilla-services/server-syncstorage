@@ -99,7 +99,6 @@ def fuzz_retry_after_header(handler, registry):
     return fuzz_retry_after_header_tween
 
 
-
 def includeme(config):
     """Include all the SyncServer tweens into the given config."""
     config.add_tween("syncstorage.tweens.check_for_blacklisted_nodes")
