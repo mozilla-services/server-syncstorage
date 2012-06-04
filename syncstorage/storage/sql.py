@@ -24,7 +24,8 @@ from time import time
 import traceback
 
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError, TimeoutError, IntegrityError
+from sqlalchemy.exc import (DBAPIError, OperationalError,
+                            TimeoutError, IntegrityError)
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             delete, and_)
 
@@ -162,7 +163,7 @@ class SQLStorage(object):
             # suffices to retry the query a single time.
             try:
                 return self._engine.execute(*args, **kwds)
-            except (OperationalError, TimeoutError), exc:
+            except DBAPIError, exc:
                 if exc.connection_invalidated:
                     return self._engine.execute(*args, **kwds)
                 else:
