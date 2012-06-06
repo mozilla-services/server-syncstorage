@@ -235,8 +235,9 @@ class MemcachedSQLStorage(SQLStorage):
     def delete_item(self, user_id, collection_name, item_id,
                     storage_time=None):
         """Deletes an item"""
-        # delete the cached size - will be recalculated
-        self.cache.delete(_key(user_id, 'size'))
+        # Since we don't know how large the item is, we can't make any
+        # useful adjustment to the cached size.  Just leave it alone and
+        # rely on automatic recalculation to keep it semi-accurate.
 
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, item_id):
@@ -257,8 +258,9 @@ class MemcachedSQLStorage(SQLStorage):
     def delete_items(self, user_id, collection_name, item_ids=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        # delete the cached size
-        self.cache.delete(_key(user_id, 'size'))
+        # Since we don't know how large the items are, we can't make any
+        # useful adjustment to the cached size.  Just leave it alone and
+        # rely on automatic recalculation to keep it semi-accurate.
 
         # remove the cached values
         if (collection_name == 'meta' and (item_ids is None
