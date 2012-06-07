@@ -7,6 +7,8 @@ Memcached + SQL backend
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
 - The meta/global bso is stored in "user_id"
+- The last-modified time for the entire storage is stored in user_id:stamp
+- The info/collections timestamp mapping is stored in user_id:stamps
 """
 import threading
 import thread
@@ -20,7 +22,7 @@ from pyramid.threadlocal import get_current_registry
 from mozsvc.exceptions import BackendError
 
 
-USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
+USER_KEYS = ('size', 'size:ts', 'meta:global', 'tabs', 'stamps', 'stamp')
 
 
 def _key(*args):

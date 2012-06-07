@@ -18,7 +18,7 @@ from sqlalchemy.sql import select, bindparam, func
 from syncstorage.util import get_timestamp
 from syncstorage.storage.sql import SQLStorage
 from syncstorage.storage.sqlmappers import bso
-from syncstorage.storage.cachemanager import CacheManager
+from syncstorage.storage.cachemanager import CacheManager, _key
 
 
 # Recalculate quota if they have less than 1MB remaining.
@@ -31,10 +31,6 @@ QUOTA_RECALCULATION_PERIOD = 60 * 60
 _COLLECTION_LIST = select([bso.c.collection, func.max(bso.c.modified),
                            func.count(bso)],
             bso.c.userid == bindparam('user_id')).group_by(bso.c.collection)
-
-
-def _key(*args):
-    return ':'.join([str(arg) for arg in args])
 
 
 # XXX suboptimal: creates an object on every dump/load call
@@ -146,12 +142,6 @@ class MemcachedSQLStorage(SQLStorage):
             return self.cache.get_tab(user_id, item_id)
 
         return _get_item()
-
-    def _delete_cache(self, user_id):
-        """Removes all cached data."""
-        KEYS = ('size', 'size:ts', 'meta:global', 'tabs', 'stamps', 'stamp')
-        for key in KEYS:
-            self.cache.delete(_key(user_id, key))
 
     def _update_stamp(self, user_id, collection_name, storage_time):
         # update the stamps cache
