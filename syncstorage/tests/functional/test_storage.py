@@ -499,12 +499,55 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue(now < int(res.headers['X-Timestamp']))
 
     def test_ifunmodifiedsince(self):
-        bso = {'payload': _PLD}
+        bso = {'id': '12345', 'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
-        ts = int(res.headers["X-Timestamp"]) - 1000
+        # Using an X-If-Unmodified-Since in the past should cause 412s.
+        ts = str(int(res.headers['X-Last-Modified']) - 1000)
+        bso = {'id': '12345', 'payload': _PLD + "XXX"}
         self.app.put_json(self.root + '/storage/col2/12345', bso,
-                     headers=[('X-If-Unmodified-Since', str(ts))],
-                     status=412)
+                          headers=[('X-If-Unmodified-Since', ts)],
+                          status=412)
+        self.app.delete(self.root + '/storage/col2/12345',
+                        headers=[('X-If-Unmodified-Since', ts)],
+                        status=412)
+        self.app.post_json(self.root + '/storage/col2', [bso],
+                           headers=[('X-If-Unmodified-Since', ts)],
+                           status=412)
+        self.app.delete(self.root + '/storage/col2?ids=12345',
+                        headers=[('X-If-Unmodified-Since', ts)],
+                        status=412)
+        # Deleting items from a collection should give 412 even if some
+        # other, unrelated item in the collection has been modified.
+        ts = res.headers['X-Last-Modified']
+        time.sleep(0.001)
+        res2 = self.app.put_json(self.root + '/storage/col2/54321', {
+                                    'payload': _PLD,
+                                 })
+        self.app.delete(self.root + '/storage/col2?ids=12345',
+                        headers=[('X-If-Unmodified-Since', ts)],
+                        status=412)
+        ts = res2.headers['X-Last-Modified']
+        # All of those should have left the BSO unchanged
+        res2 = self.app.get(self.root + '/storage/col2/12345')
+        self.assertEquals(res2.json['payload'], _PLD)
+        self.assertEquals(res2.headers['X-Last-Modified'],
+                          res.headers['X-Last-Modified'])
+        # Using an X-If-Unmodified-Since equal to X-Last-Modified should
+        # allow the request to succeed.
+        res = self.app.post_json(self.root + '/storage/col2', [bso],
+                                 headers=[('X-If-Unmodified-Since', ts)],
+                                 status=200)
+        ts = res.headers['X-Last-Modified']
+        self.app.delete(self.root + '/storage/col2/12345',
+                        headers=[('X-If-Unmodified-Since', ts)],
+                        status=204)
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso,
+                                headers=[('X-If-Unmodified-Since', '0')],
+                                status=201)
+        ts = res.headers['X-Last-Modified']
+        self.app.delete(self.root + '/storage/col2?ids=12345',
+                        headers=[('X-If-Unmodified-Since', ts)],
+                        status=204)
 
     def test_quota(self):
         res = self.app.get(self.root + '/info/quota')
