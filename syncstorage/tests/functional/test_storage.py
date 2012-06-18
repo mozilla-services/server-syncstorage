@@ -470,11 +470,13 @@ class TestStorage(StorageFunctionalTestCase):
         # deleting all
         self.app.delete(self.root + '/storage')
         res = self.app.delete(self.root + '/storage/col2', status=404)
-        now = get_timestamp()
-        self.assertTrue(abs(now - int(res.headers["X-Timestamp"])) < 200)
         self.app.get(self.root + '/storage/col2', status=404)
 
     def test_x_timestamp_header(self):
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
         now = get_timestamp()
         time.sleep(0.001)
         res = self.app.get(self.root + '/storage/col2')
