@@ -9,11 +9,6 @@ from syncstorage.tests.support import StorageTestCase
 
 class TestWSGIApp(StorageTestCase):
 
-    def test_batch_size(self):
-        # check that the batch size is correctly set
-        size = self.config.registry["syncstorage.controller"].batch_size
-        self.assertEqual(size, 25)
-
     def test_host_specific_config(self):
         req = self.make_request(environ={"HTTP_HOST": "localhost"})
         self.assertEquals(get_storage(req).sqluri,

@@ -8,7 +8,7 @@ http://docs.services.mozilla.com/storage/apis-2.0.html
 
 """
 import simplejson as json
-import itertools
+import functools
 
 from pyramid.httpexceptions import (HTTPBadRequest,
                                     HTTPNotFound,
@@ -23,9 +23,7 @@ from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
 
 from syncstorage.bso import BSO
-from syncstorage.storage import get_storage, StorageConflictError
-
-_BSO_FIELDS = ['id', 'sortindex', 'modified', 'payload']
+from syncstorage.storage import get_storage, ConflictError, NotFoundError
 
 _ONE_MEG = 1024 * 1024
 
@@ -41,15 +39,57 @@ def HTTPJsonBadRequest(data, **kwds):
     return HTTPBadRequest(body=json.dumps(data, use_decimal=True), **kwds)
 
 
-def batch(iterable, size=100):
-    """Returns the given iterable split into batches of the given size."""
-    counter = itertools.count()
+def with_read_lock(func):
+    """Method decorator to take a collection-level read lock.
 
-    def ticker(key):
-        return next(counter) // size
+    Methods decorated with this decorator will take a read lock on their
+    target collection for the duration of the method.
+    """
+    @functools.wraps(func)
+    def with_read_lock_wrapper(self, request, *args, **kwds):
+        storage = self._get_storage(request)
+        userid = request.user["uid"]
+        collection = request.matchdict.get("collection")
+        with storage.lock_for_read(userid, collection):
+            return func(self, request, *args, **kwds)
+    return with_read_lock_wrapper
 
-    for key, group in itertools.groupby(iter(iterable), ticker):
-        yield group
+
+def with_write_lock(func):
+    """Method decorator to take a collection-level write lock.
+
+    Methods decorated with this decorator will take a write lock on their
+    target collection for the duration of the method.
+    """
+    @functools.wraps(func)
+    def with_write_lock_wrapper(self, request, *args, **kwds):
+        storage = self._get_storage(request)
+        userid = request.user["uid"]
+        collection = request.matchdict.get("collection")
+        with storage.lock_for_write(userid, collection):
+            return func(self, request, *args, **kwds)
+    return with_write_lock_wrapper
+
+
+def convert_storage_errors(func):
+    """Function decorator to turn storage backend errors into HTTP errors.
+
+    This decorator does a simple mapping from the following storage backend
+    errors to their corresponding HTTP errors:
+
+        NotFoundError => HTTPNotFound
+        ConflictError => HTTPConflict
+
+    """
+    @functools.wraps(func)
+    def error_converter_wrapper(*args, **kwds):
+        try:
+            return func(*args, **kwds)
+        except NotFoundError:
+            raise HTTPNotFound
+        except ConflictError:
+            raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
+    return error_converter_wrapper
 
 
 class StorageController(object):
@@ -57,14 +97,11 @@ class StorageController(object):
     def __init__(self, config):
         settings = config.registry.settings
         self.logger = config.registry['metlog']
-        self.batch_size = settings.get('storage.batch_size', 100)
+        self.quota_size = settings.get("storage.quota_size", None)
         self.batch_max_count = settings.get('storage.batch_max_count',
                                             100)
         self.batch_max_bytes = settings.get('storage.batch_max_bytes',
                                             _ONE_MEG)
-
-    def _has_modifiers(self, data):
-        return 'payload' in data
 
     def _get_storage(self, request):
         return get_storage(request)
@@ -84,6 +121,7 @@ class StorageController(object):
         ts = self._get_resource_timestamp(request)
         if ts is not None and ts > unmodified:
             raise HTTPPreconditionFailed()
+        return ts
 
     def _check_if_modified(self, request):
         """Check the X-If-Modified-Since header.
@@ -108,6 +146,7 @@ class StorageController(object):
 
         if ts is not None and modified is not None and ts <= modified:
             raise HTTPNotModified()
+        return ts
 
     def _get_resource_timestamp(self, request):
         """Get last-modified timestamp for the target resource of the request.
@@ -118,24 +157,28 @@ class StorageController(object):
         """
         storage = self._get_storage(request)
         user_id = request.user["uid"]
-        collection_name = request.matchdict.get("collection")
+        collection = request.matchdict.get("collection")
         # No collection name; return overall storage timestamp.
-        if collection_name is None:
+        if collection is None:
             return storage.get_storage_timestamp(user_id)
         item_id = request.matchdict.get("item")
         # No item id; return timestamp of whole collection.
         if item_id is None:
-            return storage.get_collection_timestamp(user_id, collection_name)
+            try:
+                return storage.get_collection_timestamp(user_id, collection)
+            except NotFoundError:
+                return None
         # Otherwise, return timestamp of specific item.
-        item = storage.get_item(user_id, collection_name, item_id)
-        if item is None:
+        try:
+            return storage.get_item_timestamp(user_id, collection, item_id)
+        except NotFoundError:
             return None
-        return item["modified"]
 
     def get_storage(self, request):
         # XXX returns a 400 if the root is called
         raise HTTPBadRequest()
 
+    @convert_storage_errors
     def get_collection_timestamps(self, request):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
@@ -146,6 +189,7 @@ class StorageController(object):
         collections = storage.get_collection_timestamps(user_id)
         return collections
 
+    @convert_storage_errors
     def get_collection_counts(self, request):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
@@ -156,20 +200,18 @@ class StorageController(object):
         counts = storage.get_collection_counts(user_id)
         return counts
 
+    @convert_storage_errors
     def get_quota(self, request):
         self._check_if_modified(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         used = storage.get_total_size(user_id)
-        if not storage.use_quota:
-            limit = None
-        else:
-            limit = storage.quota_size
         return {
             "usage": used,
-            "quota": limit,
+            "quota": self.quota_size,
         }
 
+    @convert_storage_errors
     def get_collection_usage(self, request):
         self._check_if_modified(request)
         storage = self._get_storage(request)
@@ -181,31 +223,22 @@ class StorageController(object):
 
         This function will also raise a 400 on bad args.
         Unknown args are just dropped.
-        XXX see if we want to raise a 400 in that case
         """
         args = {}
-        filters = {}
-        convert_name = {'older': 'modified',
-                        'newer': 'modified',
-                        'index_above': 'sortindex',
-                        'index_below': 'sortindex'}
 
         for arg in  ('older', 'newer', 'index_above', 'index_below'):
             value = kw.get(arg)
             if value is None:
                 continue
             try:
-                if arg in ('older', 'newer'):
-                    value = int(value)
-                else:
-                    value = float(value)
+                value = int(value)
             except ValueError:
                 msg = 'Invalid value for "%s": %r' % (arg, value)
                 raise HTTPBadRequest(msg)
             if arg in ('older', 'index_below'):
-                filters[convert_name[arg]] = '<', value
+                args[arg] = value
             else:
-                filters[convert_name[arg]] = '>', value
+                args[arg] = value
 
         # convert limit
         limit = kw.get('limit')
@@ -217,61 +250,49 @@ class StorageController(object):
                 raise HTTPBadRequest(msg)
             args['limit'] = limit
 
-        # XXX should we control id lengths ?
         for arg in ('ids',):
             value = kw.get(arg)
             if value is None:
                 continue
-            filters['id'] = 'in', value.split(',')
+            args['items'] = value.split(',')
 
         sort = kw.get('sort')
         if sort in ('oldest', 'newest', 'index'):
             args['sort'] = sort
-        args['full'] = kw.get('full', False)
-        args['filters'] = filters
         return args
 
+    @convert_storage_errors
+    @with_read_lock
     def get_collection(self, request, **kw):
         """Returns a list of the BSO ids contained in a collection."""
         self._check_if_modified(request)
 
-        kw = self._convert_args(kw)
+        filters = self._convert_args(kw)
         collection_name = request.matchdict['collection']
         user_id = request.user["uid"]
-        full = kw['full']
-
-        if not full:
-            fields = ['id']
-        else:
-            fields = _BSO_FIELDS
+        full = kw.get('full', False)
 
         storage = self._get_storage(request)
-        res = storage.get_items(user_id, collection_name, fields,
-                                kw['filters'],
-                                kw.get('limit'),
-                                kw.get('sort'))
-        if res is None:
-            raise HTTPNotFound()
-
-        if not full:
-            res = [line['id'] for line in res]
+        if full:
+            res = storage.get_items(user_id, collection_name, **filters)
+        else:
+            res = storage.get_item_ids(user_id, collection_name, **filters)
 
         request.response.headers['X-Num-Records'] = str(len(res))
         return {
             "items": res
         }
 
-    def get_item(self, request, full=True):  # always full
+    @convert_storage_errors
+    @with_read_lock
+    def get_item(self, request):
         """Returns a single BSO object."""
         self._check_if_modified(request)
         storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
         user_id = request.user["uid"]
-        res = storage.get_item(user_id, collection_name, item_id)
-        if res is None:
-            raise HTTPNotFound()
-        return res
+        return storage.get_item(user_id, collection_name, item_id)
 
     def _check_quota(self, request, new_bsos):
         """Checks the quota.
@@ -280,10 +301,15 @@ class StorageController(object):
         """
         user_id = request.user["uid"]
         storage = self._get_storage(request)
-        if not storage.use_quota:
+        if self.quota_size is None:
             return 0
 
-        left = storage.get_size_left(user_id)
+        used = storage.get_total_size(user_id)
+        left = self.quota_size - used
+        if left < _ONE_MEG:
+            used = storage.get_total_size(user_id, recalculate=True)
+            left = self.quota_size - used
+
         for bso in new_bsos:
             left -= len(bso.get("payload", ""))
 
@@ -291,6 +317,8 @@ class StorageController(object):
             raise HTTPJsonBadRequest(ERROR_OVER_QUOTA)
         return left
 
+    @convert_storage_errors
+    @with_write_lock
     def set_item(self, request):
         """Sets a single BSO object."""
         self._check_if_unmodified(request)
@@ -319,28 +347,21 @@ class StorageController(object):
         if not consistent:
             raise HTTPJsonBadRequest(ERROR_INVALID_OBJECT)
 
-        if self._has_modifiers(bso):
-            bso['modified'] = request.server_time
-
         left = self._check_quota(request, [bso])
+        res = storage.set_item(user_id, collection_name, item_id, bso)
 
-        try:
-            modified = storage.set_item(user_id, collection_name, item_id,
-                                        storage_time=request.server_time,
-                                        **bso)
-        except StorageConflictError:
-            raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
-
-        if modified:
+        if not res["created"]:
             response = HTTPNoContent()
         else:
             response = HTTPCreated()
 
-        response.headers["X-Last-Modified"] = str(request.server_time)
+        response.headers["X-Last-Modified"] = str(res["modified"])
         if 0 < left < _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
 
+    @convert_storage_errors
+    @with_write_lock
     def delete_item(self, request):
         """Deletes a single BSO object."""
         self._check_if_unmodified(request)
@@ -348,16 +369,14 @@ class StorageController(object):
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
         user_id = request.user["uid"]
-        deleted = storage.delete_item(user_id, collection_name, item_id,
-                                      storage_time=request.server_time)
-
-        if not deleted:
-            raise HTTPNotFound()
+        storage.delete_item(user_id, collection_name, item_id)
         return HTTPNoContent()
 
+    @convert_storage_errors
+    @with_write_lock
     def set_collection(self, request):
         """Sets a batch of BSO objects into a collection."""
-        self._check_if_unmodified(request)
+        modified = self._check_if_unmodified(request)
 
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -411,37 +430,29 @@ class StorageController(object):
                 res['failed'][item_id] = ['retry bytes']
                 continue
 
-            if self._has_modifiers(bso):
-                bso['modified'] = request.server_time
-
             kept_bsos.append(bso)
 
         left = self._check_quota(request, kept_bsos)
 
-        storage_time = request.server_time
+        try:
+            modified = storage.set_items(user_id, collection_name, kept_bsos)
+        except Exception, e:
+            # Something went wrong.
+            # We want to swallow the 503 in that case.
+            self.logger.error('Could not set items')
+            self.logger.error(str(e))
+            for bso in kept_bsos:
+                res['failed'][bso['id']] = str(e)
+        else:
+            res['success'].extend([bso['id'] for bso in kept_bsos])
 
-        for bsos in batch(kept_bsos, size=self.batch_size):
-            bsos = list(bsos)   # to avoid exhaustion
-            try:
-                storage.set_items(user_id, collection_name,
-                                  bsos, storage_time=storage_time)
-
-            except StorageConflictError:
-                raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
-            except Exception, e:   # we want to swallow the 503 in that case
-                # something went wrong
-                self.logger.error('Could not set items')
-                self.logger.error(str(e))
-                for bso in bsos:
-                    res['failed'][bso['id']] = str(e)
-            else:
-                res['success'].extend([bso['id'] for bso in bsos])
-
-        request.response.headers["X-Last-Modified"] = str(storage_time)
+        request.response.headers["X-Last-Modified"] = str(modified)
         if 0 < left < _ONE_MEG:
             request.response.headers['X-Quota-Remaining'] = str(left)
         return res
 
+    @convert_storage_errors
+    @with_write_lock
     def delete_collection(self, request, **kw):
         """Deletes the collection and all contents.
 
@@ -460,16 +471,16 @@ class StorageController(object):
         storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         user_id = request.user["uid"]
-        deleted = storage.delete_items(user_id, collection_name, ids,
-                                       storage_time=request.server_time)
-        if not deleted:
-            raise HTTPNotFound()
-
-        response = HTTPNoContent()
-        if ids is not None:
-            response.headers["X-Last-Modified"] = str(request.server_time)
+        if ids is None:
+            storage.delete_collection(user_id, collection_name)
+            response = HTTPNoContent()
+        else:
+            modified = storage.delete_items(user_id, collection_name, ids)
+            response = HTTPNoContent()
+            response.headers["X-Last-Modified"] = str(modified)
         return response
 
+    @convert_storage_errors
     def delete_storage(self, request):
         """Deletes all records for the user."""
         self._check_if_unmodified(request)

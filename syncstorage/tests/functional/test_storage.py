@@ -76,7 +76,6 @@ class TestStorage(StorageFunctionalTestCase):
         keys = res.keys()
         self.assertTrue(len(keys), 2)
         self.assertEquals(resp.headers.get('X-Num-Records'), None)
-        # XXX need to test collections timestamps here
 
     def test_get_collection_count(self):
         resp = self.app.get(self.root + '/info/collection_counts')
@@ -129,13 +128,13 @@ class TestStorage(StorageFunctionalTestCase):
 
         bso = {'id': '128', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/128', bso)
-        ts = int(res.headers["X-Timestamp"])
+        ts = int(res.headers["X-Last-Modified"])
 
         time.sleep(.3)
 
         bso = {'id': '129', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/129', bso)
-        ts2 = int(res.headers["X-Timestamp"])
+        ts2 = int(res.headers["X-Last-Modified"])
 
         self.assertTrue(ts < ts2)
 
@@ -429,11 +428,8 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json["items"]), 1)
         self.app.delete(self.root + '/storage/col2?ids=13')
-        # XXX TODO: this will either return an empty list or a 404,
-        # depending on whether the storage backend tracks deletes properly.
-        res = self.app.get(self.root + '/storage/col2', status=(200, 404))
-        if res.status_int == 200:
-            self.assertEquals(len(res.json["items"]), 0)
+        res = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(len(res.json["items"]), 0)
 
     def test_delete_item(self):
         self.app.delete(self.root + '/storage/col2')
@@ -569,9 +565,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + "/storage")
 
         # Set a low quota for the storage.
-        for key in self.config.registry:
-            if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 700
+        self.config.registry["syncstorage.controller"].quota_size = 700
 
         # Check the the remaining quota is correctly reported.
         bso = {'payload': _PLD}
@@ -579,9 +573,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.headers['X-Quota-Remaining'], '200')
 
         # Set the quota so that they're over their limit.
-        for key in self.config.registry:
-            if key.startswith("syncstorage:storage:"):
-                self.config.registry[key].quota_size = 10
+        self.config.registry["syncstorage.controller"].quota_size = 10
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                                 status=400)
@@ -615,7 +607,7 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch(self):
         # Test that batch uploads are correctly processed.
         # The test config has max_count=100.
-        # Uploading 70 small objects should succeed with 3 database writes.
+        # Uploading 70 small objects should succeed.
         bsos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
@@ -639,6 +631,7 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_blacklisted_nodes(self):
         # This can't be run against a live server.
+        # XXX TODO: it really doesn't belong in this file; maybe test_wsgi.py?
         if self.distant:
             raise unittest2.SkipTest
 
@@ -748,7 +741,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
-        ts = int(res.headers["X-Timestamp"])
+        ts = int(res.headers["X-Last-Modified"])
 
         # wait a bit
         time.sleep(0.2)
@@ -771,7 +764,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/tabs', bsos)
-        ts = int(res.headers["X-Timestamp"])
+        ts = int(res.headers["X-Last-Modified"])
 
         # wait a bit
         time.sleep(0.2)
@@ -795,40 +788,34 @@ class TestStorage(StorageFunctionalTestCase):
 
         # make sure a tentative to write in tabs w/ memcached leads to a 503
         try:
-            from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+            from syncstorage.storage.memcached import MemcachedStorage
         except ImportError:
-            return
+            raise unittest2.SkipTest
 
         class BadCache(object):
-            def incr(*args, **kw):
-                return False
 
-            def set(*args, **kw):
-                pass
+            def __init__(self, cache):
+                self.cache = cache
 
-            def delete(*args, **kw):
-                pass
+            def cas(self, key, *args, **kw):
+                if key.endswith(":tabs"):
+                    raise BackendError()
+                return self.cache.cas(key, *args, **kw)
 
-            def get(*args, **kw):
-                return None
-
-            def get_tabs_timestamp(*args, **kw):
-                return 0
-
-            def set_tabs(*args, **kw):
-                raise BackendError()
+            def __getattr__(self, attr):
+                return getattr(self.cache, attr)
 
         fd, dbfile = mkstemp()
         os.close(fd)
 
         try:
             old_storages = {}
-            storage = MemcachedSQLStorage('sqlite:///%s' % dbfile,
-                                          create_tables=True)
-            storage.cache = BadCache()
             for key in self.config.registry:
                 if key.startswith("syncstorage:storage:"):
-                    old_storages[key] = self.config.registry[key]
+                    old_storages[key] = backend = self.config.registry[key]
+                    storage = MemcachedStorage(backend,
+                                               cache_only_collections=["tabs"])
+                    storage.cache = BadCache(storage.cache)
                     self.config.registry[key] = storage
 
             # send two bsos in the 'tabs' collection
@@ -976,7 +963,7 @@ class TestStorage(StorageFunctionalTestCase):
         INFO_VIEWS = ("/info/collections", "/info/quota",
                       "/info/collection_usage", "/info/collection_counts")
         r = self.app.get(self.root + "/info/collections")
-        ts1 = r.headers["X-Timestamp"]
+        ts1 = r.headers["X-Last-Modified"]
         # With X-I-M-S set before latest change, all should give a 200.
         headers = {"X-If-Modified-Since": "3"}
         for view in INFO_VIEWS:
@@ -989,7 +976,7 @@ class TestStorage(StorageFunctionalTestCase):
         time.sleep(0.01)
         bso = {"payload": "TEST"}
         r = self.app.put_json(self.root + "/storage/col2/TEST", bso)
-        ts2 = r.headers["X-Timestamp"]
+        ts2 = r.headers["X-Last-Modified"]
         # Using the previous timestamp should read the updated data.
         headers = {"X-If-Modified-Since": str(ts1)}
         for view in INFO_VIEWS:
@@ -998,9 +985,9 @@ class TestStorage(StorageFunctionalTestCase):
         headers = {"X-If-Modified-Since": str(ts2)}
         for view in INFO_VIEWS:
             self.app.get(self.root + view, headers=headers, status=304)
-        # XXX TODO: this doesn't work yet because delete timestamps
-        # are not tracked correctly.  Will require some refactoring.
-        # Delete a collection.
+        # XXX TODO: the storage-level timestamp is not tracked correctly
+        # after deleting a collection, so this test fails for now.
+        ## Delete a collection.
         #time.sleep(0.01)
         #r = self.app.delete(self.root + "/storage/col2")
         #ts3 = r.headers["X-Timestamp"]
