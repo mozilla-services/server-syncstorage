@@ -59,6 +59,33 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
             super(StorageFunctionalTestCase, self)._cleanup_test_databases()
 
 
+MOCKMYID_PRIVATE_KEY = None
+MOCKMYID_PRIVATE_KEY_DATA = {
+  "algorithnm": "RS",
+  "n": "154988747580902760394650941058372315672655463739759604809411226511"\
+       "077728241215274831074023538998462524898370248701917073947431963995"\
+       "829594255139047629967566720896935410098920308488250796497830860055"\
+       "544424902329008757928517862039480884579424169789764552974280774608"\
+       "906504095492421246555369861413637195898821600814807850489656862851"\
+       "420023207670666748797372380120641566758995125031432254819338645077"\
+       "931184578057920644455028341623155321139637468017701876856504085604"\
+       "246826549377447138137738969622637096927246306509521595969513482640"\
+       "050043750176104418359560732757087402395180114009919728116694933566"\
+       "82993446554779893834303",
+  "e": "65537",
+  "d": "65399069618723544500872440362363672698042543818900958411270855515"\
+       "77495913426869112377010004955160417265879626558436936025363204803"\
+       "91331858268095155890431830889373003315817865054997037936791585608"\
+       "73644285308283967959957813646594134677848534354507623921570269626"\
+       "94408807947047846891301466649598749901605789115278274397848888140"\
+       "10530606360821777612754992672154421572087230519464512940305680198"\
+       "74227941147032559892027555115234340986250008269684300770919843514"\
+       "10839837395828971692109391386427709263149504336916566097901771762"\
+       "64809088099477332528320749664563079224800780517787353244131447050"\
+       "2254528486411726581424522838833"
+}
+
+
 def authenticate_to_token_server(url, email=None, audience=None):
     """Authenticate to the given token-server URL.
 
@@ -71,14 +98,19 @@ def authenticate_to_token_server(url, email=None, audience=None):
     # so only import them is we really need them.
     import requests
     from browserid.tests.support import make_assertion
+    global MOCKMYID_PRIVATE_KEY
+    if MOCKMYID_PRIVATE_KEY is None:
+        from browserid.jwt import RS256Key
+        MOCKMYID_PRIVATE_KEY = RS256Key(MOCKMYID_PRIVATE_KEY_DATA)
     if email is None:
-        email = "user_%s@loadtest.local" % (random.randint(1, 100000),)
+        email = "user_%s@mockmyid.com" % (random.randint(1, 100000),)
     if audience is None:
         audience = "https://persona.org"
     assertion = make_assertion(
         email=email,
         audience=audience,
-        issuer="loadtest.local",
+        issuer="mockmyid.com",
+        issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
     )
     r = requests.get(url, headers={
         "Authorization": "Browser-ID " + assertion,
@@ -141,8 +173,12 @@ def run_live_functional_tests(TestCaseClass, argv=None):
     else:
         creds = authenticate_to_token_server(url, opts.email, opts.audience)
 
-        # Point the tests at the given endpoint URI.
-        host_url = urlparse.urlparse(creds["api_endpoint"])._replace(path="")
+        # Point the tests at the given endpoint URI, after stripping off
+        # the trailing /2.0/UID component.
+        host_url = urlparse.urlparse(creds["api_endpoint"])
+        host_path = host_url.path.rstrip("/")
+        host_path = "/".join(host_path.split("/")[:-2])
+        host_url = host_url._replace(path=host_path)
         os.environ["MOZSVC_TEST_REMOTE"] = host_url.geturl()
 
         # Customize the tests to use the provisioned auth credentials.
