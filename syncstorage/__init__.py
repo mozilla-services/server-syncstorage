@@ -3,11 +3,13 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from mozsvc.config import get_configurator
-from mozsvc.plugin import load_from_settings
+from mozsvc.metrics import load_metlog_client
 from syncstorage.controller import StorageController
 
 
 def includeme(config):
+    # Ensure that we have metlog loaded and ready for use as early as possible.
+    load_metlog_client(config)
     # Include dependencies from other packages.
     config.include("cornice")
     config.include("mozsvc")
@@ -24,8 +26,8 @@ def includeme(config):
 
 def main(global_config, **settings):
     config = get_configurator(global_config, **settings)
-    metlog_wrapper = load_from_settings('metlog', config.registry.settings)
-    config.registry['metlog'] = metlog_wrapper.client
+    # Ensure that we have metlog loaded and ready for use as early as possible.
+    load_metlog_client(config)
     config.begin()
     try:
         config.include(includeme)

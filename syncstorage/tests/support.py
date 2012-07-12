@@ -7,7 +7,7 @@ import urlparse
 import functools
 
 from metlog.decorators.base import MetlogDecorator
-from mozsvc.plugin import load_from_settings
+from mozsvc.metrics import load_metlog_client
 from mozsvc.tests.support import TestCase
 
 
@@ -49,8 +49,7 @@ class StorageTestCase(TestCase):
 
     def get_configurator(self):
         config = super(StorageTestCase, self).get_configurator()
-        metlog_plugin = load_from_settings('metlog', config.registry.settings)
-        self.metlog = metlog_plugin.client
+        self.metlog = load_metlog_client(config)
 
         # override MetlogDecorator's `client` property
         self.orig_client = MetlogDecorator.client
