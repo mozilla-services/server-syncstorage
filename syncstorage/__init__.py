@@ -11,7 +11,7 @@ def includeme(config):
     # Include dependencies from other packages.
     config.include("cornice")
     config.include("mozsvc")
-    config.include("mozsvc.user.whoauth")
+    config.include("mozsvc.user")
     # Add in the stuff we define ourselves.
     config.add_renderer("newlines", "syncstorage.views:NewlinesRenderer")
     config.include("syncstorage.tweens")

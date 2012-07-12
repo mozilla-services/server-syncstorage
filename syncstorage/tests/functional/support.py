@@ -16,9 +16,9 @@ import unittest2
 import macauthlib
 
 from pyramid.request import Request
+from pyramid.interfaces import IAuthenticationPolicy
 
 from mozsvc.tests.support import FunctionalTestCase
-from mozsvc.user.whoauth import SagradaMACAuthPlugin
 
 from syncstorage.tests.support import StorageTestCase
 
@@ -44,14 +44,10 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         # For basic testing, use a random uid and sign our own tokens.
         # Subclasses might like to override this and use a live tokenserver.
         self.user_id = random.randint(1, 100000)
-        settings = self.config.registry.settings
-        macauth_settings = settings.getsection("who.plugin.macauth")
-        macauth_settings.pop("use", None)
-        auth_plugin = SagradaMACAuthPlugin(**macauth_settings)
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank(self.host_url)
-        self.auth_token, self.auth_secret = auth_plugin.encode_mac_id(req, {
-            "uid": self.user_id
-        })
+        creds = auth_policy.encode_mac_id(req, self.user_id)
+        self.auth_token, self.auth_secret = creds
 
     def _cleanup_test_databases(self):
         # Don't cleanup databases unless we created them ourselves.
