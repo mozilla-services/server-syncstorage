@@ -110,6 +110,7 @@ def authenticate_to_token_server(url, email=None, audience=None):
     )
     r = requests.get(url, headers={
         "Authorization": "Browser-ID " + assertion,
+        "X-Conditions-Accepted": "true",
     })
     r.raise_for_status()
     creds = json.loads(r.content)
