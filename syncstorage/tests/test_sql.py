@@ -80,8 +80,9 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         self.assertEqual(table, 'bso1')
 
         # The table should initially be empty.
+        COUNT_ITEMS = 'select count(*) from bso1 /* queryName=COUNT_ITEMS */'
         with storage.dbconnector.connect() as c:
-            res = c.execute('select count(*) from bso1')
+            res = c.execute(COUNT_ITEMS)
             self.assertEqual(res.fetchall()[0][0], 0)
 
         # Do a few things on the DB
@@ -93,7 +94,7 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
 
         # Now make sure we did that in the right table
         with storage.dbconnector.connect() as c:
-            res = c.execute('select count(*) from bso1')
+            res = c.execute(COUNT_ITEMS)
             self.assertEqual(res.fetchall()[0][0], 2)
 
     def test_nopool(self):

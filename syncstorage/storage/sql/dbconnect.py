@@ -27,7 +27,7 @@ from pyramid.threadlocal import get_current_registry
 
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
-from sqlalchemy.sql import text as sqltext, insert, update
+from sqlalchemy.sql import insert, update
 from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
 from sqlalchemy import (Integer, String, Text, BigInteger,
@@ -215,14 +215,14 @@ class DBConnector(object):
             query = self._prebuilt_queries[name]
         except KeyError:
             raise KeyError("No query named %r" % (name,))
-        # If it's None then just returning it, indicating a no-op.
+        # If it's None then just return it, indicating a no-op.
         if query is None:
             return None
         # If it's a callable, call it with the sharded bso table.
         if callable(query):
             bso = self.get_bso_table(params.get("userid"))
             return query(bso, params)
-        # If it's a string, do some interpolation and return it as sqltext.
+        # If it's a string, do some interpolation and return it.
         # XXX TODO: we could pre-parse these queries at load time to look for
         # string interpolation variables, saving some time on each call.
         assert isinstance(query, basestring)
@@ -237,7 +237,7 @@ class DBConnector(object):
             qvars["ids"] = "(" + ",".join(bindparams) + ")"
         if qvars:
             query = query % qvars
-        return sqltext(query)
+        return query
 
     def get_bso_table(self, userid):
         """Get the BSO table object for the given userid."""
@@ -325,7 +325,7 @@ class DBConnection(object):
                 self._connection = None
 
     @report_backend_errors
-    def execute(self, query, params={}):
+    def execute(self, query, params=None, annotations=None):
         """Execute a database query, with retry and exception-catching logic.
 
         This method executes the given query against the database, lazily
@@ -333,8 +333,12 @@ class DBConnection(object):
         operational database errors and normalizes them into a BackendError
         exception.
         """
+        if params is None:
+            params = {}
+        if annotations is None:
+            annotations = {}
         # If there is no active connection, create a fresh one.
-        # This will affect the controll flow below.
+        # This will affect the control flow below.
         connection = self._connection
         session_was_active = True
         if connection is None:
@@ -347,7 +351,8 @@ class DBConnection(object):
             # the pool.  It's safe to retry with a new connection, but only
             # if the failed connection was never successfully used.
             try:
-                return connection.execute(query, **params)
+                query_str = self._render_query(query, params, annotations)
+                return connection.execute(query_str, **params)
             except DBAPIError, exc:
                 if not exc.connection_invalidated:
                     raise
@@ -357,7 +362,9 @@ class DBConnection(object):
                 # before opening a fresh one.
                 connection = self._connector.engine.connect()
                 transaction = connection.begin()
-                return connection.execute(query, **params)
+                annotations["retry"] = "1"
+                query_str = self._render_query(query, params, annotations)
+                return connection.execute(query_str, **params)
         finally:
             # Now that the underlying connection has been used, remember it
             # so that all subsequent queries are part of the same transaction.
@@ -365,23 +372,57 @@ class DBConnection(object):
                 self._connection = connection
                 self._transaction = transaction
 
-    def query(self, query, params={}):
+    def _render_query(self, query, params, annotations):
+        """Render a query into its final string form, to send to database.
+
+        This method does any final tweaks to the string form of the query
+        immediately before it is sent to the database.  Currently its only
+        job is to add annotations in a comment on the query.
+        """
+        # Convert SQLAlchemy expression objects into a string.
+        if isinstance(query, basestring):
+            query_str = query
+        else:
+            compiled = query.compile()
+            for param, value in compiled.params.iteritems():
+                params.setdefault(param, value)
+            query_str = str(compiled)
+        # Join all the annotations into a comment string.
+        annotation_items = sorted(annotations.items())
+        annotation_strs = ("%s=%s" % item for item in annotation_items)
+        comment = "/* [" + ", ".join(annotation_strs) + "] */"
+        # Add it to the query, at the front if possible.
+        # SQLite chokes on leading comments, so put it at back on that driver.
+        if self._connector.driver == "sqlite":
+            query_str = query_str + " " + comment
+        else:
+            query_str = comment + " " + query_str
+        return query_str
+
+    def query(self, query_name, params=None, annotations=None):
         """Execute a database query, returning the rowcount."""
-        query = self._connector.get_query(query, params)
+        query = self._connector.get_query(query_name, params)
         if query is None:
             return 0
-        res = self.execute(query, params)
+        if annotations is None:
+            annotations = {}
+        annotations.setdefault("queryName", query_name)
+        res = self.execute(query, params, annotations)
         try:
             return res.rowcount
         finally:
             res.close()
 
-    def query_scalar(self, query, params={}, default=None):
+    def query_scalar(self, query_name, params=None, default=None,
+                     annotations=None):
         """Execute a named query, returning a single scalar value."""
-        query = self._connector.get_query(query, params)
+        query = self._connector.get_query(query_name, params)
         if query is None:
             return default
-        res = self.execute(query, params)
+        if annotations is None:
+            annotations = {}
+        annotations.setdefault("queryName", query_name)
+        res = self.execute(query, params, annotations)
         try:
             row = res.fetchone()
             if row is None or row[0] is None:
@@ -390,29 +431,35 @@ class DBConnection(object):
         finally:
             res.close()
 
-    def query_fetchone(self, query, params={}):
+    def query_fetchone(self, query_name, params=None, annotations=None):
         """Execute a named query, returning the first result row."""
-        query = self._connector.get_query(query, params)
+        query = self._connector.get_query(query_name, params)
         if query is None:
             return None
-        res = self.execute(query, params)
+        if annotations is None:
+            annotations = {}
+        annotations.setdefault("queryName", query_name)
+        res = self.execute(query, params, annotations)
         try:
             return res.fetchone()
         finally:
             res.close()
 
-    def query_fetchall(self, query, params={}):
+    def query_fetchall(self, query_name, params=None, annotations=None):
         """Execute a named query, returning iterator over the results."""
-        query = self._connector.get_query(query, params)
+        query = self._connector.get_query(query_name, params)
         if query is not None:
-            res = self.execute(query, params)
+            if annotations is None:
+                annotations = {}
+            annotations.setdefault("queryName", query_name)
+            res = self.execute(query, params, annotations)
             try:
                 for row in res:
                     yield row
             finally:
                 res.close()
 
-    def insert_or_update(self, table, items):
+    def insert_or_update(self, table, items, annotations=None):
         """Perform an efficient bulk "upsert" of the given items.
 
         Given the name of a table and a list of data dicts to insert or update,
@@ -427,6 +474,9 @@ class DBConnection(object):
 
         The number of newly-inserted rows is returned.
         """
+        if annotations is None:
+            annotations = {}
+        annotations.setdefault("queryName", "UPSERT_%s" % (table,))
         # Inserting zero items is strange, but allowed.
         if not items:
             return 0
@@ -440,11 +490,11 @@ class DBConnection(object):
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
-            return self._upsert_onduplicatekey(table, items)
+            return self._upsert_onduplicatekey(table, items, annotations)
         else:
-            return self._upsert_generic(table, items)
+            return self._upsert_generic(table, items, annotations)
 
-    def _upsert_generic(self, table, items):
+    def _upsert_generic(self, table, items, annotations):
         """Upsert a batch of items one at a time, trying INSERT then UPDATE.
 
         This is a tremendously inefficient way to write a batch of items,
@@ -458,7 +508,8 @@ class DBConnection(object):
             try:
                 # Try to insert the item.
                 # If it already exists, this fails with an integrity error.
-                self.execute(insert(table), item).close()
+                query = insert(table).values(**item)
+                self.execute(query, item, annotations).close()
                 num_created += 1
             except IntegrityError:
                 # Update the item.
@@ -473,10 +524,10 @@ class DBConnection(object):
                         msg = "Item is missing primary key column %r"
                         raise ValueError(msg % (key.name,))
                 query = query.values(**item)
-                self.execute(query, item).close()
+                self.execute(query, item, annotations).close()
         return num_created
 
-    def _upsert_onduplicatekey(self, table, items):
+    def _upsert_onduplicatekey(self, table, items, annotations):
         """Upsert a batch of items using the ON DUPLICATE KEY UPDATE syntax.
 
         This is a custom batch upsert implementation based on non-standard
@@ -523,7 +574,7 @@ class DBConnection(object):
             updates = ["%s = VALUES(%s)" % (field, field) for field in fields]
             query += " ON DUPLICATE KEY UPDATE " + ",".join(updates)
             # Now we can execute it as one big query.
-            res = self.execute(sqltext(query), params)
+            res = self.execute(query, params, annotations)
             # MySQL adds one to the rowcount for each item that was inserted,
             # and adds two to the rowcount for each item that was updated.
             # Arithmetic lets us find the actual numbers.

@@ -6,6 +6,9 @@ import os
 import urlparse
 import functools
 
+import sqlalchemy.event
+from sqlalchemy.engine.base import Engine
+
 from metlog.decorators.base import MetlogDecorator
 from mozsvc.metrics import load_metlog_client
 from mozsvc.tests.support import TestCase
@@ -32,6 +35,21 @@ def restore_env(*keys):
                         os.environ[key] = value
         return wrapper
     return decorator
+
+
+# A global event listener to santity-check all queries sent to the DB.
+# Unfortunately SQLAlchemy doesn't have a way to unregister a listener,
+# so once you import this module the listener will be installed forever.
+@sqlalchemy.event.listens_for(Engine, "before_cursor_execute")
+def validate_database_query(conn, cursor, statement, *args):
+    """Check that database queries have appripriate metadata."""
+    statement = statement.strip()
+    if statement.startswith("PRAGMA "):
+        return
+    if statement.startswith("CREATE "):
+        return
+    if "queryName=" not in statement:
+        assert False, "SQL query does not have a name: %s" % (statement,)
 
 
 class StorageTestCase(TestCase):
