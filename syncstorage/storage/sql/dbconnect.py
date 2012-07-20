@@ -89,9 +89,17 @@ def _get_bso_columns(table_name):
       Column("payload", Text, nullable=False, default=""),
       Column("payload_size", Integer, nullable=False, default=0),
       Column("ttl", Integer, default=MAX_TTL),
+      # Declare indexes.
+      # We need to include the tablename in the index name due to sharding,
+      # because index names in sqlite are global, not per-table.
+      # Index on "ttl" for easy pruning of expired items.
       Index("%s_ttl_idx" % (table_name,), "ttl"),
+      # Index on "modified" for easy filtering by older/newer.
       Index("%s_usr_col_mod_idx" % (table_name,),
             "userid", "collection", "modified"),
+      # There is intentinally no index on "sortindex".
+      # Clients almost always filter on "modified" using the above index,
+      # and cannot take advantage of a separate index for sorting.
     )
 
 
