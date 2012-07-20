@@ -21,6 +21,7 @@ import sys
 import time
 import random
 import string
+import urllib
 import webtest
 import simplejson as json
 from tempfile import mkstemp
@@ -703,6 +704,23 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
         self.assertEqual(len(res.json["items"]), 0)
         res = self.app.get(self.root + '/storage/passwords')
+        self.assertEqual(len(res.json["items"]), 3)
+
+    def test_specifying_ids_with_percent_encoded_query_string(self):
+        self.app.delete(self.root + "/storage")
+        # create some items
+        bsos = [{'id': 'test-%d' % i, 'payload': _PLD} for i in range(5)]
+        res = self.app.post_json(self.root + '/storage/col2', bsos)
+        res = res.json
+        self.assertEquals(len(res["success"]), 5)
+        # now delete some of them
+        ids = ','.join(['test-%d' % i for i in range(2)])
+        ids = urllib.quote(ids)
+        self.app.delete(self.root + '/storage/col2?ids=%s' % ids)
+        # check that the correct items were deleted
+        res = self.app.get(self.root + '/storage/col2?ids=%s' % ids)
+        self.assertEqual(len(res.json["items"]), 0)
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEqual(len(res.json["items"]), 3)
 
     def test_timestamps_are_integers(self):
