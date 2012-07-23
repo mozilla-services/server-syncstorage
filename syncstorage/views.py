@@ -28,11 +28,7 @@ class NewlinesRenderer(object):
         except (KeyError, TypeError):
             pass
         # Convert the values to JSON for rendering.
-        data = []
-        for line in value:
-            line = json.dumps(line, use_decimal=True).replace('\n', '\\u000a')
-            data.append(line)
-        return '\n'.join(data)
+        return '\n'.join(json.dumps(item) for item in value)
 
 
 class SyncStorageService(MetricsService):
