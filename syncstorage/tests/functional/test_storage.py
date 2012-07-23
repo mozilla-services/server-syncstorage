@@ -390,6 +390,34 @@ class TestStorage(StorageFunctionalTestCase):
         }, status=415)
         self.app.get(self.root + "/storage/col2/TEST", status=404)
 
+    def test_app_newlines_when_payloads_contain_newlines(self):
+        self.app.delete(self.root + "/storage/col2")
+        # Send some application/newlines with embedded newline chars.
+        bsos = [
+            {'id': '1', 'payload': 'hello\nworld'},
+            {'id': '2', 'payload': '\nmarco\npolo\n'},
+        ]
+        body = "\n".join(json.dumps(bso) for bso in bsos)
+        self.assertEquals(len(body.split("\n")), 2)
+        self.app.post(self.root + '/storage/col2', body, headers={
+            "Content-Type": "application/newlines"
+        })
+        # Read them back as JSON list, check payloads.
+        items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
+        self.assertEquals(len(items), 2)
+        items.sort(key=lambda bso: bso["id"])
+        self.assertEquals(items[0]["payload"], bsos[0]["payload"])
+        self.assertEquals(items[1]["payload"], bsos[1]["payload"])
+        # Read them back as application/newlines, check payloads.
+        res = self.app.get(self.root + "/storage/col2?full=1", headers={
+          "Accept": "application/newlines",
+        })
+        items = [json.loads(line) for line in res.body.strip().split('\n')]
+        self.assertEquals(len(items), 2)
+        items.sort(key=lambda bso: bso["id"])
+        self.assertEquals(items[0]["payload"], bsos[0]["payload"])
+        self.assertEquals(items[1]["payload"], bsos[1]["payload"])
+
     def test_collection_usage(self):
         self.app.delete(self.root + "/storage")
 
