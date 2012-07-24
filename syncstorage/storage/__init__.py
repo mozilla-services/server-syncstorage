@@ -204,8 +204,7 @@ class SyncStorage(object):
 
     @abc.abstractmethod
     def get_items(self, userid, collection, items=None, older=None,
-                  newer=None, index_above=None, index_below=None,
-                  limit=None, sort=None):
+                  newer=None, limit=None, sort=None):
         """Returns items from a collection
 
         Args:
@@ -214,8 +213,6 @@ class SyncStorage(object):
             items: list of strings identifying items to return.
             older: timestamp; only return items older than this.
             newer: timestamp; only return items newer than this.
-            index_above: integer; only return items with sortindex above this.
-            index_below: integer; only return items with sortindex below this.
             limit: integer; return at most this many items.
             sort: sort order for results; one of "oldest", "newer" or "index".
 
@@ -228,8 +225,7 @@ class SyncStorage(object):
 
     @abc.abstractmethod
     def get_item_ids(self, userid, collection, items=None, older=None,
-                     newer=None, index_above=None, index_below=None,
-                     limit=None, sort=None):
+                     newer=None, limit=None, sort=None):
         """Returns item ids from a collection
 
         Args:
@@ -238,8 +234,6 @@ class SyncStorage(object):
             items: list of strings identifying items to return.
             older: timestamp; only return items older than this.
             newer: timestamp; only return items newer than this.
-            index_above: integer; only return items with sortindex above this.
-            index_below: integer; only return items with sortindex below this.
             limit: integer; return at most this many items.
             sort: sort order for results; one of "oldest", "newer" or "index".
 

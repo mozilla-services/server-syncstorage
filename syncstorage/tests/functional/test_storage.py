@@ -178,25 +178,6 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json["items"]
         self.assertTrue(isinstance(res, list))
 
-        # "index_above"
-        # If defined, only returns items with a higher sortindex than the
-        # value specified.
-        bso1 = {'id': '130', 'payload': 'x', 'sortindex': 11}
-        bso2 = {'id': '131', 'payload': 'x', 'sortindex': 9}
-        bsos = [bso1, bso2]
-        self.app.post_json(self.root + '/storage/col2', bsos)
-
-        res = self.app.get(self.root + '/storage/col2?index_above=10')
-        res = res.json["items"]
-        self.assertEquals(res, ['130'])
-
-        # "index_below"
-        # If defined, only returns items with a lower sortindex than the value
-        # specified.
-        res = self.app.get(self.root + '/storage/col2?index_below=10')
-        res = res.json["items"]
-        self.assertEquals(res, ['131'])
-
         # "limit"
         # Sets the maximum number of ids that will be returned
         self.app.delete(self.root + '/storage/col2')
@@ -704,7 +685,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json
 
         # trying weird args and make sure the server returns 400s
-        args = ('older', 'newer', 'index_above', 'index_below', 'limit')
+        args = ('older', 'newer', 'limit')
         for arg in args:
             self.app.get(self.root + '/storage/col2?%s=%s' % (arg, randtext()),
                          status=400)

@@ -700,8 +700,6 @@ class _CachedManagerBase(object):
         # Decode kwds into individual filter values.
         older = kwds.pop("older", None)
         newer = kwds.pop("newer", None)
-        index_above = kwds.pop("index_above", None)
-        index_below = kwds.pop("index_below", None)
         limit = kwds.pop("limit", None)
         sort = kwds.pop("sort", None)
         for unknown_kwd in kwds:
@@ -720,10 +718,6 @@ class _CachedManagerBase(object):
             bsos = (bso for bso in bsos if bso["modified"] < older)
         if newer is not None:
             bsos = (bso for bso in bsos if bso["modified"] > newer)
-        if index_above is not None:
-            bsos = (bso for bso in bsos if bso["sortindex"] > index_above)
-        if index_below is not None:
-            bsos = (bso for bso in bsos if bso["sortindex"] < index_below)
         # Filter out any that have expired.
         now = int(from_timestamp(get_timestamp()))
         later = now + 1

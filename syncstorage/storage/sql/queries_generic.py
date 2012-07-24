@@ -110,10 +110,6 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.modified < bindparam("older"))
     if "newer" in params:
         query = query.where(bso.c.modified > bindparam("newer"))
-    if "index_above" in params:
-        query = query.where(bso.c.sortindex > bindparam("index_above"))
-    if "index_below" in params:
-        query = query.where(bso.c.sortindex < bindparam("index_below"))
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
     sort = params.pop("sort", None)

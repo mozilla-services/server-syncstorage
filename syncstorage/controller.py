@@ -226,7 +226,7 @@ class StorageController(object):
         """
         args = {}
 
-        for arg in  ('older', 'newer', 'index_above', 'index_below'):
+        for arg in  ('older', 'newer'):
             value = kw.get(arg)
             if value is None:
                 continue
@@ -235,10 +235,7 @@ class StorageController(object):
             except ValueError:
                 msg = 'Invalid value for "%s": %r' % (arg, value)
                 raise HTTPBadRequest(msg)
-            if arg in ('older', 'index_below'):
-                args[arg] = value
-            else:
-                args[arg] = value
+            args[arg] = value
 
         # convert limit
         limit = kw.get('limit')
