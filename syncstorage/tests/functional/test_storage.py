@@ -528,6 +528,12 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + '/storage/col2?ids=12345',
                         headers=[('X-If-Unmodified-Since', ts)],
                         status=412)
+        self.app.get(self.root + '/storage/col2/12345',
+                          headers=[('X-If-Unmodified-Since', ts)],
+                          status=412)
+        self.app.get(self.root + '/storage/col2',
+                          headers=[('X-If-Unmodified-Since', ts)],
+                          status=412)
         # Deleting items from a collection should give 412 even if some
         # other, unrelated item in the collection has been modified.
         ts = res.headers['X-Last-Modified']
@@ -550,6 +556,9 @@ class TestStorage(StorageFunctionalTestCase):
                                  headers=[('X-If-Unmodified-Since', ts)],
                                  status=200)
         ts = res.headers['X-Last-Modified']
+        self.app.get(self.root + '/storage/col2/12345',
+                          headers=[('X-If-Unmodified-Since', ts)],
+                          status=200)
         self.app.delete(self.root + '/storage/col2/12345',
                         headers=[('X-If-Unmodified-Since', ts)],
                         status=204)
@@ -557,6 +566,9 @@ class TestStorage(StorageFunctionalTestCase):
                                 headers=[('X-If-Unmodified-Since', '0')],
                                 status=201)
         ts = res.headers['X-Last-Modified']
+        self.app.get(self.root + '/storage/col2',
+                          headers=[('X-If-Unmodified-Since', ts)],
+                          status=200)
         self.app.delete(self.root + '/storage/col2?ids=12345',
                         headers=[('X-If-Unmodified-Since', ts)],
                         status=204)

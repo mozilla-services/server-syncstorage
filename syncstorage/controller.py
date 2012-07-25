@@ -106,34 +106,27 @@ class StorageController(object):
     def _get_storage(self, request):
         return get_storage(request)
 
-    def _check_if_unmodified(self, request):
-        """Check the X-If-Unmodified-Since header."""
-        unmodified = request.headers.get("X-If-Unmodified-Since")
-        if unmodified is None:
-            return None
+    def _check_precondition_headers(self, request):
+        """Check the X-If-Modified-Since and X-If-Unmodified-Since headers.
 
-        try:
-            unmodified = int(unmodified)
-        except ValueError:
-            msg = 'Invalid value for "X-If-Unmodified-Since": %r'
-            raise HTTPBadRequest(msg % (unmodified,))
-
-        ts = self._get_resource_timestamp(request)
-        if ts is not None and ts > unmodified:
-            raise HTTPPreconditionFailed()
-        return ts
-
-    def _check_if_modified(self, request):
-        """Check the X-If-Modified-Since header.
-
-        This method checks whether the target resource has been modified
-        since the timestamp given in the X-If-Modified-Since header.  If
-        so a "304 Not Modified" is generated.
+        This method checks the timestamp of the target resource against the
+        X-If-Modified-Since and X-If-Unmodified-Since headers, returning a
+        "304 Not Modified" or "412 Precondition Failed" if appropriate.
 
         It also has the side-effect of setting X-Last-Modified in the
         response headers.
         """
         modified = request.headers.get("X-If-Modified-Since")
+        unmodified = request.headers.get("X-If-Unmodified-Since")
+
+        if modified is not None and unmodified is not None:
+            msg = "X-If-Modified-Since and X-If-Unmodified-Since cannot "
+            msg += "be applied to the same request"
+            raise HTTPBadRequest(msg)
+
+        ts = self._get_resource_timestamp(request)
+        request.response.headers["X-Last-Modified"] = str(ts)
+
         if modified is not None:
             try:
                 modified = int(modified)
@@ -141,12 +134,18 @@ class StorageController(object):
                 msg = "Bad value for X-If-Modified-Since: %r" % (modified,)
                 raise HTTPBadRequest(msg)
 
-        ts = self._get_resource_timestamp(request)
-        request.response.headers["X-Last-Modified"] = str(ts)
+            if ts is not None and ts <= modified:
+                raise HTTPNotModified()
 
-        if ts is not None and modified is not None and ts <= modified:
-            raise HTTPNotModified()
-        return ts
+        if unmodified is not None:
+            try:
+                unmodified = int(unmodified)
+            except ValueError:
+                msg = 'Invalid value for "X-If-Unmodified-Since": %r'
+                raise HTTPBadRequest(msg % (unmodified,))
+
+            if ts is not None and ts > unmodified:
+                raise HTTPPreconditionFailed()
 
     def _get_resource_timestamp(self, request):
         """Get last-modified timestamp for the target resource of the request.
@@ -183,7 +182,8 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the last modified timestamp for each collection
         """
-        self._check_if_modified(request)
+        request.headers.pop("X-If-Unmodified-Since", None)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         collections = storage.get_collection_timestamps(user_id)
@@ -194,7 +194,8 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
-        self._check_if_modified(request)
+        request.headers.pop("X-If-Unmodified-Since", None)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         counts = storage.get_collection_counts(user_id)
@@ -202,7 +203,8 @@ class StorageController(object):
 
     @convert_storage_errors
     def get_quota(self, request):
-        self._check_if_modified(request)
+        request.headers.pop("X-If-Unmodified-Since", None)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         used = storage.get_total_size(user_id)
@@ -213,7 +215,8 @@ class StorageController(object):
 
     @convert_storage_errors
     def get_collection_usage(self, request):
-        self._check_if_modified(request)
+        request.headers.pop("X-If-Unmodified-Since", None)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         return storage.get_collection_sizes(user_id)
@@ -262,7 +265,7 @@ class StorageController(object):
     @with_read_lock
     def get_collection(self, request, **kw):
         """Returns a list of the BSO ids contained in a collection."""
-        self._check_if_modified(request)
+        self._check_precondition_headers(request)
 
         filters = self._convert_args(kw)
         collection_name = request.matchdict['collection']
@@ -284,7 +287,7 @@ class StorageController(object):
     @with_read_lock
     def get_item(self, request):
         """Returns a single BSO object."""
-        self._check_if_modified(request)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
@@ -318,7 +321,7 @@ class StorageController(object):
     @with_write_lock
     def set_item(self, request):
         """Sets a single BSO object."""
-        self._check_if_unmodified(request)
+        self._check_precondition_headers(request)
 
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -361,7 +364,7 @@ class StorageController(object):
     @with_write_lock
     def delete_item(self, request):
         """Deletes a single BSO object."""
-        self._check_if_unmodified(request)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         collection_name = request.matchdict['collection']
         item_id = request.matchdict['item']
@@ -373,7 +376,7 @@ class StorageController(object):
     @with_write_lock
     def set_collection(self, request):
         """Sets a batch of BSO objects into a collection."""
-        modified = self._check_if_unmodified(request)
+        self._check_precondition_headers(request)
 
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -442,8 +445,8 @@ class StorageController(object):
                 res['failed'][bso['id']] = "db error"
         else:
             res['success'].extend([bso['id'] for bso in kept_bsos])
+            request.response.headers["X-Last-Modified"] = str(modified)
 
-        request.response.headers["X-Last-Modified"] = str(modified)
         if 0 < left < _ONE_MEG:
             request.response.headers['X-Quota-Remaining'] = str(left)
         return res
@@ -456,7 +459,7 @@ class StorageController(object):
         Additional request parameters may modify the selection of which
         items to delete.
         """
-        self._check_if_unmodified(request)
+        self._check_precondition_headers(request)
 
         ids = kw.get("ids")
         if ids is not None:
@@ -480,7 +483,7 @@ class StorageController(object):
     @convert_storage_errors
     def delete_storage(self, request):
         """Deletes all records for the user."""
-        self._check_if_unmodified(request)
+        self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         storage.delete_storage(user_id)  # XXX failures ?
