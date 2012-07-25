@@ -184,17 +184,32 @@ class TestStorage(StorageFunctionalTestCase):
 
         bsos = []
         for i in range(10):
-            bso = {'id': str(i), 'payload': 'x'}
+            bso = {'id': str(i), 'payload': 'x', 'sortindex': i}
             bsos.append(bso)
         self.app.post_json(self.root + '/storage/col2', bsos)
 
-        res = self.app.get(self.root + '/storage/col2?limit=2')
-        res = res.json["items"]
-        self.assertEquals(len(res), 2)
+        query_url = self.root + '/storage/col2?sort=index'
+        res = self.app.get(query_url)
+        all_items = res.json["items"]
+        self.assertEquals(len(all_items), 10)
 
-        res = self.app.get(self.root + '/storage/col2')
-        res = res.json["items"]
-        self.assertTrue(len(res) > 9)
+        res = self.app.get(query_url + '&limit=2')
+        self.assertEquals(res.json["items"], all_items[:2])
+
+        # "offset"
+        # Skips over items that have already been returned.
+        next_offset = res.headers["X-Next-Offset"]
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
+        self.assertEquals(res.json["items"], all_items[2:5])
+
+        next_offset = res.headers["X-Next-Offset"]
+        res = self.app.get(query_url + '&offset=' + next_offset)
+        self.assertEquals(res.json["items"], all_items[5:])
+        self.assertTrue("X-Next-Offset" not in res.headers)
+
+        res = self.app.get(query_url + '&limit=10000&offset=' + next_offset)
+        self.assertEquals(res.json["items"], all_items[5:])
+        self.assertTrue("X-Next-Offset" not in res.headers)
 
         # "sort"
         #   'oldest' - Orders by modification date (oldest first)
@@ -697,7 +712,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json
 
         # trying weird args and make sure the server returns 400s
-        args = ('older', 'newer', 'limit')
+        args = ('older', 'newer', 'limit', 'offset')
         for arg in args:
             self.app.get(self.root + '/storage/col2?%s=%s' % (arg, randtext()),
                          status=400)
@@ -772,7 +787,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2?newer=%s' % ts)
         res = res.json["items"]
         try:
-            self.assertEquals(res, ['3', '4'])
+            self.assertEquals(sorted(res), ['3', '4'])
         except AssertionError:
             # need to display the whole collection to understand the issue
             msg = 'Stamp used: %s' % ts
@@ -801,7 +816,7 @@ class TestStorage(StorageFunctionalTestCase):
         # of bso 1 and 2, should not return them
         res = self.app.get(self.root + '/storage/meh?newer=%s' % ts)
         res = res.json["items"]
-        self.assertEquals(res, ['3', '4'])
+        self.assertEquals(sorted(res), ['3', '4'])
 
     def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.

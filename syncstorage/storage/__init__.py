@@ -39,6 +39,11 @@ class ItemNotFoundError(NotFoundError):
     pass
 
 
+class InvalidOffsetError(StorageError, ValueError):
+    """Exception raised when an invalid offset token is provided."""
+    pass
+
+
 class SyncStorage(object):
     """Abstract Base Class for storage backends.
 
@@ -204,7 +209,7 @@ class SyncStorage(object):
 
     @abc.abstractmethod
     def get_items(self, userid, collection, items=None, older=None,
-                  newer=None, limit=None, sort=None):
+                  newer=None, limit=None, offset=None, sort=None):
         """Returns items from a collection
 
         Args:
@@ -214,18 +219,22 @@ class SyncStorage(object):
             older: timestamp; only return items older than this.
             newer: timestamp; only return items newer than this.
             limit: integer; return at most this many items.
+            offset: string; an offset vale previously returned as next_offset.
             sort: sort order for results; one of "oldest", "newer" or "index".
 
         Returns:
-            A list of BSO objects matching the given filters.
+            A dict with the following keys:
+              items: a list of BSO objects matching the given filters.
+              next_offset: a string giving next offset token, if any.
 
         Raises:
             CollectionNotFoundError: the user has no such collection.
+            InvalidOffsetError: the provided offset token is invalid.
         """
 
     @abc.abstractmethod
     def get_item_ids(self, userid, collection, items=None, older=None,
-                     newer=None, limit=None, sort=None):
+                     newer=None, limit=None, offset=None, sort=None):
         """Returns item ids from a collection
 
         Args:
@@ -235,13 +244,17 @@ class SyncStorage(object):
             older: timestamp; only return items older than this.
             newer: timestamp; only return items newer than this.
             limit: integer; return at most this many items.
+            offset: string; an offset vale previously returned as next_offset.
             sort: sort order for results; one of "oldest", "newer" or "index".
 
         Returns:
-            A list of item ids matching the given filters.
+            A dict with the following keys:
+              items: a list of BSO objects matching the given filters.
+              next_offset: a string giving next offset token, if any.
 
         Raises:
             CollectionNotFoundError: the user has no such collection.
+            InvalidOffsetError: the provided offset token is invalid.
         """
 
     @abc.abstractmethod

@@ -30,7 +30,8 @@ from syncstorage.util import get_timestamp, from_timestamp
 from syncstorage.storage import (SyncStorage,
                                  ConflictError,
                                  CollectionNotFoundError,
-                                 ItemNotFoundError)
+                                 ItemNotFoundError,
+                                 InvalidOffsetError)
 
 from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
                                                BackendError)
@@ -285,8 +286,9 @@ class SQLStorage(SyncStorage):
     def get_item_ids(self, session, userid, collection, **params):
         """Returns item ids from a collection."""
         params["fields"] = ["id"]
-        items = self._find_items(session, userid, collection, **params)
-        return [item["id"] for item in items]
+        res = self._find_items(session, userid, collection, **params)
+        res["items"] = [item["id"] for item in res["items"]]
+        return res
 
     def _find_items(self, session, userid, collection, **params):
         """Find items matching the given search parameters."""
@@ -294,6 +296,17 @@ class SQLStorage(SyncStorage):
         params["collectionid"] = self._get_collection_id(session, collection)
         if "ttl" not in params:
             params["ttl"] = int(from_timestamp(session.timestamp))
+        # We always fetch one more item than necessary, so we can tell whether
+        # there are additional items to be fetched with next_offset.
+        limit = params.get("limit")
+        if limit is not None:
+            params["limit"] = limit + 1
+        offset = params.get("offset")
+        if offset is not None:
+            try:
+                params["offset"] = offset = int(offset)
+            except ValueError:
+                raise InvalidOffsetError(offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
         items = [self._row_to_bso(row) for row in rows]
         # If the query returned no results, we don't know whether that's
@@ -301,7 +314,15 @@ class SQLStorage(SyncStorage):
         # timestamp and let it raise CollectionNotFoundError if necessary.
         if not items:
             self.get_collection_timestamp(session, userid, collection)
-        return items
+        # Check if we read past the original limit, set next_offset if so.
+        next_offset = None
+        if limit is not None and len(items) > limit:
+            next_offset = (offset or 0) + limit
+            items = items[:-1]
+        return {
+            "items": items,
+            "next_offset": next_offset,
+        }
 
     def _row_to_bso(self, row):
         """Convert a database table row into a BSO object."""

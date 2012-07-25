@@ -240,7 +240,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         self.storage.set_item(_UID, 'col1', '3', {'payload': _PLD})
         self.storage.set_item(_UID, 'col2', '4', {'payload': _PLD})
 
-        items = self.storage.get_items(_UID, 'col1')
+        items = self.storage.get_items(_UID, 'col1')["items"]
         self.assertEquals(len(items), 3)
 
         self.storage.delete_storage(_UID)

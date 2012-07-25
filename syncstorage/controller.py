@@ -23,7 +23,8 @@ from mozsvc.exceptions import (ERROR_MALFORMED_JSON, ERROR_INVALID_OBJECT,
                                ERROR_OVER_QUOTA)
 
 from syncstorage.bso import BSO
-from syncstorage.storage import get_storage, ConflictError, NotFoundError
+from syncstorage.storage import (get_storage, ConflictError,
+                                 NotFoundError, InvalidOffsetError)
 
 _ONE_MEG = 1024 * 1024
 
@@ -89,6 +90,8 @@ def convert_storage_errors(func):
             raise HTTPNotFound
         except ConflictError:
             raise HTTPConflict(headers={"Retry-After": str(RETRY_AFTER)})
+        except InvalidOffsetError:
+            raise HTTPBadRequest("Invalid offset token")
     return error_converter_wrapper
 
 
@@ -245,17 +248,26 @@ class StorageController(object):
         if limit is not None:
             try:
                 limit = int(limit)
+                if limit <= 0:
+                    raise ValueError
             except ValueError:
                 msg = 'Invalid value for "limit": %r' % (limit,)
                 raise HTTPBadRequest(msg)
             args['limit'] = limit
 
+        # extract offset
+        offset = kw.get('offset')
+        if offset is not None:
+            args['offset'] = offset
+
+        # split comma-separates list of ids.
         for arg in ('ids',):
             value = kw.get(arg)
             if value is None:
                 continue
             args['items'] = value.split(',')
 
+        # validate sort
         sort = kw.get('sort')
         if sort in ('oldest', 'newest', 'index'):
             args['sort'] = sort
@@ -278,9 +290,12 @@ class StorageController(object):
         else:
             res = storage.get_item_ids(user_id, collection_name, **filters)
 
-        request.response.headers['X-Num-Records'] = str(len(res))
+        request.response.headers['X-Num-Records'] = str(len(res["items"]))
+        next_offset = res.get("next_offset")
+        if next_offset is not None:
+            request.response.headers["X-Next-Offset"] = str(next_offset)
         return {
-            "items": res
+            "items": res["items"]
         }
 
     @convert_storage_errors

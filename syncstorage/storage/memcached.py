@@ -57,7 +57,8 @@ from syncstorage.storage import (SyncStorage,
                                  StorageError,
                                  ConflictError,
                                  CollectionNotFoundError,
-                                 ItemNotFoundError)
+                                 ItemNotFoundError,
+                                 InvalidOffsetError)
 
 from pyramid.settings import aslist
 
@@ -244,7 +245,7 @@ class MemcachedStorage(SyncStorage):
         # Add in counts for collections stored only in memcache.
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)
+                items = colmgr.get_items(userid)["items"]
             except CollectionNotFoundError:
                 pass
             else:
@@ -258,7 +259,7 @@ class MemcachedStorage(SyncStorage):
         # Add in sizes for collections stored only in memcache.
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)
+                items = colmgr.get_items(userid)["items"]
                 payloads = (item.get("payload", "") for item in items)
                 sizes[colmgr.collection] = sum(len(p) for p in payloads)
             except CollectionNotFoundError:
@@ -440,7 +441,7 @@ class MemcachedStorage(SyncStorage):
         size = self.storage.get_total_size(userid)
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)
+                items = colmgr.get_items(userid)["items"]
                 payloads = (item.get("payload", "") for item in items)
                 size += sum(len(p) for p in payloads)
             except CollectionNotFoundError:
@@ -701,6 +702,7 @@ class _CachedManagerBase(object):
         older = kwds.pop("older", None)
         newer = kwds.pop("newer", None)
         limit = kwds.pop("limit", None)
+        offset = kwds.pop("offset", None)
         sort = kwds.pop("sort", None)
         for unknown_kwd in kwds:
             raise TypeError("Unknown keyword argument: %s" % (unknown_kwd,))
@@ -722,30 +724,47 @@ class _CachedManagerBase(object):
         now = int(from_timestamp(get_timestamp()))
         later = now + 1
         bsos = (bso for bso in bsos if bso.get("ttl", later) > now)
-        # Sort the resulting list if required.
+        # Sort the resulting list.
+        # We always sort so that offset/limit work correctly.
+        # Using the id as a secondary key produces a unique ordering.
         bsos = list(bsos)
-        if sort is not None:
-            if sort == "oldest":
-                key = lambda bso: bso["modified"]
-                reverse = False
-            elif sort == "newer":
-                key = lambda bso: bso["modified"]
-                reverse = True
-            else:
-                key = lambda bso: bso["sortindex"]
-                reverse = False
-            bsos.sort(key=key, reverse=reverse)
+        if sort == "index":
+            key = lambda bso: (bso["sortindex"], bso["id"])
+            reverse = False
+        elif sort == "oldest":
+            key = lambda bso: (bso["modified"], bso["id"])
+            reverse = True
+        else:
+            key = lambda bso: (bso["modified"], bso["id"])
+            reverse = False
+        bsos.sort(key=key, reverse=reverse)
+        # Trim to the specified offset, if any.
+        # Note that we defaulted it to zero above.
+        if offset is not None:
+            try:
+                offset = int(offset)
+            except ValueError:
+                raise InvalidOffsetError(offset)
+            bsos = bsos[offset:]
         # Trim to the specified limit, if any.
+        next_offset = None
         if limit is not None:
-            bsos = bsos[:limit]
-        return bsos
+            if limit < len(bsos):
+                bsos = bsos[:limit]
+                next_offset = (offset or 0) + limit
+        # Return the necessary information.
+        return {
+            "items": bsos,
+            "next_offset": next_offset
+        }
 
     def get_item_ids(self, userid, items=None, **kwds):
-        items = self.get_items(userid, items, **kwds)
-        return [bso["id"] for bso in items]
+        res = self.get_items(userid, items, **kwds)
+        res["items"] = [bso["id"] for bso in res["items"]]
+        return res
 
     def get_item(self, userid, item):
-        items = self.get_items(userid, [item])
+        items = self.get_items(userid, [item])["items"]
         if not items:
             raise ItemNotFoundError
         return items[0]
@@ -832,7 +851,7 @@ class CachedManager(_CachedManagerBase):
                     ts = storage.get_collection_timestamp(userid, collection)
                     data["modified"] = ts
                     data["items"] = {}
-                    for bso in storage.get_items(userid, collection):
+                    for bso in storage.get_items(userid, collection)["items"]:
                         data["items"][bso["id"]] = bso
                 if add_if_missing:
                     self.cache.add(key, data)

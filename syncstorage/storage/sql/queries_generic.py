@@ -103,6 +103,7 @@ def FIND_ITEMS(bso, params):
         query = select([bso.c[field] for field in fields])
     query = query.where(bso.c.userid == bindparam("userid"))
     query = query.where(bso.c.collection == bindparam("collectionid"))
+    # Filter by the various query parameters.
     if "items" in params:
         # Sadly, we can't use a bindparam in an "IN" expression.
         query = query.where(bso.c.id.in_(params.pop("items")))
@@ -112,17 +113,24 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.modified > bindparam("newer"))
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
+    # Sort it in the order requested.
+    # We always sort by *something*, so that limit/offset work correctly.
+    # The default order is by modified, which if efficient due to the index.
+    # Using the id as a secondary key produces a unique ordering.
     sort = params.pop("sort", None)
-    if sort is not None:
-        if sort == 'oldest':
-            query = query.order_by(bso.c.modified.asc())
-        elif sort == 'newest':
-            query = query.order_by(bso.c.modified.desc())
-        else:
-            query = query.order_by(bso.c.sortindex.desc())
+    if sort == 'index':
+        query = query.order_by(bso.c.sortindex.desc(), bso.c.id.desc())
+    elif sort == 'oldest':
+        query = query.order_by(bso.c.modified.asc(), bso.c.id.asc())
+    else:
+        query = query.order_by(bso.c.modified.desc(), bso.c.id.desc())
+    # Apply limit and/or offset.
     limit = params.pop("limit", None)
     if limit is not None:
         query = query.limit(limit)
+    offset = params.pop("offset", None)
+    if offset is not None:
+        query = query.offset(int(offset))
     return query
 
 # Queries operating on a particular item.
