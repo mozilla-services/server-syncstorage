@@ -73,6 +73,18 @@ def _key(*names):
     return ":".join(map(str, names))
 
 
+def _as_list(item_or_list):
+    """Coerce value from config file into a list.
+
+    This is a little helper that can be used anywhere you expect a list of
+    items, but may be given just a single item.  It converts said single
+    item into a list.
+    """
+    if isinstance(item_or_list, (list, tuple)):
+        return item_or_list
+    return [item_or_list]
+
+
 class MemcachedStorage(SyncStorage):
     """Memcached caching wrapper for SyncStorage backends.
 
@@ -101,11 +113,11 @@ class MemcachedStorage(SyncStorage):
         self.cache = MemcachedClient(cache_servers, cache_key_prefix,
                                      cache_pool_size, cache_pool_timeout)
         self.cached_collections = {}
-        for collection in cached_collections:
+        for collection in _as_list(cached_collections):
             colmgr = CachedManager(self, collection)
             self.cached_collections[collection] = colmgr
         self.cache_only_collections = {}
-        for collection in cache_only_collections:
+        for collection in _as_list(cache_only_collections):
             colmgr = CacheOnlyManager(self, collection)
             self.cache_only_collections[collection] = colmgr
         self.cache_lock = cache_lock
@@ -172,7 +184,7 @@ class MemcachedStorage(SyncStorage):
             yield None
             return
         # Otherwise take the lock and mark it as being held.
-        if self.cache_lock:
+        if self.cache_lock or collection in self.cache_only_collections:
             lock = self._lock_in_memcache(userid, collection)
         else:
             lock = self.storage.lock_for_read(userid, collection)
@@ -185,7 +197,7 @@ class MemcachedStorage(SyncStorage):
 
     def lock_for_write(self, userid, collection):
         """Acquire an exclusive write lock on the named collection."""
-        if self.cache_lock:
+        if self.cache_lock or collection in self.cache_only_collections:
             return self._lock_in_memcache(userid, collection)
         else:
             return self.storage.lock_for_write(userid, collection)
@@ -202,7 +214,7 @@ class MemcachedStorage(SyncStorage):
             yield None
         finally:
             if time.time() - now >= ttl:
-                msg = "Lock expired while we we were holding it"
+                msg = "Lock expired while we were holding it"
                 raise RuntimeError(msg)
             self.cache.delete(key)
 

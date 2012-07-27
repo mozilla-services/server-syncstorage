@@ -804,84 +804,6 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json["items"]
         self.assertEquals(res, ['3', '4'])
 
-    def test_strict_newer_tabs(self):
-        # send two bsos in the 'tabs' collection
-        bso1 = {'id': '1', 'payload': _PLD}
-        bso2 = {'id': '2', 'payload': _PLD}
-        bsos = [bso1, bso2]
-        res = self.app.post_json(self.root + '/storage/tabs', bsos)
-        ts = int(res.headers["X-Last-Modified"])
-
-        # wait a bit
-        time.sleep(0.2)
-
-        # send two more bsos
-        bso3 = {'id': '3', 'payload': _PLD}
-        bso4 = {'id': '4', 'payload': _PLD}
-        bsos = [bso3, bso4]
-        self.app.post_json(self.root + '/storage/tabs', bsos)
-
-        # asking for bsos using newer=ts where newer is the timestamps
-        # of bso 1 and 2, should not return them
-        res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
-        res = res.json["items"]
-        self.assertEquals(res, ['3', '4'])
-
-    def test_write_tabs_503(self):
-        # This can't be run against a live server.
-        if self.distant:
-            raise unittest2.SkipTest
-
-        # make sure a tentative to write in tabs w/ memcached leads to a 503
-        try:
-            from syncstorage.storage.memcached import MemcachedStorage
-        except ImportError:
-            raise unittest2.SkipTest
-
-        class BadCache(object):
-
-            def __init__(self, cache):
-                self.cache = cache
-
-            def cas(self, key, *args, **kw):
-                if key.endswith(":tabs"):
-                    raise BackendError()
-                return self.cache.cas(key, *args, **kw)
-
-            def __getattr__(self, attr):
-                return getattr(self.cache, attr)
-
-        fd, dbfile = mkstemp()
-        os.close(fd)
-
-        try:
-            old_storages = {}
-            for key in self.config.registry:
-                if key.startswith("syncstorage:storage:"):
-                    old_storages[key] = backend = self.config.registry[key]
-                    storage = MemcachedStorage(backend,
-                                               cache_only_collections=["tabs"])
-                    storage.cache = BadCache(storage.cache)
-                    self.config.registry[key] = storage
-
-            # send two bsos in the 'tabs' collection
-            bso1 = {'id': 'sure', 'payload': _PLD}
-            bso2 = {'id': 'thing', 'payload': _PLD}
-            bsos = [bso1, bso2]
-
-            # on batch, we get back a 200 - but only failures
-            res = self.app.post_json(self.root + '/storage/tabs', bsos)
-            self.assertEqual(len(res.json['failed']), 2)
-            self.assertEqual(len(res.json['success']), 0)
-
-            # on single PUT, we get a 503
-            self.app.put_json(self.root + '/storage/tabs/sure', bso1,
-                         status=503)
-        finally:
-            for key in old_storages:
-                self.config.registry[key] = old_storages[key]
-            os.remove(dbfile)
-
     def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.
         # It should fail with ERROR_INVALID_OBJECT
@@ -1080,6 +1002,77 @@ class TestStorageMemcached(TestStorage):
         if storage:
             storage.cache.flush_all()
         super(TestStorageMemcached, self)._cleanup_test_databases()
+
+    # Memcache backend is configured to store tabs in cache only.
+    # Add some tests the see if they still behave correctly.
+
+    def test_strict_newer_tabs(self):
+        # send two bsos in the 'tabs' collection
+        bso1 = {'id': '1', 'payload': _PLD}
+        bso2 = {'id': '2', 'payload': _PLD}
+        bsos = [bso1, bso2]
+        res = self.app.post_json(self.root + '/storage/tabs', bsos)
+        ts = int(res.headers["X-Last-Modified"])
+
+        # wait a bit
+        time.sleep(0.2)
+
+        # send two more bsos
+        bso3 = {'id': '3', 'payload': _PLD}
+        bso4 = {'id': '4', 'payload': _PLD}
+        bsos = [bso3, bso4]
+        self.app.post_json(self.root + '/storage/tabs', bsos)
+
+        # asking for bsos using newer=ts where newer is the timestamps
+        # of bso 1 and 2, should not return them
+        res = self.app.get(self.root + '/storage/tabs?newer=%s' % ts)
+        res = res.json["items"]
+        self.assertEquals(res, ['3', '4'])
+
+    def test_write_tabs_503(self):
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
+        class BadCache(object):
+            """Cache client stub that raises BackendError on write."""
+
+            def __init__(self, cache):
+                self.cache = cache
+
+            def cas(self, key, *args, **kw):
+                if key.endswith(":tabs"):
+                    raise BackendError()
+                return self.cache.cas(key, *args, **kw)
+
+            def __getattr__(self, attr):
+                return getattr(self.cache, attr)
+
+        try:
+            for key in self.config.registry:
+                if key.startswith("syncstorage:storage:"):
+                    storage = self.config.registry[key]
+                    storage.cache = BadCache(storage.cache)
+
+            # send two bsos in the 'tabs' collection
+            bso1 = {'id': 'sure', 'payload': _PLD}
+            bso2 = {'id': 'thing', 'payload': _PLD}
+            bsos = [bso1, bso2]
+
+            # on batch, we get back a 200 - but only failures
+            res = self.app.post_json(self.root + '/storage/tabs', bsos)
+            self.assertEqual(len(res.json['failed']), 2)
+            self.assertEqual(len(res.json['success']), 0)
+
+            # on single PUT, we get a 503
+            self.app.put_json(self.root + '/storage/tabs/sure', bso1,
+                         status=503)
+        finally:
+            for key in self.config.registry:
+                if key.startswith("syncstorage:storage:"):
+                    storage = self.config.registry[key]
+                    if isinstance(storage.cache, BadCache):
+                        storage.cache = storage.cache.cache
 
 
 if __name__ == "__main__":
