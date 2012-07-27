@@ -12,8 +12,10 @@ import json
 import urlparse
 
 import unittest2
+import requests
 
 import macauthlib
+import browserid.tests.support
 
 from pyramid.request import Request
 from pyramid.interfaces import IAuthenticationPolicy
@@ -92,8 +94,6 @@ def authenticate_to_token_server(url, email=None, audience=None):
     """
     # These modules are not (yet) hard dependencies of syncstorage,
     # so only import them is we really need them.
-    import requests
-    from browserid.tests.support import make_assertion
     global MOCKMYID_PRIVATE_KEY
     if MOCKMYID_PRIVATE_KEY is None:
         from browserid.jwt import RS256Key
@@ -102,7 +102,7 @@ def authenticate_to_token_server(url, email=None, audience=None):
         email = "user_%s@mockmyid.com" % (random.randint(1, 100000),)
     if audience is None:
         audience = "https://persona.org"
-    assertion = make_assertion(
+    assertion = browserid.tests.support.make_assertion(
         email=email,
         audience=audience,
         issuer="mockmyid.com",
