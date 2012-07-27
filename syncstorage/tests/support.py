@@ -3,6 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import os
+import uuid
 import urlparse
 import functools
 
@@ -55,6 +56,12 @@ def validate_database_query(conn, cursor, statement, *args):
 class StorageTestCase(TestCase):
     """TestCase class with automatic cleanup of database files."""
 
+    def setUp(self):
+        # Put a fresh UUID into the environment.
+        # This can be used in e.g. config files to create unique paths.
+        os.environ["MOZSVC_UUID"] = str(uuid.uuid4())
+        super(StorageTestCase, self).setUp()
+
     def tearDown(self):
         self._cleanup_test_databases()
 
@@ -64,6 +71,7 @@ class StorageTestCase(TestCase):
         # clear the pyramid threadlocals
         self.config.end()
         super(StorageTestCase, self).tearDown()
+        del os.environ["MOZSVC_UUID"]
 
     def get_configurator(self):
         config = super(StorageTestCase, self).get_configurator()

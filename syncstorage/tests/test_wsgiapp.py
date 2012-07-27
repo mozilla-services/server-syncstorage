@@ -11,17 +11,20 @@ class TestWSGIApp(StorageTestCase):
 
     def test_host_specific_config(self):
         req = self.make_request(environ={"HTTP_HOST": "localhost"})
-        self.assertEquals(get_storage(req).sqluri,
-                          "sqlite:////tmp/tests.db")
+        sqluri = get_storage(req).sqluri
+        self.assertTrue(sqluri.startswith("sqlite:////tmp/tests-"))
+
         req = self.make_request(environ={"HTTP_HOST": "some-test-host"})
-        self.assertEquals(get_storage(req).sqluri,
-                          "sqlite:////tmp/some-test-host.db")
+        sqluri = get_storage(req).sqluri
+        self.assertTrue(sqluri.startswith("sqlite:////tmp/some-test-host-"))
+
         req = self.make_request(environ={"HTTP_HOST": "some-test-host:8000"})
-        self.assertEquals(get_storage(req).sqluri,
-                          "sqlite:////tmp/some-test-host.db")
+        sqluri = get_storage(req).sqluri
+        self.assertTrue(sqluri.startswith("sqlite:////tmp/some-test-host-"))
+
         req = self.make_request(environ={"HTTP_HOST": "another-test-host"})
-        self.assertEquals(get_storage(req).sqluri,
-                          "sqlite:////tmp/another-test-host.db")
+        sqluri = get_storage(req).sqluri
+        self.assertTrue(sqluri.startswith("sqlite:////tmp/another-test-host-"))
 
     def test_dependant_options(self):
         # make sure the app cannot be initialized if it's asked
