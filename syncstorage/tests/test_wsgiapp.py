@@ -12,7 +12,7 @@ class TestWSGIApp(StorageTestCase):
     def test_host_specific_config(self):
         req = self.make_request(environ={"HTTP_HOST": "localhost"})
         sqluri = get_storage(req).sqluri
-        self.assertTrue(sqluri.startswith("sqlite:////tmp/tests-"))
+        self.assertEquals(sqluri, "sqlite:///:memory:")
 
         req = self.make_request(environ={"HTTP_HOST": "some-test-host"})
         sqluri = get_storage(req).sqluri

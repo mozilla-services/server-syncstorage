@@ -97,9 +97,12 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
             res = c.execute(COUNT_ITEMS)
             self.assertEqual(res.fetchall()[0][0], 2)
 
-    def test_nopool(self):
-        # make sure the pool is forced to NullPool when sqlite is used.
-        config = get_test_configurator(__file__, 'tests3.ini')
-        storage = load_and_register("storage", config)
+    def test_nopool_is_disabled_when_using_memory_database(self):
+        config = get_test_configurator(__file__, 'tests-nopool.ini')
+        # Using no_pool=True will give you a NullPool when using file db.
+        storage = load_and_register("storage-file", config)
         self.assertEqual(storage.dbconnector.engine.pool.__class__.__name__,
                          'NullPool')
+        # Using no_pool=True will give you an error when using :memory: db.
+        self.assertRaises(ValueError,
+                          load_and_register, "storage-memory", config)

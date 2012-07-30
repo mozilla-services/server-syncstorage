@@ -26,7 +26,7 @@ from collections import defaultdict
 from pyramid.threadlocal import get_current_registry
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update
 from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
@@ -145,8 +145,9 @@ class DBConnector(object):
                  pool_max_overflow=10, pool_timeout=30,
                  shard=False, shardsize=100, **kwds):
 
+        parsed_sqluri = urlparse.urlparse(sqluri)
         self.sqluri = sqluri
-        self.driver = urlparse.urlparse(sqluri).scheme.lower()
+        self.driver = parsed_sqluri.scheme.lower()
         if "mysql" in self.driver:
             self.driver = "mysql"
 
@@ -157,19 +158,38 @@ class DBConnector(object):
         self.shard = shard
         self.shardsize = shardsize
 
-        # Create the SQLAlchemy engine, using the given parameters for
-        # connection pooling.  Pooling doesn't work properly for sqlite so
-        # it's disabled for that driver regardless of the value of no_pool.
+        # Construct the pooling-related arguments for SQLAlchemy engine.
         sqlkw = {}
         sqlkw["logging_name"] = "syncstorage"
-        if no_pool or self.driver == 'sqlite':
+        sqlkw["connect_args"] = {}
+        if no_pool:
             sqlkw["poolclass"] = NullPool
         else:
+            sqlkw["poolclass"] = QueuePool
             sqlkw["pool_size"] = int(pool_size)
             sqlkw["pool_recycle"] = int(pool_recycle)
             sqlkw["pool_timeout"] = int(pool_timeout)
             sqlkw["pool_reset_on_return"] = reset_on_return
             sqlkw["max_overflow"] = int(pool_max_overflow)
+
+        # Connection handling in sqlite needs some extra care.
+        # If it's a :memory: database, ensure we use only a single connection.
+        if self.driver == "sqlite":
+            # If pooling is in use, we must mark it as safe to share
+            # connection objects between threads.
+            if not no_pool:
+                sqlkw["connect_args"]["check_same_thread"] = False
+            # If using a :memory: database, we must use a QueuePool of size
+            # 1 so that a single connection is shared by all threads.
+            if parsed_sqluri.path.lower() in ("/", "/:memory:"):
+                if no_pool:
+                    msg = "You cannot specify no_pool=True "
+                    msg += "when using a :memory: database"
+                    raise ValueError(msg)
+                sqlkw["pool_size"] = 1
+                sqlkw["max_overflow"] = 0
+
+        # Create the engine.
         self.engine = create_engine(sqluri, **sqlkw)
 
         # Create the tables if necessary.
