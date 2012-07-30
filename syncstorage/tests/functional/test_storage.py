@@ -1009,12 +1009,6 @@ class TestStorageMemcached(TestStorage):
                 raise
             raise unittest2.SkipTest()
 
-    def _cleanup_test_databases(self):
-        storage = self.config.registry.get("syncstorage:storage:default")
-        if storage:
-            storage.cache.flush_all()
-        super(TestStorageMemcached, self)._cleanup_test_databases()
-
     # Memcache backend is configured to store tabs in cache only.
     # Add some tests the see if they still behave correctly.
 

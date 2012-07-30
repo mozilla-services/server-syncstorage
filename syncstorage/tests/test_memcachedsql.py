@@ -44,10 +44,6 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         except BackendError:
             raise unittest2.SkipTest
 
-    def tearDown(self):
-        self.storage.cache.flush_all()
-        super(TestMemcachedSQLStorage, self).tearDown()
-
     def test_basic(self):
         # just make sure calls goes through
         self.storage.set_item(_UID, 'col1', '1', {'payload': _PLD})
@@ -226,7 +222,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         size = self.storage.get_collection_sizes(1)
         self.assertEqual(size['tabs'], 100)
 
-    def test_flush_all(self):
+    def test_that_cache_is_cleared_when_things_are_deleted(self):
         # just make sure calls goes through
         self.storage.set_item(_UID, 'col1', '1', {'payload': _PLD})
 
