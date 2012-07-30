@@ -25,14 +25,8 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def setUp(self):
         super(TestSQLStorage, self).setUp()
-
         settings = self.config.registry.settings
         self.storage = load_storage_from_settings("storage", settings)
-
-        # make sure we have the standard collections in place
-        for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
-                     'bookmarks', 'prefs', 'tabs', 'passwords'):
-            self.storage.set_items(_UID, name, [])
 
     def test_no_create(self):
         # Storage with no create_tables option; it should default to false.
@@ -58,8 +52,6 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         # Use a configuration with sharding enabled.
         config = get_test_configurator(__file__, 'tests-shard.ini')
         storage = load_and_register("storage", config)
-
-        storage.delete_storage(_UID)
 
         # Make sure it's using the expected table name.
         table = storage.dbconnector.get_bso_table(_UID).name

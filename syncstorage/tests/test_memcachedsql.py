@@ -44,10 +44,6 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         except BackendError:
             raise unittest2.SkipTest
 
-        # make sure we have some standard collections in place
-        for name in ('client', 'crypto', 'forms', 'history'):
-            self.storage.set_items(_UID, name, [])
-
     def tearDown(self):
         self.storage.cache.flush_all()
         super(TestMemcachedSQLStorage, self).tearDown()
@@ -131,6 +127,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
                           sqlstorage.get_item, _UID, 'tabs', '1')
 
         # this should remove the cache
+        time.sleep(0.01)
         self.storage.delete_item(_UID, 'tabs', '1')
         collection = self.storage.cache.get('1:c:tabs')
         self.assertEquals(collection['items'].keys(), [])

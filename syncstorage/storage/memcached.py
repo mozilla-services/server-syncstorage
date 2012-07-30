@@ -438,6 +438,9 @@ class MemcachedStorage(SyncStorage):
         """Update the cached value for total storage size."""
         key = _key(userid, "metadata")
         data, casid = self.cache.gets(key)
+        if data is None:
+            self._get_metadata(userid)
+            data, casid = self.cache.gets(key)
         data["last_size_recalc"] = int(time.time())
         data["size"] = size
         self.cache.cas(key, data, casid)

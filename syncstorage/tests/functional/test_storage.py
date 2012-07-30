@@ -50,37 +50,35 @@ class TestStorage(StorageFunctionalTestCase):
 
     def setUp(self):
         super(TestStorage, self).setUp()
-
         self.root = '/2.0/%d' % (self.user_id,)
-
-        # Reset the storage to a known state.
+        # Reset the storage to a known state, aka "empty".
         self.app.delete(self.root + "/storage")
 
-        for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.app.post_json(self.root + "/storage/" + name, [])
-        for item in range(3):
-            self.app.put_json(self.root + "/storage/col1/%s" % (item,),
-                              {"payload": "xxx"})
-            time.sleep(0.02)   # make sure we have different timestamps
-
-        for item in range(5):
-            self.app.put_json(self.root + "/storage/col2/%s" % (item,),
-                              {"payload": "xxx"})
-            time.sleep(0.02)   # make sure we have different timestamps
-
     def test_get_collections(self):
+        # col1 gets 3 items, col2 gets 5 items.
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
+        self.app.post_json(self.root + "/storage/col1", bsos)
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
+        # only those collections should appear in the query.
         resp = self.app.get(self.root + '/info/collections')
         res = resp.json
-        keys = res.keys()
-        self.assertTrue(len(keys), 2)
+        keys = sorted(res.keys())
+        self.assertEquals(keys, ["col1", "col2"])
         self.assertEquals(resp.headers.get('X-Num-Records'), None)
 
     def test_get_collection_count(self):
+        # col1 gets 3 items, col2 gets 5 items.
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
+        self.app.post_json(self.root + "/storage/col1", bsos)
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
+        # those counts should be reflected back in query.
         resp = self.app.get(self.root + '/info/collection_counts')
         res = resp.json
-        values = res.values()
-        values.sort()
-        self.assertEquals(values, [3, 5])
+        self.assertEquals(len(res), 2)
+        self.assertEquals(res["col1"], 3)
+        self.assertEquals(res["col2"], 5)
         self.assertEquals(resp.headers.get('X-Num-Records'), None)
 
     def test_bad_cache(self):
@@ -102,6 +100,10 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(resp.json), numcols + 1)
 
     def test_get_collection(self):
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
+
+        # try just getting all items at once.
         resp = self.app.get(self.root + '/storage/col2')
         res = resp.json["items"]
         res.sort()
@@ -237,6 +239,9 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
+
         # application/json
         res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/json')])
@@ -264,10 +269,16 @@ class TestStorage(StorageFunctionalTestCase):
                      status=406)
 
     def test_set_collection_with_if_modified_since(self):
+        # Create five items with different timestamps.
+        for i in xrange(5):
+            bsos = [{"id": str(i), "payload": "xxx"}]
+            self.app.post_json(self.root + "/storage/col2", bsos)
+            time.sleep(0.01)
+        # Get them all, along with their timestamps.
         res = self.app.get(self.root + '/storage/col2?full=true').json["items"]
         self.assertEquals(len(res), 5)
         timestamps = sorted([r["modified"] for r in res])
-
+        # The ts of the collection should be the max ts of those items.
         self.app.get(self.root + "/storage/col2", headers={
             "X-If-Modified-Since": str(timestamps[0])
         }, status=200)
@@ -276,6 +287,8 @@ class TestStorage(StorageFunctionalTestCase):
         }, status=304)
 
     def test_get_item(self):
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
         # grabbing object 1 from col2
         res = self.app.get(self.root + '/storage/col2/1')
         res = res.json
@@ -352,7 +365,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_set_collection_input_formats(self):
-        self.app.delete(self.root + "/storage/col2")
         # If we send with application/newlines it should work.
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
@@ -372,7 +384,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + "/storage/col2", status=404)
 
     def test_set_item_input_formats(self):
-        self.app.delete(self.root + "/storage/col2")
         # If we send with application/json it should work.
         body = json.dumps({'payload': _PLD})
         self.app.put(self.root + '/storage/col2/TEST', body, headers={
@@ -388,7 +399,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + "/storage/col2/TEST", status=404)
 
     def test_app_newlines_when_payloads_contain_newlines(self):
-        self.app.delete(self.root + "/storage/col2")
         # Send some application/newlines with embedded newline chars.
         bsos = [
             {'id': '1', 'payload': 'hello\nworld'},
@@ -430,8 +440,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEqual(col2_size, wanted)
 
     def test_delete_collection_items(self):
-        self.app.delete(self.root + "/storage/col2")
-
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
@@ -458,8 +466,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res.json["items"]), 0)
 
     def test_delete_item(self):
-        self.app.delete(self.root + '/storage/col2')
-
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
@@ -478,8 +484,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + '/storage/col2/12982', status=404)
 
     def test_delete_storage(self):
-        self.app.delete(self.root + '/storage/col2')
-
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
@@ -498,6 +502,9 @@ class TestStorage(StorageFunctionalTestCase):
         # This can't be run against a live server.
         if self.distant:
             raise unittest2.SkipTest
+
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
 
         now = get_timestamp()
         time.sleep(0.001)
@@ -607,7 +614,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.json, ERROR_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
-        self.app.delete(self.root + '/storage/col2')
         bso = {'payload': _PLD, 'ttl': 0}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso)
         time.sleep(1.1)
@@ -732,7 +738,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEqual(len(res.json["items"]), 3)
 
     def test_specifying_ids_with_percent_encoded_query_string(self):
-        self.app.delete(self.root + "/storage")
         # create some items
         bsos = [{'id': 'test-%d' % i, 'payload': _PLD} for i in range(5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
@@ -749,11 +754,15 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEqual(len(res.json["items"]), 3)
 
     def test_timestamps_are_integers(self):
+        # Create five items with different timestamps.
+        for i in xrange(5):
+            bsos = [{"id": str(i), "payload": "xxx"}]
+            self.app.post_json(self.root + "/storage/col2", bsos)
+            time.sleep(0.01)
+
         # make sure the server returns only integer timestamps
         resp = self.app.get(self.root + '/storage/col2?full=1')
         bsos = json.loads(resp.body)["items"]
-
-        # check how the timestamps look - we need two digits stuff
         stamps = []
         for bso in bsos:
             stamp = bso['modified']
@@ -925,10 +934,15 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + "/storage/col2/TEST", bso)
 
     def test_if_modified_since_on_info_views(self):
+        # Store something, so the views have a modified time > 0.
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
+        self.app.post_json(self.root + "/storage/col1", bsos)
         INFO_VIEWS = ("/info/collections", "/info/quota",
                       "/info/collection_usage", "/info/collection_counts")
+        # Get the initial modified time.
         r = self.app.get(self.root + "/info/collections")
         ts1 = r.headers["X-Last-Modified"]
+        self.assertTrue(int(ts1) > 3)
         # With X-I-M-S set before latest change, all should give a 200.
         headers = {"X-If-Modified-Since": "3"}
         for view in INFO_VIEWS:
@@ -966,6 +980,8 @@ class TestStorage(StorageFunctionalTestCase):
         #    self.app.get(self.root + view, headers=headers, status=304)
 
     def test_that_x_last_modified_is_sent_for_all_get_requests(self):
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
         r = self.app.get(self.root + "/info/collections")
         self.assertTrue("X-Last-Modified" in r.headers)
         r = self.app.get(self.root + "/info/collection_counts")
