@@ -24,7 +24,6 @@ import string
 import urllib
 import webtest
 import simplejson as json
-from tempfile import mkstemp
 
 from syncstorage.util import get_timestamp
 from syncstorage.tests.support import restore_env
