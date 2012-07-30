@@ -9,6 +9,8 @@ from syncstorage.tests.support import StorageTestCase
 
 class TestWSGIApp(StorageTestCase):
 
+    TEST_INI_FILE = "tests-hostname.ini"
+
     def test_host_specific_config(self):
         req = self.make_request(environ={"HTTP_HOST": "localhost"})
         sqluri = get_storage(req).sqluri

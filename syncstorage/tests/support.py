@@ -56,10 +56,15 @@ def validate_database_query(conn, cursor, statement, *args):
 class StorageTestCase(TestCase):
     """TestCase class with automatic cleanup of database files."""
 
+    @restore_env("MOZSVC_TEST_INI_FILE")
     def setUp(self):
         # Put a fresh UUID into the environment.
         # This can be used in e.g. config files to create unique paths.
         os.environ["MOZSVC_UUID"] = str(uuid.uuid4())
+        # Allow subclasses to override default ini file.
+        if hasattr(self, "TEST_INI_FILE"):
+            if "MOZSVC_TEST_INI_FILE" not in os.environ:
+                os.environ["MOZSVC_TEST_INI_FILE"] = self.TEST_INI_FILE
         super(StorageTestCase, self).setUp()
 
     def tearDown(self):
@@ -102,6 +107,6 @@ class StorageTestCase(TestCase):
         for key, value in self.config.registry.settings.iteritems():
             if key.endswith(".sqluri"):
                 sqluri = urlparse.urlparse(value)
-                if sqluri.scheme == 'sqlite':
-                    if os.path.exists(sqluri.path):
+                if sqluri.scheme == 'sqlite' and ":memory:" not in value:
+                    if os.path.isfile(sqluri.path):
                         os.remove(sqluri.path)

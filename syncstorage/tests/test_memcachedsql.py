@@ -4,8 +4,6 @@
 
 import unittest2
 import time
-from tempfile import mkstemp
-import os
 
 try:
     from syncstorage.storage.memcached import MemcachedStorage  # NOQA
@@ -15,7 +13,6 @@ except ImportError:
     MEMCACHED = False
 
 from mozsvc.exceptions import BackendError
-from mozsvc.config import SettingsDict
 
 from syncstorage.tests.support import StorageTestCase
 from syncstorage.tests.test_storage import StorageTestsMixin
@@ -30,28 +27,14 @@ _PLD = '*' * 500
 
 class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
+    TEST_INI_FILE = "tests-memcached.ini"
+
     def setUp(self):
         super(TestMemcachedSQLStorage, self).setUp()
         if not MEMCACHED:
             raise unittest2.SkipTest
 
-        fd, self.dbfile = mkstemp()
-        os.close(fd)
-
-        memcachedfn = 'syncstorage.storage.memcached.MemcachedStorage'
-        sqlfn = 'syncstorage.storage.sql.SQLStorage'
-
-        settings = SettingsDict({
-                    'storage.backend': memcachedfn,
-                    'storage.wraps': 'sqlstorage',
-                    'storage.cached_collections': ['meta'],
-                    'storage.cache_only_collections': ['tabs'],
-                    'storage.cache_lock': True,
-                    'storage.quota_size': 5242880,
-                    'sqlstorage.backend': sqlfn,
-                    'sqlstorage.sqluri': 'sqlite:///%s' % self.dbfile,
-                    'sqlstorage.create_tables': True})
-
+        settings = self.config.registry.settings
         self.storage = load_storage_from_settings("storage", settings)
 
         # Check that memcached is actually running.
@@ -67,8 +50,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def tearDown(self):
         self.storage.cache.flush_all()
-        if os.path.exists(self.dbfile):
-            os.remove(self.dbfile)
+        super(TestMemcachedSQLStorage, self).tearDown()
 
     def test_basic(self):
         # just make sure calls goes through

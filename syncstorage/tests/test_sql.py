@@ -2,8 +2,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import os
-
 from mozsvc.plugin import load_and_register
 from mozsvc.tests.support import get_test_configurator
 
@@ -20,6 +18,11 @@ _PLD = '*' * 500
 
 class TestSQLStorage(StorageTestCase, StorageTestsMixin):
 
+    # These tests need to be run with a real, file-backed sqlite database.
+    # If we used an in-memory database then all threads would share a single
+    # connection, and the threading/locking tests would be pointless.
+    TEST_INI_FILE = "tests-filedb.ini"
+
     def setUp(self):
         super(TestSQLStorage, self).setUp()
 
@@ -31,47 +34,30 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
             self.storage.set_items(_UID, name, [])
 
-        self._cfiles = []
-
-    def tearDown(self):
-        for file_ in self._cfiles:
-            if os.path.exists(file_):
-                os.remove(file_)
-        super(TestSQLStorage, self).tearDown()
-
-    def _add_cleanup(self, path):
-        self._cfiles.append(path)
-
     def test_no_create(self):
         # Storage with no create_tables option; it should default to false.
         # This should fail because the table is absent
-        config = get_test_configurator(__file__, 'tests3.ini')
+        config = get_test_configurator(__file__, 'tests-nocreate.ini')
         storage = load_and_register("storage", config)
         bsos = [{"id": "TEST", "payload": _PLD}]
         self.assertRaises(BackendError, storage.set_items, _UID, "test", bsos)
 
         # Storage with create_tables explicitly set to false.
         # This should fail because the table is absent
-        config = get_test_configurator(__file__, 'tests4.ini')
+        config = get_test_configurator(__file__, 'tests-dontcreate.ini')
         storage = load_and_register("storage", config)
-        sqlfile = storage.sqluri.split('sqlite:///')[-1]
-        self._add_cleanup(sqlfile)
         self.assertRaises(BackendError, storage.set_items, _UID, "test", bsos)
 
         # Storage with create_tables explicit set to true.
         # This should succeed because the table gets created.
-        config = get_test_configurator(__file__, 'tests2.ini')
+        config = get_test_configurator(__file__, 'tests-docreate.ini')
         storage = load_and_register("storage", config)
-        sqlfile = storage.sqluri.split('sqlite:///')[-1]
-        self._add_cleanup(sqlfile)
         storage.set_items(_UID, "test", bsos)
 
     def test_shard(self):
         # Use a configuration with sharding enabled.
-        config = get_test_configurator(__file__, 'tests2.ini')
+        config = get_test_configurator(__file__, 'tests-shard.ini')
         storage = load_and_register("storage", config)
-        sqlfile = storage.sqluri.split('sqlite:///')[-1]
-        self._add_cleanup(sqlfile)
 
         storage.delete_storage(_UID)
 

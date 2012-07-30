@@ -16,7 +16,6 @@ consider it a bug.
 
 import unittest2
 
-import os
 import sys
 import time
 import random
@@ -26,7 +25,6 @@ import webtest
 import simplejson as json
 
 from syncstorage.util import get_timestamp
-from syncstorage.tests.support import restore_env
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.controller import MAX_IDS_PER_BATCH
@@ -981,12 +979,11 @@ class TestStorage(StorageFunctionalTestCase):
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
 
-    @restore_env("MOZSVC_TEST_INI_FILE")
+    TEST_INI_FILE = "tests-memcached.ini"
+
     def setUp(self):
-        # Force use of the memcached-specific config file.
         # If we can't initialize due to an ImportError or BackendError,
         # assume that memcache is unavailable and skip the test.
-        os.environ["MOZSVC_TEST_INI_FILE"] = "tests-memcached.ini"
         try:
             super(TestStorageMemcached, self).setUp()
         except (ImportError, BackendError):
