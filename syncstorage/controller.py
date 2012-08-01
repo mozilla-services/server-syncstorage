@@ -442,7 +442,7 @@ class StorageController(object):
             self.logger.error('Could not set items')
             self.logger.error(str(e))
             for bso in kept_bsos:
-                res['failed'][bso['id']] = str(e)
+                res['failed'][bso['id']] = "db error"
         else:
             res['success'].extend([bso['id'] for bso in kept_bsos])
 
