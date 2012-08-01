@@ -6,6 +6,7 @@
 Runs the Application. This script can be called by any wsgi runner that looks
 for an 'application' variable
 """
+
 import os
 from logging.config import fileConfig
 from ConfigParser import NoSectionError
@@ -18,13 +19,15 @@ os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 ini_file = os.path.join('/etc', 'syncserver', 'production.ini')
 ini_file = os.path.abspath(os.environ.get('SYNCSTORAGE_INI_FILE', ini_file))
 
-# running the app using Paste
-if __name__ == '__main__':
-    # setting up logging
-    try:
-        fileConfig(ini_file)
-    except NoSectionError:
-        pass
+# setting up logging
+try:
+    fileConfig(ini_file)
+except NoSectionError:
+    pass
 
-    from paste.deploy import loadapp
-    application = loadapp('config:%s' % ini_file)
+from paste.deploy import loadapp
+try:
+  application = loadapp('config:%s' % ini_file)
+except Exception:
+  import traceback; traceback.print_exc()
+  raise

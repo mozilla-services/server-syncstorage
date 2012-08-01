@@ -22,7 +22,7 @@ ordereddict==1.1
 Paste==1.7.5.1
 PasteDeploy==1.5
 PasteScript==1.7.5
-PyBrowserID==0.7
+PyBrowserID==0.8
 Pygments==1.5
 pylibmc==1.2.3
 PyMySQL==0.5
