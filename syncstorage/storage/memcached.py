@@ -59,6 +59,8 @@ from syncstorage.storage import (SyncStorage,
                                  CollectionNotFoundError,
                                  ItemNotFoundError)
 
+from pyramid.settings import aslist
+
 from mozsvc.storage.mcclient import MemcachedClient
 
 
@@ -71,18 +73,6 @@ DEFAULT_CACHE_LOCK_TTL = 5 * 60
 
 def _key(*names):
     return ":".join(map(str, names))
-
-
-def _as_list(item_or_list):
-    """Coerce value from config file into a list.
-
-    This is a little helper that can be used anywhere you expect a list of
-    items, but may be given just a single item.  It converts said single
-    item into a list.
-    """
-    if isinstance(item_or_list, (list, tuple)):
-        return item_or_list
-    return [item_or_list]
 
 
 class MemcachedStorage(SyncStorage):
@@ -113,11 +103,11 @@ class MemcachedStorage(SyncStorage):
         self.cache = MemcachedClient(cache_servers, cache_key_prefix,
                                      cache_pool_size, cache_pool_timeout)
         self.cached_collections = {}
-        for collection in _as_list(cached_collections):
+        for collection in aslist(cached_collections):
             colmgr = CachedManager(self, collection)
             self.cached_collections[collection] = colmgr
         self.cache_only_collections = {}
-        for collection in _as_list(cache_only_collections):
+        for collection in aslist(cache_only_collections):
             colmgr = CacheOnlyManager(self, collection)
             self.cache_only_collections[collection] = colmgr
         self.cache_lock = cache_lock
