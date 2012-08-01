@@ -10,6 +10,7 @@ for an 'application' variable
 import os
 from logging.config import fileConfig
 from ConfigParser import NoSectionError
+from paste.deploy import loadapp
 
 # setting up the egg cache to a place where apache can write
 os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
@@ -19,15 +20,20 @@ os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 ini_file = os.path.join('/etc', 'syncserver', 'production.ini')
 ini_file = os.path.abspath(os.environ.get('SYNCSTORAGE_INI_FILE', ini_file))
 
+# the ini file is grabbed at its production place
+# unless force via an environ variable
+ini_file = os.environ.get("SYNCSTORAGE_INI_FILE")
+if ini_file is None:
+    ini_file = os.path.join('/etc', 'syncstorage', 'production.ini')
+    if not os.path.exists(ini_file):
+        ini_file = os.path.join(os.path.dirname(__file__),
+                                "tests", "tests.ini")
+ini_file = os.path.abspath(ini_file)
+
 # setting up logging
 try:
     fileConfig(ini_file)
 except NoSectionError:
     pass
 
-from paste.deploy import loadapp
-try:
-  application = loadapp('config:%s' % ini_file)
-except Exception:
-  import traceback; traceback.print_exc()
-  raise
+application = loadapp('config:%s' % ini_file)
