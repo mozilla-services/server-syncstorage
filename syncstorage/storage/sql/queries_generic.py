@@ -11,8 +11,8 @@ query object.
 In addition to standard bindparam syntax, the query loader supports some
 string interpolation variables with special meaning:
 
-    * %(bso)s:   insert the name of the user's sharded BSO storage table
-    * %(ids)s:   insert a list of items matching the "ids" query parameter.
+    * {bso}:   insert the name of the user's sharded BSO storage table
+    * {ids}:   insert a list of items matching the "ids" query parameter.
 
 """
 
@@ -23,21 +23,21 @@ from sqlalchemy.sql import select, bindparam
 STORAGE_TIMESTAMP = "SELECT MAX(last_modified) FROM user_collections "\
                     "WHERE userid=:userid"
 
-STORAGE_SIZE = "SELECT SUM(payload_size) FROM %(bso)s WHERE "\
+STORAGE_SIZE = "SELECT SUM(payload_size) FROM {bso} WHERE "\
                "userid=:userid AND ttl>:ttl"
 
 COLLECTIONS_TIMESTAMPS = "SELECT collection, last_modified "\
                          "FROM user_collections WHERE userid=:userid"
 
-COLLECTIONS_COUNTS = "SELECT collection, COUNT(collection) FROM %(bso)s "\
+COLLECTIONS_COUNTS = "SELECT collection, COUNT(collection) FROM {bso} "\
                      "WHERE userid=:userid AND ttl>:ttl "\
                      "GROUP BY collection"
 
-COLLECTIONS_SIZES = "SELECT collection, SUM(payload_size) FROM %(bso)s "\
+COLLECTIONS_SIZES = "SELECT collection, SUM(payload_size) FROM {bso} "\
                     "WHERE userid=:userid AND ttl>:ttl "\
                     "GROUP BY collection"
 
-DELETE_ALL_BSOS = "DELETE FROM %(bso)s WHERE userid=:userid"
+DELETE_ALL_BSOS = "DELETE FROM {bso} WHERE userid=:userid"
 
 DELETE_ALL_COLLECTIONS = "DELETE FROM user_collections WHERE userid=:userid"
 
@@ -64,7 +64,7 @@ COLLECTION_NAME = "SELECT name FROM collections "\
                   "WHERE collectionid=:collectionid"
 
 COLLECTION_NAMES = "SELECT collectionid, name FROM collections "\
-                   "WHERE collectionid IN %(ids)s"
+                   "WHERE collectionid IN {ids}"
 
 INSERT_COLLECTION = "INSERT INTO collections (collectionid, name) "\
                     "VALUES (:collectionid, :name)"
@@ -79,23 +79,24 @@ TOUCH_COLLECTION = "UPDATE user_collections SET last_modified=:modified "\
 COLLECTION_TIMESTAMP = "SELECT last_modified FROM user_collections "\
                        "WHERE userid=:userid AND collection=:collectionid"
 
-DELETE_COLLECTION_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
+DELETE_COLLECTION_ITEMS = "DELETE FROM {bso} WHERE userid=:userid "\
                           "AND collection=:collectionid"
 
 DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
                     "AND collection=:collectionid"
 
-DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
-               "AND collection=:collectionid AND id IN %(ids)s"
+DELETE_ITEMS = "DELETE FROM {bso} WHERE userid=:userid "\
+               "AND collection=:collectionid AND id IN {ids}"
 
 
-def FIND_ITEMS(bso, params):
+def FIND_ITEMS(connector, params):
     """Item search query.
 
     Unlike all the other pre-built queries, this one really can't be written
     as a simple string.  We need to include/exclude various WHERE clauses
     based on the values provided at runtime.
     """
+    bso = connector.get_bso_table(params["userid"])
     fields = params.pop("fields", None)
     if fields is None:
         query = select([bso])
@@ -135,13 +136,13 @@ def FIND_ITEMS(bso, params):
 
 # Queries operating on a particular item.
 
-DELETE_ITEM = "DELETE FROM %(bso)s WHERE userid=:userid AND "\
+DELETE_ITEM = "DELETE FROM {bso} WHERE userid=:userid AND "\
               "collection=:collectionid AND id=:item AND ttl>:ttl"\
 
-ITEM_DETAILS = "SELECT id, sortindex, modified, payload FROM %(bso)s "\
+ITEM_DETAILS = "SELECT id, sortindex, modified, payload FROM {bso} "\
                "WHERE collection=:collectionid AND userid=:userid "\
                "AND id=:item AND ttl>:ttl"
 
-ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
+ITEM_TIMESTAMP = "SELECT modified FROM {bso} "\
                  "WHERE collection=:collectionid AND userid=:userid "\
                  "AND id=:item AND ttl>:ttl"

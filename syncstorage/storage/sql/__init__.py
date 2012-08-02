@@ -33,8 +33,12 @@ from syncstorage.storage import (SyncStorage,
                                  ItemNotFoundError,
                                  InvalidOffsetError)
 
-from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
-                                               BackendError)
+from syncstorage.storage.sql.dbconnect import DBConnector,  BackendError
+from syncstorage.storage.sql.tables import (collections,
+                                            user_collections,
+                                            make_bso_table,
+                                            MAX_TTL,)
+
 
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.
@@ -47,6 +51,62 @@ STANDARD_COLLECTIONS = {1: "clients", 2: "crypto", 3: "forms", 4: "history",
 FIRST_CUSTOM_COLLECTION_ID = 100
 
 MAX_COLLECTIONS_CACHE_SIZE = 1000
+
+
+class ShardedDBConnector(DBConnector):
+    """DBConnector with transparent sharding of BSO tables.
+
+    This class extends to the base DBConnector class with optional transparent
+    sharding of the BSO storage table.  If enabled, each user will have their
+    BSOs stored in one of the tables "bso0" through "bsoN" depending on their
+    numeric user id.
+
+    Queries loaded into this connector may use the format variable {bso}
+    to refer to the name of the user's BSO storage table.
+    """
+
+    def __init__(self, *args, **kwds):
+        self.shard = kwds.pop("shard", False)
+        self.shardsize = kwds.pop("shardsize", 100)
+        super(ShardedDBConnector, self).__init__(*args, **kwds)
+        # Initialize the table definitions, depending on
+        # whether sharding is in use.
+        self.load_table(collections)
+        self.load_table(user_collections)
+        if not self.shard:
+            self.load_table(make_bso_table("bso"))
+        else:
+            for i in xrange(self.shardsize):
+                table_name = "bso{}".format(i)
+                self.load_table(make_bso_table(table_name))
+        # Load the pre-defined queries.
+        # We have some custom queries for use with sqlite.
+        self.load_queries("syncstorage.storage.sql.queries_generic")
+        if self.driver == "sqlite":
+            self.load_queries("syncstorage.storage.sql.queries_sqlite")
+
+    def get_bso_table_name(self, userid):
+        """Get the name of the BSO storage table for the given userid."""
+        if not self.shard:
+            return "bso"
+        return "bso{}".format(userid % self.shardsize)
+
+    def get_bso_table(self, userid):
+        """Get the BSO storage table object for the given userid."""
+        try:
+            return self._tables[self.get_bso_table_name(userid)]
+        except KeyError:
+            print self._tables.keys()
+            raise
+
+    def _render_format_variable(self, name, params):
+        # If the variable is the special name "bso", insert
+        # the name of the sharded bso table for the target user.
+        if name == "bso":
+            return self.get_bso_table_name(params["userid"])
+        # All other variables get rendered as before.
+        supercls = super(ShardedDBConnector, self)
+        return supercls._render_format_variable(name, params)
 
 
 def with_session(func):
@@ -87,9 +147,8 @@ class SQLStorage(SyncStorage):
     """
 
     def __init__(self, sqluri, standard_collections=False, **dbkwds):
-
         self.sqluri = sqluri
-        self.dbconnector = DBConnector(sqluri, **dbkwds)
+        self.dbconnector = ShardedDBConnector(sqluri, **dbkwds)
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.  Fake it by inserting
@@ -97,12 +156,11 @@ class SQLStorage(SyncStorage):
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
             zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
-            with self.dbconnector.connect() as connection:
-                params = {"collectionid": zeroth_id, "name": ""}
-                try:
-                    connection.query("INSERT_COLLECTION", params)
-                except IntegrityError:
-                    pass
+            params = {"collectionid": zeroth_id, "name": ""}
+            try:
+                self.dbconnector.query("INSERT_COLLECTION", params)
+            except IntegrityError:
+                pass
 
         # A local in-memory cache for the name => collectionid mapping.
         self._collections_by_name = {}
@@ -338,7 +396,7 @@ class SQLStorage(SyncStorage):
         for data in items:
             id = data["id"]
             self._prepare_item_data(session, userid, collectionid, id, data)
-        session.insert_or_update("bso", items)
+        session.insert_or_update("{bso}", items)
         self._touch_collection(session, userid, collectionid)
         return session.timestamp
 
@@ -425,7 +483,7 @@ class SQLStorage(SyncStorage):
         """Creates or updates a single item in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
         self._prepare_item_data(session, userid, collectionid, item, data)
-        num_created = session.insert_or_update("bso", [data])
+        num_created = session.insert_or_update("{bso}", [data])
         self._touch_collection(session, userid, collectionid)
         return {
             "created": bool(num_created),

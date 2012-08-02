@@ -2,19 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-Low-level SQL backend for syncstorage.
+Low-level RDBMS client class.
 
 This module implements a thin data access layer on top of an SQL database,
-providing the primitive operations on which to build a full SyncStorage
-backend.  It provides three database tables:
-
-  collections:  the names and ids of all collections in the store
-  collection_timestamps:  the per-user timestamps for each collection
-  bso:  the individual BSO items stored in each collection
-
-For efficiency when dealing with large datasets, this module also supports
-sharding of the BSO items into multiple tables named "bso0" through "bsoN".
-This behaviour is off by default; pass shard=True to enable it.
+providing a simplified API over SQLAlchemy.
 """
 
 import re
@@ -25,115 +16,34 @@ from collections import defaultdict
 
 from pyramid.threadlocal import get_current_registry
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Table
 from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update
 from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
-from sqlalchemy import (Integer, String, Text, BigInteger,
-                        MetaData, Column, Table, Index)
 
+from mozsvc.util import maybe_resolve_name
 from mozsvc.exceptions import BackendError
 
-from syncstorage.storage.sql import queries_generic, queries_sqlite
 
+# Regular expression matching strings that are safe to use as SQL field names.
+# This gets applied as an addtional safety check when creating SQL by hand.
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")
 
-MAX_TTL = 2100000000
 
-metadata = MetaData()
-
-
-# Table mapping collection_name => collection_id.
-#
-# This table holds the names and corresponding ids of the collections in
-# use on the storage node.  The collection id space is global, since we
-# expect most users to have the same small, static set of collection names.
-
-collections = Table("collections", metadata,
-    Column("collectionid", Integer, primary_key=True, nullable=False,
-                           autoincrement=True),
-    Column("name", String(32), nullable=False, unique=True)
-)
-
-
-# Table mapping (user_id, collection_id) => collection-level metadata.
-#
-# This table holds collection-level metadata on a per-user basis.  Currently
-# the only such metadata is the last-modified time of the collection.
-
-user_collections = Table("user_collections", metadata,
-    Column("userid", Integer, primary_key=True, nullable=False,
-                     autoincrement=False),
-    Column("collection", Integer, primary_key=True, nullable=False,
-                         autoincrement=False),
-    Column("last_modified", BigInteger, nullable=False)
-)
-
-
-# Column definitions for BSO storage table/tables.
-#
-# This list class defines the columns used for storage of BSO records.
-# It is used to create either sharded or non-shareded BSO storage tables,
-# depending on the run-time settings of the application.
-
-def _get_bso_columns(table_name):
-    return (
-      Column("id", String(64), primary_key=True, autoincrement=False),
-      Column("userid", Integer, primary_key=True, nullable=False,
-                       autoincrement=False),
-      Column("collection", Integer, primary_key=True, nullable=False,
-                           autoincrement=False),
-      Column("sortindex", Integer),
-      Column("modified", BigInteger),
-      Column("payload", Text, nullable=False, default=""),
-      Column("payload_size", Integer, nullable=False, default=0),
-      Column("ttl", Integer, default=MAX_TTL),
-      # Declare indexes.
-      # We need to include the tablename in the index name due to sharding,
-      # because index names in sqlite are global, not per-table.
-      # Index on "ttl" for easy pruning of expired items.
-      Index("%s_ttl_idx" % (table_name,), "ttl"),
-      # Index on "modified" for easy filtering by older/newer.
-      Index("%s_usr_col_mod_idx" % (table_name,),
-            "userid", "collection", "modified"),
-      # There is intentinally no index on "sortindex".
-      # Clients almost always filter on "modified" using the above index,
-      # and cannot take advantage of a separate index for sorting.
-    )
-
-
-#  If the storage controller is not doing sharding based on userid,
-#  then it will use the single "bso" table below for BSO storage.
-
-bso = Table("bso", metadata, *_get_bso_columns("bso"))
-
-#  If the storage controller is doing sharding based on userid,
-#  then it will use the below functions to select a table from "bso0"
-#  to "bsoN" for each userid.
-
-BSO_SHARDS = {}
-
-
-def get_bso_table(index):
-    """Get the Table object for table bso<N>."""
-    bso = BSO_SHARDS.get(index)
-    if bso is None:
-        table_name = "bso%d" % (index,)
-        bso = Table(table_name, metadata, *_get_bso_columns(table_name))
-        BSO_SHARDS[index] = bso
-    return bso
+# Regular expression for extraction substitution names from a format string.
+# It is used to extract e.g. "table" from the string "INSERT INTO {table}".
+FORMAT_SUBST_NAME_RE = re.compile("\\{([a-zA-Z0-9]+)\\}")
 
 
 class DBConnector(object):
     """Database connector class for SQL access layer.
 
-    This class, along with its companion class DBConnection, provide the
+    This class, along with its companion class DBConnection, provide a
     layer through which to access the SQL database.  It is a thin layer
     on top of the SQLAlchemy engine/connection machinery, with the following
     additional features:
 
-        * transparent sharding of BSO storage tables
         * use pre-defined queries rather than inline construction of SQL
         * accessor methods that automatically clean up database resources
         * automatic retry of connections that are invalidated by the server
@@ -142,8 +52,7 @@ class DBConnector(object):
 
     def __init__(self, sqluri, create_tables=False, pool_size=100,
                  no_pool=False, pool_recycle=60, reset_on_return=True,
-                 pool_max_overflow=10, pool_timeout=30,
-                 shard=False, shardsize=100, **kwds):
+                 pool_max_overflow=10, pool_timeout=30, **kwds):
 
         parsed_sqluri = urlparse.urlparse(sqluri)
         self.sqluri = sqluri
@@ -154,9 +63,6 @@ class DBConnector(object):
         if self.driver not in ("mysql", "sqlite"):
             msg = "Only MySQL and SQLite databases are officially supported"
             self.logger.warn(msg)
-
-        self.shard = shard
-        self.shardsize = shardsize
 
         # Construct the pooling-related arguments for SQLAlchemy engine.
         sqlkw = {}
@@ -192,36 +98,40 @@ class DBConnector(object):
         # Create the engine.
         self.engine = create_engine(sqluri, **sqlkw)
 
-        # Create the tables if necessary.
-        if create_tables:
-            collections.create(self.engine, checkfirst=True)
-            user_collections.create(self.engine, checkfirst=True)
-            if not self.shard:
-                bso.create(self.engine, checkfirst=True)
-            else:
-                for idx in xrange(self.shardsize):
-                    bsoN = get_bso_table(idx)
-                    bsoN.create(self.engine, checkfirst=True)
-
-        # Load the pre-built queries to use with this database backend.
-        # Currently we have a generic set of queries, and some queries specific
-        # to SQLite.  We may add more backend-specific queries in future.
-        self._prebuilt_queries = {}
-        query_modules = [queries_generic]
-        if self.driver == "sqlite":
-            query_modules.append(queries_sqlite)
-        for queries in query_modules:
-            for nm in dir(queries):
-                if nm.isupper():
-                    self._prebuilt_queries[nm] = getattr(queries, nm)
+        self.create_tables = create_tables
+        self._tables = {}
+        self._queries = {}
 
     @property
     def logger(self):
         return get_current_registry()["metlog"]
 
-    def connect(self, *args, **kwds):
-        """Create a new DBConnection object from this connector."""
-        return DBConnection(self)
+    def load_table(self, table):
+        assert isinstance(table, Table)
+        self._tables[table.name] = table
+        if self.create_tables:
+            table.create(self.engine, checkfirst=True)
+
+    def load_query(self, name, query):
+        if query is not None:
+            if not callable(query):
+                if not isinstance(query, basestring):
+                    msg = "Can't use {!r} as a query"
+                    raise ValueError(msg.format(query))
+        self._queries[name] = query
+
+    def load_tables(self, name_or_module):
+        module = maybe_resolve_name(name_or_module)
+        for nm in dir(module):
+            table = getattr(module, nm)
+            if isinstance(table, Table):
+                self.load_table(table)
+        
+    def load_queries(self, name_or_module):
+        module = maybe_resolve_name(name_or_module)
+        for nm in dir(module):
+            if nm.isupper():
+                self.load_query(nm, getattr(module, nm))
 
     def get_query(self, name, params):
         """Get the named pre-built query.
@@ -232,38 +142,71 @@ class DBConnector(object):
         # Get the pre-built query with that name.
         # It might be None, a string query, or a callable returning the query.
         try:
-            query = self._prebuilt_queries[name]
+            query = self._queries[name]
         except KeyError:
-            raise KeyError("No query named %r" % (name,))
+            raise KeyError("No query named {!r}".format(name))
         # If it's None then just return it, indicating a no-op.
         if query is None:
             return None
-        # If it's a callable, call it with the sharded bso table.
+        # If it's a callable, call it with a reference to this connector.
         if callable(query):
-            bso = self.get_bso_table(params.get("userid"))
-            return query(bso, params)
-        # If it's a string, do some interpolation and return it.
-        # XXX TODO: we could pre-parse these queries at load time to look for
-        # string interpolation variables, saving some time on each call.
+            return query(self, params)
+        # If it's a string, do format string interpolation and return it.
         assert isinstance(query, basestring)
+        return self._format_query(query, params)
+
+    def _format_query(self, query, params):
         qvars = {}
-        if "%(bso)s" in query:
-            qvars["bso"] = self.get_bso_table(params["userid"])
-        if "%(ids)s" in query:
-            bindparams = []
-            for i, id in enumerate(params["ids"]):
-                params["id%d" % (i,)] = id
-                bindparams.append(":id%d" % (i,))
-            qvars["ids"] = "(" + ",".join(bindparams) + ")"
+        for name in set(FORMAT_SUBST_NAME_RE.findall(query)):
+            qvars[name] = self._render_format_variable(name, params)
         if qvars:
-            query = query % qvars
+            query = query.format(**qvars)
         return query
 
-    def get_bso_table(self, userid):
-        """Get the BSO table object for the given userid."""
-        if not self.shard or userid is None:
-            return bso
-        return get_bso_table(userid % self.shardsize)
+    def _render_format_variable(self, name, params):
+        value = params[name]
+        # If it's a list of values, turn it into a list of bindparams.
+        if isinstance(value, (list, tuple)):
+            bindparams = []
+            for i, item in enumerate(value):
+                param = "qvar_{}_{}".format(name, i)
+                params[param] = item
+                bindparams.append(":" + param)
+            return "(" + ",".join(bindparams) + ")"
+        # Otherwise, treat it as a literal string.
+        # It must be a safe value.
+        value = str(value)
+        assert SAFE_FIELD_NAME_RE.match(value)
+        return value
+
+    def connect(self):
+        """Create a new DBConnection object from this connector."""
+        return DBConnection(self)
+
+    def query(self, *args, **kwds):
+        """Execute a database query, returning the rowcount."""
+        with self.connect() as c:
+            return c.query(*args, **kwds)
+
+    def query_scalar(self, *args, **kwds):
+        """Execute a named query, returning a single scalar value."""
+        with self.connect() as c:
+            return c.query_scalar(*args, **kwds)
+
+    def query_fetchone(self, *args, **kwds):
+        """Execute a named query, returning the first result row."""
+        with self.connect() as c:
+            return c.query_fetchone(*args, **kwds)
+
+    def query_fetchall(self, *args, **kwds):
+        """Execute a named query, returning iterator over the results."""
+        with self.connect() as c:
+            return c.query_fetchall(*args, **kwds)
+
+    def insert_or_update(self, *args, **kwds):
+        """Perform an efficient bulk "upsert" of the given items."""
+        with self.connect() as c:
+            return c.insert_or_update(*args, **kwds)
 
 
 def report_backend_errors(func):
@@ -409,7 +352,7 @@ class DBConnection(object):
             query_str = str(compiled)
         # Join all the annotations into a comment string.
         annotation_items = sorted(annotations.items())
-        annotation_strs = ("%s=%s" % item for item in annotation_items)
+        annotation_strs = ("{}={}".format(*item) for item in annotation_items)
         comment = "/* [" + ", ".join(annotation_strs) + "] */"
         # Add it to the query, at the front if possible.
         # SQLite chokes on leading comments, so put it at back on that driver.
@@ -496,18 +439,14 @@ class DBConnection(object):
         """
         if annotations is None:
             annotations = {}
-        annotations.setdefault("queryName", "UPSERT_%s" % (table,))
+        annotations.setdefault("queryName", "UPSERT_{}".format(table))
         # Inserting zero items is strange, but allowed.
         if not items:
             return 0
         # Find the table object into which we're inserting.
-        # To work properly with sharding, all items must have same userid
-        # so that we can select a single BSO table.
-        userid = items[0].get("userid")
-        if table == "bso":
-            table = self._connector.get_bso_table(userid)
-        else:
-            table = metadata.tables[table]
+        if isinstance(table, basestring):
+            table = self._connector._format_query(table, items[0])
+            table = self._connector._tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
             return self._upsert_onduplicatekey(table, items, annotations)
@@ -521,10 +460,8 @@ class DBConnection(object):
         but it's guaranteed to work without special cooperation from the
         database.  For MySQL we use the much improved _upsert_onduplicatekey.
         """
-        userid = items[0].get("userid")
         num_created = 0
         for item in items:
-            assert item.get("userid") == userid
             try:
                 # Try to insert the item.
                 # If it already exists, this fails with an integrity error.
@@ -541,8 +478,8 @@ class DBConnection(object):
                     try:
                         query = query.where(key == item.pop(key.name))
                     except KeyError:
-                        msg = "Item is missing primary key column %r"
-                        raise ValueError(msg % (key.name,))
+                        msg = "Item is missing primary key column {!r}"
+                        raise ValueError(msg.format(key.name))
                 query = query.values(**item)
                 self.execute(query, item, annotations).close()
         return num_created
@@ -562,13 +499,11 @@ class DBConnection(object):
         The values from the given items will be collected into a matching set
         of bind parameters :c11 through :cMN  when executing the query.
         """
-        userid = items[0].get("userid")
         # Group the items to be inserted into batches that all have the same
         # set of fields.  Each batch will have the same ON DUPLICATE KEY UPDATE
         # clause and so can be sent as a single query.
         batches = defaultdict(list)
         for item in items:
-            assert item.get("userid") == userid
             batches[frozenset(item.iterkeys())].append(item)
         # Now construct and send an appropriate query for each batch.
         num_created = 0
@@ -579,19 +514,19 @@ class DBConnection(object):
             assert all(SAFE_FIELD_NAME_RE.match(field) for field in fields)
             # Each item corresponds to a set of bindparams and a matching
             # entry in the "VALUES" clause of the query.
-            query = "INSERT INTO %s (%s) VALUES "\
-                    % (table.name, ",".join(fields))
-            binds = [":%s%%(num)d" % field for field in fields]
-            pattern = "(%s) " % ",".join(binds)
+            query = "INSERT INTO {} ({}) VALUES "
+            query = query.format(table.name, ",".join(fields))
+            binds = [":{}{{num}}".format(field) for field in fields]
+            pattern = "({}) ".format(",".join(binds))
             params = {}
             vclauses = []
             for num, item in enumerate(batch):
-                vclauses.append(pattern % {"num": num})
+                vclauses.append(pattern.format(num=num))
                 for field, value in item.iteritems():
-                    params["%s%d" % (field, num)] = value
+                    params["{}{}".format(field, num)] = value
             query += ",".join(vclauses)
             # The ON DUPLICATE KEY CLAUSE updates all the given fields.
-            updates = ["%s = VALUES(%s)" % (field, field) for field in fields]
+            updates = ["{f} = VALUES({f})".format(f=field) for field in fields]
             query += " ON DUPLICATE KEY UPDATE " + ",".join(updates)
             # Now we can execute it as one big query.
             res = self.execute(query, params, annotations)
