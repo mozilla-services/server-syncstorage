@@ -261,11 +261,12 @@ class StorageController(object):
             args['offset'] = offset
 
         # split comma-separates list of ids.
-        for arg in ('ids',):
-            value = kw.get(arg)
-            if value is None:
-                continue
-            args['items'] = value.split(',')
+        ids = kw.get('ids')
+        if ids is not None:
+            args['items'] = ids.split(',')
+            if len(args['items']) > MAX_IDS_PER_BATCH:
+                msg = 'Cannot specify more than %s BSO ids at a time'
+                raise HTTPBadRequest(msg % (MAX_IDS_PER_BATCH,))
 
         # validate sort
         sort = kw.get('sort')

@@ -915,16 +915,37 @@ class TestStorage(StorageFunctionalTestCase):
         bso["payload"] = "testing_again"
         self.app.put_json(self.root + "/storage/col2/TEST", bso, status=204)
 
-    def test_that_batch_deletes_are_limited_to_max_number_of_items(self):
+    def test_that_batch_gets_are_limited_to_max_number_of_ids(self):
         bso = {"id": "1", "payload": "testing"}
+        self.app.put_json(self.root + "/storage/col2/1", bso)
+
+        # Getting with less than the limit works OK.
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
+        res = self.app.get(self.root + "/storage/col2?ids=" + ids)
+        self.assertEquals(res.json["items"], ["1"])
+
+        # Getting with equal to the limit works OK.
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
+        res = self.app.get(self.root + "/storage/col2?ids=" + ids)
+        self.assertEquals(res.json["items"], ["1"])
+
+        # Getting with more than the limit fails.
+        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
+        self.app.get(self.root + "/storage/col2?ids=" + ids, status=400)
+
+    def test_that_batch_deletes_are_limited_to_max_number_of_ids(self):
+        bso = {"id": "1", "payload": "testing"}
+
         # Deleting with less than the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+
         # Deleting with equal to the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
+
         # Deleting with more than the limit fails.
         self.app.put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
