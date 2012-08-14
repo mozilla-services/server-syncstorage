@@ -273,6 +273,43 @@ class DBConnector(object):
         return get_bso_table(userid % self.shardsize)
 
 
+def is_retryable_db_error(engine, exc):
+    """Check whether we can safely retry in response to the given db error."""
+    # Any connection-related errors can be safely retried.
+    if exc.connection_invalidated:
+        return True
+    # Try to get the MySQL error number.
+    # Unfortunately this requires use of a private API.
+    # The try-except will also catch cases where we're not running MySQL.
+    try:
+        mysql_error_code = engine.dialect._extract_error_code(exc.orig)
+    except AttributeError:
+        pass
+    else:
+        # MySQL Lock Wait Timeout errors can be safely retried.
+        if mysql_error_code == 1205:
+            return True
+    # Any other error is assumed not to be retryable.  Better safe than sorry.
+    return False
+
+
+def is_operational_db_error(engine, exc):
+    """Check whether the given error is an operations-related db error.
+
+    An operations-related error is loosely defined as something caused by
+    the operational environment, e.g. the database being overloaded or
+    unreachable.  It doesn't represent a bug in the code.
+    """
+    # All OperationalError or TimeoutError instances are operational.
+    if isinstance(exc, (OperationalError, TimeoutError)):
+        return True
+    # Any retryable error is operational.
+    if isinstance(exc, DBAPIError) and is_retryable_db_error(engine, exc):
+        return True
+    # Everything else counts as a programming error.
+    return False
+
+
 def report_backend_errors(func):
     """Method decorator to log and normalize unexpected DB errors.
 
@@ -285,7 +322,9 @@ def report_backend_errors(func):
     def report_backend_errors_wrapper(self, *args, **kwds):
         try:
             return func(self, *args, **kwds)
-        except (OperationalError, TimeoutError), exc:
+        except Exception, exc:
+            if not is_operational_db_error(self._connector.engine, exc):
+                raise
             # An unexpected database-level error.
             # Log the error, then normalize it into a BackendError instance.
             # Note that this will not not logic errors such as IntegrityError,
@@ -373,20 +412,23 @@ class DBConnection(object):
             transaction = connection.begin()
             session_was_active = False
         try:
-            # It's possible for the backend to raise a "connection invalided"
-            # error if e.g. the server timed out the connection we got from
-            # the pool.  It's safe to retry with a new connection, but only
-            # if the failed connection was never successfully used.
+            # It's possible for the backend to fail in a way that the query
+            # can be retried,  e.g. the server timed out the connection we
+            # got from the pool.  If so then we can retry the query with a
+            # new connection, but only if the failed connection was never
+            # successfully used as part of this transaction.
             try:
                 query_str = self._render_query(query, params, annotations)
                 return connection.execute(query_str, **params)
             except DBAPIError, exc:
-                if not exc.connection_invalidated:
+                if not is_retryable_db_error(self._connector.engine, exc):
                     raise
                 if session_was_active:
                     raise
-                # The connection is dead, no need to close it here
-                # before opening a fresh one.
+                # Don't try to close the connection if it's already dead.
+                if not exc.connection_invalidated:
+                    transaction.rollback()
+                    connection.close()
                 connection = self._connector.engine.connect()
                 transaction = connection.begin()
                 annotations["retry"] = "1"
