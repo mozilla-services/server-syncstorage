@@ -232,7 +232,7 @@ class StorageController(object):
         """
         args = {}
 
-        for arg in  ('older', 'newer'):
+        for arg in ('older', 'newer'):
             value = kw.get(arg)
             if value is None:
                 continue
