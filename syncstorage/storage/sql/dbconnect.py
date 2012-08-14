@@ -17,6 +17,7 @@ sharding of the BSO items into multiple tables named "bso0" through "bsoN".
 This behaviour is off by default; pass shard=True to enable it.
 """
 
+import os
 import re
 import urlparse
 import traceback
@@ -190,7 +191,13 @@ class DBConnector(object):
                 sqlkw["max_overflow"] = 0
 
         # Create the engine.
-        self.engine = create_engine(sqluri, **sqlkw)
+        # We set the umask during this call, to ensure that any sqlite
+        # databases will be created with secure permissions by default.
+        old_umask = os.umask(0077)
+        try:
+            self.engine = create_engine(sqluri, **sqlkw)
+        finally:
+            os.umask(old_umask)
 
         # Create the tables if necessary.
         if create_tables:
