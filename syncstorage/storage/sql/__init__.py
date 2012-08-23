@@ -555,6 +555,12 @@ class SQLStorage(SyncStorage):
             for id, name in uncached_names:
                 names[id] = name
                 self._cache_collection_id(id, name)
+        # Check that we actually got a name for each specified id.
+        for id in collection_ids:
+            if id not in names:
+                msg = "Collection id %d has no corresponding name."
+                msg += "  Possible database corruption?"
+                raise KeyError(msg % (id,))
         return names
 
     def _map_collection_names(self, session, values):
