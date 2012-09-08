@@ -6,7 +6,6 @@
 Runs the Application. This script can be called by any wsgi runner that looks
 for an 'application' variable
 """
-
 import os
 from logging.config import fileConfig
 from ConfigParser import NoSectionError
@@ -15,19 +14,16 @@ from paste.deploy import loadapp
 # setting up the egg cache to a place where apache can write
 os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 
-# the ini file is grabbed at its production place
-# unless force via an environ variable
-ini_file = os.path.join('/etc', 'syncserver', 'production.ini')
-ini_file = os.path.abspath(os.environ.get('SYNCSTORAGE_INI_FILE', ini_file))
-
-# the ini file is grabbed at its production place
-# unless force via an environ variable
+# Use the .ini file specified in the environment if given.
+# Otherwise use the production .ini file if available.
 ini_file = os.environ.get("SYNCSTORAGE_INI_FILE")
 if ini_file is None:
-    ini_file = os.path.join('/etc', 'syncstorage', 'production.ini')
+    ini_file = os.path.join('/etc', 'mozilla-services',
+                            'syncstorage', 'production.ini')
     if not os.path.exists(ini_file):
-        ini_file = os.path.join(os.path.dirname(__file__),
-                                "tests", "tests.ini")
+        msg = "Config file %s not found; please set SYNCSTORAGE_INI_FILE to "\
+              "the path of your desired config file."
+        raise RuntimeError(msg % (ini_file,))
 ini_file = os.path.abspath(ini_file)
 
 # setting up logging
@@ -36,4 +32,5 @@ try:
 except NoSectionError:
     pass
 
+# running the app using Paste
 application = loadapp('config:%s' % ini_file)
