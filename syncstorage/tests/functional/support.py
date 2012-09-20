@@ -33,6 +33,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
         # Generate userid and auth token crednentials.
         # This can be overridden by subclasses.
+        self.config.commit()
         self._authenticate()
 
         # Monkey-patch the app to sign all requests with the token.

@@ -46,7 +46,7 @@ INSTALL += $(INSTALLOPTIONS)
 all:	build
 
 build:
-	$(VIRTUALENV) --no-site-packages --distribute .
+	$(VIRTUALENV) --no-site-packages --use-distribute .
 	$(INSTALL) Distribute
 	$(INSTALL) MoPyTools
 	$(INSTALL) nose
@@ -57,6 +57,8 @@ build:
 	# reinstalling fixes it
 	./bin/pip uninstall -y repoze.lru
 	$(INSTALL) repoze.lru
+	./bin/pip uninstall -y zope.deprecation
+	$(INSTALL) zope.deprecation
 	# NOTE: we don't install pyzmq and related dependencies here.
 	# They're not needed by default and they require extra system-level
 	# libraries to build.  If you want them, run `make build_rpms` and
@@ -68,6 +70,7 @@ update:
 
 test:
 	$(NOSE) $(TESTS)
+	./bin/paster serve syncstorage/tests/tests.ini & SERVER_PID=$$! ; sleep 2 ; ./bin/python syncstorage/tests/functional/test_storage.py http://localhost:5000 ; kill $$SERVER_PID
 
 cover:
 	$(NOSE) --with-coverage --cover-html --cover-package=syncstorage $(TESTS)
