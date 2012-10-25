@@ -20,14 +20,14 @@ from sqlalchemy.sql import select, bindparam
 
 # Queries operating on all collections in the storage.
 
-STORAGE_TIMESTAMP = "SELECT MAX(last_modified) FROM user_collections "\
-                    "WHERE userid=:userid"
+STORAGE_VERSION = "SELECT MAX(last_modified_v) FROM user_collections "\
+                  "WHERE userid=:userid"
 
 STORAGE_SIZE = "SELECT SUM(payload_size) FROM %(bso)s WHERE "\
                "userid=:userid AND ttl>:ttl"
 
-COLLECTIONS_TIMESTAMPS = "SELECT collection, last_modified "\
-                         "FROM user_collections WHERE userid=:userid"
+COLLECTIONS_VERSIONS = "SELECT collection, last_modified_v "\
+                       "FROM user_collections WHERE userid=:userid"
 
 COLLECTIONS_COUNTS = "SELECT collection, COUNT(collection) FROM %(bso)s "\
                      "WHERE userid=:userid AND ttl>:ttl "\
@@ -47,11 +47,11 @@ BEGIN_TRANSACTION_READ = None
 
 BEGIN_TRANSACTION_WRITE = None
 
-LOCK_COLLECTION_READ = "SELECT last_modified FROM user_collections "\
+LOCK_COLLECTION_READ = "SELECT last_modified_v FROM user_collections "\
                        "WHERE userid=:userid AND collection=:collectionid "\
                        "LOCK IN SHARE MODE"
 
-LOCK_COLLECTION_WRITE = "SELECT last_modified FROM user_collections "\
+LOCK_COLLECTION_WRITE = "SELECT last_modified_v FROM user_collections "\
                         "WHERE userid=:userid AND collection=:collectionid "\
                         "FOR UPDATE"
 
@@ -70,14 +70,14 @@ INSERT_COLLECTION = "INSERT INTO collections (collectionid, name) "\
                     "VALUES (:collectionid, :name)"
 
 INIT_COLLECTION = "INSERT INTO user_collections "\
-                  "(userid, collection, last_modified) "\
-                  "VALUES (:userid, :collectionid, :modified)"
+                  "(userid, collection, last_modified_v) "\
+                  "VALUES (:userid, :collectionid, :version)"
 
-TOUCH_COLLECTION = "UPDATE user_collections SET last_modified=:modified "\
+TOUCH_COLLECTION = "UPDATE user_collections SET last_modified_v=:version "\
                    "WHERE userid=:userid AND collection=:collectionid"
 
-COLLECTION_TIMESTAMP = "SELECT last_modified FROM user_collections "\
-                       "WHERE userid=:userid AND collection=:collectionid"
+COLLECTION_VERSION = "SELECT last_modified_v FROM user_collections "\
+                     "WHERE userid=:userid AND collection=:collectionid"
 
 DELETE_COLLECTION_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                           "AND collection=:collectionid"
@@ -108,22 +108,22 @@ def FIND_ITEMS(bso, params):
         # Sadly, we can't use a bindparam in an "IN" expression.
         query = query.where(bso.c.id.in_(params.pop("items")))
     if "older" in params:
-        query = query.where(bso.c.modified < bindparam("older"))
+        query = query.where(bso.c.version < bindparam("older"))
     if "newer" in params:
-        query = query.where(bso.c.modified > bindparam("newer"))
+        query = query.where(bso.c.version > bindparam("newer"))
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work correctly.
-    # The default order is by modified, which if efficient due to the index.
+    # The default order is by version, which if efficient due to the index.
     # Using the id as a secondary key produces a unique ordering.
     sort = params.pop("sort", None)
     if sort == 'index':
         query = query.order_by(bso.c.sortindex.desc(), bso.c.id.desc())
     elif sort == 'oldest':
-        query = query.order_by(bso.c.modified.asc(), bso.c.id.asc())
+        query = query.order_by(bso.c.version.asc(), bso.c.id.asc())
     else:
-        query = query.order_by(bso.c.modified.desc(), bso.c.id.desc())
+        query = query.order_by(bso.c.version.desc(), bso.c.id.desc())
     # Apply limit and/or offset.
     limit = params.pop("limit", None)
     if limit is not None:
@@ -138,10 +138,10 @@ def FIND_ITEMS(bso, params):
 DELETE_ITEM = "DELETE FROM %(bso)s WHERE userid=:userid AND "\
               "collection=:collectionid AND id=:item AND ttl>:ttl"\
 
-ITEM_DETAILS = "SELECT id, sortindex, modified, payload FROM %(bso)s "\
+ITEM_DETAILS = "SELECT id, sortindex, version, timestamp, payload "\
+               "FROM %(bso)s WHERE collection=:collectionid "\
+               "AND userid=:userid AND id=:item AND ttl>:ttl"
+
+ITEM_VERSION = "SELECT version FROM %(bso)s "\
                "WHERE collection=:collectionid AND userid=:userid "\
                "AND id=:item AND ttl>:ttl"
-
-ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
-                 "WHERE collection=:collectionid AND userid=:userid "\
-                 "AND id=:item AND ttl>:ttl"

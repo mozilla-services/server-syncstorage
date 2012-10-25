@@ -6,7 +6,7 @@
 
 import re
 
-_FIELDS = set(('id', 'collection', 'sortindex', 'modified',
+_FIELDS = set(('id', 'collection', 'sortindex', 'version', 'timestamp',
                'payload', 'payload_size', 'ttl'))
 
 MAX_TTL = 31536000

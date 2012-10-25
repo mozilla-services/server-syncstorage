@@ -110,86 +110,89 @@ class StorageController(object):
         return get_storage(request)
 
     def _check_precondition_headers(self, request):
-        """Check the X-If-Modified-Since and X-If-Unmodified-Since headers.
+        """Check the X-If-[Un|M]odified-Since-Version headers.
 
-        This method checks the timestamp of the target resource against the
-        X-If-Modified-Since and X-If-Unmodified-Since headers, returning a
-        "304 Not Modified" or "412 Precondition Failed" if appropriate.
+        This method checks the version of the target resource against the
+        X-If-Modified-Since-Version and X-If-Unmodified-Since-Version headers,
+        returning an appropriate "304 Not Modified" or "412 Precondition l
+        Failed" response if required.
 
-        It also has the side-effect of setting X-Last-Modified in the
+        It also has the side-effect of setting X-Last-Modified-Version in the
         response headers.
         """
-        modified = request.headers.get("X-If-Modified-Since")
-        unmodified = request.headers.get("X-If-Unmodified-Since")
+        modified = request.headers.get("X-If-Modified-Since-Version")
+        unmodified = request.headers.get("X-If-Unmodified-Since-Version")
 
         if modified is not None and unmodified is not None:
-            msg = "X-If-Modified-Since and X-If-Unmodified-Since cannot "
+            msg = "X-If-Modified-Since-Version and "
+            msg += "X-If-Unmodified-Since-Version cannot "
             msg += "be applied to the same request"
             raise HTTPBadRequest(msg)
 
-        ts = self._get_resource_timestamp(request)
-        request.response.headers["X-Last-Modified"] = str(ts)
+        version = self._get_resource_version(request)
+        request.response.headers["X-Last-Modified-Version"] = str(version)
 
         if modified is not None:
             try:
                 modified = int(modified)
             except ValueError:
-                msg = "Bad value for X-If-Modified-Since: %r" % (modified,)
-                raise HTTPBadRequest(msg)
+                msg = "Bad value for X-If-Modified-Since-Version: %r"
+                raise HTTPBadRequest(msg % (modified,))
 
-            if ts is not None and ts <= modified:
+            if version <= modified:
                 raise HTTPNotModified()
 
         if unmodified is not None:
             try:
                 unmodified = int(unmodified)
             except ValueError:
-                msg = 'Invalid value for "X-If-Unmodified-Since": %r'
+                msg = 'Invalid value for "X-If-Unmodified-Since-Version": %r'
                 raise HTTPBadRequest(msg % (unmodified,))
 
-            if ts is not None and ts > unmodified:
+            if version > unmodified:
                 raise HTTPPreconditionFailed()
 
-    def _get_resource_timestamp(self, request):
-        """Get last-modified timestamp for the target resource of the request.
+    def _get_resource_version(self, request):
+        """Get last-modified version for the target resource of the request.
 
-        This method retreives the last-modified timestamp of the storage
+        This method retreives the last-modified version of the storage
         itself, a specific collection in the storage, or a specific item
         in a collection, depending on what resouce is targeted by the request.
+        If the target resource does not exist, it returns zero.
         """
         storage = self._get_storage(request)
         user_id = request.user["uid"]
         collection = request.matchdict.get("collection")
-        # No collection name; return overall storage timestamp.
+        # No collection name; return overall storage version.
         if collection is None:
-            return storage.get_storage_timestamp(user_id)
+            return storage.get_storage_version(user_id)
         item_id = request.matchdict.get("item")
-        # No item id; return timestamp of whole collection.
+        # No item id; return version of whole collection.
         if item_id is None:
             try:
-                return storage.get_collection_timestamp(user_id, collection)
+                return storage.get_collection_version(user_id, collection)
             except NotFoundError:
-                return None
-        # Otherwise, return timestamp of specific item.
+                return 0
+        # Otherwise, return version of specific item.
         try:
-            return storage.get_item_timestamp(user_id, collection, item_id)
+            return storage.get_item_version(user_id, collection, item_id)
         except NotFoundError:
-            return None
+            return 0
 
     def get_storage(self, request):
         # XXX returns a 400 if the root is called
         raise HTTPBadRequest()
 
     @convert_storage_errors
-    def get_collection_timestamps(self, request):
+    def get_collection_versions(self, request):
         """Returns a hash of collections associated with the account,
-        Along with the last modified timestamp for each collection
+        Along with the last modified version for each collection
         """
-        request.headers.pop("X-If-Unmodified-Since", None)
+        request.headers.pop("X-If-Unmodified-Since-Version", None)
         self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
-        collections = storage.get_collection_timestamps(user_id)
+        collections = storage.get_collection_versions(user_id)
         return collections
 
     @convert_storage_errors
@@ -197,7 +200,7 @@ class StorageController(object):
         """Returns a hash of collections associated with the account,
         Along with the total number of items for each collection.
         """
-        request.headers.pop("X-If-Unmodified-Since", None)
+        request.headers.pop("X-If-Unmodified-Since-Version", None)
         self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -206,7 +209,7 @@ class StorageController(object):
 
     @convert_storage_errors
     def get_quota(self, request):
-        request.headers.pop("X-If-Unmodified-Since", None)
+        request.headers.pop("X-If-Unmodified-Since-Version", None)
         self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -218,7 +221,7 @@ class StorageController(object):
 
     @convert_storage_errors
     def get_collection_usage(self, request):
-        request.headers.pop("X-If-Unmodified-Since", None)
+        request.headers.pop("X-If-Unmodified-Since-Version", None)
         self._check_precondition_headers(request)
         storage = self._get_storage(request)
         user_id = request.user["uid"]
@@ -371,7 +374,7 @@ class StorageController(object):
         else:
             response = HTTPCreated()
 
-        response.headers["X-Last-Modified"] = str(res["modified"])
+        response.headers["X-Last-Modified-Version"] = str(res["version"])
         if 0 < left < _ONE_MEG:
             response.headers['X-Quota-Remaining'] = str(left)
         return response
@@ -451,7 +454,7 @@ class StorageController(object):
         left = self._check_quota(request, kept_bsos)
 
         try:
-            modified = storage.set_items(user_id, collection_name, kept_bsos)
+            version = storage.set_items(user_id, collection_name, kept_bsos)
         except Exception, e:
             # Something went wrong.
             # We want to swallow the 503 in that case.
@@ -461,7 +464,7 @@ class StorageController(object):
                 res['failed'][bso['id']] = "db error"
         else:
             res['success'].extend([bso['id'] for bso in kept_bsos])
-            request.response.headers["X-Last-Modified"] = str(modified)
+            request.response.headers["X-Last-Modified-Version"] = str(version)
 
         if 0 < left < _ONE_MEG:
             request.response.headers['X-Quota-Remaining'] = str(left)
@@ -491,9 +494,9 @@ class StorageController(object):
             storage.delete_collection(user_id, collection_name)
             response = HTTPNoContent()
         else:
-            modified = storage.delete_items(user_id, collection_name, ids)
+            version = storage.delete_items(user_id, collection_name, ids)
             response = HTTPNoContent()
-            response.headers["X-Last-Modified"] = str(modified)
+            response.headers["X-Last-Modified-Version"] = str(version)
         return response
 
     @convert_storage_errors

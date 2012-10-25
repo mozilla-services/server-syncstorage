@@ -9,7 +9,7 @@ providing the primitive operations on which to build a full SyncStorage
 backend.  It provides three database tables:
 
   collections:  the names and ids of all collections in the store
-  collection_timestamps:  the per-user timestamps for each collection
+  user_collections:  the per-user metadata associated with each collection
   bso:  the individual BSO items stored in each collection
 
 For efficiency when dealing with large datasets, this module also supports
@@ -61,14 +61,14 @@ collections = Table("collections", metadata,
 # Table mapping (user_id, collection_id) => collection-level metadata.
 #
 # This table holds collection-level metadata on a per-user basis.  Currently
-# the only such metadata is the last-modified time of the collection.
+# the only such metadata is the last-modified version of the collection.
 
 user_collections = Table("user_collections", metadata,
     Column("userid", Integer, primary_key=True, nullable=False,
                      autoincrement=False),
     Column("collection", Integer, primary_key=True, nullable=False,
                          autoincrement=False),
-    Column("last_modified", BigInteger, nullable=False)
+    Column("last_modified_v", BigInteger, nullable=False)
 )
 
 
@@ -86,7 +86,8 @@ def _get_bso_columns(table_name):
       Column("collection", Integer, primary_key=True, nullable=False,
                            autoincrement=False),
       Column("sortindex", Integer),
-      Column("modified", BigInteger),
+      Column("version", BigInteger),
+      Column("timestamp", BigInteger),
       Column("payload", Text, nullable=False, default=""),
       Column("payload_size", Integer, nullable=False, default=0),
       Column("ttl", Integer, default=MAX_TTL),
@@ -95,11 +96,11 @@ def _get_bso_columns(table_name):
       # because index names in sqlite are global, not per-table.
       # Index on "ttl" for easy pruning of expired items.
       Index("%s_ttl_idx" % (table_name,), "ttl"),
-      # Index on "modified" for easy filtering by older/newer.
-      Index("%s_usr_col_mod_idx" % (table_name,),
-            "userid", "collection", "modified"),
+      # Index on "version" for easy filtering by older/newer.
+      Index("%s_usr_col_ver_idx" % (table_name,),
+            "userid", "collection", "version"),
       # There is intentinally no index on "sortindex".
-      # Clients almost always filter on "modified" using the above index,
+      # Clients almost always filter on "version" using the above index,
       # and cannot take advantage of a separate index for sorting.
     )
 

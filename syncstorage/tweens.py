@@ -2,11 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import time
 import random
 
 from pyramid.httpexceptions import HTTPException, HTTPServiceUnavailable
-
-from syncstorage.util import get_timestamp
 
 
 try:
@@ -19,7 +18,7 @@ def set_x_timestamp_header(handler, registry):
     """Tween to set the X-Timestamp header on all responses."""
 
     def set_x_timestamp_header_tween(request):
-        request.server_time = get_timestamp()
+        request.server_time = int(time.time() * 1000)
         response = handler(request)
         response.headers["X-Timestamp"] = str(request.server_time)
         return response
