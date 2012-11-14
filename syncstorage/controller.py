@@ -110,7 +110,7 @@ class StorageController(object):
         return get_storage(request)
 
     def _check_precondition_headers(self, request):
-        """Check the X-If-[Un|M]odified-Since-Version headers.
+        """Check the X-If-[Unm|M]odified-Since-Version headers.
 
         This method checks the version of the target resource against the
         X-If-Modified-Since-Version and X-If-Unmodified-Since-Version headers,
