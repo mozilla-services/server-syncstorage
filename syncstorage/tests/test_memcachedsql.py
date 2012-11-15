@@ -130,6 +130,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         #  adding some stuff
         items = [{'id': '1', 'payload': 'xxx'},
                 {'id': '2', 'payload': 'xxx'}]
+        time.sleep(0.001)
         self.storage.set_items(_UID, 'tabs', items)
         collection = self.storage.cache.get('1:c:tabs')
         self.assertEquals(len(collection['items']), 2)

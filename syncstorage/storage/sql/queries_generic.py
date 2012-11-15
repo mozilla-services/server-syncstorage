@@ -104,9 +104,9 @@ def FIND_ITEMS(bso, params):
     query = query.where(bso.c.userid == bindparam("userid"))
     query = query.where(bso.c.collection == bindparam("collectionid"))
     # Filter by the various query parameters.
-    if "items" in params:
+    if "ids" in params:
         # Sadly, we can't use a bindparam in an "IN" expression.
-        query = query.where(bso.c.id.in_(params.pop("items")))
+        query = query.where(bso.c.id.in_(params.pop("ids")))
     if "older" in params:
         query = query.where(bso.c.version < bindparam("older"))
     if "newer" in params:

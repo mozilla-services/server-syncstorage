@@ -445,7 +445,8 @@ class SQLStorage(SyncStorage):
             data["payload_size"] = len(data["payload"])
         # If provided, ttl will be an offset in seconds.
         # Add it to the current timestamp to get an absolute time.
-        if "ttl" not in data:
+        # If not provided or None, this means no ttl should be set.
+        if data.get("ttl") is None:
             data["ttl"] = MAX_TTL
         else:
             data["ttl"] += int(session.timestamp)

@@ -6,8 +6,14 @@
 
 import re
 
-_FIELDS = set(('id', 'collection', 'sortindex', 'version', 'timestamp',
-               'payload', 'payload_size', 'ttl'))
+FIELDS = set(('id', 'collection', 'sortindex', 'version', 'timestamp',
+              'payload', 'payload_size', 'ttl'))
+
+FIELD_DEFAULTS = {
+  "payload": "",
+  "sortindex": None,
+  "ttl": None,
+}
 
 MAX_TTL = 31536000
 MAX_ID_SIZE = 64
@@ -37,8 +43,6 @@ class BSO(dict):
                 if not isinstance(value, (int, long, float, basestring)):
                     msg = "BSO fields must be scalar values, not %s"
                     raise ValueError(msg % (type(value),))
-            if name not in _FIELDS:
-                raise ValueError("Unknown BSO field %r" % (name,))
             if name in converters:
                 value = converters[name](value)
             if value is None:
@@ -48,6 +52,10 @@ class BSO(dict):
 
     def validate(self):
         """Validates the values the BSO has."""
+        # Check that there are no extraneous fields.
+        for name in self:
+            if name not in FIELDS:
+                return False, 'unknown field %r' % (name,)
 
         # Check that id field is well-formed.
         if 'id' in self:

@@ -13,10 +13,6 @@ class TestBSO(unittest2.TestCase):
         self.assertRaises(ValueError,
                           BSO, {'payload': ('non', 'scalar', 'value')})
 
-    def test_that_unknown_fields_are_rejected(self):
-        self.assertRaises(ValueError, BSO, {'boooo': ''})
-        self.assertRaises(ValueError, BSO, {42: '17'})
-
     def test_validation(self):
         bso = BSO()
         result, failure = bso.validate()
@@ -71,6 +67,16 @@ class TestBSO(unittest2.TestCase):
         self.assertTrue(result)
 
         data = {'payload':  "X" * 300000}
+        bso = BSO(data)
+        result, failure = bso.validate()
+        self.assertFalse(result)
+
+        data = {"boooo":  ""}
+        bso = BSO(data)
+        result, failure = bso.validate()
+        self.assertFalse(result)
+
+        data = {42:  17}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)

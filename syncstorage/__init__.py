@@ -4,7 +4,6 @@
 
 from mozsvc.config import get_configurator
 from mozsvc.metrics import load_metlog_client
-from syncstorage.controller import StorageController
 
 
 def includeme(config):
@@ -15,13 +14,9 @@ def includeme(config):
     config.include("mozsvc")
     config.include("mozsvc.user")
     # Add in the stuff we define ourselves.
-    config.add_renderer("newlines", "syncstorage.views:NewlinesRenderer")
     config.include("syncstorage.tweens")
     config.include("syncstorage.storage")
-    config.scan("syncstorage.views")
-    # Create a "controller" object.  This is a vestiage of the
-    # pre-pyramid codebase and will probably go away in the future.
-    config.registry["syncstorage.controller"] = StorageController(config)
+    config.include("syncstorage.views")
 
 
 def main(global_config, **settings):

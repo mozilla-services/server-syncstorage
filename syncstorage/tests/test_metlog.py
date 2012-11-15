@@ -4,8 +4,11 @@
 
 import json
 
+import cornice
+from pyramid.events import NewRequest
 from metlog.senders import DebugCaptureSender
 from syncstorage.views import get_info_counts
+from syncstorage.storage import get_storage
 from syncstorage.tests.support import StorageTestCase
 
 
@@ -15,6 +18,9 @@ class TestMetlog(StorageTestCase):
         req = super(TestMetlog, self).make_request(*args, **kwds)
         req.user = {'uid': 'aa'}
         req.matchdict = {}
+        cornice.wrap_request(NewRequest(req))
+        req.validated["storage"] = get_storage(req)
+        req.validated["userid"] = req.user["uid"]
         return req
 
     def test_sender_class(self):

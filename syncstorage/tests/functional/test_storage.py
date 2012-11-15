@@ -26,10 +26,9 @@ import simplejson as json
 
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
-from syncstorage.controller import MAX_IDS_PER_BATCH
+from syncstorage.views.validators import BATCH_MAX_COUNT
 
 from mozsvc.exceptions import BackendError
-from mozsvc.exceptions import ERROR_OVER_QUOTA, ERROR_INVALID_OBJECT
 
 
 _PLD = '*' * 500
@@ -273,9 +272,10 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + "/storage/col2", headers={
             "X-If-Modified-Since-Version": str(versions[0])
         }, status=200)
-        self.app.get(self.root + "/storage/col2", headers={
+        res = self.app.get(self.root + "/storage/col2", headers={
             "X-If-Modified-Since-Version": str(versions[-1])
         }, status=304)
+        self.assertTrue("X-Last-Modified-Version" in res.headers)
 
     def test_get_item(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
@@ -526,12 +526,14 @@ class TestStorage(StorageFunctionalTestCase):
         # Using an X-If-Unmodified-Since-Version in the past should cause 412s.
         ver = str(int(res.headers['X-Last-Modified-Version']) - 1000)
         bso = {'id': '12345', 'payload': _PLD + "XXX"}
-        self.app.put_json(self.root + '/storage/col2/12345', bso,
+        res = self.app.put_json(self.root + '/storage/col2/12345', bso,
                           headers=[('X-If-Unmodified-Since-Version', ver)],
                           status=412)
-        self.app.delete(self.root + '/storage/col2/12345',
+        self.assertTrue("X-Last-Modified-Version" in res.headers)
+        res = self.app.delete(self.root + '/storage/col2/12345',
                         headers=[('X-If-Unmodified-Since-Version', ver)],
                         status=412)
+        self.assertTrue("X-Last-Modified-Version" in res.headers)
         self.app.post_json(self.root + '/storage/col2', [bso],
                            headers=[('X-If-Unmodified-Since-Version', ver)],
                            status=412)
@@ -600,7 +602,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + "/storage")
 
         # Set a low quota for the storage.
-        self.config.registry["syncstorage.controller"].quota_size = 700
+        self.config.registry.settings["storage.quota_size"] = 700
 
         # Check the the remaining quota is correctly reported.
         bso = {'payload': _PLD}
@@ -608,12 +610,12 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.headers['X-Quota-Remaining'], '200')
 
         # Set the quota so that they're over their limit.
-        self.config.registry["syncstorage.controller"].quota_size = 10
+        self.config.registry.settings["storage.quota_size"] = 10
         bso = {'payload': _PLD}
         res = self.app.put_json(self.root + '/storage/col2/12345', bso,
-                                status=400)
+                                status=403)
         self.assertEquals(res.content_type.split(";")[0], 'application/json')
-        self.assertEquals(res.json, ERROR_OVER_QUOTA)
+        self.assertEquals(res.json["status"], "quota-exceeded")
 
     def test_get_collection_ttl(self):
         bso = {'payload': _PLD, 'ttl': 0}
@@ -708,8 +710,11 @@ class TestStorage(StorageFunctionalTestCase):
         # trying weird args and make sure the server returns 400s
         args = ('older', 'newer', 'limit', 'offset')
         for arg in args:
-            self.app.get(self.root + '/storage/col2?%s=%s' % (arg, randtext()),
-                         status=400)
+            value = randtext()
+            r = self.app.get(self.root + '/storage/col2?%s=%s' % (arg, value),
+                             status=400)
+            self.assertEquals(r.json["errors"][0]["location"], "querystring")
+            self.assertEquals(r.json["errors"][0]["name"], arg)
 
         # what about a crazy ids= string ?
         ids = ','.join([randtext(100) for i in range(10)])
@@ -810,30 +815,44 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.
-        # It should fail with ERROR_INVALID_OBJECT
         bso = "notabso"
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
+
         bso = 42
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
+
         bso = {'id': ["1", "2"], 'payload': {'3': '4'}}
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
                            status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
+
         # Batch upload with JSON that's not a list of BSOs
-        # It should fail with ERROR_INVALID_OBJECT
         bsos = "notalist"
         res = self.app.post_json(self.root + '/storage/col2', bsos, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bsos")
+
         bsos = 42
         res = self.app.post_json(self.root + '/storage/col2', bsos, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
-        # Batch upload a list with something that's not a BSO
-        # It should process the good entry and fail for the bad.
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bsos")
+
+        # Batch upload a list with something that's not a valid data dict.
+        # It should fail out entirely, as the input is seriously broken.
         bsos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
+        res = self.app.post_json(self.root + '/storage/col2', bsos, status=400)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+
+        # Batch upload a list with something that's an invalid BSO.
+        # It should process the good entry and fail for the bad.
+        bsos = [{'id': '1', 'payload': 'GOOD'}, {'id': '2', 'invalid': 'ya'}]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 1)
@@ -854,48 +873,57 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid sortindex - not an integer
         bso = {"id": "TEST", "payload": "testing", "sortindex": "meh"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid sortindex - not an integer
         bso = {"id": "TEST", "payload": "testing", "sortindex": "2.6"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid sortindex - larger than max value
         bso = {"id": "TEST", "payload": "testing", "sortindex": "1" + "0" * 9}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid payload - not a string
         bso = {"id": "TEST", "payload": 42}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid ttl - not an integer
         bso = {"id": "TEST", "payload": "testing", "ttl": "eh?"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid ttl - not an integer
         bso = {"id": "TEST", "payload": "testing", "ttl": "4.2"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
         # Invalid BSO - unknown field
         bso = {"id": "TEST", "unexpected": "spanish-inquisition"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
-        self.assertEquals(int(res.body), ERROR_INVALID_OBJECT)
+        self.assertEquals(res.json["errors"][0]["location"], "body")
+        self.assertEquals(res.json["errors"][0]["name"], "bso")
 
     def test_generation_of_201_and_204_response_codes(self):
         bso = {"id": "TEST", "payload": "testing"}
@@ -910,17 +938,17 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + "/storage/col2/1", bso)
 
         # Getting with less than the limit works OK.
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT - 1))
         res = self.app.get(self.root + "/storage/col2?ids=" + ids)
         self.assertEquals(res.json["items"], ["1"])
 
         # Getting with equal to the limit works OK.
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT))
         res = self.app.get(self.root + "/storage/col2?ids=" + ids)
         self.assertEquals(res.json["items"], ["1"])
 
         # Getting with more than the limit fails.
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT + 1))
         self.app.get(self.root + "/storage/col2?ids=" + ids, status=400)
 
     def test_that_batch_deletes_are_limited_to_max_number_of_ids(self):
@@ -928,17 +956,17 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Deleting with less than the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH - 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT - 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
 
         # Deleting with equal to the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=204)
 
         # Deleting with more than the limit fails.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(MAX_IDS_PER_BATCH + 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT + 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=400)
 
     def test_that_expired_items_can_be_overwritten_via_PUT(self):
