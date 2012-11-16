@@ -2,11 +2,7 @@ argparse
 cef
 Chameleon
 cornice
-coverage
-distribute
-Distutils2
 docutils
-flake8
 gevent
 greenlet
 Jinja2
@@ -15,7 +11,6 @@ Mako
 MarkupSafe
 metlog-py
 mock
-MoPyTools
 mozsvc
 nose
 ordereddict
@@ -24,7 +19,6 @@ PasteDeploy
 PasteScript
 PyBrowserID
 Pygments
-pylibmc
 PyMySQL
 pymysql_sa
 pyramid
