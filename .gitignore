@@ -19,3 +19,4 @@ test
 nosetests.xml
 build
 cover
+loadtest.*
