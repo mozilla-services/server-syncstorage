@@ -1036,6 +1036,55 @@ class TestStorage(StorageFunctionalTestCase):
         r = self.app.get(self.root + "/storage/col2/1")
         self.assertTrue("X-Last-Modified-Version" in r.headers)
 
+    def test_update_of_ttl_without_sending_data(self):
+        bso = {"payload": "x", "ttl": 1}
+        self.app.put_json(self.root + "/storage/col2/TEST1", bso)
+        self.app.put_json(self.root + "/storage/col2/TEST2", bso)
+        # We can only update via POST, not PUT.
+        bso = {"ttl": 10}
+        self.app.put_json(self.root + "/storage/col2/TEST2", bso, status=400)
+        # Before those expire, update ttl on one that exists
+        # and on one that does not.
+        time.sleep(0.2)
+        bso = {"ttl": 10}
+        self.app.post_json(self.root + "/storage/col2/TEST2", bso)
+        self.app.post_json(self.root + "/storage/col2/TEST3", bso)
+        # If we wait, TEST1 should expire but the others should not.
+        time.sleep(0.8)
+        items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
+        items = dict((item["id"], item) for item in items)
+        self.assertEquals(sorted(items.keys()), ["TEST2", "TEST3"])
+        # The existing item should have retained its payload.
+        # The new item should have got a default payload of empty string.
+        self.assertEquals(items["TEST2"]["payload"], "x")
+        self.assertEquals(items["TEST3"]["payload"], "")
+
+    def test_bulk_update_of_ttls_without_sending_data(self):
+        # Create 5 BSOs with a ttl of 1 second.
+        bsos = [{"id": str(i), "payload": "x", "ttl": 1} for i in xrange(5)]
+        self.app.post_json(self.root + "/storage/col2", bsos)
+        # Before they expire, bulk-update the ttl to something longer.
+        # Also send data for some that don't exist yet.
+        # And just to be really tricky, we're also going to update
+        # one of the payloads at the same time.
+        time.sleep(0.2)
+        bsos = [{"id": str(i), "ttl": 10} for i in xrange(3, 7)]
+        bsos[0]["payload"] = "xx"
+        r = self.app.post_json(self.root + "/storage/col2", bsos)
+        self.assertEquals(len(r.json["success"]), 4)
+        # If we wait then items 0, 1, 2 should have expired.
+        # Items 3, 4, 5, 6 should still exist.
+        time.sleep(0.8)
+        items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
+        items = dict((item["id"], item) for item in items)
+        self.assertEquals(sorted(items.keys()), ["3", "4", "5", "6"])
+        # Items 3 and 4 should have the specified payloads.
+        # Items 5 and 6 should have payload defaulted to empty string.
+        self.assertEquals(items["3"]["payload"], "xx")
+        self.assertEquals(items["4"]["payload"], "x")
+        self.assertEquals(items["5"]["payload"], "")
+        self.assertEquals(items["6"]["payload"], "")
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""

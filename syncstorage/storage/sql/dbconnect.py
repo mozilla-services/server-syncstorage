@@ -29,7 +29,7 @@ from pyramid.threadlocal import get_current_registry
 from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
 from sqlalchemy.pool import NullPool, QueuePool
-from sqlalchemy.sql import insert, update
+from sqlalchemy.sql import insert, update, text as sqltext
 from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
 from sqlalchemy import (Integer, String, Text, BigInteger,
@@ -89,9 +89,10 @@ def _get_bso_columns(table_name):
       Column("sortindex", Integer),
       Column("version", BigInteger),
       Column("timestamp", BigInteger),
-      Column("payload", Text, nullable=False, default=""),
-      Column("payload_size", Integer, nullable=False, default=0),
-      Column("ttl", Integer, default=MAX_TTL),
+      Column("payload", Text, nullable=False, server_default=""),
+      Column("payload_size", Integer, nullable=False,
+                             server_default=sqltext("0")),
+      Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
       # Declare indexes.
       # We need to include the tablename in the index name due to sharding,
       # because index names in sqlite are global, not per-table.
