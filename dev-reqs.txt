@@ -31,7 +31,6 @@ Sphinx
 SQLAlchemy
 tokenlib
 translationstring
-umemcache
 unittest2
 venusian
 WebOb

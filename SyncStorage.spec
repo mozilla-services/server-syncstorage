@@ -1,6 +1,6 @@
 %define name python26-syncstorage
 %define pythonname SyncStorage
-%define version 2.1
+%define version 2.2
 %define release 1
 
 Summary: Sync Storage server
@@ -15,7 +15,7 @@ Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Ryan Kelly <rfkelly@mozilla.com>
 BuildRequires: libevent-devel libmemcached-devel
-Requires: memcached gunicorn python26 python26-argparse python26-cef python26-cornice python26-setuptools python26-docutils python26-gevent python26-greenlet python26-macauthlib python26-mako python26-markupsafe python26-metlog-py python26-mozsvc python26-mysql-python python26-ordereddict python26-paste python26-pastedeploy python26-pastescript python26-pylibmc python26-pymysql python26-pymysql_sa python26-pyramid python26-pyramid_debugtoolbar python26-pyramid_whoauth python26-repoze.lru python26-repoze.who python26-repoze.who.plugins.macauth  python26-pyzmq python-simplejson
+Requires: memcached gunicorn python26 argparse python26-cef python26-cornice python26-setuptools python26-docutils python26-gevent python26-greenlet python26-macauthlib python26-mako python26-markupsafe python26-metlog-py python26-mozsvc python26-ordereddict python26-paste python26-pastedeploy python26-pastescript python26-umemcache python26-pymysql python26-pymysql_sa python26-pyramid python26-pyramid_debugtoolbar python26-repoze.lru python-simplejson python26-pyramid_macauth
 Url: https://github.com/mozilla-servcices/server-syncstorage
 
 %description
