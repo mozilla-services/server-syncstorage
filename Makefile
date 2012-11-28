@@ -53,6 +53,9 @@ build:
 	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# umemcache doesn't work with pypi2rpm, so it can't be listed
+	# in the req files.  Install by hand.
+	$(INSTALL) umemcache
 	# repoze.lru install seems to conflict with repoze.who, but
 	# reinstalling fixes it.  Possible easy_install-vs-pip silliness.
 	./bin/pip uninstall -y repoze.lru
