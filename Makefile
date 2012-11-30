@@ -68,6 +68,10 @@ update:
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
 
 test:
+	# Check that flake8 passes before bothering to run anything.
+	# This can really cut down time wasted by typos etc.
+	./bin/flake8 syncstorage
+	# Run the actual testcases.
 	$(NOSE) $(TESTS)
 	# Test that live functional tests can run correctly, by actually
 	# spinning up a server and running them against it.
