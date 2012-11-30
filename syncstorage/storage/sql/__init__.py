@@ -446,10 +446,11 @@ class SQLStorage(SyncStorage):
         # If provided, ttl will be an offset in seconds.
         # Add it to the current timestamp to get an absolute time.
         # If not provided or None, this means no ttl should be set.
-        if data.get("ttl") is None:
-            data["ttl"] = MAX_TTL
-        else:
-            data["ttl"] += int(session.timestamp)
+        if "ttl" in data:
+            if data["ttl"] is None:
+                data["ttl"] = MAX_TTL
+            else:
+                data["ttl"] += int(session.timestamp)
         return data
 
     @with_session

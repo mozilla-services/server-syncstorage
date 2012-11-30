@@ -1049,6 +1049,9 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {"ttl": 10}
         self.app.post_json(self.root + "/storage/col2/TEST2", bso)
         self.app.post_json(self.root + "/storage/col2/TEST3", bso)
+        # Update some other field on TEST1, which should leave ttl untouched.
+        bso = {"sortindex": 3}
+        self.app.post_json(self.root + "/storage/col2/TEST1", bso)
         # If we wait, TEST1 should expire but the others should not.
         time.sleep(0.8)
         items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
