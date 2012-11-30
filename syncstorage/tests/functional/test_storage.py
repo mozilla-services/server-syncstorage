@@ -1085,6 +1085,31 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(items["5"]["payload"], "")
         self.assertEquals(items["6"]["payload"], "")
 
+    def test_that_negative_integer_fields_are_not_accepted(self):
+        # ttls cannot be negative
+        self.app.put_json(self.root + "/storage/col2/TEST", {
+          "payload": "TEST",
+          "ttl": -1,
+        }, status=400)
+        # sortindex cannot be negative
+        self.app.put_json(self.root + "/storage/col2/TEST", {
+          "payload": "TEST",
+          "sortindex": -42,
+        }, status=400)
+        # limit cannot be negative
+        self.app.put_json(self.root + "/storage/col2/TEST", {"payload": "X"})
+        self.app.get(self.root + "/storage/col2?limit=-1", status=400)
+        # X-If-Modified-Since-Version cannot be negative
+        self.app.get(self.root + "/storage/col2", headers={
+          "X-If-Modified-Since-Version": "-3",
+        }, status=400)
+        # X-If-Unmodified-Since-Version cannot be negative
+        self.app.put_json(self.root + "/storage/col2/TEST", {
+          "payload": "TEST",
+        }, headers={
+          "X-If-Unmodified-Since-Version": "-3",
+        }, status=400)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""

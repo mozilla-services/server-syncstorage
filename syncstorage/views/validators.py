@@ -49,6 +49,8 @@ def extract_precondition_headers(request):
     if if_modified_since is not None:
         try:
             if_modified_since = int(if_modified_since)
+            if if_modified_since < 0:
+                raise ValueError
         except ValueError:
             msg = "Bad value for X-If-Modified-Since-Version: %r"
             request.errors.add("header", "X-If-Modified-Since-Version",
@@ -60,6 +62,8 @@ def extract_precondition_headers(request):
     if if_unmodified_since is not None:
         try:
             if_unmodified_since = int(if_unmodified_since)
+            if if_unmodified_since < 0:
+                raise ValueError
         except ValueError:
             msg = 'Invalid value for "X-If-Unmodified-Since-Version": %r'
             request.errors.add("header", "X-If-Unmodified-Since_Version",

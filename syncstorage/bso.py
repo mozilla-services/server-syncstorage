@@ -19,7 +19,7 @@ MAX_TTL = 31536000
 MAX_ID_SIZE = 64
 MAX_PAYLOAD_SIZE = 256 * 1024
 MAX_SORTINDEX_VALUE = 999999999
-MIN_SORTINDEX_VALUE = -999999999
+MIN_SORTINDEX_VALUE = 0
 VALID_ID_REGEX = re.compile("^[a-zA-Z0-9_-]+$")
 
 
@@ -76,7 +76,7 @@ class BSO(dict):
                 return False, 'invalid id'
             self['id'] = value
 
-        # Check that the ttl is an int, and less than one year.
+        # Check that the ttl is a positive int, and less than one year.
         if 'ttl' in self:
             try:
                 ttl = int(self['ttl'])
@@ -86,7 +86,7 @@ class BSO(dict):
                 return False, 'invalid ttl'
             self['ttl'] = ttl
 
-        # Check that the sortindex is a valid integer.
+        # Check that the sortindex is a valid positive integer.
         # Convert from other types as necessary.
         if 'sortindex' in self:
             try:
