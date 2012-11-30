@@ -94,13 +94,13 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         # Create an engine with known pool parameters.
         # Unfortunately we can't load this from a config file, since
         # pool params are ignored for sqlite databases.
-        engine = create_engine("sqlite:///:memory:",
+        engine = create_engine(
+            "sqlite:///:memory:",
             poolclass=QueuePoolWithMaxBacklog,
             pool_size=2,
             pool_timeout=1,
             max_backlog=2,
-            max_overflow=1,
-        )
+            max_overflow=1)
 
         # Define a utility function to take a connection from the pool
         # and hold onto it.  This makes it easy to spawn as a bg thread

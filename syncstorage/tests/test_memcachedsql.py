@@ -129,7 +129,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
         #  adding some stuff
         items = [{'id': '1', 'payload': 'xxx'},
-                {'id': '2', 'payload': 'xxx'}]
+                 {'id': '2', 'payload': 'xxx'}]
         time.sleep(0.001)
         self.storage.set_items(_UID, 'tabs', items)
         collection = self.storage.cache.get('1:c:tabs')
@@ -210,11 +210,16 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def test_collection_sizes(self):
         # setting the tabs in memcache
-        tabs = {'version': 1299142695760,
-                'items': {'mCwylprUEiP5':
-                  {'payload': '*' * 100,
-                   'id': 'mCwylprUEiP5',
-                   'version': 1299142695760}}}
+        tabs = {
+            'version': 1299142695760,
+            'items': {
+                'mCwylprUEiP5': {
+                    'payload': '*' * 100,
+                    'id': 'mCwylprUEiP5',
+                    'version': 1299142695760
+                }
+            }
+        }
         self.storage.cache.set('1:c:tabs', tabs)
         size = self.storage.get_collection_sizes(1)
         self.assertEqual(size['tabs'], 100)

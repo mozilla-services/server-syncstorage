@@ -52,9 +52,11 @@ metadata = MetaData()
 # use on the storage node.  The collection id space is global, since we
 # expect most users to have the same small, static set of collection names.
 
-collections = Table("collections", metadata,
+collections = Table(
+    "collections",
+    metadata,
     Column("collectionid", Integer, primary_key=True, nullable=False,
-                           autoincrement=True),
+           autoincrement=True),
     Column("name", String(32), nullable=False, unique=True)
 )
 
@@ -64,11 +66,13 @@ collections = Table("collections", metadata,
 # This table holds collection-level metadata on a per-user basis.  Currently
 # the only such metadata is the last-modified version of the collection.
 
-user_collections = Table("user_collections", metadata,
+user_collections = Table(
+    "user_collections",
+    metadata,
     Column("userid", Integer, primary_key=True, nullable=False,
-                     autoincrement=False),
+           autoincrement=False),
     Column("collection", Integer, primary_key=True, nullable=False,
-                         autoincrement=False),
+           autoincrement=False),
     Column("last_modified_v", BigInteger, nullable=False)
 )
 
@@ -81,29 +85,29 @@ user_collections = Table("user_collections", metadata,
 
 def _get_bso_columns(table_name):
     return (
-      Column("id", String(64), primary_key=True, autoincrement=False),
-      Column("userid", Integer, primary_key=True, nullable=False,
-                       autoincrement=False),
-      Column("collection", Integer, primary_key=True, nullable=False,
-                           autoincrement=False),
-      Column("sortindex", Integer),
-      Column("version", BigInteger),
-      Column("timestamp", BigInteger),
-      Column("payload", Text, nullable=False, server_default=""),
-      Column("payload_size", Integer, nullable=False,
-                             server_default=sqltext("0")),
-      Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
-      # Declare indexes.
-      # We need to include the tablename in the index name due to sharding,
-      # because index names in sqlite are global, not per-table.
-      # Index on "ttl" for easy pruning of expired items.
-      Index("%s_ttl_idx" % (table_name,), "ttl"),
-      # Index on "version" for easy filtering by older/newer.
-      Index("%s_usr_col_ver_idx" % (table_name,),
-            "userid", "collection", "version"),
-      # There is intentinally no index on "sortindex".
-      # Clients almost always filter on "version" using the above index,
-      # and cannot take advantage of a separate index for sorting.
+        Column("id", String(64), primary_key=True, autoincrement=False),
+        Column("userid", Integer, primary_key=True, nullable=False,
+               autoincrement=False),
+        Column("collection", Integer, primary_key=True, nullable=False,
+               autoincrement=False),
+        Column("sortindex", Integer),
+        Column("version", BigInteger),
+        Column("timestamp", BigInteger),
+        Column("payload", Text, nullable=False, server_default=""),
+        Column("payload_size", Integer, nullable=False,
+               server_default=sqltext("0")),
+        Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
+        # Declare indexes.
+        # We need to include the tablename in the index name due to sharding,
+        # because index names in sqlite are global, not per-table.
+        # Index on "ttl" for easy pruning of expired items.
+        Index("%s_ttl_idx" % (table_name,), "ttl"),
+        # Index on "version" for easy filtering by older/newer.
+        Index("%s_usr_col_ver_idx" % (table_name,),
+              "userid", "collection", "version"),
+        # There is intentinally no index on "sortindex".
+        # Clients almost always filter on "version" using the above index,
+        # and cannot take advantage of a separate index for sorting.
     )
 
 

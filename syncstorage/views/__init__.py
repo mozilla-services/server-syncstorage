@@ -84,7 +84,7 @@ root = SyncStorageService(name="root",
 info = SyncStorageService(name="info",
                           path="/info")
 info_quota = SyncStorageService(name="info_quota",
-                                 path="/info/quota")
+                                path="/info/quota")
 info_versions = SyncStorageService(name="info_versions",
                                    path="/info/collections")
 info_usage = SyncStorageService(name="info_usage",

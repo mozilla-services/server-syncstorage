@@ -408,7 +408,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(items[1]["payload"], bsos[1]["payload"])
         # Read them back as application/newlines, check payloads.
         res = self.app.get(self.root + "/storage/col2?full=1", headers={
-          "Accept": "application/newlines",
+            "Accept": "application/newlines",
         })
         items = [json.loads(line) for line in res.body.strip().split('\n')]
         self.assertEquals(len(items), 2)
@@ -526,35 +526,42 @@ class TestStorage(StorageFunctionalTestCase):
         # Using an X-If-Unmodified-Since-Version in the past should cause 412s.
         ver = str(int(res.headers['X-Last-Modified-Version']) - 1000)
         bso = {'id': '12345', 'payload': _PLD + "XXX"}
-        res = self.app.put_json(self.root + '/storage/col2/12345', bso,
-                          headers=[('X-If-Unmodified-Since-Version', ver)],
-                          status=412)
+        res = self.app.put_json(
+            self.root + '/storage/col2/12345', bso,
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
         self.assertTrue("X-Last-Modified-Version" in res.headers)
-        res = self.app.delete(self.root + '/storage/col2/12345',
-                        headers=[('X-If-Unmodified-Since-Version', ver)],
-                        status=412)
+        res = self.app.delete(
+            self.root + '/storage/col2/12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
         self.assertTrue("X-Last-Modified-Version" in res.headers)
-        self.app.post_json(self.root + '/storage/col2', [bso],
-                           headers=[('X-If-Unmodified-Since-Version', ver)],
-                           status=412)
-        self.app.delete(self.root + '/storage/col2?ids=12345',
-                        headers=[('X-If-Unmodified-Since-Version', ver)],
-                        status=412)
-        self.app.get(self.root + '/storage/col2/12345',
-                          headers=[('X-If-Unmodified-Since-Version', ver)],
-                          status=412)
-        self.app.get(self.root + '/storage/col2',
-                          headers=[('X-If-Unmodified-Since-Version', ver)],
-                          status=412)
+        self.app.post_json(
+            self.root + '/storage/col2', [bso],
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
+        self.app.delete(
+            self.root + '/storage/col2?ids=12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
+        self.app.get(
+            self.root + '/storage/col2/12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
+        self.app.get(
+            self.root + '/storage/col2',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
         # Deleting items from a collection should give 412 even if some
         # other, unrelated item in the collection has been modified.
         ver = res.headers['X-Last-Modified-Version']
         res2 = self.app.put_json(self.root + '/storage/col2/54321', {
-                                    'payload': _PLD,
-                                 })
-        self.app.delete(self.root + '/storage/col2?ids=12345',
-                        headers=[('X-If-Unmodified-Since-Version', ver)],
-                        status=412)
+            'payload': _PLD,
+        })
+        self.app.delete(
+            self.root + '/storage/col2?ids=12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=412)
         ver = res2.headers['X-Last-Modified-Version']
         # All of those should have left the BSO unchanged
         res2 = self.app.get(self.root + '/storage/col2/12345')
@@ -563,26 +570,32 @@ class TestStorage(StorageFunctionalTestCase):
                           res.headers['X-Last-Modified-Version'])
         # Using an X-If-Unmodified-Since-Version equal to
         # X-Last-Modified-Version should allow the request to succeed.
-        res = self.app.post_json(self.root + '/storage/col2', [bso],
-                             headers=[('X-If-Unmodified-Since-Version', ver)],
-                             status=200)
+        res = self.app.post_json(
+            self.root + '/storage/col2', [bso],
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=200)
         ver = res.headers['X-Last-Modified-Version']
-        self.app.get(self.root + '/storage/col2/12345',
-                          headers=[('X-If-Unmodified-Since-Version', ver)],
-                          status=200)
-        self.app.delete(self.root + '/storage/col2/12345',
-                        headers=[('X-If-Unmodified-Since-Version', ver)],
-                        status=204)
-        res = self.app.put_json(self.root + '/storage/col2/12345', bso,
-                            headers=[('X-If-Unmodified-Since-Version', '0')],
-                            status=201)
+        self.app.get(
+            self.root + '/storage/col2/12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=200)
+        self.app.delete(
+            self.root + '/storage/col2/12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=204)
+        res = self.app.put_json(
+            self.root + '/storage/col2/12345', bso,
+            headers=[('X-If-Unmodified-Since-Version', '0')],
+            status=201)
         ver = res.headers['X-Last-Modified-Version']
-        self.app.get(self.root + '/storage/col2',
-                          headers=[('X-If-Unmodified-Since-Version', ver)],
-                          status=200)
-        self.app.delete(self.root + '/storage/col2?ids=12345',
-                        headers=[('X-If-Unmodified-Since-Version', ver)],
-                        status=204)
+        self.app.get(
+            self.root + '/storage/col2',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=200)
+        self.app.delete(
+            self.root + '/storage/col2?ids=12345',
+            headers=[('X-If-Unmodified-Since-Version', ver)],
+            status=204)
 
     def test_quota(self):
         res = self.app.get(self.root + '/info/quota')
@@ -817,19 +830,19 @@ class TestStorage(StorageFunctionalTestCase):
         # Single upload with JSON that's not a BSO.
         bso = "notabso"
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
-                           status=400)
+                                status=400)
         self.assertEquals(res.json["errors"][0]["location"], "body")
         self.assertEquals(res.json["errors"][0]["name"], "bso")
 
         bso = 42
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
-                           status=400)
+                                status=400)
         self.assertEquals(res.json["errors"][0]["location"], "body")
         self.assertEquals(res.json["errors"][0]["name"], "bso")
 
         bso = {'id': ["1", "2"], 'payload': {'3': '4'}}
         res = self.app.put_json(self.root + '/storage/col2/invalid', bso,
-                           status=400)
+                                status=400)
         self.assertEquals(res.json["errors"][0]["location"], "body")
         self.assertEquals(res.json["errors"][0]["name"], "bso")
 
@@ -1091,26 +1104,26 @@ class TestStorage(StorageFunctionalTestCase):
     def test_that_negative_integer_fields_are_not_accepted(self):
         # ttls cannot be negative
         self.app.put_json(self.root + "/storage/col2/TEST", {
-          "payload": "TEST",
-          "ttl": -1,
+            "payload": "TEST",
+            "ttl": -1,
         }, status=400)
         # sortindex cannot be negative
         self.app.put_json(self.root + "/storage/col2/TEST", {
-          "payload": "TEST",
-          "sortindex": -42,
+            "payload": "TEST",
+            "sortindex": -42,
         }, status=400)
         # limit cannot be negative
         self.app.put_json(self.root + "/storage/col2/TEST", {"payload": "X"})
         self.app.get(self.root + "/storage/col2?limit=-1", status=400)
         # X-If-Modified-Since-Version cannot be negative
         self.app.get(self.root + "/storage/col2", headers={
-          "X-If-Modified-Since-Version": "-3",
+            "X-If-Modified-Since-Version": "-3",
         }, status=400)
         # X-If-Unmodified-Since-Version cannot be negative
         self.app.put_json(self.root + "/storage/col2/TEST", {
-          "payload": "TEST",
+            "payload": "TEST",
         }, headers={
-          "X-If-Unmodified-Since-Version": "-3",
+            "X-If-Unmodified-Since-Version": "-3",
         }, status=400)
 
 
@@ -1191,7 +1204,7 @@ class TestStorageMemcached(TestStorage):
 
             # on single PUT, we get a 503
             self.app.put_json(self.root + '/storage/tabs/sure', bso1,
-                         status=503)
+                              status=503)
         finally:
             for key in self.config.registry:
                 if key.startswith("syncstorage:storage:"):

@@ -61,22 +61,22 @@ class TestBSO(unittest2.TestCase):
         result, failure = bso.validate()
         self.assertTrue(result)
 
-        data = {'payload':  "X" * 30000}
+        data = {'payload': "X" * 30000}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertTrue(result)
 
-        data = {'payload':  "X" * 300000}
+        data = {'payload': "X" * 300000}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
 
-        data = {"boooo":  ""}
+        data = {"boooo": ""}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)
 
-        data = {42:  17}
+        data = {42: 17}
         bso = BSO(data)
         result, failure = bso.validate()
         self.assertFalse(result)

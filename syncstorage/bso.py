@@ -10,9 +10,9 @@ FIELDS = set(('id', 'collection', 'sortindex', 'version', 'timestamp',
               'payload', 'payload_size', 'ttl'))
 
 FIELD_DEFAULTS = {
-  "payload": "",
-  "sortindex": None,
-  "ttl": None,
+    "payload": "",
+    "sortindex": None,
+    "ttl": None,
 }
 
 MAX_TTL = 31536000
