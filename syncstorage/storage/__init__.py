@@ -82,6 +82,10 @@ class SyncStorage(object):
 
     __metaclass__ = abc.ABCMeta
 
+    @abc.abstractmethod
+    def is_healthy(self):
+        """Check whether the storage backend is healthy and active."""
+
     #
     # APIs for collection-level locking.
     #
@@ -405,6 +409,16 @@ def get_storage(request):
         return request.registry["syncstorage:storage:host:" + host_name]
     except KeyError:
         return request.registry["syncstorage:storage:default"]
+
+
+def get_all_storages(config):
+    """Iterator over all (hostname, storage) pairs for a config."""
+    for key in config.registry:
+        if key == "syncstorage:storage:default":
+            yield ("default", config.registry[key])
+        elif key.startswith("syncstorage:storage:host:"):
+            hostname = key[len("syncstorage:storage:host:"):]
+            yield (hostname, config.registry[key])
 
 
 def includeme(config):

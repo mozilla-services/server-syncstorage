@@ -149,6 +149,9 @@ class MemcachedStorage(SyncStorage):
             except KeyError:
                 return UncachedManager(self, collection)
 
+    def is_healthy(self):
+        return self.storage.is_healthy()
+
     #
     # APIs for collection-level locking.
     #

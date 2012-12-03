@@ -120,6 +120,18 @@ class SQLStorage(SyncStorage):
     def logger(self):
         return get_current_registry()["metlog"]
 
+    def is_healthy(self):
+        """Check whether the backend is healthy and active."""
+        # This executes a real query, but we don't care if is returns rows.
+        # We're only interested in whether it raises a BackendError.
+        # there will be no rows in the result.
+        try:
+            with self._get_or_create_session() as session:
+                self._get_collection_name(session, 0)
+        except CollectionNotFoundError:
+            pass
+        return True
+
     def _get_or_create_session(self):
         """Get an existing session if one exists, or start a new one if not."""
         try:
