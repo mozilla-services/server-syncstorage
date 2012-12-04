@@ -18,3 +18,6 @@ LOCK_COLLECTION_READ = "SELECT last_modified_v FROM user_collections "\
                        "WHERE userid=:userid AND collection=:collectionid"
 
 LOCK_COLLECTION_WRITE = None
+
+PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
+                           "WHERE ttl < (strftime('%%s', 'now') - :grace) "

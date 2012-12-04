@@ -145,3 +145,13 @@ ITEM_DETAILS = "SELECT id, sortindex, version, timestamp, payload "\
 ITEM_VERSION = "SELECT version FROM %(bso)s "\
                "WHERE collection=:collectionid AND userid=:userid "\
                "AND id=:item AND ttl>:ttl"
+
+# Administrative queries
+
+# This query nominally deletes *some* expired items, but not necessarily all.
+# The idea is to delete them in small batches to keep overhead low.
+# Unfortunately there's no generic way to achieve this in SQL so the default
+# case winds up deleting all expired items.  There is a MySQL-specific
+# version using DELETE <blah> LIMIT 1000.
+PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
+                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "

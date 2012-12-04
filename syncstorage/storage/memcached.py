@@ -365,6 +365,19 @@ class MemcachedStorage(SyncStorage):
             return ver
 
     #
+    # Administrative/maintenance methods.
+    #
+
+    def purge_expired_items(self, grace_period=0):
+        """Purges items with an expired TTL from the database."""
+        # We have no way to purge expired items from memcached, as
+        # there's no way to enumerate all the userids.  Purging is
+        # instead done on each write for cached collections, with the
+        # expectation that this will be cheap due to low item count.
+        # Therefore, the only thing we can do here is pass on the call.
+        return self.storage.purge_expired_items()
+
+    #
     #  Private APIs for managing the cached metadata
     #
 
@@ -657,6 +670,17 @@ class _CachedManagerBase(object):
                 data["items"][bso["id"]] = bso
         if num_created > 0:
             data["version"] = version
+        # Purge any items that have expired.
+        # We can't do this as part of the purge_expired_items()
+        # because we don't have a way to enumerate all user ids.
+        expired_ids = set()
+        expiry_time = int(time.time()) - 86400
+        for id, bso in data["items"].iteritems():
+            ttl = bso.get("ttl")
+            if ttl is not None and ttl < expiry_time:
+                expired_ids.add(id)
+        for id in expired_ids:
+            del data["items"][id]
         key = self.get_key(userid)
         if not self.cache.cas(key, data, casid):
             raise ConflictError

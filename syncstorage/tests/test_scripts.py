@@ -4,6 +4,7 @@
 
 import os
 import sys
+import time
 import unittest2
 import subprocess
 
@@ -18,6 +19,13 @@ try:
     MEMCACHED = True
 except ImportError:
     MEMCACHED = False
+
+
+def spawn_script(name, *args, **kwds):
+    scriptdir = os.path.join(os.path.dirname(__file__), "..", "scripts")
+    scriptfile = os.path.join(scriptdir, name)
+    command = (sys.executable, scriptfile) + args
+    return subprocess.Popen(command, **kwds)
 
 
 class TestMemcacheManagementScripts(StorageTestCase):
@@ -39,12 +47,6 @@ class TestMemcacheManagementScripts(StorageTestCase):
         except BackendError:
             raise unittest2.SkipTest
 
-    def _spawn_script(self, name, *args, **kwds):
-        scriptdir = os.path.join(os.path.dirname(__file__), "..", "scripts")
-        scriptfile = os.path.join(scriptdir, name)
-        command = (sys.executable, scriptfile) + args
-        return subprocess.Popen(command, **kwds)
-
     def test_mcclear_script(self):
         # Create some data in cached collections, for three different users.
         self.storage.set_item(1, "meta", "test", {"payload": "test"})
@@ -59,8 +61,7 @@ class TestMemcacheManagementScripts(StorageTestCase):
         self.assertTrue(self.storage.cache.get("3:metadata"))
         # Run the mcclear script on users 2 and 3.
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
-        proc = self._spawn_script("mcclear.py", ini_file,
-                                  stdin=subprocess.PIPE)
+        proc = spawn_script("mcclear.py", ini_file, stdin=subprocess.PIPE)
         proc.stdin.write("2\n\n3\n")
         proc.stdin.close()
         assert proc.wait() == 0
@@ -86,9 +87,9 @@ class TestMemcacheManagementScripts(StorageTestCase):
         self.storage.set_item(3, "tabs", "test3", {"payload": "test3"})
         # Run the mcread script on users 2 and 3.
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
-        proc = self._spawn_script("mcread.py", ini_file,
-                                  stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE)
+        proc = spawn_script("mcread.py", ini_file,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE)
         proc.stdin.write("2\n\n3\n")
         proc.stdin.close()
         output = [ln.strip() for ln in proc.stdout]
@@ -100,3 +101,50 @@ class TestMemcacheManagementScripts(StorageTestCase):
         self.assertTrue("2:c:tabs" in output_keys)
         self.assertTrue("3:metadata" in output_keys)
         self.assertTrue("3:c:tabs" in output_keys)
+
+
+class TestPurgeTTLScript(StorageTestCase):
+
+    TEST_INI_FILE = "tests-hostname.ini"
+
+    def test_purgettl_script(self):
+        # Use a non-default storage, to test if it hits all backends.
+        key = "syncstorage:storage:host:another-test-host"
+        storage = self.config.registry[key]
+
+        def count_items():
+            COUNT_ITEMS = "select count(*) from %(bso)s "\
+                          "/* queryName=COUNT_ITEMS */"
+            total_items = 0
+            for i in xrange(storage.dbconnector.shardsize):
+                with storage.dbconnector.connect() as c:
+                    res = c.execute(COUNT_ITEMS % {"bso": "bso" + str(i)})
+                    total_items += res.fetchall()[0][0]
+            return total_items
+
+        storage.set_item(1, "col", "test1", {"payload": "X", "ttl": 0})
+        storage.set_item(1, "col", "test2", {"payload": "X", "ttl": 0})
+        storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 10})
+        self.assertEquals(count_items(), 3)
+
+        time.sleep(1)
+
+        # Long grace period == not purged
+        ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
+        proc = spawn_script("purgettl.py",
+                            "--oneshot",
+                            "--backend-interval=0",
+                            "--grace-period=10",
+                            ini_file)
+        assert proc.wait() == 0
+        self.assertEquals(count_items(), 3)
+
+        # Short grace period == not purged
+        ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
+        proc = spawn_script("purgettl.py",
+                            "--oneshot",
+                            "--backend-interval=0",
+                            "--grace-period=0",
+                            ini_file)
+        assert proc.wait() == 0
+        self.assertEquals(count_items(), 1)
