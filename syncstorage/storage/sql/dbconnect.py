@@ -73,7 +73,8 @@ user_collections = Table(
            autoincrement=False),
     Column("collection", Integer, primary_key=True, nullable=False,
            autoincrement=False),
-    Column("last_modified_v", BigInteger, nullable=False)
+    Column("last_modified_v", BigInteger, nullable=False),
+    Column("last_deleted_v", BigInteger, nullable=False),
 )
 
 

@@ -354,10 +354,11 @@ class SQLStorage(SyncStorage):
         count += session.query("DELETE_COLLECTION", {
             "userid": userid,
             "collectionid": collectionid,
+            "version": session.new_version
         })
         if count == 0:
             raise CollectionNotFoundError
-        return self.get_storage_version(userid)
+        return session.new_version
 
     @with_session
     def delete_items(self, session, userid, collection, items):

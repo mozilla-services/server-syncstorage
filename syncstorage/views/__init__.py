@@ -197,7 +197,8 @@ def delete_collection(request):
     collection = request.validated["collection"]
     ids = request.validated.get("ids")
     if ids is None:
-        storage.delete_collection(userid, collection)
+        version = storage.delete_collection(userid, collection)
+        request.response.headers["X-Last-Modified-Version"] = str(version)
     else:
         version = storage.delete_items(userid, collection, ids)
         request.response.headers["X-Last-Modified-Version"] = str(version)

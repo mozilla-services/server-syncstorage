@@ -1015,6 +1015,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {"payload": "TEST"}
         r = self.app.put_json(self.root + "/storage/col2/TEST", bso)
         ver2 = r.headers["X-Last-Modified-Version"]
+        assert ver2 > ver1
         # Using the previous version should read the updated data.
         headers = {"X-If-Modified-Since-Version": str(ver1)}
         for view in INFO_VIEWS:
@@ -1023,19 +1024,18 @@ class TestStorage(StorageFunctionalTestCase):
         headers = {"X-If-Modified-Since-Version": str(ver2)}
         for view in INFO_VIEWS:
             self.app.get(self.root + view, headers=headers, status=304)
-        # XXX TODO: the storage-level timestamp is not tracked correctly
-        # after deleting a collection, so this test fails for now.
-        ## Delete a collection.
-        #r = self.app.delete(self.root + "/storage/col2")
-        #ver3 = r.headers["X-Last-Modified-Version"]
-        ## Using the previous timestamp should read the updated data.
-        #headers = {"X-If-Modified-Since-Version": str(ver2)}
-        #for view in INFO_VIEWS:
-        #    self.app.get(self.root + view, headers=headers, status=200)
-        ## Using the new timestamp should produce 304s.
-        #headers = {"X-If-Modified-Since-Version": str(ver3)}
-        #for view in INFO_VIEWS:
-        #    self.app.get(self.root + view, headers=headers, status=304)
+        # Delete a collection.
+        r = self.app.delete(self.root + "/storage/col2")
+        ver3 = r.headers["X-Last-Modified-Version"]
+        assert ver3 > ver2
+        # Using the previous timestamp should read the updated data.
+        headers = {"X-If-Modified-Since-Version": str(ver2)}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=200)
+        # Using the new timestamp should produce 304s.
+        headers = {"X-If-Modified-Since-Version": str(ver3)}
+        for view in INFO_VIEWS:
+            self.app.get(self.root + view, headers=headers, status=304)
 
     def test_that_x_last_modified_is_sent_for_all_get_requests(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]

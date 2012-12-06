@@ -27,7 +27,9 @@ STORAGE_SIZE = "SELECT SUM(payload_size) FROM %(bso)s WHERE "\
                "userid=:userid AND ttl>:ttl"
 
 COLLECTIONS_VERSIONS = "SELECT collection, last_modified_v "\
-                       "FROM user_collections WHERE userid=:userid"
+                       "FROM user_collections "\
+                       "WHERE userid=:userid "\
+                       "AND last_modified_v > last_deleted_v"\
 
 COLLECTIONS_COUNTS = "SELECT collection, COUNT(collection) FROM %(bso)s "\
                      "WHERE userid=:userid AND ttl>:ttl "\
@@ -49,6 +51,7 @@ BEGIN_TRANSACTION_WRITE = None
 
 LOCK_COLLECTION_READ = "SELECT last_modified_v FROM user_collections "\
                        "WHERE userid=:userid AND collection=:collectionid "\
+                       "AND last_modified_v > last_deleted_v "\
                        "LOCK IN SHARE MODE"
 
 LOCK_COLLECTION_WRITE = "SELECT last_modified_v FROM user_collections "\
@@ -70,20 +73,22 @@ INSERT_COLLECTION = "INSERT INTO collections (collectionid, name) "\
                     "VALUES (:collectionid, :name)"
 
 INIT_COLLECTION = "INSERT INTO user_collections "\
-                  "(userid, collection, last_modified_v) "\
-                  "VALUES (:userid, :collectionid, :version)"
+                  "(userid, collection, last_modified_v, last_deleted_v) "\
+                  "VALUES (:userid, :collectionid, :version, 0)"
 
 TOUCH_COLLECTION = "UPDATE user_collections SET last_modified_v=:version "\
                    "WHERE userid=:userid AND collection=:collectionid"
 
 COLLECTION_VERSION = "SELECT last_modified_v FROM user_collections "\
-                     "WHERE userid=:userid AND collection=:collectionid"
+                     "WHERE userid=:userid AND collection=:collectionid "\
+                     "AND last_modified_v > last_deleted_v"
 
 DELETE_COLLECTION_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                           "AND collection=:collectionid"
 
-DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
-                    "AND collection=:collectionid"
+DELETE_COLLECTION = "UPDATE user_collections "\
+                    "SET last_modified_v=:version, last_deleted_v=:version "\
+                    "WHERE userid=:userid AND collection=:collectionid"
 
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
@@ -145,3 +150,5 @@ ITEM_DETAILS = "SELECT id, sortindex, version, timestamp, payload "\
 ITEM_VERSION = "SELECT version FROM %(bso)s "\
                "WHERE collection=:collectionid AND userid=:userid "\
                "AND id=:item AND ttl>:ttl"
+
+ALL_COLLECTIONS = "SELECT * FROM user_collections"
