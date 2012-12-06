@@ -16,32 +16,44 @@ string interpolation variables with special meaning:
 
 """
 
-from sqlalchemy.sql import select, bindparam
+from sqlalchemy.sql import select, bindparam, and_
+
+from syncstorage.storage.sql.dbconnect import user_collections
 
 # Queries operating on all collections in the storage.
 
 STORAGE_VERSION = "SELECT MAX(last_modified_v) FROM user_collections "\
                   "WHERE userid=:userid"
 
-STORAGE_SIZE = "SELECT SUM(payload_size) FROM %(bso)s WHERE "\
-               "userid=:userid AND ttl>:ttl"
+STORAGE_SIZE = "SELECT SUM(b.payload_size) "\
+               "FROM %(bso)s b, user_collections uc "\
+               "WHERE b.userid=:userid AND uc.userid=:userid "\
+               "AND b.collection=uc.collection "\
+               "AND b.ttl>:ttl AND b.version>uc.last_deleted_v"
 
 COLLECTIONS_VERSIONS = "SELECT collection, last_modified_v "\
                        "FROM user_collections "\
                        "WHERE userid=:userid "\
                        "AND last_modified_v > last_deleted_v"\
 
-COLLECTIONS_COUNTS = "SELECT collection, COUNT(collection) FROM %(bso)s "\
-                     "WHERE userid=:userid AND ttl>:ttl "\
-                     "GROUP BY collection"
+COLLECTIONS_COUNTS = "SELECT b.collection, COUNT(b.collection) "\
+                     "FROM %(bso)s b, user_collections uc "\
+                     "WHERE b.userid=:userid AND uc.userid=:userid "\
+                     "AND b.collection=uc.collection "\
+                     "AND b.ttl>:ttl AND b.version>uc.last_deleted_v "\
+                     "GROUP BY b.collection"
 
-COLLECTIONS_SIZES = "SELECT collection, SUM(payload_size) FROM %(bso)s "\
-                    "WHERE userid=:userid AND ttl>:ttl "\
-                    "GROUP BY collection"
+COLLECTIONS_SIZES = "SELECT b.collection, SUM(b.payload_size) "\
+                    "FROM %(bso)s b, user_collections uc "\
+                    "WHERE b.userid=:userid AND uc.userid=:userid "\
+                    "AND b.collection=uc.collection "\
+                    "AND b.ttl>:ttl AND b.version>uc.last_deleted_v "\
+                    "GROUP BY b.collection"
 
-DELETE_ALL_BSOS = "DELETE FROM %(bso)s WHERE userid=:userid"
-
-DELETE_ALL_COLLECTIONS = "DELETE FROM user_collections WHERE userid=:userid"
+DELETE_ALL_COLLECTIONS = "UPDATE user_collections "\
+                         "SET last_modified_v=:version, "\
+                         "    last_deleted_v=:version "\
+                         "WHERE userid=:userid"
 
 # Queries for locking/unlocking a collection.
 
@@ -83,12 +95,13 @@ COLLECTION_VERSION = "SELECT last_modified_v FROM user_collections "\
                      "WHERE userid=:userid AND collection=:collectionid "\
                      "AND last_modified_v > last_deleted_v"
 
-DELETE_COLLECTION_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
-                          "AND collection=:collectionid"
+COLLECTION_LAST_DELETED = "SELECT last_deleted_v FROM user_collections "\
+                          "WHERE userid=:userid AND collection=:collectionid "
 
 DELETE_COLLECTION = "UPDATE user_collections "\
                     "SET last_modified_v=:version, last_deleted_v=:version "\
-                    "WHERE userid=:userid AND collection=:collectionid"
+                    "WHERE userid=:userid AND collection=:collectionid "\
+                    "AND last_modified_v > last_deleted_v"
 
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
@@ -108,6 +121,15 @@ def FIND_ITEMS(bso, params):
         query = select([bso.c[field] for field in fields])
     query = query.where(bso.c.userid == bindparam("userid"))
     query = query.where(bso.c.collection == bindparam("collectionid"))
+    # Ensure that it hasn't been deleted by a previous operation.
+    # This formulates a sub-query to look up last_deleted_v and then
+    # check the the item's version is greater than that.
+    # XXX TODO: check if mysql can successfully optimize this sub-query
+    last_deleted_v = select([user_collections.c.last_deleted_v]).where(and_(
+        user_collections.c.userid == bindparam("userid"),
+        user_collections.c.collection == bindparam("collectionid"),
+    ))
+    query = query.where(bso.c.version > last_deleted_v)
     # Filter by the various query parameters.
     if "ids" in params:
         # Sadly, we can't use a bindparam in an "IN" expression.
@@ -141,14 +163,24 @@ def FIND_ITEMS(bso, params):
 # Queries operating on a particular item.
 
 DELETE_ITEM = "DELETE FROM %(bso)s WHERE userid=:userid AND "\
-              "collection=:collectionid AND id=:item AND ttl>:ttl"\
+              "collection=:collectionid AND id IN "\
+              "  (SELECT b.id FROM %(bso)s b, user_collections uc "\
+              "   WHERE b.userid=:userid AND uc.userid=:userid "\
+              "   AND b.id=:item AND b.collection=uc.collection "\
+              "   AND b.ttl>:ttl AND b.version>uc.last_deleted_v)"
 
 ITEM_DETAILS = "SELECT id, sortindex, version, timestamp, payload "\
-               "FROM %(bso)s WHERE collection=:collectionid "\
-               "AND userid=:userid AND id=:item AND ttl>:ttl"
+               "FROM %(bso)s b WHERE collection=:collectionid "\
+               "AND userid=:userid AND id=:item AND ttl>:ttl AND version > "\
+               "  (SELECT last_deleted_v FROM user_collections uc "\
+               "   WHERE uc.userid=:userid AND uc.collection=b.collection)"
 
-ITEM_VERSION = "SELECT version FROM %(bso)s "\
+ITEM_VERSION = "SELECT version FROM %(bso)s b "\
                "WHERE collection=:collectionid AND userid=:userid "\
-               "AND id=:item AND ttl>:ttl"
+               "AND id=:item AND ttl>:ttl AND version > "\
+               "  (SELECT last_deleted_v FROM user_collections uc "\
+               "   WHERE uc.userid=:userid AND uc.collection=b.collection)"
 
 ALL_COLLECTIONS = "SELECT * FROM user_collections"
+
+ALL_ITEMS = "SELECT * FROM bso"

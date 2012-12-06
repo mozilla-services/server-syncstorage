@@ -29,15 +29,13 @@ from pyramid.threadlocal import get_current_registry
 from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
 from sqlalchemy.pool import NullPool, QueuePool
-from sqlalchemy.sql import insert, update, text as sqltext
+from sqlalchemy.sql import insert, update, case, text as sqltext
 from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
 from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
 
 from mozsvc.exceptions import BackendError
-
-from syncstorage.storage.sql import queries_generic, queries_sqlite
 
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")
 
@@ -274,9 +272,12 @@ class DBConnector(object):
         # Load the pre-built queries to use with this database backend.
         # Currently we have a generic set of queries, and some queries specific
         # to SQLite.  We may add more backend-specific queries in future.
+        # NOTE: these may have circular imports to table defs in this file
         self._prebuilt_queries = {}
+        from syncstorage.storage.sql import queries_generic
         query_modules = [queries_generic]
         if self.driver == "sqlite":
+            from syncstorage.storage.sql import queries_sqlite
             query_modules.append(queries_sqlite)
         for queries in query_modules:
             for nm in dir(queries):
@@ -589,7 +590,7 @@ class DBConnection(object):
             finally:
                 res.close()
 
-    def insert_or_update(self, table, items, annotations=None):
+    def insert_or_update(self, table, items, last_deleted=None, annotations=None):
         """Perform an efficient bulk "upsert" of the given items.
 
         Given the name of a table and a list of data dicts to insert or update,
@@ -620,11 +621,11 @@ class DBConnection(object):
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
-            return self._upsert_onduplicatekey(table, items, annotations)
+            return self._upsert_onduplicatekey(table, items, annotations, last_deleted)
         else:
-            return self._upsert_generic(table, items, annotations)
+            return self._upsert_generic(table, items, annotations, last_deleted)
 
-    def _upsert_generic(self, table, items, annotations):
+    def _upsert_generic(self, table, items, annotations, last_deleted):
         """Upsert a batch of items one at a time, trying INSERT then UPDATE.
 
         This is a tremendously inefficient way to write a batch of items,
@@ -634,12 +635,14 @@ class DBConnection(object):
         userid = items[0].get("userid")
         num_created = 0
         for item in items:
+            print "UPSERTING: ", item
             assert item.get("userid") == userid
             try:
                 # Try to insert the item.
                 # If it already exists, this fails with an integrity error.
                 query = insert(table).values(**item)
                 self.execute(query, item, annotations).close()
+                print "  INSERTED", item
                 num_created += 1
             except IntegrityError:
                 # Update the item.
@@ -653,8 +656,19 @@ class DBConnection(object):
                     except KeyError:
                         msg = "Item is missing primary key column %r"
                         raise ValueError(msg % (key.name,))
+                # We may be overwriting "deleted" data.
+                # Columns specified explicitly can overwrite, but columns
+                # not specified explicitly must take their default value.
+                #for col in table.columns:
+                #    if col.name in item:
+                #        value = item[col.name]
+                #    else:
+                #        value = case([(table.c.version > last_deleted, col)],
+                #                     else_=col.default)
+                #    query = query.values(**{col.name: value})
                 query = query.values(**item)
                 self.execute(query, item, annotations).close()
+                print "  UPDATED", item
         return num_created
 
     def _upsert_onduplicatekey(self, table, items, annotations):

@@ -1062,12 +1062,21 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {"ttl": 10}
         self.app.post_json(self.root + "/storage/col2/TEST2", bso)
         self.app.post_json(self.root + "/storage/col2/TEST3", bso)
+        self.config.registry["syncstorage:storage:default"].dump_items()
         # Update some other field on TEST1, which should leave ttl untouched.
         bso = {"sortindex": 3}
         self.app.post_json(self.root + "/storage/col2/TEST1", bso)
-        # If we wait, TEST1 should expire but the others should not.
-        time.sleep(0.8)
         items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
+        print items
+        self.assertEquals(len(items), 3)
+        # If we wait, TEST1 should expire but the others should not.
+        self.config.registry["syncstorage:storage:default"].dump_collections()
+        self.config.registry["syncstorage:storage:default"].dump_items()
+        time.sleep(0.8)
+        self.config.registry["syncstorage:storage:default"].dump_collections()
+        self.config.registry["syncstorage:storage:default"].dump_items()
+        items = self.app.get(self.root + "/storage/col2?full=1").json["items"]
+        print items
         items = dict((item["id"], item) for item in items)
         self.assertEquals(sorted(items.keys()), ["TEST2", "TEST3"])
         # The existing item should have retained its payload.

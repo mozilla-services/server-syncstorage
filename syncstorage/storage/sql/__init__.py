@@ -250,11 +250,9 @@ class SQLStorage(SyncStorage):
     @with_session
     def delete_storage(self, session, userid):
         """Removes all data for the user."""
-        session.query("DELETE_ALL_BSOS", {
-            "userid": userid,
-        })
         session.query("DELETE_ALL_COLLECTIONS", {
             "userid": userid,
+            "version": session.new_version
         })
 
     #
@@ -339,7 +337,11 @@ class SQLStorage(SyncStorage):
         for data in items:
             id = data["id"]
             self._prepare_item_data(session, userid, collectionid, id, data)
-        session.insert_or_update("bso", items)
+        last_deleted = session.query_scalar("COLLECTION_LAST_DELETED", {
+            "userid": userid,
+            "collectionid": collectionid,
+        })
+        session.insert_or_update("bso", items, last_deleted)
         self._touch_collection(session, userid, collectionid)
         return session.new_version
 
@@ -347,11 +349,7 @@ class SQLStorage(SyncStorage):
     def delete_collection(self, session, userid, collection):
         """Deletes an entire collection."""
         collectionid = self._get_collection_id(session, collection)
-        count = session.query("DELETE_COLLECTION_ITEMS", {
-            "userid": userid,
-            "collectionid": collectionid,
-        })
-        count += session.query("DELETE_COLLECTION", {
+        count = session.query("DELETE_COLLECTION", {
             "userid": userid,
             "collectionid": collectionid,
             "version": session.new_version
@@ -427,7 +425,12 @@ class SQLStorage(SyncStorage):
         """Creates or updates a single item in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
         self._prepare_item_data(session, userid, collectionid, item, data)
-        num_created = session.insert_or_update("bso", [data])
+        print "PREPARED ITEM", data
+        last_deleted = session.query_scalar("COLLECTION_LAST_DELETED", {
+            "userid": userid,
+            "collectionid": collectionid,
+        })
+        num_created = session.insert_or_update("bso", [data], last_deleted)
         self._touch_collection(session, userid, collectionid)
         return {
             "created": bool(num_created),
@@ -441,6 +444,8 @@ class SQLStorage(SyncStorage):
         data["id"] = item
         # If a payload is provided, make sure to update dependant fields.
         if "payload" in data:
+            # XXX TODO: we need to ensure version and timestamp get set
+            # on creation, even if we default to a payload of null
             data["version"] = session.new_version
             data["timestamp"] = int(session.timestamp * 1000)
             data["payload_size"] = len(data["payload"])
@@ -589,6 +594,20 @@ class SQLStorage(SyncStorage):
             self._collections_by_name[collection] = collectionid
             self._collections_by_id[collectionid] = collection
 
+    @with_session
+    def dump_items(self, session):
+        print "===ITEMS=="
+        for row in session.query_fetchall("ALL_ITEMS"):
+            print row
+        print "=========="
+
+    @with_session
+    def dump_collections(self, session):
+        print "===COLLECTIONS==="
+        for row in session.query_fetchall("ALL_COLLECTIONS"):
+            print row
+        print "=========="
+
 
 class SQLStorageSession(object):
     """Object representing a data access session.
@@ -622,10 +641,10 @@ class SQLStorageSession(object):
         else:
             self.rollback()
 
-    def insert_or_update(self, table, items):
+    def insert_or_update(self, table, items, last_deleted=None):
         """Do a bulk insert/update of the given items."""
         assert self._nesting_level > 0, "Session has not been started"
-        return self.connection.insert_or_update(table, items)
+        return self.connection.insert_or_update(table, items, last_deleted)
 
     def query(self, query, params={}):
         """Execute a database query, returning the rowcount."""
