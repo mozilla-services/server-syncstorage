@@ -84,14 +84,9 @@ build_rpms:
 	rm -rf rpms
 	mkdir -p  rpms ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	# The simplejson rpms conflict with a RHEL6 system package.
-	# Do a custom build so that they can overwrite rather than conflict.
-	rm -f $(CURDIR)/rpms/python26-simplejson*.rpm
-	wget -O ${BUILD_TMP}/simplejson-2.4.0.tar.gz http://pypi.python.org/packages/source/s/simplejson/simplejson-2.4.0.tar.gz
-	cd ${BUILD_TMP}; tar -xzvf simplejson-2.4.0.tar.gz
-	HERE=`pwd` ; cd ${BUILD_TMP}/simplejson-2.4.0; $$HERE/bin/python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python-simplejson --dist-dir=$(CURDIR)/rpms
-	rm -rf ${BUILD_TMP}/simplejson-2.4.0
-	rm -f ${BUILD_TMP}/simplejson-2.4.0.tar.gz
+	# The pygments rpm conflicts with a system package.
+	# Just remove it and depend on the system version.
+	rm -f $(CURDIR)/rpms/python26-pygments*.rpm
 	# umemcache doesn't play nicely with pypi2rpm.
 	# Ergo, we have to build it by hand.
 	wget -O ${BUILD_TMP}/umemcache.tar.gz https://github.com/esnme/ultramemcache/archive/ad77f6df02b026f0160e8a95321bb0df36647ef6.tar.gz
