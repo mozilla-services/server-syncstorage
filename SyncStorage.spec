@@ -14,7 +14,7 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Ryan Kelly <rfkelly@mozilla.com>
-BuildRequires: libevent-devel libmemcached-devel
+BuildRequires: libevent-devel
 Requires: memcached gunicorn python26 argparse python26-cef python26-cornice python26-setuptools python26-docutils python26-gevent python26-greenlet python26-macauthlib python26-mako python26-markupsafe python26-metlog-py python26-mozsvc python26-ordereddict python26-paste python26-pastedeploy python26-pastescript python26-umemcache python26-pymysql python26-pymysql_sa python26-pyramid python26-pyramid_debugtoolbar python26-repoze.lru python-simplejson python26-pyramid_macauth
 Url: https://github.com/mozilla-servcices/server-syncstorage
 
