@@ -115,29 +115,12 @@ class HDFSUploader(object):
     def call_subprocess(self, *args, **kwargs):
         return subprocess.call(*args, **kwargs)
 
-    def get_user_home(self):
-        # Just tell hadoop to import the file
-        priv_key = os.path.join(self._ssh_keypath,
-                                "id_private_%s" % self.HADOOP_USER)
-        ssh_target = "%s@%s" % (self.HADOOP_USER, self.HADOOP_HOST)
-        cmd = ["/usr/bin/ssh",
-               "-i",
-               priv_key,
-               ssh_target,
-               "pwd"]
-        self.LOGGER.info(' '.join(cmd))
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        results = proc.communicate()
-        user_home = results[0].strip()
-        return user_home
-
     def dfs_put(self):
         # Just tell hadoop to import the file
         priv_key = os.path.join(self._ssh_keypath,
                                 "id_private_%s" % self.HADOOP_USER)
         ssh_target = "%s@%s" % (self.HADOOP_USER, self.HADOOP_HOST)
 
-        user_home = self.get_user_home()
         cmd = ["/usr/bin/ssh",
                "-i",
                priv_key,
@@ -146,7 +129,7 @@ class HDFSUploader(object):
                "dfs",
                "-put",
                self.DST_FNAME,
-               os.path.join(user_home, self.DST_FNAME)]
+               "/user/%s/%s" % (self.HADOOP_USER, self.DST_FNAME)]
 
         self.LOGGER.info(' '.join(cmd))
         dfs_result = self.call_subprocess(cmd)
