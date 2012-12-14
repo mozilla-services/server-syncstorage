@@ -92,14 +92,14 @@ build_rpms:
 	rm -f $(CURDIR)/rpms/python26-simplejson*.rpm
 	wget -O ${BUILD_TMP}/simplejson-2.4.0.tar.gz http://pypi.python.org/packages/source/s/simplejson/simplejson-2.4.0.tar.gz
 	cd ${BUILD_TMP}; tar -xzvf simplejson-2.4.0.tar.gz
-	cd ${BUILD_TMP}/simplejson-2.4.0; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python-simplejson --dist-dir=$(CURDIR)/rpms
+	cd ${BUILD_TMP}/simplejson-2.4.0; ${PYTHON} setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python-simplejson --dist-dir=$(CURDIR)/rpms
 	rm -rf ${BUILD_TMP}/simplejson-2.4.0
 	rm -f ${BUILD_TMP}/simplejson-2.4.0.tar.gz
 	# umemcache doesn't play nicely with pypi2rpm.
 	# Ergo, we have to build it by hand.
 	wget -O ${BUILD_TMP}/umemcache.tar.gz https://github.com/esnme/ultramemcache/archive/ad77f6df02b026f0160e8a95321bb0df36647ef6.tar.gz
 	cd ${BUILD_TMP}; tar -xzvf umemcache.tar.gz
-	cd ${BUILD_TMP}/ultramemcache-*; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-umemcache --dist-dir=$(CURDIR)/rpms
+	cd ${BUILD_TMP}/ultramemcache-*; ${PYTHON} setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-umemcache --dist-dir=$(CURDIR)/rpms
 	rm -rf ${BUILD_TMP}
 
 
