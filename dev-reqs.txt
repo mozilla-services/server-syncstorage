@@ -5,6 +5,7 @@ cornice
 docutils
 gevent
 greenlet
+gunicorn
 Jinja2
 macauthlib
 Mako

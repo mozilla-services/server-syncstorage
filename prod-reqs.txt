@@ -5,6 +5,7 @@ cornice==0.11
 docutils==0.8.1
 gevent==0.13.8
 greenlet==0.4
+gunicorn==0.16.1
 Jinja2==2.6
 macauthlib==0.5
 Mako==0.7.2
