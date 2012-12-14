@@ -1,0 +1,34 @@
+[server:main]
+use = egg:gunicorn#main
+host = 127.0.0.1
+port = 8000
+
+[app:main]
+use = egg:SyncStorage
+
+[macauth]
+secret = TED KOPPEL IS A ROBOT
+
+[metlog]
+backend = mozsvc.metrics.MetlogPlugin
+logger = syncstorage
+sender_class = metlog.senders.udp.UdpSender
+sender_host = 127.0.0.1
+sender_port = 5566
+
+[cef]
+use = true
+file = syslog
+vendor = mozilla
+version = 0
+device_version = 1.3
+product = sync2
+syslog.options = PID,CONS
+syslog.priority = DEBUG
+syslog.facility = LOCAL5
+
+[storage]
+backend = syncstorage.storage.sql.SQLStorage
+sqluri = pymysql://<%= @db_user %>:<%= @db_password %>@<%= @db_host %>/sync2_1
+standard_collections = true
+create_tables = true

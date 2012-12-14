@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# gunicorn-syncstorage - this script starts and stops the gunicorn webserver
+#
+# chkconfig:   - 84 16
+# description:  gunicorn-syncstorage is the application webserver for the \
+#               SyncStorage product.
+# processname: gunicorn
+# config:      /etc/mozilla-services/syncstorage/production.ini
+# pidfile:     /var/run/gunicorn-syncstorage.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+gunicorn="/usr/bin/gunicorn"
+prog=$(basename $gunicorn)
+
+lockfile="/var/lock/subsys/gunicorn-syncstorage"
+pidfile="/var/run/gunicorn-syncstorage.pid"
+
+args="-b 127.0.0.1:8000 --workers 4 --worker-class gevent --timeout 500"
+args="$args --daemon --pid $pidfile --user www-data --group nobody"
+args="$args --error-logfile /var/log/gunicorn-syncstorage"
+args="$args syncstorage.run:application"
+
+
+start() {
+    [ -x $gunicorn ] || exit 5
+    echo -n $"Starting $prog: "
+    $gunicorn $args
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    killproc -p $pidfile $prog
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+restart() {
+    configtest || return 6
+    stop
+    start
+}
+
+reload() {
+    configtest || return 6
+    echo -n $"Reloading $prog: "
+    killproc -p $pidfile $prog -HUP
+    echo
+}
+
+configtest() {
+    $gunicorn --check-config $args
+}
+
+rh_status() {
+    status $prog
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+        $1
+        ;;
+    restart|configtest)
+        $1
+        ;;
+    reload)
+        rh_status_q || exit 7
+        $1
+        ;;
+    status|status_q)
+        rh_$1
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|reload|configtest|status|restart}"
+        exit 2
+esac

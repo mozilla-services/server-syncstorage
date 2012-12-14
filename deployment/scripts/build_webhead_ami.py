@@ -40,3 +40,5 @@ TAGS = {
   "Author": "rfkelly@mozilla.com"
 }
 
+if __name__ == "__main__":
+    raise RuntimeError("SCRIPT IS NOT FINISHED YET")

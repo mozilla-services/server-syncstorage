@@ -2,16 +2,6 @@
 AWS Deployment Notes
 ====================
 
-Create WebHead AMI
--------------------
-
-* Launch m1.small with Amazon Linux AMI
-
-
-Create Storage Node AMI
------------------------
-
-
 Create Load Balancer
 --------------------
 
@@ -28,37 +18,24 @@ Create Security Group
 Needs ssh and http, nothing else.
 
 
-Scripty Things To Write
+Create WebHead AMI
+-------------------
+
+* Launch m1.small with Amazon Linux AMI
+* Use setup_webhead.sh as the user-data
+* ...NOW WHAT?
+
+
+Create Storage Node AMI
 -----------------------
 
-Build and push a new version
-  * based on bobm's syncpush script
-  * with rollback etc?
-  * both for storage nodes and webheads?
-
-Provision a new storage node
-  * spin it up from the AMI
-  * get IP address, assign DNS name, etc?
-  * update configuration on all webheads
-      * puppet?
-  * test its reachability somehow
-  * update WIMMS database
+* Launch m1.small with Amazon Linux AMI
+* Use setup_dbnode.sh as the user-data
+* ...NOW WHAT?
 
 
-When storage node boots up, it needs to:
-  * initialize the database
+Notes
+-----
 
-When a webhead boots up, it needs to:
-  * figure out what storage backends it can talk to
-  * connect to memcache somehow
-    * use the AWS hosted memcache?
-  * 
+instance-store based Amz Linux AMI: ami-e8249881
 
-
-Open Questions
---------------
-
-We're doing some sort of puppet-based thing with RPMs, need to figure that out.
-
-instance-store based Amz Linux AMI:
-  ami-e8249881    
