@@ -109,7 +109,7 @@ class SQLStorage(SyncStorage):
         self._collections_by_name = {}
         self._collections_by_id = {}
         if self.standard_collections:
-            for id, name in STANDARD_COLLECTIONS:
+            for id, name in STANDARD_COLLECTIONS.iteritems():
                 self._collections_by_name[name] = id
                 self._collections_by_id[id] = name
 
