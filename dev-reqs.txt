@@ -33,7 +33,7 @@ SQLAlchemy
 tokenlib
 translationstring
 unittest2
-venusian
+venusian>=1.0a3
 WebOb
 WebTest
 WSGIProxy
