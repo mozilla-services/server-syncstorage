@@ -479,7 +479,7 @@ class DBConnection(object):
             # successfully used as part of this transaction.
             try:
                 query_str = self._render_query(query, params, annotations)
-                return connection.execute(query_str, **params)
+                return connection.execute(sqltext(query_str), **params)
             except DBAPIError, exc:
                 if not is_retryable_db_error(self._connector.engine, exc):
                     raise
@@ -493,7 +493,7 @@ class DBConnection(object):
                 transaction = connection.begin()
                 annotations["retry"] = "1"
                 query_str = self._render_query(query, params, annotations)
-                return connection.execute(query_str, **params)
+                return connection.execute(sqltext(query_str), **params)
         finally:
             # Now that the underlying connection has been used, remember it
             # so that all subsequent queries are part of the same transaction.
