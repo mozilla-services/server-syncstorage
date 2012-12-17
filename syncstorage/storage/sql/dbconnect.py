@@ -19,6 +19,7 @@ This behaviour is off by default; pass shard=True to enable it.
 
 import os
 import re
+import copy
 import urlparse
 import traceback
 import functools
@@ -282,6 +283,12 @@ class DBConnector(object):
                 if nm.isupper():
                     self._prebuilt_queries[nm] = getattr(queries, nm)
 
+        # Constuct a Dialect object to use for rendering query objects.
+        # This forces rendering of bindparams using the "named" style,
+        # so that the resulting string is compatible with sqltext().
+        self._render_query_dialect = copy.copy(self.engine.dialect)
+        self._render_query_dialect.paramstyle = "named"
+
     @property
     def logger(self):
         return get_current_registry()["metlog"]
@@ -512,7 +519,8 @@ class DBConnection(object):
         if isinstance(query, basestring):
             query_str = query
         else:
-            compiled = query.compile()
+            dialect = self._connector._render_query_dialect
+            compiled = query.compile(dialect=dialect)
             for param, value in compiled.params.iteritems():
                 params.setdefault(param, value)
             query_str = str(compiled)
