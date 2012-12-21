@@ -25,3 +25,9 @@ More general information can be found at the following links:
 
    * https://docs.services.mozilla.com/storage/
    * https://wiki.mozilla.org/Services/Sync
+
+Initial deployment of the Sync2.0 service will be hosted on AWS.  Tooling and
+documentation for this deployment can be found in the the "deployment" subdir,
+located here:
+
+   * https://github.com/mozilla-services/server-syncstorage/tree/rfk/aws-deployment/deployment
