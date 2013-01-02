@@ -54,18 +54,19 @@ AWS uses security groups to control access between cloud resources.  For
 syncstorage we need independent security groups for the webheads, the dbnodes,
 and the elasticache cluster.
   
-  * A "sync2-sg-web" EC2 security group for the webheads, allowing inbound
-    traffic on ports 22 and 80.
-  * A "sync2-sg-db" RDS security group to contain the dbnodes, allowing 
-    access from machines in the "sync2-sg-web" security group.
-  * A "sync2-sg-cache" ElastiCache security group for the elasticache instance,
-    allowing access from machines in the "sync2-sg-web" security group.
+  * A "syncstorage-sg-web" EC2 security group for the webheads, allowing
+    inbound traffic on ports 22 and 80.
+  * A "syncstorage-sg-db" RDS security group to contain the dbnodes, allowing 
+    access from machines in the "syncstorage-sg-web" security group.
+  * A "syncstorage-sg-cache" ElastiCache security group for the elasticache
+    instance, allowing access from machines in the "syncstorage-sg-web"
+    security group.
 
 
 Load Balancer
 ~~~~~~~~~~~~~
 
-Create a "sync2-lb" instance of Elastic Load Balancer.  Configure it to
+Create a "syncstorage-lb" instance of Elastic Load Balancer.  Configure it to
 accept HTTP traffic only, and forward it as HTTP traffic.
 
 (XXX TODO: confer with JR and Ops on how to use HTTPS rather than HTTP)
@@ -83,7 +84,7 @@ Webhead Instance
 Launch an m1.small instance using image "ami-e8249881".  This is an Amazon
 Linux image using instance storage for its root partition.
 
-Place it in the "sync2-sg-web" security group, and use the contents of
+Place it in the "syncstorage-sg-web" security group, and use the contents of
 "./scripts/setup_webhead.sh" as the "user data" during startup.  This is
 a cloud-init script that will build and install all the necessary packages to
 stand up a fully-functioning webhead.
@@ -96,8 +97,8 @@ DBNode RDS Instance
 ~~~~~~~~~~~~~~~~~~~
 
 Create a new RDS DB instance with appropriate storage.  Create a default user
-of "sync2" and see ./scripts/setup_webhead.sh for the corresponding password.
-Place the instance in the "sync2-sg-db" security group.
+of "syncstorage" and see ./scripts/setup_webhead.sh for the corresponding
+password.  Place the instance in the "syncstorage-sg-db" security group.
 
 Grab the DNS name for the new instance, and put it in the files under ./puppet/
 at the appropriate location.  Then push the config change out to all the
@@ -113,7 +114,7 @@ ElastiCache
 ~~~~~~~~~~~
 
 Create a new Elasticache cluster, appropriately sized.  Place it in the
-"sync2-sg-cache" security group.
+"syncstorage-sg-cache" security group.
 
 Grab the DNS name for the new instance, and put it in the files under ./puppet/
 at the appropriate location.  Then push the config change out to all the
@@ -124,11 +125,48 @@ to adjust the config as nodes are added or removed - we should look into that.
 http://docs.amazonwebservices.com/AmazonElastiCache/latest/UserGuide/AutoDiscovery.ConfigCommand.html)
 
 
-Things To Do
-~~~~~~~~~~~~
+TODO: Integration with Tokenserver
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Things we haven't completely figured out yet:
+The tokenserver needs to know what hostnames are available, and the master
+secret to use for each hostname.  The webheads need to know what hostnames map
+to what DBNode, and the master secret to use for each hostname.
 
-* Metrics and logging setup
-* Monitoring
+To add a new DBNode we need to do the following, in order:
 
+   * Bring up the instance, configure MySQL, create tables, etc.
+   * Assign a set of new hostnames to it in syncstorage::webhead manifest
+   * Add a master secret for each new hostname to puppet://syncstorage/secrets
+   * Push the new puppet config to the syncstorage webheads
+   * Push the updated secrets file to the tokenserver
+   * Add each new hostname into the nodes database on tokenserver
+
+To chance the master secret for an existing node we need to do the following,
+in order:
+
+   * Add a new secret for that node in puppet://syncstorage/secrets, leaving
+     the current secret in place.
+   * Push the new puppet config to the syncstorage webheads; it is now able
+     to accept tokens signed with either new or old secret.
+   * Push the updated secrets file to the tokenserver; it will now generate
+     tokens with the new secret.
+   * After some time, remove the old secret for the node from
+     puppet://syncstorage/secrets and push to syncstorage and tokenserver.
+
+
+TODO: Metrics and Logging
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+I need to talk to whd about this, and look at the existing puppet code.
+
+TODO: Monitoring
+~~~~~~~~~~~~~~~~
+
+I need to look at the existing puppet code.
+
+
+TODO: Misc
+~~~~~~~~~~
+
+nginx should be more generic, make a conf.d and allow other recipes
+to insert configuration into it.
