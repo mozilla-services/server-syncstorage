@@ -7,7 +7,7 @@ port = 8000
 use = egg:SyncStorage
 
 [macauth]
-secret = TED KOPPEL IS A ROBOT
+secrets_file = /etc/mozilla-services/syncstorage/secrets
 
 [metlog]
 backend = mozsvc.metrics.MetlogPlugin
@@ -22,13 +22,29 @@ file = syslog
 vendor = mozilla
 version = 0
 device_version = 1.3
-product = sync2
+product = syncstorage
 syslog.options = PID,CONS
 syslog.priority = DEBUG
 syslog.facility = LOCAL5
 
 [storage]
+backend = syncstorage.storage.memcached.MemcachedStorage
+cache_servers = syncstorage-stage.y1uh6n.0001.use1.cache.amazonaws.com:11211
+cached_collections = meta
+cache_only_collections = tabs
+wraps = sqlstorage
+
+[sqlstorage]
 backend = syncstorage.storage.sql.SQLStorage
-sqluri = pymysql://<%= @db_user %>:<%= @db_password %>@<%= @db_host %>/sync2_1
+sqluri = pymysql://INVALIDUSER:INVALIDPASSWORD@INVALIDHOST/INVALIDDB
 standard_collections = true
-create_tables = true
+
+<%-#  One [host:hostname] section for each dbnode hostname -%>
+
+<% @db_nodes.each do |hostname, db_node| -%>
+
+[host:<%= hostname %>]
+sqlstorage.sqluri = pymysql://<%= @db_user %>:<%= @db_password %>@<%= db_node %>
+sqlstorage.create_tables = true
+
+<% end -%>

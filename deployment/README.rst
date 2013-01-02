@@ -52,10 +52,11 @@ Security Groups
 
 AWS uses security groups to control access between cloud resources.  For
 syncstorage we need independent security groups for the webheads, the dbnodes,
-and the elasticache cluster.
+and the elasticache cluster:
   
   * A "syncstorage-sg-web" EC2 security group for the webheads, allowing
-    inbound traffic on ports 22 and 80.
+    inbound traffic on ports 22 and 80.  Don't forget to "apply changes"
+    after adding the rules!
   * A "syncstorage-sg-db" RDS security group to contain the dbnodes, allowing 
     access from machines in the "syncstorage-sg-web" security group.
   * A "syncstorage-sg-cache" ElastiCache security group for the elasticache
@@ -67,15 +68,66 @@ Load Balancer
 ~~~~~~~~~~~~~
 
 Create a "syncstorage-lb" instance of Elastic Load Balancer.  Configure it to
-accept HTTP traffic only, and forward it as HTTP traffic.
+accept HTTP traffic on port 80 and forward it as HTTP traffic on port 80.
 
 (XXX TODO: confer with JR and Ops on how to use HTTPS rather than HTTP)
 
-Configure the "health check" to ping /__heartbeat__, which is a special
+Configure the "health check" ping path to be /__heartbeat__, which is a special
 URL used by mozsvc applications to report on their health.
 
-File a bug to get a <blah>.services.mozilla.com DNS alias setup as a CNAME
-for the loadbalancer.
+Don't add any instances to it yet, we don't have any running.
+
+
+
+DBNode RDS Instance
+~~~~~~~~~~~~~~~~~~~
+
+Create a new RDS DB instance using MySQL, size db.m1.small, with 100 GB of
+storage.  Create a default user of "syncstorage" and grab the corresponding
+password from ./scripts/setup_webhead.sh.  Place the instance in the
+"syncstorage-sg-db" security group.
+
+Each dbnode manages 10 virtual hostnames.  Assign 10 new DNS hostnames for this
+node (XXX TODO: how exactly?) and set them up as CNAME records pointing to the
+load balancer.  Then create 10 corresponding databases on the instance named
+"syncstorage0" through "syncstorage9":
+
+    CREATE DATABASE syncstorageX;
+
+Grab the internal DNS name for the new RDS instance, and edit the "webhead"
+puppet recipe to add them to the db_nodes hash, like this::
+
+    $db_nodes = {
+      "external-hostname-0" => "internal-rds-hostname/syncstorage0",
+      "external-hostname-1" => "internal-rds-hostname/syncstorage1",
+      ...
+      "external-hostname-9" => "internal-rds-hostname/syncstorage9",
+    }
+ 
+
+Use puppet to push this update out to any running webheads, so they can connect
+to the new instance.
+
+Finally, add the newly-assigned hostnames into the tokenserver nodes database.
+
+(XXX TODO: get MySQL puppet recipes from Ops, convert this to use a custom
+cluster of EC2 instances rather than RDS instances)
+
+
+ElastiCache
+~~~~~~~~~~~
+
+Create a new Elasticache cluster, size cache.m1.small.  Use only a single node,
+because the syncstorage code can't currently handle more than 1 node.  Place it
+in the "syncstorage-sg-cache" security group.
+
+Grab the DNS name for the new instance, and put it in the files under ./puppet/
+at the appropriate location.  Then push the config change out to all the
+webheads.
+
+(XXX TODO: elasticache has an "autodiscovery" thing that can avoid having
+to adjust the config as nodes are added or removed - we should look into that.
+http://docs.amazonwebservices.com/AmazonElastiCache/latest/UserGuide/AutoDiscovery.ConfigCommand.html)
 
 
 Webhead Instance
@@ -89,40 +141,21 @@ Place it in the "syncstorage-sg-web" security group, and use the contents of
 a cloud-init script that will build and install all the necessary packages to
 stand up a fully-functioning webhead.
 
+Ensure you assign an appropriate ssh key, so you can shell into it once it's
+up and running.
+
+Now wait.  A lot.
+
+The machine will spend quite some time building syncstorage and all the
+necessary dependencies, so ssh into it and watch "top" until there's no
+more activity.  Check /var/log/cloud-init.log for any errors.
+
 Associate the instance with the Load Balancer, and it should start accepting
 traffic as soon as it's ready.
 
-
-DBNode RDS Instance
-~~~~~~~~~~~~~~~~~~~
-
-Create a new RDS DB instance with appropriate storage.  Create a default user
-of "syncstorage" and see ./scripts/setup_webhead.sh for the corresponding
-password.  Place the instance in the "syncstorage-sg-db" security group.
-
-Grab the DNS name for the new instance, and put it in the files under ./puppet/
-at the appropriate location.  Then push the config change out to all the
-webheads.
-
-(XXX TODO: the puppet files don't yet work with multiple dbnodes)
-
-(XXX TODO: get MySQL puppet recipes from Ops, convert this to use a custom
-cluter of EC2 instances)
-
-
-ElastiCache
-~~~~~~~~~~~
-
-Create a new Elasticache cluster, appropriately sized.  Place it in the
-"syncstorage-sg-cache" security group.
-
-Grab the DNS name for the new instance, and put it in the files under ./puppet/
-at the appropriate location.  Then push the config change out to all the
-webheads.
-
-(XXX TODO: elasticache has an "autodiscovery" thing that can avoid having
-to adjust the config as nodes are added or removed - we should look into that.
-http://docs.amazonwebservices.com/AmazonElastiCache/latest/UserGuide/AutoDiscovery.ConfigCommand.html)
+(XXX TODO: save it as an image for easy deployment of additional webheads;
+this can't be dont through the web console because it's not using EBS for
+its root device)
 
 
 TODO: Integration with Tokenserver
@@ -136,12 +169,13 @@ To add a new DBNode we need to do the following, in order:
 
    * Bring up the instance, configure MySQL, create tables, etc.
    * Assign a set of new hostnames to it in syncstorage::webhead manifest
-   * Add a master secret for each new hostname to puppet://syncstorage/secrets
+   * Re-generate the secrets file from the puppet template, so that it includes
+     the new hostnames
    * Push the new puppet config to the syncstorage webheads
    * Push the updated secrets file to the tokenserver
    * Add each new hostname into the nodes database on tokenserver
 
-To chance the master secret for an existing node we need to do the following,
+To change the master secret for an existing node we need to do the following,
 in order:
 
    * Add a new secret for that node in puppet://syncstorage/secrets, leaving

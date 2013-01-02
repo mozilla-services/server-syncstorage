@@ -11,6 +11,26 @@
 
 set -e
 
+#  Write runtime configuration data where puppet+hiera can find it.
+#  This should be the only place you need to configure anything for a live
+#  deployment; everything else is taken care of within puppet.
+#
+#  Eventually this data will come from somewhere more sophisticated, e.g.
+#  a hiera backend talking to a production "config" server
+#  For now, it nicely centralizes this config in a single location.
+
+mkdir -p /etc/puppet/hieradata
+cat << EOF > /etc/puppet/hieradata/common.yaml
+
+master_secrets:
+    11111: 'WHYSOSECRETIVE'
+    12345: 'IAMBATMAN'
+
+db_user: 'syncstorage'
+db_password: 'IAMBATMAN'
+
+EOF
+
 #  Update and bootstrap the system to puppetizability.
 
 YUM="yum --assumeyes"
@@ -23,6 +43,8 @@ gem install hiera hiera-puppet
 ln -s /usr/lib/ruby/gems/1.8/gems/hiera-puppet-1.0.0 /usr/share/puppet/modules/hiera-puppet
 $YUM remove ruby-devel make gcc
 
+#  Configure puppet on where to look for hiera data.
+
 cat << EOF > /etc/puppet/hiera.yaml
 :hierarchy:
     - common
@@ -31,15 +53,10 @@ cat << EOF > /etc/puppet/hiera.yaml
 :yaml:
     :datadir: '/etc/puppet/hieradata'
 EOF
-mkdir -p /etc/puppet/hieradata
-
-cat << EOF > /etc/puppet/hieradata/common.yaml
-db_password: 'SYNCTWOPASSWORD'
-EOF
 
 #  Grab the latest puppet scripts from github, and apply.
 
-WORK_DIR=/tmp/sync2-bootstrap-build
+WORK_DIR=/tmp/syncstorage-bootstrap-build
 
 mkdir -p $WORK_DIR
 cd $WORK_DIR

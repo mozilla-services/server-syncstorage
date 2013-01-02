@@ -1,13 +1,25 @@
 
-
 class syncstorage::webhead inherits syncstorage  {
 
   include mozsvcbase
   include nginx
 
-  $db_host = "sync2-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com"
-  $db_user = "sync2"
+  $master_secrets = hiera("master_secrets")
+  $db_user = hiera("db_user")
   $db_password = hiera("db_password")
+
+  $db_nodes = {
+    "stage-syncstorage0.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage0",
+    "stage-syncstorage1.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage1",
+    "stage-syncstorage2.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage2",
+    "stage-syncstorage3.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage3",
+    "stage-syncstorage4.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage4",
+    "stage-syncstorage5.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage5",
+    "stage-syncstorage6.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage6",
+    "stage-syncstorage7.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage7",
+    "stage-syncstorage8.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage8",
+    "stage-syncstorage9.services.mozilla.com" =>  "syncstorage-stage-db1.c9vxdyuyp2a1.us-east-1.rds.amazonaws.com/syncstorage9",
+  }
 
   user { "www-data":
     ensure => present,
@@ -49,7 +61,7 @@ class syncstorage::webhead inherits syncstorage  {
   file { "secrets":
     path => "/etc/mozilla-services/syncstorage/secrets",
     ensure => file,
-    source => "puppet:///modules/syncstorage/secrets",
+    content => template("syncstorage/secrets.erb"),
     owner => "root",
     group => "root",
     mode => 0644,
