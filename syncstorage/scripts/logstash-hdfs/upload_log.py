@@ -5,6 +5,7 @@ import argparse
 import os
 import os.path
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -39,8 +40,9 @@ class HDFSUploader(object):
         self.DST_FNAME = os.path.join(os.path.split(
                                       cfg.get('metlog_metrics_hdfs',
                                               'DST_FNAME'))[0],
-                                      os.path.split(time.strftime(
-                                                    self.SRC_LOGFILE))[-1])
+	                              "%s_%s" % (socket.gethostname(),
+                                                 os.path.split(time.strftime(
+                                                    self.SRC_LOGFILE))[-1]))
 
         # Make a copy of the log file in case it gets rotated out from
         # under us
