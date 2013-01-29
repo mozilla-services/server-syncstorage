@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from webtest import TestApp
+
 from syncstorage import main, tweens
 from syncstorage.storage import get_storage
 from syncstorage.tests.support import StorageTestCase
@@ -39,3 +41,8 @@ class TestWSGIApp(StorageTestCase):
             self.assertRaises(ValueError, main, {}, **settings)
         finally:
             tweens.Client = old_client
+
+    def test_the_it_works_page(self):
+        app = TestApp(self.config.make_wsgi_app())
+        r = app.get("/")
+        self.assertTrue("It Works!" in r.body)

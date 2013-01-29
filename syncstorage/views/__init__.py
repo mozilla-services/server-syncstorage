@@ -75,11 +75,22 @@ class SyncStorageService(MetricsService):
         return view_wrapper
 
 
+# We define a simple "It Works!" view at the site root, so that
+# it's easy to see if the service is correctly running.
+site_root = MetricsService(name="site_root",
+                           path="/")
+
+
+@site_root.get()
+def get_site_root(request):
+    return "It Works!  SyncStorage is successfully running on this host."
+
+
 # We define a service at the root, but don't give it any methods.
 # This will generate a "415 Method Unsupported" for all attempts to use it,
 # which is less confusing than having the root give a "404 Not Found".
-root = SyncStorageService(name="root",
-                          path="/")
+service_root = SyncStorageService(name="service_root",
+                                  path="/")
 
 info = SyncStorageService(name="info",
                           path="/info")
