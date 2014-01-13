@@ -95,7 +95,8 @@ def authenticate_to_token_server(url, email=None, audience=None):
     if email is None:
         email = "user_%s@mockmyid.com" % (random.randint(1, 100000),)
     if audience is None:
-        audience = "https://persona.org"
+        audience = urlparse.urlparse(url)._replace(path="")
+        audience = urlparse.urlunparse(audience)
     assertion = browserid.tests.support.make_assertion(
         email=email,
         audience=audience,
@@ -104,7 +105,6 @@ def authenticate_to_token_server(url, email=None, audience=None):
     )
     r = requests.get(url, headers={
         "Authorization": "Browser-ID " + assertion,
-        "X-Conditions-Accepted": "true",
     })
     r.raise_for_status()
     creds = json.loads(r.content)

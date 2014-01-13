@@ -3,10 +3,30 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import time
+import decimal
+import simplejson
 
 
-def get_new_version(value=None):
-    """Transforms a python time value into a SyncStorage version number."""
+TWO_DECIMAL_PLACES = decimal.Decimal("1.00")
+
+
+def get_timestamp(value=None):
+    """Transforms a python time value into a syncstorage timestamp."""
     if value is None:
         value = time.time()
-    return int(value * 1000)
+    try:
+        if not isinstance(value, decimal.Decimal):
+            value = decimal.Decimal(str(value))
+        return value.quantize(TWO_DECIMAL_PLACES)
+    except decimal.InvalidOperation, e:
+        raise ValueError(str(e))
+
+
+def json_dumps(value):
+    """Decimal-aware version of json.dumps()."""
+    return simplejson.dumps(value, use_decimal=True)
+
+
+def json_loads(value):
+    """Decimal-aware version of json.loads()."""
+    return simplejson.loads(value, use_decimal=True)

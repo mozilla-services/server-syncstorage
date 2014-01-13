@@ -35,12 +35,12 @@ class TestWSGIApp(StorageTestCase):
         # to check for blacklisted node and memcached is not present
         settings = self.config.registry.settings.copy()
         settings['storage.check_blacklisted_nodes'] = True
-        old_client = tweens.Client
-        tweens.Client = None
+        old_client = tweens.MemcachedClient
+        tweens.MemcachedClient = None
         try:
             self.assertRaises(ValueError, main, {}, **settings)
         finally:
-            tweens.Client = old_client
+            tweens.MemcachedClient = old_client
 
     def test_the_it_works_page(self):
         app = TestApp(self.config.make_wsgi_app())

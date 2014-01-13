@@ -77,6 +77,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         self.assertEquals(item['payload'], _PLD)
 
         # This should remove the cache entry for meta global
+        time.sleep(0.01)
         self.storage.delete_item(_UID, 'meta', 'global')
 
         collection = self.storage.cache.get('1:c:meta')
@@ -90,6 +91,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
         # let's store some items in the meta collection
         # and checks that the global object is uploaded
+        time.sleep(0.01)
         items = [{'id': 'global', 'payload': 'xyx'},
                  {'id': 'other', 'payload': 'xxx'}]
         self.storage.set_items(_UID, 'meta', items)
@@ -99,6 +101,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
                           ['global', 'other'])
 
         # this should remove the cache
+        time.sleep(0.01)
         self.storage.delete_collection(_UID, 'meta')
         self.assertRaises(CollectionNotFoundError,
                           self.storage.get_items, _UID, 'meta')
@@ -123,6 +126,7 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
                           sqlstorage.get_item, _UID, 'tabs', '1')
 
         # this should remove the cache
+        time.sleep(0.01)
         self.storage.delete_item(_UID, 'tabs', '1')
         collection = self.storage.cache.get('1:c:tabs')
         self.assertEquals(collection['items'].keys(), [])
@@ -130,12 +134,13 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         #  adding some stuff
         items = [{'id': '1', 'payload': 'xxx'},
                  {'id': '2', 'payload': 'xxx'}]
-        time.sleep(0.001)
+        time.sleep(0.01)
         self.storage.set_items(_UID, 'tabs', items)
         collection = self.storage.cache.get('1:c:tabs')
         self.assertEquals(len(collection['items']), 2)
 
         # this should remove the cache
+        time.sleep(0.01)
         self.storage.delete_collection(_UID, 'tabs')
         self.assertRaises(CollectionNotFoundError,
                           self.storage.get_items, _UID, 'tabs')
@@ -163,41 +168,41 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         self.assertEquals(self.storage.get_total_size(_UID, True), wanted)
         self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
-    def test_collection_versions(self):
+    def test_collection_timestamps(self):
         self.storage.delete_storage(_UID)
         self.storage.set_item(_UID, 'tabs', '1', {'payload': _PLD * 200})
         self.storage.set_item(_UID, 'foo', '1', {'payload': _PLD * 200})
 
-        versions = self.storage.get_collection_versions(_UID)
-        cached_versions = self.storage.cache.get('1:metadata')['collections']
-        self.assertEquals(versions['tabs'], cached_versions['tabs'])
+        timestamps = self.storage.get_collection_timestamps(_UID)
+        cached_timestamps = self.storage.cache.get('1:metadata')['collections']
+        self.assertEquals(timestamps['tabs'], cached_timestamps['tabs'])
 
-        versions2 = self.storage.get_collection_versions(_UID)
-        self.assertEquals(len(versions), len(versions2))
-        self.assertEquals(len(versions), 2)
+        timestamps2 = self.storage.get_collection_timestamps(_UID)
+        self.assertEquals(len(timestamps), len(timestamps2))
+        self.assertEquals(len(timestamps2), 2)
 
-        # checking the versions
-        versions = self.storage.cache.get('1:metadata')['collections']
-        keys = versions.keys()
+        # checking the timestamps
+        timestamps = self.storage.cache.get('1:metadata')['collections']
+        keys = timestamps.keys()
         keys.sort()
         self.assertEquals(keys, ['foo', 'tabs'])
 
-        # adding a new item should modify the versions cache
+        # adding a new item should modify the timestamps cache
         res = self.storage.set_item(_UID, 'baz', '2', {'payload': _PLD * 200})
-        ver = res["version"]
+        ts = res["modified"]
 
-        # checking the versions
-        versions = self.storage.cache.get('1:metadata')['collections']
-        self.assertEqual(versions['baz'], ver)
-        keys = versions.keys()
+        # checking the timestamps
+        timestamps = self.storage.cache.get('1:metadata')['collections']
+        self.assertEqual(timestamps['baz'], ts)
+        keys = timestamps.keys()
         keys.sort()
         self.assertEquals(keys, ['baz', 'foo', 'tabs'])
 
-        # deleting the item should also update the version
+        # deleting the item should also update the timestamp
         cached_size = self.storage.cache.get('1:metadata')['size']
-        ver = self.storage.delete_item(_UID, 'baz', '2')
-        versions = self.storage.get_collection_versions(_UID)
-        self.assertEqual(versions['baz'], ver)
+        ts = self.storage.delete_item(_UID, 'baz', '2')
+        timestamps = self.storage.get_collection_timestamps(_UID)
+        self.assertEqual(timestamps['baz'], ts)
 
         # that should have left the cached size alone.
         self.assertEquals(self.storage.cache.get('1:metadata')['size'],
@@ -211,12 +216,12 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
     def test_collection_sizes(self):
         # setting the tabs in memcache
         tabs = {
-            'version': 1299142695760,
+            'modified': 1299142695.76,
             'items': {
                 'mCwylprUEiP5': {
                     'payload': '*' * 100,
                     'id': 'mCwylprUEiP5',
-                    'version': 1299142695760
+                    'modified': 1299142695.76
                 }
             }
         }
@@ -249,14 +254,14 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
         self.assertRaises(CollectionNotFoundError,
                           self.storage.get_items, _UID, 'col1')
 
-        versions = self.storage.get_collection_versions(_UID)
-        self.assertEquals(len(versions), 0)
+        timestamps = self.storage.get_collection_timestamps(_UID)
+        self.assertEquals(len(timestamps), 0)
 
-    def test_get_version_of_empty_collection(self):
+    def test_get_timestamp_of_empty_collection(self):
         # This tests for derivative of the error behind Bug 693893.
-        # Getting version for a non-existent collection should raise error.
+        # Getting timestamp for a non-existent collection should raise error.
         self.assertRaises(CollectionNotFoundError,
-                          self.storage.get_collection_version, _UID, "meta")
+                          self.storage.get_collection_timestamp, _UID, "meta")
 
     def test_recalculation_of_cached_quota_usage(self):
         storage = self.storage

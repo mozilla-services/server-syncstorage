@@ -56,10 +56,10 @@ class SyncStorage(object):
     the data, like so::
 
           with storage.lock_for_read(userid, collection):
-              ver = storage.get_collection_version(userid, collection)
-              if ver <= if_modified_since:
+              ts = storage.get_collection_timestamp(userid, collection)
+              if ts <= if_modified_since:
                   raise HTTPNotModified
-              return storage.get_items(userid, collection, newer=ver)
+              return storage.get_items(userid, collection, newer=ts)
 
     Any thread holding a read lock on a collection is guaranteed to see a
     fixed, consistent view of the data in that collection.  It will be
@@ -70,8 +70,8 @@ class SyncStorage(object):
     the data, like so::
 
           with storage.lock_for_write(userid, collection):
-              ver = storage.get_collection_version(userid, collection)
-              if ver > if_unmodified_since:
+              ts = storage.get_collection_timestamp(userid, collection)
+              if ts > if_unmodified_since:
                   raise HTTPModified
               storage.set_items(userid, collection, new_items)
 
@@ -119,25 +119,25 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_storage_version(self, userid):
-        """Returns the last-modified version for the entire storage.
+    def get_storage_timestamp(self, userid):
+        """Returns the last-modified timestamp for the entire storage.
 
         Args:
             userid: integer identifying the user in the storage.
 
         Returns:
-            The last-modified version for the entire storage.
+            The last-modified timestamp for the entire storage.
         """
 
     @abc.abstractmethod
-    def get_collection_versions(self, userid):
-        """Returns the collection versions for a user.
+    def get_collection_timestamps(self, userid):
+        """Returns the collection timestamps for a user.
 
         Args:
             userid: integer identifying the user in the storage.
 
         Returns:
-            A dict mapping collection names to their last-modified version.
+            A dict mapping collection names to their last-modified timestamp.
         """
 
     @abc.abstractmethod
@@ -193,34 +193,33 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_collection_version(self, userid, collection):
-        """Returns the last-modified version for the named collection.
+    def get_collection_timestamp(self, userid, collection):
+        """Returns the last-modified timestamp for the named collection.
 
         Args:
             userid: integer identifying the user in the storage.
             collection: name of the collection.
 
         Returns:
-            The last-modified version for the collection.
+            The last-modified timestamp for the collection.
 
         Raises:
             CollectionNotFoundError: the user has no such collection.
         """
 
     @abc.abstractmethod
-    def get_items(self, userid, collection, items=None, older=None,
-                  newer=None, limit=None, offset=None, sort=None):
+    def get_items(self, userid, collection, items=None, newer=None,
+                  limit=None, offset=None, sort=None):
         """Returns items from a collection
 
         Args:
             userid: integer identifying the user in the storage.
             collection: name of the collection.
             items: list of strings identifying items to return.
-            older: integer; only return items older than this version.
-            newer: integer; only return items newer than this version.
+            newer: float; only return items newer than this timestamp.
             limit: integer; return at most this many items.
             offset: string; an offset vale previously returned as next_offset.
-            sort: sort order for results; one of "oldest", "newer" or "index".
+            sort: sort order for results; one of "newer" or "index".
 
         Returns:
             A dict with the following keys:
@@ -233,16 +232,15 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def get_item_ids(self, userid, collection, items=None, older=None,
-                     newer=None, limit=None, offset=None, sort=None):
+    def get_item_ids(self, userid, collection, items=None, newer=None,
+                     limit=None, offset=None, sort=None):
         """Returns item ids from a collection
 
         Args:
             userid: integer identifying the user in the storage.
             collection: name of the collection.
             items: list of strings identifying items to return.
-            older: integer; only return items older than this version.
-            newer: integer; only return items newer than this version.
+            newer: float; only return items newer than this timestamp.
             limit: integer; return at most this many items.
             offset: string; an offset vale previously returned as next_offset.
             sort: sort order for results; one of "oldest", "newer" or "index".
@@ -267,7 +265,7 @@ class SyncStorage(object):
             items: a list of dicts giving data for each item.
 
         Returns:
-            The new last-modified version for the collection.
+            The new last-modified timestamp for the collection.
 
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
@@ -282,7 +280,7 @@ class SyncStorage(object):
             collection: name of the collection.
 
         Returns:
-            The new last-modified version for the storage.
+            The new last-modified timestamp for the storage.
 
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
@@ -299,7 +297,7 @@ class SyncStorage(object):
             items: list of strings identifying the items to be removed.
 
         Returns:
-            The new last-modified version for the collection.
+            The new last-modified timestamp for the collection.
 
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
@@ -311,8 +309,8 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_item_version(self, userid, collection, item):
-        """Returns the last-modified version for the named item.
+    def get_item_timestamp(self, userid, collection, item):
+        """Returns the last-modified timestamp for the named item.
 
         Args:
             userid: integer identifying the user in the storage.
@@ -320,7 +318,7 @@ class SyncStorage(object):
             item: string identifying the item.
 
         Returns:
-            The last-modified version for the item.
+            The last-modified timestamp for the item.
 
         Raises:
             CollectionNotFoundError: the user has no such collection.
@@ -357,7 +355,7 @@ class SyncStorage(object):
         Returns:
             A dict with the following keys:
               created: boolean indicating whether this created a new item
-              version: the new last-modified version of the item.
+              modified: the new last-modified timestamp of the item.
 
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
@@ -373,7 +371,7 @@ class SyncStorage(object):
             item: string identifying the item
 
         Returns:
-            The new last-modified version for the collection.
+            The new last-modified timestamp for the collection.
 
         Raises:
             ConflictError: the operation conflicted with a concurrent write.

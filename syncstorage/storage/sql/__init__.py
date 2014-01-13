@@ -16,7 +16,6 @@ sharding of the BSO items into multiple tables named "bso0" through "bsoN".
 This behaviour is off by default; pass shard=True to enable it.
 """
 
-import time
 import functools
 import threading
 import contextlib
@@ -27,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 from pyramid.threadlocal import get_current_registry
 
 from syncstorage.bso import BSO
-from syncstorage.util import get_new_version
+from syncstorage.util import get_timestamp
 from syncstorage.storage import (SyncStorage,
                                  ConflictError,
                                  CollectionNotFoundError,
@@ -48,6 +47,14 @@ STANDARD_COLLECTIONS = {1: "clients", 2: "crypto", 3: "forms", 4: "history",
 FIRST_CUSTOM_COLLECTION_ID = 100
 
 MAX_COLLECTIONS_CACHE_SIZE = 1000
+
+
+def ts2bigint(timestamp):
+    return int(timestamp * 1000)
+
+
+def bigint2ts(bigint):
+    return get_timestamp(bigint / 1000.0)
 
 
 def with_session(func):
@@ -157,15 +164,16 @@ class SQLStorage(SyncStorage):
             params = {"userid": userid, "collectionid": collectionid}
             try:
                 session.query("BEGIN_TRANSACTION_READ")
-                ver = session.query_scalar("LOCK_COLLECTION_READ", params)
+                ts = session.query_scalar("LOCK_COLLECTION_READ", params)
             except BackendError, e:
                 # There is no standard exception to detect lock-wait timeouts.
                 if "lock" in str(e).lower():
                     raise ConflictError
                 raise
-            if ver is None:
+            if ts is None:
                 raise CollectionNotFoundError
-            session.cache[(userid, collectionid)].last_modified_v = ver
+            ts = bigint2ts(ts)
+            session.cache[(userid, collectionid)].last_modified = ts
             session.locked_collections.add((userid, collectionid))
             try:
                 # Yield context back to the calling code.
@@ -186,14 +194,18 @@ class SQLStorage(SyncStorage):
             params = {"userid": userid, "collectionid": collectionid}
             try:
                 session.query("BEGIN_TRANSACTION_WRITE")
-                ver = session.query_scalar("LOCK_COLLECTION_WRITE", params)
+                ts = session.query_scalar("LOCK_COLLECTION_WRITE", params)
             except BackendError, e:
                 # There is no standard exception to detect lock-wait timeouts.
                 if "lock" in str(e).lower():
                     raise ConflictError
                 raise
-            if ver is not None:
-                session.cache[(userid, collectionid)].last_modified_v = ver
+            if ts is not None:
+                ts = bigint2ts(ts)
+                # Forbid the write if it would not properly incr the timestamp.
+                if ts >= session.timestamp:
+                    raise ConflictError
+                session.cache[(userid, collectionid)].last_modified = ts
             session.locked_collections.add((userid, collectionid))
             try:
                 # Yield context back to the calling code.
@@ -207,19 +219,23 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def get_storage_version(self, session, userid):
-        """Returns the last-modified version for the entire storage."""
-        return session.query_scalar("STORAGE_VERSION", params={
+    def get_storage_timestamp(self, session, userid):
+        """Returns the last-modified timestamp for the entire storage."""
+        ts = session.query_scalar("STORAGE_TIMESTAMP", params={
             "userid": userid,
         }, default=0)
+        return bigint2ts(ts)
 
     @with_session
-    def get_collection_versions(self, session, userid):
-        """Returns the collection versions for a user."""
-        res = session.query_fetchall("COLLECTIONS_VERSIONS", {
+    def get_collection_timestamps(self, session, userid):
+        """Returns the collection timestamps for a user."""
+        res = session.query_fetchall("COLLECTIONS_TIMESTAMPS", {
             "userid": userid,
         })
-        return self._map_collection_names(session, res)
+        res = self._map_collection_names(session, res)
+        for collection in res:
+            res[collection] = bigint2ts(res[collection])
+        return res
 
     @with_session
     def get_collection_counts(self, session, userid):
@@ -262,21 +278,21 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def get_collection_version(self, session, userid, collection):
-        """Returns the last-modified version of a collection."""
+    def get_collection_timestamp(self, session, userid, collection):
+        """Returns the last-modified timestamp of a collection."""
         collectionid = self._get_collection_id(session, collection)
-        # The last-modified version may be cached on the session.
-        cached_version = session.cache[(userid, collectionid)].last_modified_v
-        if cached_version is not None:
-            return cached_version
+        # The last-modified timestamp may be cached on the session.
+        cached_ts = session.cache[(userid, collectionid)].last_modified
+        if cached_ts is not None:
+            return cached_ts
         # Otherwise we need to look it up in the database.
-        version = session.query_scalar("COLLECTION_VERSION", {
+        ts = session.query_scalar("COLLECTION_TIMESTAMP", {
             "userid": userid,
             "collectionid": collectionid,
         })
-        if version is None:
+        if ts is None:
             raise CollectionNotFoundError
-        return version
+        return bigint2ts(ts)
 
     @with_session
     def get_items(self, session, userid, collection, **params):
@@ -297,6 +313,8 @@ class SQLStorage(SyncStorage):
         params["collectionid"] = self._get_collection_id(session, collection)
         if "ttl" not in params:
             params["ttl"] = int(session.timestamp)
+        if "newer" in params:
+            params["newer"] = ts2bigint(params["newer"])
         # We always fetch one more item than necessary, so we can tell whether
         # there are additional items to be fetched with next_offset.
         limit = params.get("limit")
@@ -312,9 +330,9 @@ class SQLStorage(SyncStorage):
         items = [self._row_to_bso(row) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
-        # version and let it raise CollectionNotFoundError if necessary.
+        # timestamp and let it raise CollectionNotFoundError if necessary.
         if not items:
-            self.get_collection_version(session, userid, collection)
+            self.get_collection_timestamp(session, userid, collection)
         # Check if we read past the original limit, set next_offset if so.
         next_offset = None
         if limit is not None and len(items) > limit:
@@ -330,6 +348,9 @@ class SQLStorage(SyncStorage):
         item = dict(row)
         for key in ("userid", "collection", "payload_size", "ttl",):
             item.pop(key, None)
+        ts = item.get("modified")
+        if ts is not None:
+            item["modified"] = bigint2ts(ts)
         return BSO(item)
 
     @with_session
@@ -340,8 +361,7 @@ class SQLStorage(SyncStorage):
             id = data["id"]
             self._prepare_item_data(session, userid, collectionid, id, data)
         session.insert_or_update("bso", items)
-        self._touch_collection(session, userid, collectionid)
-        return session.new_version
+        return self._touch_collection(session, userid, collectionid)
 
     @with_session
     def delete_collection(self, session, userid, collection):
@@ -357,7 +377,7 @@ class SQLStorage(SyncStorage):
         })
         if count == 0:
             raise CollectionNotFoundError
-        return self.get_storage_version(userid)
+        return self.get_storage_timestamp(userid)
 
     @with_session
     def delete_items(self, session, userid, collection, items):
@@ -368,19 +388,17 @@ class SQLStorage(SyncStorage):
             "collectionid": collectionid,
             "ids": items,
         })
-        self._touch_collection(session, userid, collectionid)
-        return session.new_version
+        return self._touch_collection(session, userid, collectionid)
 
     def _touch_collection(self, session, userid, collectionid):
-        """Update the last-modified version of the given collection."""
+        """Update the last-modified timestamp of the given collection."""
         params = {
             "userid": userid,
             "collectionid": collectionid,
-            "version": session.new_version,
+            "modified": ts2bigint(session.timestamp),
         }
         # The common case will be an UPDATE, so try that first.
         # If it doesn't update any rows then do an INSERT.
-        # XXX TODO: we should refuse to move the version number backwards.
         rowcount = session.query("TOUCH_COLLECTION", params)
         if rowcount != 1:
             try:
@@ -388,24 +406,25 @@ class SQLStorage(SyncStorage):
             except IntegrityError:
                 # Someone else inserted it at the same time.
                 pass
+        return session.timestamp
 
     #
     # Items APIs
     #
 
     @with_session
-    def get_item_version(self, session, userid, collection, item):
-        """Returns the last-modified version for the named item."""
+    def get_item_timestamp(self, session, userid, collection, item):
+        """Returns the last-modified timestamp for the named item."""
         collectionid = self._get_collection_id(session, collection)
-        version = session.query_scalar("ITEM_VERSION", {
+        ts = session.query_scalar("ITEM_TIMESTAMP", {
             "userid": userid,
             "collectionid": collectionid,
             "item": item,
             "ttl": int(session.timestamp),
         })
-        if version is None:
+        if ts is None:
             raise ItemNotFoundError
-        return version
+        return bigint2ts(ts)
 
     @with_session
     def get_item(self, session, userid, collection, item):
@@ -427,10 +446,9 @@ class SQLStorage(SyncStorage):
         collectionid = self._get_collection_id(session, collection, create=1)
         self._prepare_item_data(session, userid, collectionid, item, data)
         num_created = session.insert_or_update("bso", [data])
-        self._touch_collection(session, userid, collectionid)
         return {
             "created": bool(num_created),
-            "version": session.new_version,
+            "modified": self._touch_collection(session, userid, collectionid)
         }
 
     def _prepare_item_data(self, session, userid, collectionid, item, data):
@@ -440,8 +458,7 @@ class SQLStorage(SyncStorage):
         data["id"] = item
         # If a payload is provided, make sure to update dependant fields.
         if "payload" in data:
-            data["version"] = session.new_version
-            data["timestamp"] = int(session.timestamp * 1000)
+            data["modified"] = ts2bigint(session.timestamp)
             data["payload_size"] = len(data["payload"])
         # If provided, ttl will be an offset in seconds.
         # Add it to the current timestamp to get an absolute time.
@@ -465,8 +482,7 @@ class SQLStorage(SyncStorage):
         })
         if rowcount == 0:
             raise ItemNotFoundError
-        self._touch_collection(session, userid, collection)
-        return session.new_version
+        return self._touch_collection(session, userid, collection)
 
     #
     # Private methods for manipulating collections.
@@ -539,7 +555,7 @@ class SQLStorage(SyncStorage):
         cause _get_collection_name() to do a separate database query for
         each collection id, which is very inefficient.
 
-        Since it may not be possible to cache the names for all the request
+        Since it may not be possible to cache the names for all the requested
         collections, this method also returns a mapping from ids to names.
         """
         names = {}
@@ -597,16 +613,14 @@ class SQLStorageSession(object):
     begin accessed.  For example:
 
         * the "current time" on the server during the snapshot
-        * the new version number to be associated with any writes
-        * the last-modified versions of collections
         * the set of currently-locked collections
+
     """
 
-    def __init__(self, storage):
+    def __init__(self, storage, timestamp=None):
         self.storage = storage
         self.connection = storage.dbconnector.connect()
-        self.new_version = get_new_version()
-        self.timestamp = time.time()
+        self.timestamp = get_timestamp(timestamp)
         self.cache = defaultdict(SQLCachedCollectionData)
         self.locked_collections = set()
         self._nesting_level = 0
@@ -698,7 +712,7 @@ class SQLCachedCollectionData(object):
 
     The SQLStorageSession object maintains a small cache of data that has
     already been looked up during that session.  Currently this includes only
-    the last-modified version of any collections locked by that session.
+    the last-modified timestamp of any collections locked by that session.
     """
     def __init__(self):
-        self.last_modified_v = None
+        self.last_modified = None

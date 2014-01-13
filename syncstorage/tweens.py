@@ -2,25 +2,35 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import time
 import random
+import json
 
 from pyramid.httpexceptions import HTTPException, HTTPServiceUnavailable
 
+from syncstorage.util import get_timestamp
 
 try:
-    from memcache import Client
+    from mozsvc.storage.mcclient import MemcachedClient
 except ImportError:
-    Client = None       # NOQA
+    MemcachedClient = None  # NOQA
+
+
+WEAVE_ILLEGAL_METH = 1              # Illegal method/protocol
+WEAVE_MALFORMED_JSON = 6            # Json parse failure
+WEAVE_INVALID_WBO = 8               # Invalid Weave Basic Object
+WEAVE_OVER_QUOTA = 14               # User over quota
 
 
 def set_x_timestamp_header(handler, registry):
-    """Tween to set the X-Timestamp header on all responses."""
+    """Tween to set the X-Weave-Timestamp header on all responses."""
 
     def set_x_timestamp_header_tween(request):
-        request.server_time = int(time.time() * 1000)
+        ts1 = get_timestamp()
         response = handler(request)
-        response.headers["X-Timestamp"] = str(request.server_time)
+        # The storage might have created a new timestamp when processing
+        # a write.  Report that one if it's newer than the current one.
+        ts2 = get_timestamp(response.headers.get("X-Last-Modified"))
+        response.headers["X-Weave-Timestamp"] = str(max(ts1, ts2))
         return response
 
     return set_x_timestamp_header_tween
@@ -34,12 +44,12 @@ def check_for_blacklisted_nodes(handler, registry):
         return handler
 
     # Create a memcached client, error out if that's not possible.
-    if Client is None:
+    if MemcachedClient is None:
         raise ValueError('The "check_blacklisted_nodes" option '
                          'requires a memcached server')
 
     servers = registry.settings.get('storage.cache_servers', '127.0.0.1:11211')
-    cache = registry["cache"] = Client(servers.split(','))
+    cache = MemcachedClient(servers.split(','))
 
     def check_for_blacklisted_nodes_tween(request):
         # Is it down?  We just error out straight away.
@@ -52,7 +62,7 @@ def check_for_blacklisted_nodes(handler, registry):
         # Is it backed-off?  We process the request but add a header.
         backoff = cache.get('backoff:%s' % host)
         if backoff is not None:
-            response.headers["X-Backoff"] = str(backoff)
+            response.headers["X-Weave-Backoff"] = str(backoff)
         return response
 
     return check_for_blacklisted_nodes_tween
@@ -98,9 +108,63 @@ def fuzz_retry_after_header(handler, registry):
     return fuzz_retry_after_header_tween
 
 
+def convert_cornice_errors_to_respcodes(handler, registry):
+    """Tween to convert cornice error objects into integer response codes.
+
+    This is an uglifying pass that inspects cornice error information and
+    decides on the appropriate Weave error response code to send in its
+    place.  It makes the author very sad, but it is necessary for backwards
+    compatibility in the sync1.5 protocol.
+    """
+
+    def pick_weave_error_code(body):
+        try:
+            if body["status"] == "quota-exceeded":
+                return WEAVE_OVER_QUOTA
+            error = body["errors"][0]
+            if error["location"] == "body":
+                if error["name"] in ("bso", "bsos"):
+                    if "invalid json" in error["description"].lower():
+                        return WEAVE_MALFORMED_JSON
+                    return WEAVE_INVALID_WBO
+        except (KeyError, IndexError):
+            pass
+        return None
+
+    def convert_cornice_response(request, response):
+        try:
+            body = json.loads(response.body)
+        except ValueError:
+            pass
+        else:
+            code = pick_weave_error_code(body)
+            if code is None:
+                # We have to return an integer, so use this as
+                # a generic "unexpected error" code.
+                code = WEAVE_ILLEGAL_METH
+            response.body = str(code)
+            response.content_length = len(response.body)
+
+    def convert_cornice_errors_to_respcodes_tween(request):
+        try:
+            response = handler(request)
+        except HTTPException, response:
+            if response.content_type == "application/json":
+                convert_cornice_response(request, response)
+            raise
+        else:
+            if response.status_code == 400:
+                if response.content_type == "application/json":
+                    convert_cornice_response(request, response)
+            return response
+
+    return convert_cornice_errors_to_respcodes_tween
+
+
 def includeme(config):
     """Include all the SyncServer tweens into the given config."""
     config.add_tween("syncstorage.tweens.check_for_blacklisted_nodes")
     config.add_tween("syncstorage.tweens.set_x_timestamp_header")
     config.add_tween("syncstorage.tweens.set_default_accept_header")
     config.add_tween("syncstorage.tweens.fuzz_retry_after_header")
+    config.add_tween("syncstorage.tweens.convert_cornice_errors_to_respcodes")

@@ -24,18 +24,18 @@ It has the following structure:
     {
       "size":               <approximate total size of the stored data>,
       "last_size_recalc":   <time when size was last recalculated>,
-      "version":            <last-modified version for the entire storage>,
+      "modified":           <last-modified timestamp for the entire storage>,
       "collections": {
-         <collection name>:  <last-modified version for the collection>,
+         <collection name>:  <last-modified timestamp for the collection>,
       },
     }
 
 For each collection to be stored in memcache, the corresponding key contains
 a JSON mapping from item ids to BSO objects along with a record of the last-
-modified version for that collection:
+modified timestamp for that collection:
 
     {
-      "version":   <last-modified version for the collection>,
+      "modified":   <last-modified timestamp for the collection>,
       "items": {
         <item id>:  <BSO object for that item>,
       }
@@ -52,7 +52,7 @@ import time
 import threading
 import contextlib
 
-from syncstorage.util import get_new_version
+from syncstorage.util import get_timestamp, json_loads, json_dumps
 from syncstorage.storage import (SyncStorage,
                                  StorageError,
                                  ConflictError,
@@ -74,6 +74,19 @@ DEFAULT_CACHE_LOCK_TTL = 5 * 60
 
 def _key(*names):
     return ":".join(map(str, names))
+
+
+class MemcachedClient(MemcachedClient):
+    """MemcachedClient that can handle decimal.Decimal instances."""
+
+    def _encode_value(self, value):
+        value = json_dumps(value)
+        if len(value) > self.max_value_size:
+            raise ValueError("value too long")
+        return value, 0
+
+    def _decode_value(self, value, flags):
+        return json_loads(value)
 
 
 class MemcachedStorage(SyncStorage):
@@ -123,7 +136,7 @@ class MemcachedStorage(SyncStorage):
     def _iter_cache_keys(self, userid):
         """Iterator over all potential cache keys for the given userid.
 
-        This method yields all potential cacher keys for the given userid,
+        This method yields all potential cache keys for the given userid,
         including their metadata key and the keys for any cached collections.
         The yielded keys do *not* include the key prefix, if any.
         """
@@ -213,30 +226,30 @@ class MemcachedStorage(SyncStorage):
     # APIs to operate on the entire storage.
     #
 
-    def get_storage_version(self, userid):
-        """Returns the last-modified version for the entire storage."""
+    def get_storage_timestamp(self, userid):
+        """Returns the last-modified timestamp for the entire storage."""
         # Try to use the cached value.
-        ver = self._get_metadata(userid)["version"]
+        ts = self._get_metadata(userid)["modified"]
         # Fall back to live data if it's dirty.
-        if ver is None:
-            ver = self.storage.get_storage_version(userid)
+        if ts is None:
+            ts = self.storage.get_storage_timestamp(userid)
             for colmgr in self.cache_only_collections.itervalues():
-                ver = max(ver, colmgr.get_version(userid))
-        return ver
+                ts = max(ts, colmgr.get_timestamp(userid))
+        return ts
 
-    def get_collection_versions(self, userid):
-        """Returns the collection versions for a user."""
+    def get_collection_timestamps(self, userid):
+        """Returns the collection timestamps for a user."""
         # Try to use the cached value.
-        versions = self._get_metadata(userid)["collections"]
+        timestamps = self._get_metadata(userid)["collections"]
         # Fall back to live data for any collections that are dirty.
-        for collection, ver in versions.items():
-            if ver is None:
+        for collection, ts in timestamps.items():
+            if ts is None:
                 colmgr = self._get_collection_manager(collection)
                 try:
-                    versions[collection] = colmgr.get_version(userid)
+                    timestamps[collection] = colmgr.get_timestamp(userid)
                 except CollectionNotFoundError:
-                    del versions[collection]
-        return versions
+                    del timestamps[collection]
+        return timestamps
 
     def get_collection_counts(self, userid):
         """Returns the collection counts."""
@@ -283,20 +296,20 @@ class MemcachedStorage(SyncStorage):
     # APIs to operate on an individual collection
     #
 
-    def get_collection_version(self, userid, collection):
-        """Returns the last-modified version for the named collection."""
-        # It's likely cheaper to read all cached versions out of memcache
-        # than to read just the single version from the database.
-        versions = self.get_collection_versions(userid)
+    def get_collection_timestamp(self, userid, collection):
+        """Returns the last-modified timestamp for the named collection."""
+        # It's likely cheaper to read all cached timestamps out of memcache
+        # than to read just the single timestamp from the database.
+        timestamps = self.get_collection_timestamps(userid)
         try:
-            ver = versions[collection]
+            ts = timestamps[collection]
         except KeyError:
             raise CollectionNotFoundError
         # Refresh from the live data if dirty.
-        if ver is None:
+        if ts is None:
             colmgr = self._get_collection_manager(collection)
-            ver = colmgr.get_version(userid)
-        return ver
+            ts = colmgr.get_timestamp(userid)
+        return ts
 
     def get_items(self, userid, collection, **kwds):
         """Returns items from a collection"""
@@ -312,35 +325,35 @@ class MemcachedStorage(SyncStorage):
         """Creates or updates multiple items in a collection."""
         colmgr = self._get_collection_manager(collection)
         with self._mark_collection_dirty(userid, collection) as update:
-            ver = colmgr.set_items(userid, items)
+            ts = colmgr.set_items(userid, items)
             size = sum(len(item.get("payload", "")) for item in items)
-            update(ver, ver, size)
-            return ver
+            update(ts, ts, size)
+            return ts
 
     def delete_collection(self, userid, collection):
         """Deletes an entire collection."""
         colmgr = self._get_collection_manager(collection)
         with self._mark_collection_dirty(userid, collection) as update:
-            ver = colmgr.del_collection(userid)
-            update(ver, None)
-            return ver
+            ts = colmgr.del_collection(userid)
+            update(ts, None)
+            return ts
 
     def delete_items(self, userid, collection, items):
         """Deletes multiple items from a collection."""
         colmgr = self._get_collection_manager(collection)
         with self._mark_collection_dirty(userid, collection) as update:
-            ver = colmgr.del_items(userid, items)
-            update(ver, ver)
-            return ver
+            ts = colmgr.del_items(userid, items)
+            update(ts, ts)
+            return ts
 
     #
     # Items APIs
     #
 
-    def get_item_version(self, userid, collection, item):
-        """Returns the last-modified version for the named item."""
+    def get_item_timestamp(self, userid, collection, item):
+        """Returns the last-modified timestamp for the named item."""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.get_item_version(userid, item)
+        return colmgr.get_item_timestamp(userid, item)
 
     def get_item(self, userid, collection, item):
         """Returns one item from a collection."""
@@ -353,16 +366,16 @@ class MemcachedStorage(SyncStorage):
         with self._mark_collection_dirty(userid, collection) as update:
             res = colmgr.set_item(userid, item, data)
             size = len(data.get("payload", ""))
-            update(res["version"], res["version"], size)
+            update(res["modified"], res["modified"], size)
             return res
 
     def delete_item(self, userid, collection, item):
         """Deletes a single item from a collection."""
         colmgr = self._get_collection_manager(collection)
         with self._mark_collection_dirty(userid, collection) as update:
-            ver = colmgr.del_item(userid, item)
-            update(ver, ver)
-            return ver
+            ts = colmgr.del_item(userid, item)
+            update(ts, ts)
+            return ts
 
     #
     #  Private APIs for managing the cached metadata
@@ -373,7 +386,7 @@ class MemcachedStorage(SyncStorage):
 
         This method pulls the dict of metadata out of memcache and returns it.
         If there is no information yet in memcache then it pulls the data from
-        the underlying storage, cache it and then returns it.
+        the underlying storage, caches it and then returns it.
 
         If recalculate_size is given and True, then the cache size value will
         be recalculated from the store if it is more than an hour old.
@@ -384,21 +397,21 @@ class MemcachedStorage(SyncStorage):
         # Use CAS to avoid overwriting other changes, but don't error out if
         # the write fails - it just means that someone else beat us to it.
         if data is None:
-            # Get the mapping of collection names to versions.
+            # Get the mapping of collection names to timestamps.
             # Make sure to include any cache-only collections.
-            versions = self.storage.get_collection_versions(userid)
+            timestamps = self.storage.get_collection_timestamps(userid)
             for colmgr in self.cached_collections.itervalues():
-                if colmgr.collection not in versions:
+                if colmgr.collection not in timestamps:
                     try:
-                        ver = colmgr.get_version(userid)
-                        versions[colmgr.collection] = ver
+                        ts = colmgr.get_timestamp(userid)
+                        timestamps[colmgr.collection] = ts
                     except CollectionNotFoundError:
                         pass
             # Get the storage-level modified time.
-            # Make sure it's not less than any collection-level version.
-            ver = self.storage.get_storage_version(userid)
-            if versions:
-                ver = max(ver, max(versions.itervalues()))
+            # Make sure it's not less than any collection-level timestamp.
+            ts = self.storage.get_storage_timestamp(userid)
+            if timestamps:
+                ts = max(ts, max(timestamps.itervalues()))
             # Calculate the total size if requested,
             # but don't bother if it's not necessary.
             if not recalculate_size:
@@ -411,8 +424,8 @@ class MemcachedStorage(SyncStorage):
             data = {
                 "size": size,
                 "last_size_recalc": last_size_recalc,
-                "version": ver,
-                "collections": versions,
+                "modified": ts,
+                "collections": timestamps,
             }
             self.cache.cas(key, data, casid)
         # Recalculate the size if it appears to be out of date.
@@ -455,18 +468,18 @@ class MemcachedStorage(SyncStorage):
         To prevent the cache from getting out of sync with the underlying store
         it is necessary to mark a collection as dirty before performing any
         modifications on it.  This is a handy context manager that can take
-        care of that, as well as update the versions with new results when
+        care of that, as well as update the timestamps with new results when
         the modification is complete.
 
         The context object associated with this method is a callback function
         that can be used to update the stored metadata.  It accepts the top-
-        level storage version, collection-level version, and a total size
+        level storage timestamp, collection-level timestamp, and a total size
         increment as its three arguments.  Example usage::
 
             with self._mark_collection_dirty(userid, collection) as update:
                 colobj = self._get_collection_manager(collection)
-                ver = colobj.set_item(userid, "test", {"payload": "TEST"})
-                update(ver, ver, len("TEST"))
+                ts = colobj.set_item(userid, "test", {"payload": "TEST"})
+                update(ts, ts, len("TEST"))
 
         """
         # Get the old values from the metadata.
@@ -474,13 +487,14 @@ class MemcachedStorage(SyncStorage):
         key = _key(userid, "metadata")
         data, casid = self.cache.gets(key)
         if data is None:
+            # No cached data, so refresh.
             self._get_metadata(userid)
             data, casid = self.cache.gets(key)
 
         # Write None into the metadata to mark things as dirty.
-        version = data["version"]
-        col_version = data["collections"].get(collection)
-        data["version"] = None
+        ts = data["modified"]
+        col_ts = data["collections"].get(collection)
+        data["modified"] = None
         data["collections"][collection] = None
         if not self.cache.cas(key, data, casid):
             raise ConflictError
@@ -489,17 +503,17 @@ class MemcachedStorage(SyncStorage):
         # We also use this function internally to recover from errors.
         update_was_called = []
 
-        def update(version=version, col_version=col_version, size_incr=0):
+        def update(ts=ts, col_ts=col_ts, size_incr=0):
             assert not update_was_called
             update_was_called.append(True)
-            data["version"] = version
-            if col_version is None:
+            data["modified"] = ts
+            if col_ts is None:
                 del data["collections"][collection]
             else:
-                data["collections"][collection] = col_version
+                data["collections"][collection] = col_ts
             data["size"] += size_incr
             # We assume the write lock is held to avoid conflicting changes.
-            # Sadly, using CAS again would return another round-trip.
+            # Sadly, using CAS again would require another round-trip.
             self.cache.set(key, data)
 
         # Yield out to the calling code.
@@ -537,9 +551,9 @@ class UncachedManager(object):
         self.owner = owner
         self.collection = collection
 
-    def get_version(self, userid):
+    def get_timestamp(self, userid):
         storage = self.owner.storage
-        return storage.get_collection_version(userid, self.collection)
+        return storage.get_collection_timestamp(userid, self.collection)
 
     def get_items(self, userid, **kwds):
         storage = self.owner.storage
@@ -561,9 +575,9 @@ class UncachedManager(object):
         storage = self.owner.storage
         return storage.delete_items(userid, self.collection, items)
 
-    def get_item_version(self, userid, item):
+    def get_item_timestamp(self, userid, item):
         storage = self.owner.storage
-        return storage.get_item_version(userid, self.collection, item)
+        return storage.get_item_timestamp(userid, self.collection, item)
 
     def get_item(self, userid, item):
         storage = self.owner.storage
@@ -630,11 +644,11 @@ class _CachedManagerBase(object):
     # need to layer different steps around it.
     #
 
-    def _set_items(self, userid, items, version, data, casid):
+    def _set_items(self, userid, items, modified, data, casid):
         """Update the cached data by setting the given items.
 
         This method performs the equivalent of SyncStorage.set_items() on
-        the cached data.  You must provide the new last-modified version,
+        the cached data.  You must provide the new last-modified timestamp,
         the existing data dict, and the casid of the data currently stored
         in memcache.
 
@@ -643,30 +657,30 @@ class _CachedManagerBase(object):
         the cached data.
         """
         if not data:
-            data = {"version": version, "items": {}}
-        elif data["version"] >= version:
+            data = {"modified": modified, "items": {}}
+        elif data["modified"] >= modified:
             raise ConflictError
         num_created = 0
         for bso in items:
             if "payload" in bso:
-                bso["version"] = version
+                bso["modified"] = modified
+                data["modified"] = modified
             try:
                 data["items"][bso["id"]].update(bso)
             except KeyError:
                 num_created += 1
                 data["items"][bso["id"]] = bso
-        if num_created > 0:
-            data["version"] = version
+                data["modified"] = modified
         key = self.get_key(userid)
         if not self.cache.cas(key, data, casid):
             raise ConflictError
         return num_created
 
-    def _del_items(self, userid, items, version, data, casid):
+    def _del_items(self, userid, items, modified, data, casid):
         """Update the cached data by deleting the given items.
 
         This method performs the equivalent of SyncStorage.delete_items() on
-        the cached data.  You must provide the new last-modified version,
+        the cached data.  You must provide the new last-modified timestamp,
         the existing data dict, and the casid of the data currently stored
         in memcache.
 
@@ -674,14 +688,14 @@ class _CachedManagerBase(object):
         """
         if not data:
             raise CollectionNotFoundError
-        if data["version"] >= version:
+        if data["modified"] >= modified:
             raise ConflictError
         num_deleted = 0
         for id in items:
             if data["items"].pop(id, None) is not None:
                 num_deleted += 1
         if num_deleted > 0:
-            data["version"] = version
+            data["modified"] = modified
         key = self.get_key(userid)
         if not self.cache.cas(key, data, casid):
             raise ConflictError
@@ -691,15 +705,14 @@ class _CachedManagerBase(object):
     # Methods whose implementation can be shared between subclasses.
     #
 
-    def get_version(self, userid):
+    def get_timestamp(self, userid):
         data, _ = self.get_cached_data(userid)
         if data is None:
             raise CollectionNotFoundError
-        return data["version"]
+        return data["modified"]
 
     def get_items(self, userid, items=None, **kwds):
         # Decode kwds into individual filter values.
-        older = kwds.pop("older", None)
         newer = kwds.pop("newer", None)
         limit = kwds.pop("limit", None)
         offset = kwds.pop("offset", None)
@@ -716,10 +729,8 @@ class _CachedManagerBase(object):
         else:
             bsos = data["items"].itervalues()
         # Apply the various filters as generator expressions.
-        if older is not None:
-            bsos = (bso for bso in bsos if bso["version"] < older)
         if newer is not None:
-            bsos = (bso for bso in bsos if bso["version"] > newer)
+            bsos = (bso for bso in bsos if bso["modified"] > newer)
         # Filter out any that have expired.
         now = int(time.time())
         later = now + 1
@@ -731,11 +742,8 @@ class _CachedManagerBase(object):
         if sort == "index":
             key = lambda bso: (bso["sortindex"], bso["id"])
             reverse = False
-        elif sort == "oldest":
-            key = lambda bso: (bso["version"], bso["id"])
-            reverse = True
         else:
-            key = lambda bso: (bso["version"], bso["id"])
+            key = lambda bso: (bso["modified"], bso["id"])
             reverse = False
         bsos.sort(key=key, reverse=reverse)
         # Trim to the specified offset, if any.
@@ -769,15 +777,15 @@ class _CachedManagerBase(object):
             raise ItemNotFoundError
         return items[0]
 
-    def get_item_version(self, userid, item):
-        return self.get_item(userid, item)["version"]
+    def get_item_timestamp(self, userid, item):
+        return self.get_item(userid, item)["modified"]
 
 
 class CacheOnlyManager(_CachedManagerBase):
     """Object for managing storage of a collection solely in memcached.
 
     This manager class stores collection data in memcache without writing
-    it through to the underlying store.  It generates its own version numbers
+    it through to the underlying store.  It manages its own timestamps
     internally and uses CAS to avoid conflicting writes.
     """
 
@@ -785,39 +793,39 @@ class CacheOnlyManager(_CachedManagerBase):
         return self.cache.gets(self.get_key(userid))
 
     def set_items(self, userid, items):
-        version = get_new_version()
+        modified = get_timestamp()
         data, casid = self.get_cached_data(userid)
-        self._set_items(userid, items, version, data, casid)
-        return version
+        self._set_items(userid, items, modified, data, casid)
+        return modified
 
     def del_collection(self, userid):
         if not self.cache.delete(self.get_key(userid)):
             raise CollectionNotFoundError
-        return get_new_version()
+        return get_timestamp()
 
     def del_items(self, userid, items):
-        version = get_new_version()
+        modified = get_timestamp()
         data, casid = self.get_cached_data(userid)
-        self._del_items(userid, items, version, data, casid)
-        return data["version"]
+        self._del_items(userid, items, modified, data, casid)
+        return data["modified"]
 
     def set_item(self, userid, item, bso):
         bso["id"] = item
-        version = get_new_version()
+        modified = get_timestamp()
         data, casid = self.get_cached_data(userid)
-        num_created = self._set_items(userid, [bso], version, data, casid)
+        num_created = self._set_items(userid, [bso], modified, data, casid)
         return {
             "created": num_created == 1,
-            "version": version,
+            "modified": modified,
         }
 
     def del_item(self, userid, item):
-        version = get_new_version()
+        modified = get_timestamp()
         data, casid = self.get_cached_data(userid)
-        num_deleted = self._del_items(userid, [item], version, data, casid)
+        num_deleted = self._del_items(userid, [item], modified, data, casid)
         if num_deleted == 0:
             raise ItemNotFoundError
-        return version
+        return modified
 
 
 class CachedManager(_CachedManagerBase):
@@ -825,7 +833,7 @@ class CachedManager(_CachedManagerBase):
 
     This manager class duplicates collection data from the underlying store
     into memcache, allowing faster access while guarding against data loss
-    in the cache of memcache failure/purge.
+    in the case of memcache failure/purge.
 
     To avoid the cache getting out of sync with the underlying store, the
     cached data is deleted before any write operations and restored once
@@ -848,8 +856,8 @@ class CachedManager(_CachedManagerBase):
                 storage = self.storage
                 collection = self.collection
                 with self.owner.lock_for_read(userid, collection):
-                    ver = storage.get_collection_version(userid, collection)
-                    data["version"] = ver
+                    ts = storage.get_collection_timestamp(userid, collection)
+                    data["modified"] = ts
                     data["items"] = {}
                     for bso in storage.get_items(userid, collection)["items"]:
                         data["items"][bso["id"]] = bso
@@ -863,9 +871,9 @@ class CachedManager(_CachedManagerBase):
     def set_items(self, userid, items):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
-            ver = storage.set_items(userid, self.collection, items)
-        self._set_items(userid, items, ver, data, casid)
-        return ver
+            ts = storage.set_items(userid, self.collection, items)
+        self._set_items(userid, items, ts, data, casid)
+        return ts
 
     def del_collection(self, userid):
         self.cache.delete(self.get_key(userid))
@@ -874,24 +882,24 @@ class CachedManager(_CachedManagerBase):
     def del_items(self, userid, items):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
-            ver = storage.delete_items(userid, self.collection, items)
-        self._del_items(userid, items, ver, data, casid)
-        return ver
+            ts = storage.delete_items(userid, self.collection, items)
+        self._del_items(userid, items, ts, data, casid)
+        return ts
 
     def set_item(self, userid, item, bso):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
             res = storage.set_item(userid, self.collection, item, bso)
         bso["id"] = item
-        self._set_items(userid, [bso], res["version"], data, casid)
+        self._set_items(userid, [bso], res["modified"], data, casid)
         return res
 
     def del_item(self, userid, item):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
-            ver = storage.delete_item(userid, self.collection, item)
-        self._del_items(userid, [item], ver, data, casid)
-        return ver
+            ts = storage.delete_item(userid, self.collection, item)
+        self._del_items(userid, [item], ts, data, casid)
+        return ts
 
     @contextlib.contextmanager
     def _mark_dirty(self, userid):
@@ -899,17 +907,17 @@ class CachedManager(_CachedManagerBase):
 
         All operations that may modify the underlying collection should be
         performed within this context manager.  It removes the data from cache
-        before attempting the write, and rolls back to the cached version if
+        before attempting the write, and rolls back to the old data if
         it is safe to do so.
 
         Once the write operation has successfully completed, the calling code
         should update the cache with the new data.
         """
-        # Grad the current cache state so we can pass it to calling function.
+        # Grab the current cache state so we can pass it to calling function.
         key = self.get_key(userid)
         data, casid = self.get_cached_data(userid, add_if_missing=False)
         # Remove it from the cache so that we don't serve stale data.
-        # A CAS-DELETE here would be nice, but does memcached have one?
+        # A CAS-DELETE here would be nice, but memcached doesn't have one.
         if data is not None:
             self.cache.delete(key)
         # Yield control back the the calling function.

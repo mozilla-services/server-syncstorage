@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import time
+
 from pyramid.httpexceptions import (HTTPNotFound,
                                     HTTPConflict,
                                     HTTPNotModified,
@@ -13,9 +15,10 @@ from syncstorage.storage import (ConflictError,
 
 from syncstorage.views.util import (make_decorator,
                                     json_error,
-                                    get_resource_version)
+                                    get_resource_timestamp)
 
-_ONE_MEG = 1024 * 1024
+ONE_KB = 1024
+ONE_MB = 1024 * 1024
 
 # How long the client should wait before retrying a conflicting write.
 RETRY_AFTER = 5
@@ -44,6 +47,26 @@ def convert_storage_errors(viewfunc, request):
 
 
 @make_decorator
+def sleep_and_retry_on_conflict(viewfunc, request):
+    """View decorator to perform one automatic retry on ConflictError.
+
+    This makes things a bit easier for clients (and for the tests!) when
+    doing closely-spaced writes.  They might fail because the timestamp has
+    progressed sufficiently; this lets it progress and then tries again.
+    """
+    start = time.time()
+    try:
+        return viewfunc(request)
+    except ConflictError:
+        # If the request took a long time to error out, it's probably
+        # a lock-related error rather than a timestamp issue.
+        if time.time() - start > 0.2:
+            raise
+        time.sleep(0.01)
+        return viewfunc(request)
+
+
+@make_decorator
 def check_storage_quota(viewfunc, request):
     """View decorator to check the user's quota.
 
@@ -52,7 +75,7 @@ def check_storage_quota(viewfunc, request):
     error response is returned.
 
     In addition, if the user has less than one meg of quota remaining then
-    it will include an "X-Quota-Remaining" header in the response.
+    it will include an "X-Weave-Quota-Remaining" header in the response.
     """
     # This only applies to write requests.
     if request.method not in ("PUT", "POST"):
@@ -70,7 +93,7 @@ def check_storage_quota(viewfunc, request):
     # If we're close to going over quota, ask it to recalculate fresher info.
     used = storage.get_total_size(userid)
     left = quota_size - used
-    if left < _ONE_MEG:
+    if left < ONE_MB:
         used = storage.get_total_size(userid, recalculate=True)
         left = quota_size - used
 
@@ -90,39 +113,40 @@ def check_storage_quota(viewfunc, request):
     # Report errors/warnings as appropriate.
     if left <= 0:  # no space left
         raise json_error(403, "quota-exceeded")
-    if left < _ONE_MEG:
-        request.response.headers["X-Quota-Remaining"] = str(left)
+    if left < ONE_MB:
+        left_kb = round(float(left) / ONE_KB, 2)
+        request.response.headers["X-Weave-Quota-Remaining"] = str(left_kb)
 
     return viewfunc(request)
 
 
 @make_decorator
 def check_precondition_headers(viewfunc, request):
-    """View decorator to check X-If-[Unm|M]odified-Since-Version headers.
+    """View decorator to check X-If-[Unm|M]odified-Since headers.
 
-    This decorator checks pre-validated X-If-Modified-Since-Version and
-    X-If-Unmodified-Since-Version headers against the actual last-modified
-    version of the target resource.  If the preconditions are not met then
+    This decorator checks pre-validated vlaues from the X-If-Modified-Since
+    and X-If-Unmodified-Since headers against the actual last-modified
+    time of the target resource.  If the preconditions are not met then
     it raises the appropriate error response.
 
-    In addition, and retreived value for the last-modified version will be
+    In addition, any retreived value for the last-modified time will be
     stored in the response headers for return to the client.  This may save
     having to look it up again when the response is being rendered.
     """
     if "if_modified_since" in request.validated:
-        version = get_resource_version(request)
-        request.response.headers["X-Last-Modified-Version"] = str(version)
-        if version <= request.validated["if_modified_since"]:
+        ts = get_resource_timestamp(request)
+        request.response.headers["X-Last-Modified"] = str(ts)
+        if ts <= request.validated["if_modified_since"]:
             raise HTTPNotModified(headers={
-                "X-Last-Modified-Version": str(version),
+                "X-Last-Modified": str(ts),
             })
 
     if "if_unmodified_since" in request.validated:
-        version = get_resource_version(request)
-        request.response.headers["X-Last-Modified-Version"] = str(version)
-        if version > request.validated["if_unmodified_since"]:
+        ts = get_resource_timestamp(request)
+        request.response.headers["X-Last-Modified"] = str(ts)
+        if ts > request.validated["if_unmodified_since"]:
             raise HTTPPreconditionFailed(headers={
-                "X-Last-Modified-Version": str(version),
+                "X-Last-Modified": str(ts),
             })
 
     return viewfunc(request)
@@ -148,7 +172,7 @@ def with_collection_lock(viewfunc, request):
 
     # Otherwise, take a read or write lock depending on request method.
     # To prevent silly bugs if additional methods are added, we explicitly
-    # enumerating the safer read methods, and assume anything else is a write.
+    # enumerate the safer read methods, and assume anything else is a write.
     if request.method in ("GET", "HEAD",):
         lock_collection = storage.lock_for_read
     else:

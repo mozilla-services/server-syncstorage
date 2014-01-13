@@ -29,4 +29,4 @@ test:
 	$(NOSE) $(TESTS)
 	# Test that live functional tests can run correctly, by actually
 	# spinning up a server and running them against it.
-	./local/bin/paster serve syncstorage/tests/tests.ini & SERVER_PID=$$! ; sleep 2 ; ./local/bin/python syncstorage/tests/functional/test_storage.py http://localhost:5000 ; kill $$SERVER_PID
+	./local/bin/pserve syncstorage/tests/tests.ini & SERVER_PID=$$! ; sleep 2 ; ./local/bin/python syncstorage/tests/functional/test_storage.py http://localhost:5000 ; kill $$SERVER_PID

@@ -5,8 +5,9 @@
 """
 
 import re
+import decimal
 
-FIELDS = set(('id', 'collection', 'sortindex', 'version', 'timestamp',
+FIELDS = set(('id', 'collection', 'sortindex', 'modified',
               'payload', 'payload_size', 'ttl'))
 
 FIELD_DEFAULTS = {
@@ -16,11 +17,12 @@ FIELD_DEFAULTS = {
 }
 
 MAX_TTL = 31536000
-MAX_ID_SIZE = 64
 MAX_PAYLOAD_SIZE = 256 * 1024
 MAX_SORTINDEX_VALUE = 999999999
 MIN_SORTINDEX_VALUE = 0
-VALID_ID_REGEX = re.compile("^[a-zA-Z0-9_-]+$")
+VALID_ID_REGEX = re.compile("^[ -~]{1,64}$")  # <=64 printable characters
+
+SCALAR_TYPES = (int, long, basestring, decimal.Decimal)
 
 
 class BSO(dict):
@@ -40,7 +42,7 @@ class BSO(dict):
 
         for name, value in data_items:
             if value is not None:
-                if not isinstance(value, (int, long, float, basestring)):
+                if not isinstance(value, SCALAR_TYPES):
                     msg = "BSO fields must be scalar values, not %s"
                     raise ValueError(msg % (type(value),))
             if name in converters:
@@ -60,7 +62,7 @@ class BSO(dict):
         # Check that id field is well-formed.
         if 'id' in self:
             value = self['id']
-            # Check that it's base64url-compliant.
+            # Check that it's printable-asscii characters.
             # Doing the regex match first has the nice side-effect of
             # erroring out if the value is not a string or unicode object.
             # This avoids accidentally coercing other types to a string.
@@ -72,8 +74,6 @@ class BSO(dict):
             # Make sure it's stored as a bytestring, not a unicode object.
             # This won't fail because we've checked for valid chars above.
             value = str(self['id'])
-            if len(value) > MAX_ID_SIZE:
-                return False, 'invalid id'
             self['id'] = value
 
         # Check that the ttl is a positive int, and less than one year.
