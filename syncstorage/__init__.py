@@ -9,6 +9,8 @@ from mozsvc.metrics import load_metlog_client
 def includeme(config):
     # Ensure that we have metlog loaded and ready for use as early as possible.
     load_metlog_client(config)
+    # Disable cornice default exception-handling views.
+    config.registry.settings.setdefault("handle_exceptions", False)
     # Include dependencies from other packages.
     config.include("cornice")
     config.include("mozsvc")
