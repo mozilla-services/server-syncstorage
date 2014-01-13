@@ -1,6 +1,3 @@
 include README
-include RELEASE.txt
 include MANIFEST.in
-include SyncStorage.spec
-include *.cfg
-recursive-include syncstorage *.cfg *.ini
+recursive-include syncstorage *.ini
