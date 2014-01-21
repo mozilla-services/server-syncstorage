@@ -10,16 +10,33 @@ import base64
 import random
 import json
 import time
-from ConfigParser import NoOptionError
+from urlparse import urlparse
 
-from funkload.FunkLoadTestCase import FunkLoadTestCase
-from funkload.utils import Data
+import hawkauthlib
+import browserid.jwt
+import browserid.tests.support
+import requests.auth
 
-import macauthlib
-from webob import Request
-from mozsvc.user import SagradaAuthenticationPolicy
+from loads import TestCase
 
-from syncstorage.tests.functional.support import authenticate_to_token_server
+
+MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
+    "algorithm": "DS",
+    "x": "385cb3509f086e110c5e24bdd395a84b335a09ae",
+    "y": "738ec929b559b604a232a9b55a5295afc368063bb9c20fac4e53a74970a4db795"
+         "6d48e4c7ed523405f629b4cc83062f13029c4d615bbacb8b97f5e56f0c7ac9bc1"
+         "d4e23809889fa061425c984061fca1826040c399715ce7ed385c4dd0d40225691"
+         "2451e03452d3c961614eb458f188e3e8d2782916c43dbe2e571251ce38262",
+    "p": "ff600483db6abfc5b45eab78594b3533d550d9f1bf2a992a7a8daa6dc34f8045a"
+         "d4e6e0c429d334eeeaaefd7e23d4810be00e4cc1492cba325ba81ff2d5a5b305a"
+         "8d17eb3bf4a06a349d392e00d329744a5179380344e82a18c47933438f891e22a"
+         "eef812d69c8f75e326cb70ea000c3f776dfdbd604638c2ef717fc26d02e17",
+    "q": "e21e04f911d1ed7991008ecaab3bf775984309c3",
+    "g": "c52a4a0ff3b7e61fdf1867ce84138369a6154f4afa92966e3c827e25cfa6cf508b"
+         "90e5de419e1337e07a2e9e2a3cd5dea704d175f8ebf6af397d69e110b96afb17c7"
+         "a03259329e4829b0d03bbc7896b15b4ade53e130858cc34d96269aa89041f40913"
+         "6c7242a38895c9d5bccad4f389af1d7a4bd1398bd072dffa896233397a",
+})
 
 
 # The collections to operate on.
@@ -49,89 +66,64 @@ delete_count_distribution = [99, 1, 0, 0, 0]
 deleteall_probability = 1 / 100.
 
 
-class StressTest(FunkLoadTestCase):
+class HawkAuth(requests.auth.AuthBase):
 
-    # Customize the _browse() method to send authentication headers on all
-    # requests, and to perform additional logging.
+    def __init__(self, server_url, id, secret):
+        self.server_url = server_url
+        self.id = id
+        self.secret = secret
 
-    def _browse(self, url_in, params_in=None, description=None, ok_codes=None,
-                method='post', *args, **kwds):
-        # Automatically add a fresh MACAuth header to the request.
-        if self.auth_token is not None:
-            req = Request.blank(url_in)
-            req.method = method.upper()
-            if params_in and req.method in ("GET", "HEAD",):
-                qs_items = ("%s=%s" % item for item in params_in.iteritems())
-                req.query_string = "&".join(qs_items)
-            macauthlib.sign_request(req, self.auth_token, self.auth_secret)
-            self.setHeader("Authorization", req.environ["HTTP_AUTHORIZATION"])
-        # Log the start and end of the request, for debugging purposes.
-        args = (url_in, params_in, description, ok_codes, method) + args
-        self.logi("%s: %s" % (method.upper(), url_in))
-        try:
-            result = super(StressTest, self)._browse(*args, **kwds)
-        except Exception, e:
-            self.logi("    FAIL: " + url_in + " " + repr(e))
-            raise
-        else:
-            self.logi("    OK: " + url_in + " " + repr(result))
-            return result
+    def __call__(self, req):
+        # Requets doesn't seem to include the port in the Host header,
+        # and loads replaces hostnames with IPs.  Undo all this rubbish
+        # so that we can calculate the correct signature.
+        req.headers['Host'] = urlparse(self.server_url).netloc
+        hawkauthlib.sign_request(req, self.id, self.secret)
+        return req
 
-    def setUp(self):
-        # Should we use a tokenserver or synthesize our own?
-        try:
-            self.token_server_url = self.conf_get("main", "token_server_url")
-            self.logi("using tokenserver at %s" % (self.token_server_url,))
-        except NoOptionError:
-            self.token_server_url = None
-            secrets_file = self.conf_get("main", "secrets_file")
-            self.logi("using secrets_file from %s" % (secrets_file,))
-            policy = SagradaAuthenticationPolicy(secrets_file=secrets_file)
-            self.auth_policy = policy
-            nodes = self.conf_get("main", "endpoint_nodes").split("\n")
-            nodes = [node.strip() for node in nodes]
-            nodes = [node for node in nodes if not node.startswith("#")]
-            self.endpoint_nodes = nodes
+
+class StressTest(TestCase):
+
+    server_url = "https://token.dev.lcip.org"
 
     def test_storage_session(self):
         self._generate_token_credentials()
-        self.logi("using endpoint url %s" % (self.endpoint_url,))
+        self.session.auth = HawkAuth(self.server_url, self.auth_token,
+                                     self.auth_secret)
+
+        headers = {"content-type": "application/json"}
 
         # Always GET info/collections
-        self.setOkCodes([200, 404])
         url = self.endpoint_url + "/info/collections"
-        response = self.get(url)
+        response = self.session.get(url)
+        self.assertTrue(response.status_code in (200, 404))
 
         # GET requests to meta/global.
         num_requests = self._pick_weighted_count(metaglobal_count_distribution)
-        self.setOkCodes([200, 404])
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/meta/global"
-            response = self.get(url)
-            if response.code == 404:
+            response = self.session.get(url)
+            if response.status_code == 404:
                 metapayload = "This is the metaglobal payload which contains"\
                               " some client data that doesnt look much"\
                               " like this"
                 data = json.dumps({"id": "global", "payload": metapayload})
-                data = Data('application/json', data)
-                self.setOkCodes([200, 201])
-                self.put(url, params=data)
+                response = self.session.put(url, data=data, headers=headers)
+            self.assertEqual(response.status_code, 200)
 
         # GET requests to individual collections.
         num_requests = self._pick_weighted_count(get_count_distribution)
         cols = random.sample(collections, num_requests)
-        self.setOkCodes([200, 404])
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x]
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            self.logi("about to GET (x=%d) %s" % (x, url))
-            response = self.get(url, params)
+            response = self.session.get(url, params=params)
+            self.assertTrue(response.status_code in (200, 404))
 
         # PUT requests with 100 WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
         cols = random.sample(collections, num_requests)
-        self.setOkCodes([200])
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x]
             data = []
@@ -143,10 +135,9 @@ class StressTest(FunkLoadTestCase):
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
-            data = Data('application/json', data)
-            self.logi("about to POST (x=%d) %s" % (x, url))
-            response = self.post(url, params=data)
-            body = response.body
+            response = self.session.post(url, data=data, headers=headers)
+            self.assertEqual(response.status_code, 200)
+            body = response.content
             self.assertTrue(body != '')
             result = json.loads(body)
             self.assertEquals(len(result["success"]), items_per_batch)
@@ -156,39 +147,37 @@ class StressTest(FunkLoadTestCase):
         # We might choose to delete some individual collections, or to do
         # a full reset and delete all the data.  Never both in the same run.
         num_requests = self._pick_weighted_count(delete_count_distribution)
-        self.setOkCodes([204])
         if num_requests:
             cols = random.sample(collections, num_requests)
             for x in range(num_requests):
                 url = self.endpoint_url + "/storage/" + cols[x]
-                self.delete(url)
+                response = self.session.delete(url)
+                self.assertTrue(response.status_code in (200, 204))
         else:
             if random.random() <= deleteall_probability:
                 url = self.endpoint_url + "/storage"
-                self.delete(url)
+                response = self.session.delete(url)
+                self.assertEquals(response.status_code, 200)
 
     def _generate_token_credentials(self):
         """Pick an identity, log in and generate the auth token."""
-        uid = random.randint(1, 1000000)  # existing user
-        # Use the tokenserver if configured, otherwise fake it ourselves.
-        if self.token_server_url is None:
-            self.logi("synthesizing token for uid %s" % (uid,))
-            endpoint_node = random.choice(self.endpoint_nodes)
-            req = Request.blank(endpoint_node)
-            creds = self.auth_policy.encode_mac_id(req, uid)
-            self.auth_token, self.auth_secret = creds
-            self.endpoint_url = endpoint_node + "/2.0/%s" % (uid,)
-        else:
-            email = "user%s@mockmyid.com" % (uid,)
-            token_url = self.token_server_url + "/1.0/sync/2.0"
-            self.logi("requesting token for %s from %s" % (email, token_url))
-            credentials = authenticate_to_token_server(token_url, email,
-                                               audience=self.token_server_url)
-            self.auth_token = credentials["id"]
-            self.auth_secret = credentials["key"]
-            self.endpoint_url = credentials["api_endpoint"]
-
-        self.logi("assigned endpoint_url %s" % (self.endpoint_url))
+        uid = random.randint(1, 1000000)
+        email = "user%s@mockmyid.com" % (uid,)
+        assertion = browserid.tests.support.make_assertion(
+            email=email,
+            audience=self.server_url,
+            issuer="mockmyid.com",
+            issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
+        )
+        token_url = self.server_url + "/1.0/sync/1.5"
+        response = self.session.get(token_url, headers={
+            "Authorization": "BrowserID " + assertion,
+        })
+        response.raise_for_status()
+        credentials = response.json()
+        self.auth_token = credentials["id"].encode('ascii')
+        self.auth_secret = credentials["key"].encode('ascii')
+        self.endpoint_url = credentials["api_endpoint"]
         return self.auth_token, self.auth_secret, self.endpoint_url
 
     def _pick_weighted_count(self, weights):
@@ -200,5 +189,4 @@ class StressTest(FunkLoadTestCase):
             if i <= base:
                 break
             count += 1
-
         return count

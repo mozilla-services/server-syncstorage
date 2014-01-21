@@ -12,5 +12,6 @@ cover
 bin
 html
 lib
+lib64
 include
 loadtest.*
