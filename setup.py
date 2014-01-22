@@ -1,29 +1,22 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
+
 from setuptools import setup, find_packages
 import os
 import re
 
-install_requires = ['SQLALchemy', 'PasteDeploy', 'unittest2', 'simplejson',
-                    'mozsvc>=0.3', 'cornice', 'macauthlib']
+install_requires = ['SQLALchemy', 'unittest2', 'simplejson', 'pyramid',
+                    'mozsvc', 'cornice', 'pyramid_hawkauth', 'PyMySQL',
+                    'pymysql_sa', 'umemcache', 'metlog-py', 'wsgiproxy',
+                    'webtest', 'requests', 'PyBrowserID']
 
 entry_points = """
 [paste.app_factory]
 main = syncstorage:main
-
-[paste.app_install]
-main = paste.script.appinstall:Installer
 """
 
-# extracting the version number from the .spec file
-here = os.path.dirname(__file__)
-spec = os.path.join(here, 'SyncStorage.spec')
-with open(spec) as f:
-    spec = f.read()
-
-_VERSION = re.compile('^%define version (.*)$', re.M)
-version = _VERSION.findall(spec)[0]
+version = "1.5.0"
 
 
 setup(name='SyncStorage',

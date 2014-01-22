@@ -65,7 +65,7 @@ collections = Table(
 # Table mapping (user_id, collection_id) => collection-level metadata.
 #
 # This table holds collection-level metadata on a per-user basis.  Currently
-# the only such metadata is the last-modified version of the collection.
+# the only such metadata is the last-modified timestamp of the collection.
 
 user_collections = Table(
     "user_collections",
@@ -74,7 +74,7 @@ user_collections = Table(
            autoincrement=False),
     Column("collection", Integer, primary_key=True, nullable=False,
            autoincrement=False),
-    Column("last_modified_v", BigInteger, nullable=False)
+    Column("last_modified", BigInteger, nullable=False)
 )
 
 
@@ -92,8 +92,7 @@ def _get_bso_columns(table_name):
         Column("collection", Integer, primary_key=True, nullable=False,
                autoincrement=False),
         Column("sortindex", Integer),
-        Column("version", BigInteger),
-        Column("timestamp", BigInteger),
+        Column("modified", BigInteger),
         Column("payload", Text, nullable=False, server_default=""),
         Column("payload_size", Integer, nullable=False,
                server_default=sqltext("0")),
@@ -103,11 +102,11 @@ def _get_bso_columns(table_name):
         # because index names in sqlite are global, not per-table.
         # Index on "ttl" for easy pruning of expired items.
         Index("%s_ttl_idx" % (table_name,), "ttl"),
-        # Index on "version" for easy filtering by older/newer.
-        Index("%s_usr_col_ver_idx" % (table_name,),
-              "userid", "collection", "version"),
+        # Index on "modified" for easy filtering by timestamp.
+        Index("%s_usr_col_mod_idx" % (table_name,),
+              "userid", "collection", "modified"),
         # There is intentinally no index on "sortindex".
-        # Clients almost always filter on "version" using the above index,
+        # Clients almost always filter on "modified" using the above index,
         # and cannot take advantage of a separate index for sorting.
     )
 

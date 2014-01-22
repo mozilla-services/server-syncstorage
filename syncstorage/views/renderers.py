@@ -4,7 +4,7 @@
 
 import simplejson as json
 
-from syncstorage.views.util import get_resource_version
+from syncstorage.views.util import get_resource_timestamp
 
 
 class SyncStorageRenderer(object):
@@ -23,12 +23,12 @@ class SyncStorageRenderer(object):
         return self.render_value(value)
 
     def adjust_response(self, value, request, response):
-        # Ensure that every response reports the last-modified version.
+        # Ensure that every response reports the last-modified timestamp.
         # In most cases this will have already been set when we looked it
         # up during processing of the request.
-        if "X-Last-Modified-Version" not in response.headers:
-            version = get_resource_version(request)
-            response.headers["X-Last-Modified-Version"] = str(version)
+        if "X-Last-Modified" not in response.headers:
+            ts = get_resource_timestamp(request)
+            response.headers["X-Last-Modified"] = str(ts)
 
     def render_value(self, value):
         raise NotImplementedError
@@ -42,13 +42,9 @@ class JsonRenderer(SyncStorageRenderer):
         if response.content_type == response.default_content_type:
             response.content_type = "application/json"
         if isinstance(value, (list, tuple)):
-            response.headers["X-Num-Records"] = str(len(value))
+            response.headers["X-Weave-Records"] = str(len(value))
 
     def render_value(self, value):
-        # It's not safe to render lists as a raw json list.
-        # Instead we produce a dict with the lone key "items".
-        if isinstance(value, (list, tuple)):
-            value = {"items": value}
         return json.dumps(value)
 
 
@@ -59,36 +55,18 @@ class NewlinesRenderer(SyncStorageRenderer):
         super(NewlinesRenderer, self).adjust_response(value, request, response)
         if response.content_type == response.default_content_type:
             response.content_type = "application/newlines"
-        response.headers["X-Num-Records"] = str(len(value))
+        response.headers["X-Weave-Records"] = str(len(value))
 
     def render_value(self, value):
         data = []
         for line in value:
-            line = json.dumps(line).replace('\n', '\\u000a')
+            line = json.dumps(line)
+            line = line.replace('\n', '\\u000a')
             data.append(line)
         return '\n'.join(data)
-
-
-class VoidRenderer(SyncStorageRenderer):
-    """Pyramid renderer for 201/204 responses, where no content is needed.
-
-    It's convenient to do this as a renderer to get header tweaking etc
-    for free.
-    """
-
-    def adjust_response(self, value, request, response):
-        super(VoidRenderer, self).adjust_response(value, request, response)
-        if value and value.get("created", False):
-            response.status_code = 201
-        else:
-            response.status_code = 204
-
-    def render_value(self, value):
-        return ""
 
 
 def includeme(config):
     here = "syncstorage.views.renderers:"
     config.add_renderer("sync-json", here + "JsonRenderer")
     config.add_renderer("sync-newlines", here + "NewlinesRenderer")
-    config.add_renderer("sync-void", here + "VoidRenderer")

@@ -2,9 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import json
-
 from syncstorage.bso import BSO, VALID_ID_REGEX
+from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
 
 
@@ -36,42 +35,42 @@ def extract_target_resource(request):
 
 
 def extract_precondition_headers(request):
-    """Validator to extract the X-If-[Unm|M]odified-Since-Version headers.
+    """Validator to extract the X-If-[Unm|M]odified-Since headers.
 
-    This validator extracts the X-If-Modified-Since-Version header or the
-    X-If-Unmodified-Since-Version header, validates it and parses it into
+    This validator extracts the X-If-Modified-Since- header or the
+    X-If-Unmodified-Since header, validates it and parses it into a float.
     an integer.  The result is stored under the key "if_modified_since" or
     "if_unmodified_since" as appropriate.
 
     It is an error to specify both headers in a single request.
     """
-    if_modified_since = request.headers.get("X-If-Modified-Since-Version")
+    if_modified_since = request.headers.get("X-If-Modified-Since")
     if if_modified_since is not None:
         try:
-            if_modified_since = int(if_modified_since)
+            if_modified_since = get_timestamp(if_modified_since)
             if if_modified_since < 0:
                 raise ValueError
         except ValueError:
-            msg = "Bad value for X-If-Modified-Since-Version: %r"
-            request.errors.add("header", "X-If-Modified-Since-Version",
+            msg = "Bad value for X-If-Modified-Since: %r"
+            request.errors.add("header", "X-If-Modified-Since",
                                msg % (if_modified_since))
         else:
             request.validated["if_modified_since"] = if_modified_since
 
-    if_unmodified_since = request.headers.get("X-If-Unmodified-Since-Version")
+    if_unmodified_since = request.headers.get("X-If-Unmodified-Since")
     if if_unmodified_since is not None:
         try:
-            if_unmodified_since = int(if_unmodified_since)
+            if_unmodified_since = get_timestamp(if_unmodified_since)
             if if_unmodified_since < 0:
                 raise ValueError
         except ValueError:
-            msg = 'Invalid value for "X-If-Unmodified-Since-Version": %r'
-            request.errors.add("header", "X-If-Unmodified-Since_Version",
+            msg = 'Invalid value for "X-If-Unmodified-Since": %r'
+            request.errors.add("header", "X-If-Unmodified-Since",
                                msg % (if_unmodified_since,))
         else:
             if if_modified_since is not None:
-                msg = "Cannot specify both X-If-Modified-Since-Version and "\
-                      "X-If-Unmodified-Since-Version on a single request"
+                msg = "Cannot specify both X-If-Modified-Since and "\
+                      "X-If-Unmodified-Since on a single request"
                 request.errors.add("header", "X-If-Unmodified-Since", msg)
             else:
                 request.validated["if_unmodified_since"] = if_unmodified_since
@@ -82,8 +81,7 @@ def extract_query_params(request):
 
     This validator will extract and validate the following search params:
 
-        * older, newer:  bounds on last-modified version (integer)
-        * index_above, index_below:  bounds on searchindex (integer)
+        * newer: lower-bound on last-modified time (float timestamp)
         * sort:  order in which to return results (string)
         * limit:  maximum number of items to return (integer)
         * offset:  position at which to restart search (string)
@@ -91,18 +89,29 @@ def extract_query_params(request):
         * full: flag, whether to include full bodies (bool)
 
     """
-    for field in ("older", "newer", "index_above", "index_below", "limit"):
-        value = request.GET.get(field)
-        if value is not None:
-            try:
-                value = int(value)
-                if value < 0:
-                    raise ValueError
-            except ValueError:
-                msg = "Invalid value for %s: %r" % (field, value)
-                request.errors.add("querystring", field, msg)
-            else:
-                request.validated[field] = value
+    newer = request.GET.get("newer")
+    if newer is not None:
+        try:
+            newer = get_timestamp(newer)
+            if newer < 0:
+                raise ValueError
+        except ValueError:
+            msg = "Invalid value for newer: %r" % (newer,)
+            request.errors.add("querystring", "newer", msg)
+        else:
+            request.validated["newer"] = newer
+
+    limit = request.GET.get("limit")
+    if limit is not None:
+        try:
+            limit = int(limit)
+            if limit < 0:
+                raise ValueError
+        except ValueError:
+            msg = "Invalid value for limit: %r" % (limit,)
+            request.errors.add("querystring", "limit", msg)
+        else:
+            request.validated["limit"] = limit
 
     # The offset token is an opaque string, with semantics determined by
     # the storage backend, so we can't parse or validate it here.  Rather,
@@ -113,8 +122,8 @@ def extract_query_params(request):
 
     sort = request.GET.get("sort")
     if sort is not None:
-        if sort not in ("oldest", "newest", "index"):
-            msg = "Invalid value for sort: %r" % (value,)
+        if sort not in ("newest", "index"):
+            msg = "Invalid value for sort: %r" % (sort,)
             request.errors.add("querystring", "sort", msg)
         else:
             request.validated["sort"] = sort
@@ -148,10 +157,10 @@ def parse_multiple_bsos(request):
     """
     content_type = request.content_type
     try:
-        if content_type in ("application/json", None):
-            bso_datas = json.loads(request.body)
+        if content_type in ("application/json", "text/plain", None):
+            bso_datas = json_loads(request.body)
         elif content_type == "application/newlines":
-            bso_datas = [json.loads(ln) for ln in request.body.split("\n")]
+            bso_datas = [json_loads(ln) for ln in request.body.split("\n")]
         else:
             msg = "Unsupported Media Type: %s" % (content_type,)
             request.errors.add("header", "Content-Type", msg)
@@ -215,8 +224,8 @@ def parse_single_bso(request):
     """
     content_type = request.content_type
     try:
-        if content_type in ("application/json", None):
-            bso_data = json.loads(request.body)
+        if content_type in ("application/json", "text/plain", None):
+            bso_data = json_loads(request.body)
         else:
             msg = "Unsupported Media Type: %s" % (content_type,)
             request.errors.add("header", "Content-Type", msg)

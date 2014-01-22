@@ -14,7 +14,7 @@ import urlparse
 import unittest2
 import requests
 
-import macauthlib
+import hawkauthlib
 import browserid.tests.support
 
 from pyramid.request import Request
@@ -38,7 +38,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
         # Monkey-patch the app to sign all requests with the token.
         def new_do_request(req, *args, **kwds):
-            macauthlib.sign_request(req, self.auth_token, self.auth_secret)
+            hawkauthlib.sign_request(req, self.auth_token, self.auth_secret)
             return orig_do_request(req, *args, **kwds)
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request
@@ -49,7 +49,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         self.user_id = random.randint(1, 100000)
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank(self.host_url)
-        creds = auth_policy.encode_mac_id(req, self.user_id)
+        creds = auth_policy.encode_hawk_id(req, self.user_id)
         self.auth_token, self.auth_secret = creds
 
     def _cleanup_test_databases(self):
@@ -95,7 +95,8 @@ def authenticate_to_token_server(url, email=None, audience=None):
     if email is None:
         email = "user_%s@mockmyid.com" % (random.randint(1, 100000),)
     if audience is None:
-        audience = "https://persona.org"
+        audience = urlparse.urlparse(url)._replace(path="")
+        audience = urlparse.urlunparse(audience)
     assertion = browserid.tests.support.make_assertion(
         email=email,
         audience=audience,
@@ -104,7 +105,6 @@ def authenticate_to_token_server(url, email=None, audience=None):
     )
     r = requests.get(url, headers={
         "Authorization": "Browser-ID " + assertion,
-        "X-Conditions-Accepted": "true",
     })
     r.raise_for_status()
     creds = json.loads(r.content)

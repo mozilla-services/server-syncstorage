@@ -14,7 +14,8 @@ BEGIN_TRANSACTION_READ = "BEGIN DEFERRED TRANSACTION"
 
 BEGIN_TRANSACTION_WRITE = "BEGIN EXCLUSIVE TRANSACTION"
 
-LOCK_COLLECTION_READ = "SELECT last_modified_v FROM user_collections "\
+LOCK_COLLECTION_READ = "SELECT last_modified FROM user_collections "\
                        "WHERE userid=:userid AND collection=:collectionid"
 
-LOCK_COLLECTION_WRITE = None
+LOCK_COLLECTION_WRITE = "SELECT last_modified FROM user_collections "\
+                        "WHERE userid=:userid AND collection=:collectionid"
