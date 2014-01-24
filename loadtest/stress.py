@@ -167,7 +167,7 @@ class StressTest(TestCase):
         uid = random.randint(1, 1000000)
         url = urlparse(self.server_url)
         if url.fragment:
-            endpoint = url._replace(fragment="", path=url.path + "/" + str(uid))
+            endpoint = url._replace(fragment="", path="/1.5/" + str(uid))
             self.endpoint_url = urlunparse(endpoint)
             data = {"uid": uid, "node": self.endpoint_url}
             self.auth_token = tokenlib.make_token(data, secret=url.fragment)

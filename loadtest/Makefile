@@ -20,6 +20,11 @@ clean:
 test:
 	./bin/loads-runner --hits=1 --users=1 stress.StressTest.test_storage_session --server-url=$(SERVER_URL)
 
-# Run a full bench, by submitting to broker in AWS.
+# Run a bench of 20 concurrent users.
 bench:
-	./bin/loads-runner --users=20 --duration=1800 --include-file=./stress.py --python-dep=hawkauthlib stress.StressTest.test_storage_session --server-url=$(SERVER_URL)
+	./bin/loads-runner --users=20 --duration=60 stress.StressTest.test_storage_session --server-url=$(SERVER_URL)
+
+# Run a much bigger bench, by submitting to broker in AWS.
+megabench:
+	./loadsrunner.sh --users=20 --duration=300 --agents=5 --python-dep=hawkauthlib --python-dep=tokenlib --python-dep=PyBrowserID --python-dep=requests --include-file=./stress.py stress.StressTest.test_storage_session --server-url=$(SERVER_URL)
+
