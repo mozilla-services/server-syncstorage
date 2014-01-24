@@ -10,8 +10,9 @@ import base64
 import random
 import json
 import time
-from urlparse import urlparse
+from urlparse import urlparse, urlunparse
 
+import tokenlib
 import hawkauthlib
 import browserid.jwt
 import browserid.tests.support
@@ -88,27 +89,27 @@ class StressTest(TestCase):
 
     def test_storage_session(self):
         self._generate_token_credentials()
-        self.session.auth = HawkAuth(self.server_url, self.auth_token,
-                                     self.auth_secret)
+        self.session.verify = False
+        auth = HawkAuth(self.server_url, self.auth_token, self.auth_secret)
 
         headers = {"content-type": "application/json"}
 
         # Always GET info/collections
         url = self.endpoint_url + "/info/collections"
-        response = self.session.get(url)
+        response = self.session.get(url, auth=auth)
         self.assertTrue(response.status_code in (200, 404))
 
         # GET requests to meta/global.
         num_requests = self._pick_weighted_count(metaglobal_count_distribution)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/meta/global"
-            response = self.session.get(url)
+            response = self.session.get(url, auth=auth)
             if response.status_code == 404:
                 metapayload = "This is the metaglobal payload which contains"\
                               " some client data that doesnt look much"\
                               " like this"
                 data = json.dumps({"id": "global", "payload": metapayload})
-                response = self.session.put(url, data=data, headers=headers)
+                response = self.session.put(url, data=data, headers=headers, auth=auth)
             self.assertEqual(response.status_code, 200)
 
         # GET requests to individual collections.
@@ -118,7 +119,7 @@ class StressTest(TestCase):
             url = self.endpoint_url + "/storage/" + cols[x]
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            response = self.session.get(url, params=params)
+            response = self.session.get(url, params=params, auth=auth)
             self.assertTrue(response.status_code in (200, 404))
 
         # PUT requests with 100 WBOs batched together
@@ -135,7 +136,7 @@ class StressTest(TestCase):
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
-            response = self.session.post(url, data=data, headers=headers)
+            response = self.session.post(url, data=data, headers=headers, auth=auth)
             self.assertEqual(response.status_code, 200)
             body = response.content
             self.assertTrue(body != '')
@@ -151,33 +152,44 @@ class StressTest(TestCase):
             cols = random.sample(collections, num_requests)
             for x in range(num_requests):
                 url = self.endpoint_url + "/storage/" + cols[x]
-                response = self.session.delete(url)
+                response = self.session.delete(url, headers={"X-Confirm-Delete": "1"}, auth=auth)
                 self.assertTrue(response.status_code in (200, 204))
         else:
             if random.random() <= deleteall_probability:
                 url = self.endpoint_url + "/storage"
-                response = self.session.delete(url)
+                response = self.session.delete(url, headers={"X-Confirm-Delete": "1"}, auth=auth)
                 self.assertEquals(response.status_code, 200)
 
     def _generate_token_credentials(self):
         """Pick an identity, log in and generate the auth token."""
+        # If the server_url has a hash fragment, it's a storage node and
+        # that's the secret.  Otherwise it's a token server url.
         uid = random.randint(1, 1000000)
-        email = "user%s@mockmyid.com" % (uid,)
-        assertion = browserid.tests.support.make_assertion(
-            email=email,
-            audience=self.server_url,
-            issuer="mockmyid.com",
-            issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
-        )
-        token_url = self.server_url + "/1.0/sync/1.5"
-        response = self.session.get(token_url, headers={
-            "Authorization": "BrowserID " + assertion,
-        })
-        response.raise_for_status()
-        credentials = response.json()
-        self.auth_token = credentials["id"].encode('ascii')
-        self.auth_secret = credentials["key"].encode('ascii')
-        self.endpoint_url = credentials["api_endpoint"]
+        url = urlparse(self.server_url)
+        if url.fragment:
+            endpoint = url._replace(fragment="", path=url.path + "/" + str(uid))
+            self.endpoint_url = urlunparse(endpoint)
+            data = {"uid": uid, "node": self.endpoint_url}
+            self.auth_token = tokenlib.make_token(data, secret=url.fragment)
+            self.auth_secret = tokenlib.get_derived_secret(self.auth_token,
+                                                           secret=url.fragment)
+        else:
+            email = "user%s@mockmyid.com" % (uid,)
+            assertion = browserid.tests.support.make_assertion(
+                email=email,
+                audience=self.server_url,
+                issuer="mockmyid.com",
+                issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
+            )
+            token_url = self.server_url + "/1.0/sync/1.5"
+            response = self.session.get(token_url, headers={
+                "Authorization": "BrowserID " + assertion,
+            })
+            response.raise_for_status()
+            credentials = response.json()
+            self.auth_token = credentials["id"].encode('ascii')
+            self.auth_secret = credentials["key"].encode('ascii')
+            self.endpoint_url = credentials["api_endpoint"]
         return self.auth_token, self.auth_secret, self.endpoint_url
 
     def _pick_weighted_count(self, weights):

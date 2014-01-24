@@ -9,6 +9,7 @@ build:
 	./bin/pip install https://github.com/mozilla-services/loads/archive/master.zip
 	./bin/pip install PyBrowserID
 	./bin/pip install hawkauthlib
+	./bin/pip install tokenlib
 	rm -rf ./local  # ubuntu, why you create this useless folder?
 
 # Clean all the things installed by `make build`.
