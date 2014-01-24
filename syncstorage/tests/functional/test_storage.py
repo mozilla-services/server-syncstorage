@@ -100,6 +100,11 @@ class TestStorage(StorageFunctionalTestCase):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
         self.app.post_json(self.root + "/storage/col2", bsos)
 
+        # non-existent collections appear as empty
+        resp = self.app.get(self.root + '/storage/nonexistent')
+        res = resp.json
+        self.assertEquals(res, [])
+
         # try just getting all items at once.
         resp = self.app.get(self.root + '/storage/col2')
         res = resp.json
@@ -346,7 +351,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
         }, status=415)
-        self.app.get(self.root + "/storage/col2", status=404)
+        items = self.app.get(self.root + "/storage/col2").json
+        self.assertEquals(len(items), 0)
 
     def test_set_item_input_formats(self):
         # If we send with application/json it should work.
@@ -422,7 +428,8 @@ class TestStorage(StorageFunctionalTestCase):
 
         # deleting all items
         self.app.delete(self.root + '/storage/col2')
-        self.app.get(self.root + '/storage/col2', status=404)
+        items = self.app.get(self.root + '/storage/col2').json
+        self.assertEquals(len(items), 0)
 
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
@@ -466,8 +473,10 @@ class TestStorage(StorageFunctionalTestCase):
 
         # deleting all
         self.app.delete(self.root + '/storage')
-        res = self.app.delete(self.root + '/storage/col2', status=404)
-        self.app.get(self.root + '/storage/col2', status=404)
+        items = self.app.get(self.root + '/storage/col2').json
+        self.assertEquals(len(items), 0)
+        self.app.delete(self.root + '/storage/col2', status=200)
+        self.assertEquals(len(items), 0)
 
     def test_x_timestamp_header(self):
         # This can't be run against a live server.

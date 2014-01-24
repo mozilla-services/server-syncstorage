@@ -69,7 +69,10 @@ class TestOldStorage(StorageFunctionalTestCase):
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
 
     def test_get_collection(self):
-        self.app.get(self.root + '/storage/col3', status=404)
+        resp = self.app.get(self.root + '/storage/col3')
+        res = resp.json
+        self.assertEquals(res, [])
+
         resp = self.app.get(self.root + '/storage/col2')
         res = resp.json
         res.sort()
@@ -272,9 +275,8 @@ class TestOldStorage(StorageFunctionalTestCase):
 
         # deleting all items
         self.app.delete(self.root + '/storage/col2')
-        res = self.app.get(self.root + '/storage/col2', status=404)
-        # XXX TODO: this has changed in 1.5, now the collection 404s
-        #self.assertEquals(len(res.json), 0)
+        res = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(len(res.json), 0)
 
         # now trying deletion with filters
 
@@ -338,7 +340,8 @@ class TestOldStorage(StorageFunctionalTestCase):
         res = self.app.delete(self.root + '/storage',
                               headers=[("X-Confirm-Delete", "1")])
         res = json.loads(res.body)
-        self.app.get(self.root + '/storage/col2', status=404)
+        items = self.app.get(self.root + '/storage/col2').json
+        self.assertEquals(items, [])
         self.app.get(self.root + '/storage/meta/global', status=404)
         self.app.get(self.root + '/storage/tabs/home', status=404)
 

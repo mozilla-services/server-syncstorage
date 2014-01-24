@@ -158,9 +158,14 @@ class SQLStorage(SyncStorage):
         """Acquire a shared read lock on the named collection."""
         with self._get_or_create_session() as session:
             # Begin a transaction and take a lock in the database.
-            collectionid = self._get_collection_id(session, collection)
-            if (userid, collectionid) in session.locked_collections:
-                raise RuntimeError("Collection already locked")
+            try:
+                collectionid = self._get_collection_id(session, collection)
+                if (userid, collectionid) in session.locked_collections:
+                    raise RuntimeError("Collection already locked")
+            except CollectionNotFoundError:
+                # If the collection doesn't exist, we still want to start
+                # a transaction so it will continue to not exist.
+                collectionid = 0
             params = {"userid": userid, "collectionid": collectionid}
             try:
                 session.query("BEGIN_TRANSACTION_READ")
@@ -170,10 +175,9 @@ class SQLStorage(SyncStorage):
                 if "lock" in str(e).lower():
                     raise ConflictError
                 raise
-            if ts is None:
-                raise CollectionNotFoundError
-            ts = bigint2ts(ts)
-            session.cache[(userid, collectionid)].last_modified = ts
+            if ts is not None:
+                ts = bigint2ts(ts)
+                session.cache[(userid, collectionid)].last_modified = ts
             session.locked_collections.add((userid, collectionid))
             try:
                 # Yield context back to the calling code.

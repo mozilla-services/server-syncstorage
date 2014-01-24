@@ -7,7 +7,7 @@ from pyramid.security import Allow
 from mozsvc.metrics import MetricsService
 
 from syncstorage.bso import VALID_ID_REGEX
-from syncstorage.storage import ConflictError
+from syncstorage.storage import ConflictError, NotFoundError
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
@@ -184,16 +184,18 @@ def get_collection(request):
         if name in request.validated:
             filters[name] = request.validated[name]
 
-    if request.validated.get("full", False):
-        res = storage.get_items(userid, collection, **filters)
-    else:
-        res = storage.get_item_ids(userid, collection, **filters)
-
-    next_offset = res.get("next_offset")
-    if next_offset is not None:
-        request.response.headers["X-Weave-Next-Offset"] = str(next_offset)
-
-    return res["items"]
+    # For b/w compat, non-existent collections must return an empty list.
+    try:
+        if request.validated.get("full", False):
+            res = storage.get_items(userid, collection, **filters)
+        else:
+            res = storage.get_item_ids(userid, collection, **filters)
+        next_offset = res.get("next_offset")
+        if next_offset is not None:
+            request.response.headers["X-Weave-Next-Offset"] = str(next_offset)
+        return res["items"]
+    except NotFoundError:
+        return []
 
 
 @collection.post(accept="application/json", renderer="sync-json",
@@ -235,12 +237,17 @@ def delete_collection(request):
     userid = request.validated["userid"]
     collection = request.validated["collection"]
     ids = request.validated.get("ids")
-    if ids is None:
-        ts = storage.delete_collection(userid, collection)
-    else:
-        ts = storage.delete_items(userid, collection, ids)
-        request.response.headers["X-Last-Modified"] = str(ts)
-    return {"modified": ts}
+
+    # For b/w compat, non-existent collections must not give an error.
+    try:
+        if ids is None:
+            ts = storage.delete_collection(userid, collection)
+        else:
+            ts = storage.delete_items(userid, collection, ids)
+            request.response.headers["X-Last-Modified"] = str(ts)
+        return {"modified": ts}
+    except NotFoundError:
+        return {"modified": storage.get_storage_timestamp(userid)}
 
 
 @item.get(accept="application/json", renderer="sync-json")
