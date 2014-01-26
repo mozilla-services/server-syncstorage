@@ -234,7 +234,10 @@ class MemcachedStorage(SyncStorage):
         if ts is None:
             ts = self.storage.get_storage_timestamp(userid)
             for colmgr in self.cache_only_collections.itervalues():
-                ts = max(ts, colmgr.get_timestamp(userid))
+                try:
+                    ts = max(ts, colmgr.get_timestamp(userid))
+                except CollectionNotFoundError:
+                    pass
         return ts
 
     def get_collection_timestamps(self, userid):
