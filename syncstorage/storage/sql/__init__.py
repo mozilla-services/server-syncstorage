@@ -568,7 +568,7 @@ class SQLStorage(SyncStorage):
         # build a list of any ids whose names are not cached.
         for id in collection_ids:
             try:
-                names[id] = self._collections_by_name[id]
+                names[id] = self._collections_by_id[id]
             except KeyError:
                 uncached_ids.append(id)
         # Use a single query to fetch the names for all uncached collections.
