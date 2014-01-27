@@ -58,6 +58,10 @@ class SyncStorageService(MetricsService):
     endpoints, such as configuring authentication and path prefixes.
     """
 
+    # Cornice warns about a JSON XSRF vuln that's not relevant to us.
+    # Disable the filter that checks for this to avoid annoying log lines.
+    default_filters = []
+
     def __init__(self, **kwds):
         # Configure DRY defaults for the path.
         kwds["path"] = self._configure_the_path(kwds["path"])
