@@ -1106,6 +1106,20 @@ class TestStorageMemcached(TestStorage):
                 raise
             raise unittest2.SkipTest()
 
+    # Memcache backend is configured to store 'meta' in write-through cache.
+    # Add some tests the see if it behave correctly.
+
+    def test_cached_meta_collection(self):
+        self.app.get(self.root + '/storage/meta/global', status=404)
+        res = self.app.get(self.root + '/storage/meta')
+        self.assertEquals(res.json, [])
+        self.app.put_json(self.root + '/storage/meta/global',
+                          {'payload': 'blob'})
+        res = self.app.get(self.root + '/storage/meta')
+        self.assertEquals(res.json, ['global'])
+        res = self.app.get(self.root + '/storage/meta/global')
+        self.assertEquals(res.json['payload'], 'blob')
+
     # Memcache backend is configured to store tabs in cache only.
     # Add some tests the see if they still behave correctly.
 

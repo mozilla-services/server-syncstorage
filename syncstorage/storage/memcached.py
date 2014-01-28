@@ -176,31 +176,12 @@ class MemcachedStorage(SyncStorage):
     # the lock, it will eventually expire.
     #
 
-    @contextlib.contextmanager
     def lock_for_read(self, userid, collection):
         """Acquire a shared read lock on the named collection."""
-        # We need to be able to take a read lock in some internal methods,
-        # so that we can populate the cache with consistent data.
-        # Use a thread-local set of held locks to make it reentrant.
-        try:
-            read_locks = self._tldata.read_locks
-        except AttributeError:
-            read_locks = self._tldata.read_locks = set()
-        # If we already have a read lock, don't take it again.
-        if (userid, collection) in read_locks:
-            yield None
-            return
-        # Otherwise take the lock and mark it as being held.
         if self.cache_lock or collection in self.cache_only_collections:
-            lock = self._lock_in_memcache(userid, collection)
+            return self._lock_in_memcache(userid, collection)
         else:
-            lock = self.storage.lock_for_read(userid, collection)
-        with lock:
-            read_locks.add((userid, collection))
-            try:
-                yield None
-            finally:
-                read_locks.remove((userid, collection))
+            return self.storage.lock_for_read(userid, collection)
 
     def lock_for_write(self, userid, collection):
         """Acquire an exclusive write lock on the named collection."""
@@ -212,14 +193,25 @@ class MemcachedStorage(SyncStorage):
     @contextlib.contextmanager
     def _lock_in_memcache(self, userid, collection):
         """Helper method to take a memcache-level lock on a collection."""
+        # Use a thread-local set of held locks to make this reentrant.
+        try:
+            locked_collections = self._tldata.locked_collections
+        except AttributeError:
+            locked_collections = self._tldata.locked_collections = set()
+        if (userid, collection) in locked_collections:
+            yield None
+            return
+        # Take the lock in memcached.
         ttl = self.cache_lock_ttl
         now = time.time()
         key = _key(userid, "lock", collection)
         if not self.cache.add(key, True, time=ttl):
             raise ConflictError
+        locked_collections.add((userid, collection))
         try:
             yield None
         finally:
+            locked_collections.remove((userid, collection))
             if time.time() - now >= ttl:
                 msg = "Lock expired while we were holding it"
                 raise RuntimeError(msg)

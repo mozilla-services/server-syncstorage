@@ -157,15 +157,18 @@ class SQLStorage(SyncStorage):
     def lock_for_read(self, userid, collection):
         """Acquire a shared read lock on the named collection."""
         with self._get_or_create_session() as session:
-            # Begin a transaction and take a lock in the database.
             try:
                 collectionid = self._get_collection_id(session, collection)
-                if (userid, collectionid) in session.locked_collections:
-                    raise RuntimeError("Collection already locked")
             except CollectionNotFoundError:
                 # If the collection doesn't exist, we still want to start
                 # a transaction so it will continue to not exist.
                 collectionid = 0
+            # If we already have a read or write lock then
+            # it's safe to use it as-is.
+            if (userid, collectionid) in session.locked_collections:
+                yield None
+                return
+            # Begin a transaction and take a lock in the database.
             params = {"userid": userid, "collectionid": collectionid}
             try:
                 session.query("BEGIN_TRANSACTION_READ")
@@ -178,13 +181,13 @@ class SQLStorage(SyncStorage):
             if ts is not None:
                 ts = bigint2ts(ts)
                 session.cache[(userid, collectionid)].last_modified = ts
-            session.locked_collections.add((userid, collectionid))
+            session.locked_collections[(userid, collectionid)] = 0
             try:
                 # Yield context back to the calling code.
                 # This leaves the session active and holding the lock
                 yield None
             finally:
-                session.locked_collections.remove((userid, collectionid))
+                session.locked_collections.pop((userid, collectionid))
 
     # Note: you can't use the @with_session decorator here.
     # It doesn't work right because of the generator-contextmanager thing.
@@ -193,8 +196,9 @@ class SQLStorage(SyncStorage):
         """Acquire an exclusive write lock on the named collection."""
         with self._get_or_create_session() as session:
             collectionid = self._get_collection_id(session, collection, True)
-            if (userid, collectionid) in session.locked_collections:
-                raise RuntimeError("Collection already locked")
+            locked = session.locked_collections.get((userid, collectionid))
+            if locked == 0:
+                raise RuntimeError("Can't escalate read-lock to write-lock")
             params = {"userid": userid, "collectionid": collectionid}
             try:
                 session.query("BEGIN_TRANSACTION_WRITE")
@@ -210,13 +214,13 @@ class SQLStorage(SyncStorage):
                 if ts >= session.timestamp:
                     raise ConflictError
                 session.cache[(userid, collectionid)].last_modified = ts
-            session.locked_collections.add((userid, collectionid))
+            session.locked_collections[(userid, collectionid)] = 1
             try:
                 # Yield context back to the calling code.
                 # This leaves the session active and holding the lock
                 yield None
             finally:
-                session.locked_collections.remove((userid, collectionid))
+                session.locked_collections.pop((userid, collectionid))
 
     #
     # APIs to operate on the entire storage.
@@ -681,7 +685,7 @@ class SQLStorageSession(object):
         self.connection = storage.dbconnector.connect()
         self.timestamp = get_timestamp(timestamp)
         self.cache = defaultdict(SQLCachedCollectionData)
-        self.locked_collections = set()
+        self.locked_collections = {}
         self._nesting_level = 0
 
     def __enter__(self):
