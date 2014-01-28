@@ -133,7 +133,7 @@ class MemcachedStorage(SyncStorage):
         # This is needed to make the read locking API reentrant.
         self._tldata = threading.local()
 
-    def _iter_cache_keys(self, userid):
+    def iter_cache_keys(self, userid):
         """Iterator over all potential cache keys for the given userid.
 
         This method yields all potential cache keys for the given userid,
@@ -291,7 +291,7 @@ class MemcachedStorage(SyncStorage):
 
     def delete_storage(self, userid):
         """Removes all data for the user."""
-        for key in self._iter_cache_keys(userid):
+        for key in self.iter_cache_keys(userid):
             self.cache.delete(key)
         self.storage.delete_storage(userid)
 

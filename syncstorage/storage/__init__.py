@@ -390,6 +390,16 @@ class SyncStorage(object):
         return True
 
 
+def get_all_storages(config):
+    """Iterator over all (hostname, storage) pairs for a config."""
+    for key in config.registry:
+        if key == "syncstorage:storage:default":
+            yield ("default", config.registry[key])
+        elif key.startswith("syncstorage:storage:host:"):
+            hostname = key[len("syncstorage:storage:host:"):]
+            yield (hostname, config.registry[key])
+
+
 def get_storage(request):
     """Returns a storage backend instance, given a request object.
 
