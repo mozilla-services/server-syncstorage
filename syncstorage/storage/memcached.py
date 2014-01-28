@@ -387,14 +387,14 @@ class MemcachedStorage(SyncStorage):
     # Administrative/maintenance methods.
     #
 
-    def purge_expired_items(self, grace_period=0):
+    def purge_expired_items(self, grace_period=0, max_per_loop=1000):
         """Purges items with an expired TTL from the database."""
         # We have no way to purge expired items from memcached, as
         # there's no way to enumerate all the userids.  Purging is
         # instead done on each write for cached collections, with the
         # expectation that this will be cheap due to low item count.
         # Therefore, the only thing we can do here is pass on the call.
-        return self.storage.purge_expired_items()
+        return self.storage.purge_expired_items(grace_period, max_per_loop)
 
     #
     #  Private APIs for managing the cached metadata

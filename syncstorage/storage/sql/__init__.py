@@ -493,7 +493,7 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def purge_expired_items(self, session, grace_period=0):
+    def purge_expired_items(self, session, grace_period=0, max_per_loop=1000):
         """Purges items with an expired TTL from the database."""
         # Get the set of all BSO tables in the database.
         # This will be different depending on whether sharding is done.
@@ -515,6 +515,7 @@ class SQLStorage(SyncStorage):
             rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
                 "bso": table,
                 "grace": grace_period,
+                "maxitems": max_per_loop,
             })
             while rowcount > 0:
                 num_affected += rowcount
@@ -528,6 +529,7 @@ class SQLStorage(SyncStorage):
                 rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
                     "bso": table,
                     "grace": grace_period,
+                    "maxitems": max_per_loop,
                 })
             self.logger.info("Purged %d expired items from %s",
                              num_affected, table)

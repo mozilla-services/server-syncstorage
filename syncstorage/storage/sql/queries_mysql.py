@@ -12,4 +12,4 @@ tailored to MySQL.
 
 PURGE_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
                       "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "\
-                      "ORDER BY ttl LIMIT 1000"
+                      "ORDER BY ttl LIMIT :maxitems"

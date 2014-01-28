@@ -25,7 +25,8 @@ from syncstorage.storage import get_all_storages
 logger = logging.getLogger("syncstorage.scripts.prunettl")
 
 
-def purge_expired_items(config_file, grace_period=0, backend_interval=0):
+def purge_expired_items(config_file, grace_period=0, max_per_loop=1000,
+                        backend_interval=0):
     """Purge expired BSOs from all storage backends in the given config file.
 
     This function iterates through each storage backend in the given config
@@ -40,7 +41,7 @@ def purge_expired_items(config_file, grace_period=0, backend_interval=0):
         logger.debug("Purging backend for %s", hostname)
         config.begin()
         try:
-            backend.purge_expired_items(grace_period)
+            backend.purge_expired_items(grace_period, max_per_loop)
         except Exception:
             logger.exception("Error while purging backend for %s", hostname)
         else:
@@ -67,6 +68,8 @@ def main(args=None):
                       help="Interval to sleep between purging each backend")
     parser.add_option("", "--grace-period", type="int", default=86400,
                       help="Number of seconds grace to allow after expiry")
+    parser.add_option("", "--max-per-loop", type="int", default=1000,
+                      help="Maximum number of items to delete in one go")
     parser.add_option("", "--oneshot", action="store_true",
                       help="Do a single purge run and then exit")
     parser.add_option("-v", "--verbose", action="count", dest="verbosity",
@@ -83,6 +86,7 @@ def main(args=None):
 
     purge_expired_items(config_file,
                         grace_period=opts.grace_period,
+                        max_per_loop=opts.max_per_loop,
                         backend_interval=opts.backend_interval)
     if not opts.oneshot:
         while True:

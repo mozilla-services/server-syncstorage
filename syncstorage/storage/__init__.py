@@ -386,7 +386,7 @@ class SyncStorage(object):
     # would be used by stand-alone maintenance scripts.
     #
 
-    def purge_expired_items(self, grace_period=0):
+    def purge_expired_items(self, grace_period=0, max_per_loop=1000):
         """Purges items with an expired TTL from the database.
 
         This method attempts to delete any items with an expired TTL from
@@ -396,6 +396,8 @@ class SyncStorage(object):
 
         Args:
             grace_period: number of seconds grace to allow after expiry
+            max_per_loop: number of records to delete per loop iteration
+                          (if supported by the backend)
 
         Returns:
             A dict with the following keys:
