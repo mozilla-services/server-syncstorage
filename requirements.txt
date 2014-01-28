@@ -26,4 +26,5 @@ waitress==0.8.8
 wsgiref==0.1.2
 zope.deprecation==4.1.0
 zope.interface==4.0.5
+gevent==0.13.8
 https://github.com/mozilla-services/mozservices/archive/rfk/hawkauth.zip
