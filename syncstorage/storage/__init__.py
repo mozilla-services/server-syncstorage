@@ -379,6 +379,34 @@ class SyncStorage(object):
             ItemNotFoundError: the collection contains no such item.
         """
 
+    #
+    # Administrative/maintenance methods.
+    #
+    # These would not be called during operation of the app, but rather
+    # would be used by stand-alone maintenance scripts.
+    #
+
+    def purge_expired_items(self, grace_period=0):
+        """Purges items with an expired TTL from the database.
+
+        This method attempts to delete any items with an expired TTL from
+        the storage.  It is designed to be a background maintenance task,
+        and so is not guaranteed to delete *all* expired items if this would
+        consume too many resources.
+
+        Args:
+            grace_period: number of seconds grace to allow after expiry
+
+        Returns:
+            A dict with the following keys:
+              num_purged: the number of items removed from the storage.
+              is_complete: whether any expired items may remain
+        """
+
+    #
+    # Additional utility methods.
+    #
+
     @classmethod
     def __subclasshook__(cls, klass):
         for method in cls.__abstractmethods__:

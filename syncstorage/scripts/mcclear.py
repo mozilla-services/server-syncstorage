@@ -16,7 +16,7 @@ import sys
 import logging
 import optparse
 
-import syncstorage
+import syncstorage.scripts
 from syncstorage.storage import get_all_storages
 from syncstorage.storage.memcached import MemcachedStorage
 
@@ -73,13 +73,7 @@ def main(args=None):
         parser.print_usage()
         return 1
 
-    if not opts.verbosity:
-        loglevel = logging.WARNING
-    elif opts.verbosity == 1:
-        loglevel = logging.INFO
-    else:
-        loglevel = logging.DEBUG
-    logging.basicConfig(level=loglevel)
+    syncstorage.scripts.configure_script_logging(opts)
 
     config_file = os.path.abspath(args[0])
 
@@ -90,5 +84,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    exitcode = main()
-    sys.exit(exitcode)
+    syncstorage.scripts.run_script(main)

@@ -38,7 +38,10 @@ from sqlalchemy import (Integer, String, Text, BigInteger,
 
 from mozsvc.exceptions import BackendError
 
-from syncstorage.storage.sql import queries_generic, queries_sqlite
+from syncstorage.storage.sql import (queries_generic,
+                                     queries_sqlite,
+                                     queries_mysql)
+
 
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")
 
@@ -277,6 +280,8 @@ class DBConnector(object):
         query_modules = [queries_generic]
         if self.driver == "sqlite":
             query_modules.append(queries_sqlite)
+        elif self.driver == "mysql":
+            query_modules.append(queries_mysql)
         for queries in query_modules:
             for nm in dir(queries):
                 if nm.isupper():
@@ -321,7 +326,10 @@ class DBConnector(object):
         assert isinstance(query, basestring)
         qvars = {}
         if "%(bso)s" in query:
-            qvars["bso"] = self.get_bso_table(params["userid"])
+            if "bso" in params:
+                qvars["bso"] = params["bso"]
+            else:
+                qvars["bso"] = self.get_bso_table(params["userid"])
         if "%(ids)s" in query:
             bindparams = []
             for i, id in enumerate(params["ids"]):

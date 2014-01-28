@@ -489,6 +489,59 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collection)
 
     #
+    # Administrative/maintenance methods.
+    #
+
+    @with_session
+    def purge_expired_items(self, session, grace_period=0):
+        """Purges items with an expired TTL from the database."""
+        # Get the set of all BSO tables in the database.
+        # This will be different depending on whether sharding is done.
+        if not self.dbconnector.shard:
+            tables = set(("bso",))
+        else:
+            tables = set(self.dbconnector.get_bso_table(i).name
+                         for i in xrange(self.dbconnector.shardsize))
+            assert len(tables) == self.dbconnector.shardsize
+        # Purge each table in turn, summing rowcounts.
+        # We set an upper limit on the number of iterations, to avoid
+        # getting stuck indefinitely on a single table.
+        total_affected = 0
+        is_incomplete = False
+        for table in sorted(tables):
+            self.logger.info("Purging expired items from %s", table)
+            num_iters = 1
+            num_affected = 0
+            rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
+                "bso": table,
+                "grace": grace_period,
+            })
+            while rowcount > 0:
+                num_affected += rowcount
+                self.logger.debug("After %d iterations, %s items purged",
+                                  num_iters, num_affected)
+                num_iters += 1
+                if num_iters > 100:
+                    self.logger.debug("Too many iterations, bailing out.")
+                    is_incomplete = True
+                    break
+                rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
+                    "bso": table,
+                    "grace": grace_period,
+                })
+            self.logger.info("Purged %d expired items from %s",
+                             num_affected, table)
+            total_affected += num_affected
+        # Return the required data to the caller.
+        # We use "is_incomplete" rather than "is_complete" in the code above
+        # because we expect that, most of the time, the purge will complete.
+        # So it's more efficient to flag the case when it doesn't.
+        return {
+            "num_purged": total_affected,
+            "is_complete": not is_incomplete,
+        }
+
+    #
     # Private methods for manipulating collections.
     #
 

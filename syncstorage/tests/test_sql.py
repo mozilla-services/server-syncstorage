@@ -152,3 +152,44 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         thread2.join()
         self.assertEquals(len(connections), 3)
         self.assertEquals(len(errors), 3)
+
+    def test_purging_of_expired_items(self):
+
+        def count_items():
+            COUNT_ITEMS = "select count(*) from bso "\
+                          "/* queryName=COUNT_ITEMS */"
+            with self.storage.dbconnector.connect() as c:
+                res = c.execute(COUNT_ITEMS)
+                return res.fetchall()[0][0]
+
+        # Initially there should be no entries in the db.
+        self.assertEquals(count_items(), 0)
+
+        # Add 2000 items with short ttl to the db.
+        # This forces the purge script to run several iterations.
+        items = [{"id": "SHORT" + str(i), "payload": str(i), "ttl": 0}
+                 for i in xrange(2000)]
+        self.storage.set_items(_UID, "col", items)
+
+        # Add 5 items with long ttl to the db.
+        items = [{"id": "LONG" + str(i), "payload": str(i), "ttl": 10}
+                 for i in xrange(5)]
+        self.storage.set_items(_UID, "col", items)
+
+        # Wait for ttls to expire.
+        # The items should be in the database, but not read by the backend.
+        time.sleep(1)
+        self.assertEquals(count_items(), 2005)
+        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
+
+        # Purging with a long grace period will not remove them.
+        res = self.storage.purge_expired_items(grace_period=100)
+        self.assertEquals(res["num_purged"], 0)
+        self.assertEquals(count_items(), 2005)
+        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
+
+        # Purging with no grace period should remove them from the database.
+        res = self.storage.purge_expired_items(grace_period=0)
+        self.assertEquals(res["num_purged"], 2000)
+        self.assertEquals(count_items(), 5)
+        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
