@@ -15,3 +15,4 @@ lib
 lib64
 include
 loadtest.*
+deps
