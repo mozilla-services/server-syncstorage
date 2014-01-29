@@ -89,7 +89,6 @@ class StressTest(TestCase):
 
     def test_storage_session(self):
         self._generate_token_credentials()
-        self.session.verify = False
         auth = HawkAuth(self.endpoint_url, self.auth_token, self.auth_secret)
 
         headers = {"content-type": "application/json"}
