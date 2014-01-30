@@ -16,6 +16,7 @@ consider it a bug.
 
 import unittest2
 
+import re
 import sys
 import time
 import random
@@ -1088,6 +1089,27 @@ class TestStorage(StorageFunctionalTestCase):
             "X-If-Unmodified-Since": "-3",
         }, status=400)
 
+    def test_meta_global_sanity(self):
+        # Memcache backend is configured to store 'meta' in write-through
+        # cache, so we want to check it explicitly.  We might as well put it
+        # in the base tests because there's nothing memcached-specific here.
+        self.app.get(self.root + '/storage/meta/global', status=404)
+        res = self.app.get(self.root + '/storage/meta')
+        self.assertEquals(res.json, [])
+        self.app.put_json(self.root + '/storage/meta/global',
+                          {'payload': 'blob'})
+        res = self.app.get(self.root + '/storage/meta')
+        self.assertEquals(res.json, ['global'])
+        res = self.app.get(self.root + '/storage/meta/global')
+        self.assertEquals(res.json['payload'], 'blob')
+        # It should not have extra keys.
+        keys = res.json.keys()
+        keys.sort()
+        self.assertEquals(keys, ['id', 'modified', 'payload'])
+        # It should have a properly-formatted "modified" field.
+        modified_re = r"['\"]modified['\"]:\s*[0-9]+\.[0-9][0-9]\s*[,}]"
+        self.assertTrue(re.search(modified_re, res.body))
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
@@ -1105,23 +1127,6 @@ class TestStorageMemcached(TestStorage):
             if "503" not in str(e):
                 raise
             raise unittest2.SkipTest()
-
-    # Memcache backend is configured to store 'meta' in write-through cache.
-    # Add some tests the see if it behave correctly.
-
-    def test_cached_meta_collection(self):
-        self.app.get(self.root + '/storage/meta/global', status=404)
-        res = self.app.get(self.root + '/storage/meta')
-        self.assertEquals(res.json, [])
-        self.app.put_json(self.root + '/storage/meta/global',
-                          {'payload': 'blob'})
-        res = self.app.get(self.root + '/storage/meta')
-        self.assertEquals(res.json, ['global'])
-        res = self.app.get(self.root + '/storage/meta/global')
-        self.assertEquals(res.json['payload'], 'blob')
-        keys = res.json.keys()
-        keys.sort()
-        self.assertEquals(keys, ['id', 'modified', 'payload'])
 
     # Memcache backend is configured to store tabs in cache only.
     # Add some tests the see if they still behave correctly.

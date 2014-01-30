@@ -2,8 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import simplejson as json
 
+from syncstorage.util import json_dumps
 from syncstorage.views.util import get_resource_timestamp
 
 
@@ -45,7 +45,7 @@ class JsonRenderer(SyncStorageRenderer):
             response.headers["X-Weave-Records"] = str(len(value))
 
     def render_value(self, value):
-        return json.dumps(value)
+        return json_dumps(value)
 
 
 class NewlinesRenderer(SyncStorageRenderer):
@@ -60,7 +60,7 @@ class NewlinesRenderer(SyncStorageRenderer):
     def render_value(self, value):
         data = []
         for line in value:
-            line = json.dumps(line)
+            line = json_dumps(line)
             line = line.replace('\n', '\\u000a')
             data.append(line)
         return '\n'.join(data)
