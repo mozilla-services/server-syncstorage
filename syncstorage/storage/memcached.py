@@ -673,6 +673,10 @@ class _CachedManagerBase(object):
             raise ConflictError
         num_created = 0
         for bso in items:
+            # Remove unwanted fields that might be there from the backend.
+            bso.pop("userid", None)
+            bso.pop("collection", None)
+            bso.pop("payload_size", None)
             if "payload" in bso:
                 bso["modified"] = modified
                 data["modified"] = modified

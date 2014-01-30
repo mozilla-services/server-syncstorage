@@ -1119,6 +1119,9 @@ class TestStorageMemcached(TestStorage):
         self.assertEquals(res.json, ['global'])
         res = self.app.get(self.root + '/storage/meta/global')
         self.assertEquals(res.json['payload'], 'blob')
+        keys = res.json.keys()
+        keys.sort()
+        self.assertEquals(keys, ['id', 'modified', 'payload'])
 
     # Memcache backend is configured to store tabs in cache only.
     # Add some tests the see if they still behave correctly.
