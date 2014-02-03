@@ -82,7 +82,7 @@ class SyncStorageService(MetricsService):
         # Add path prefix for the API version number and userid.
         # XXX TODO: current FF client hardcodes "1.1" as the version number.
         # We accept it for now but should disable this eventually.
-        path = "/{api:1.[1-5]}/{userid:[0-9]{1,10}}" + path
+        path = "/{api:1\\.5}/{userid:[0-9]{1,10}}" + path
         return path
 
     def get_view_wrapper(self, kwds):
