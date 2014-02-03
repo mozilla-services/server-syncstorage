@@ -672,14 +672,27 @@ class _CachedManagerBase(object):
         elif data["modified"] >= modified:
             raise ConflictError
         num_created = 0
-        for bso in items:
-            # Remove unwanted fields that might be there from the backend.
-            bso.pop("userid", None)
-            bso.pop("collection", None)
-            bso.pop("payload_size", None)
-            if "payload" in bso:
+        for item in items:
+            # Cache only the fields we need.
+            bso = {}
+            bso["id"] = item["id"]
+            if "payload" in item:
+                bso["payload"] = item["payload"]
                 bso["modified"] = modified
-                data["modified"] = modified
+            else:
+                bso["modified"] = item.get("modified", modified)
+            if "sortindex" in item:
+                bso["sortindex"] = item["sortindex"]
+            if "ttl" in item:
+                # ttl is given as an offset; make it an absolute time.
+                if item["ttl"] is None:
+                    bso["ttl"] = None
+                else:
+                    bso["ttl"] = int(modified) + item["ttl"] + 1
+            # Ensure top-level modified time matches the contained items.
+            if bso["modified"] > data["modified"]:
+                data["modified"] = bso["modified"]
+            # Update it in-place, or create if it doesn't exist.
             try:
                 data["items"][bso["id"]].update(bso)
             except KeyError:

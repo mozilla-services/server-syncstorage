@@ -365,10 +365,13 @@ class SQLStorage(SyncStorage):
     def set_items(self, session, userid, collection, items):
         """Creates or updates multiple items in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
+        rows = []
         for data in items:
             id = data["id"]
-            self._prepare_item_data(session, userid, collectionid, id, data)
-        session.insert_or_update("bso", items)
+            row = self._prepare_bso_row(session, userid, collectionid,
+                                        id, data)
+            rows.append(row)
+        session.insert_or_update("bso", rows)
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
@@ -452,31 +455,35 @@ class SQLStorage(SyncStorage):
     def set_item(self, session, userid, collection, item, data):
         """Creates or updates a single item in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
-        self._prepare_item_data(session, userid, collectionid, item, data)
-        num_created = session.insert_or_update("bso", [data])
+        row = self._prepare_bso_row(session, userid, collectionid, item, data)
+        num_created = session.insert_or_update("bso", [row])
         return {
             "created": bool(num_created),
             "modified": self._touch_collection(session, userid, collectionid)
         }
 
-    def _prepare_item_data(self, session, userid, collectionid, item, data):
-        """Fill in and normalize fields in the given item data."""
-        data["userid"] = userid
-        data["collection"] = collectionid
-        data["id"] = item
+    def _prepare_bso_row(self, session, userid, collectionid, item, data):
+        """Prepare row data for storing the given BSO."""
+        row = {}
+        row["userid"] = userid
+        row["collection"] = collectionid
+        row["id"] = item
+        if "sortindex" in data:
+            row["sortindex"] = data["sortindex"]
         # If a payload is provided, make sure to update dependant fields.
         if "payload" in data:
-            data["modified"] = ts2bigint(session.timestamp)
-            data["payload_size"] = len(data["payload"])
+            row["modified"] = ts2bigint(session.timestamp)
+            row["payload"] = data["payload"]
+            row["payload_size"] = len(data["payload"])
         # If provided, ttl will be an offset in seconds.
         # Add it to the current timestamp to get an absolute time.
         # If not provided or None, this means no ttl should be set.
         if "ttl" in data:
             if data["ttl"] is None:
-                data["ttl"] = MAX_TTL
+                row["ttl"] = MAX_TTL
             else:
-                data["ttl"] += int(session.timestamp)
-        return data
+                row["ttl"] = data["ttl"] + int(session.timestamp)
+        return row
 
     @with_session
     def delete_item(self, session, userid, collection, item):
