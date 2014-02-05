@@ -63,7 +63,8 @@ class NewlinesRenderer(SyncStorageRenderer):
             line = json_dumps(line)
             line = line.replace('\n', '\\u000a')
             data.append(line)
-        return '\n'.join(data)
+            data.append('\n')
+        return ''.join(data)
 
 
 def includeme(config):

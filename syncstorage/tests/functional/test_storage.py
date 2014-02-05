@@ -227,6 +227,7 @@ class TestStorage(StorageFunctionalTestCase):
                            headers=[('Accept', 'application/newlines')])
         self.assertEquals(res.content_type, 'application/newlines')
 
+        self.assertTrue(res.body.endswith('\n'))
         res = [json_loads(line) for line in res.body.strip().split('\n')]
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
