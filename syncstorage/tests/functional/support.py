@@ -104,7 +104,7 @@ def authenticate_to_token_server(url, email=None, audience=None):
         issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
     )
     r = requests.get(url, headers={
-        "Authorization": "Browser-ID " + assertion,
+        "Authorization": "BrowserID " + assertion,
     })
     r.raise_for_status()
     creds = json.loads(r.content)
