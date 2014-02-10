@@ -40,6 +40,17 @@ MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
 })
 
 
+# Each run reads clients collection 10% of the time.
+# (This only happens when a differnt client writes a record, which is rare).
+client_get_probability = 10 / 100.
+
+# Each run will update a client record 20% of the time.
+client_post_probability = 20 / 100.
+
+# The client ids to simulate.
+# Mostly they'll use a single client, sometimes a second, etc.
+clients_distribution = [80, 15, 4, 1]
+
 # The collections to operate on.
 # Each operation will randomly select a collection from this list.
 # The "tabs" collection is not included since it uses memcache; we need
@@ -110,6 +121,28 @@ class StressTest(TestCase):
                 data = json.dumps({"id": "global", "payload": metapayload})
                 response = self.session.put(url, data=data, headers=headers, auth=auth)
             self.assertEqual(response.status_code, 200)
+
+        # Occasional reads of client records.
+        if random.random() <= client_get_probability:
+            url = self.endpoint_url + "/storage/clients"
+            newer = int(time.time() - random.randint(3600, 360000))
+            params = {"full": "1", "newer": str(newer)}
+            response = self.session.get(url, params=params, auth=auth)
+            self.assertTrue(response.status_code in (200, 404))
+
+        # Occasional updates to client records.
+        if random.random() <= client_post_probability:
+            clientid = str(self._pick_weighted_count(clients_distribution))
+            url = self.endpoint_url + "/storage/clients"
+            wbo = {'id': 'client' + clientid, 'payload': clientid * 300}
+            data = json.dumps([wbo])
+            response = self.session.post(url, data=data, headers=headers, auth=auth)
+            self.assertEqual(response.status_code, 200)
+            body = response.content
+            self.assertTrue(body != '')
+            result = json.loads(body)
+            self.assertEquals(len(result["success"]), 1)
+            self.assertEquals(len(result["failed"]), 0)
 
         # GET requests to individual collections.
         num_requests = self._pick_weighted_count(get_count_distribution)
