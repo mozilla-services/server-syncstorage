@@ -33,8 +33,9 @@ from syncstorage.storage import (SyncStorage,
                                  ItemNotFoundError,
                                  InvalidOffsetError)
 
-from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
-                                               BackendError)
+from syncstorage.storage.sql.dbclient import DBClient, MAX_TTL
+from mozsvc.storage.dbclient import BackendError
+                                               
 
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.
@@ -97,7 +98,7 @@ class SQLStorage(SyncStorage):
     def __init__(self, sqluri, standard_collections=False, **dbkwds):
 
         self.sqluri = sqluri
-        self.dbconnector = DBConnector(sqluri, **dbkwds)
+        self.dbclient = DBClient(sqluri, **dbkwds)
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.  Fake it by inserting
@@ -105,7 +106,7 @@ class SQLStorage(SyncStorage):
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
             zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
-            with self.dbconnector.connect() as connection:
+            with self.dbclient.connect() as connection:
                 params = {"collectionid": zeroth_id, "name": ""}
                 try:
                     connection.query("INSERT_COLLECTION", params)
@@ -508,12 +509,12 @@ class SQLStorage(SyncStorage):
         """Purges items with an expired TTL from the database."""
         # Get the set of all BSO tables in the database.
         # This will be different depending on whether sharding is done.
-        if not self.dbconnector.shard:
+        if not self.dbclient.shard:
             tables = set(("bso",))
         else:
-            tables = set(self.dbconnector.get_bso_table(i).name
-                         for i in xrange(self.dbconnector.shardsize))
-            assert len(tables) == self.dbconnector.shardsize
+            tables = set(self.dbclient.get_bso_table(i).name
+                         for i in xrange(self.dbclient.shardsize))
+            assert len(tables) == self.dbclient.shardsize
         # Purge each table in turn, summing rowcounts.
         # We set an upper limit on the number of iterations, to avoid
         # getting stuck indefinitely on a single table.
@@ -689,7 +690,7 @@ class SQLStorageSession(object):
 
     def __init__(self, storage, timestamp=None):
         self.storage = storage
-        self.connection = storage.dbconnector.connect()
+        self.connection = storage.dbclient.connect()
         self.timestamp = get_timestamp(timestamp)
         self.cache = defaultdict(SQLCachedCollectionData)
         self.locked_collections = {}
