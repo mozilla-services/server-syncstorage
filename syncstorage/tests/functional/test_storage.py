@@ -118,7 +118,7 @@ class TestStorage(StorageFunctionalTestCase):
         # "ids"
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
-        res = self.app.get(self.root + '/storage/col2?ids=1,3')
+        res = self.app.get(self.root + '/storage/col2?ids=1,3,17')
         res = res.json
         res.sort()
         self.assertEquals(res, ['1', '3'])
@@ -1215,6 +1215,26 @@ class TestStorageMemcached(TestStorage):
                     storage = self.config.registry[key]
                     if isinstance(storage.cache, BadCache):
                         storage.cache = storage.cache.cache
+
+
+class TestStorageMemcachedWriteThrough(TestStorageMemcached):
+    """Storage testcases run against the memcached backend, if available.
+
+    These tests are configred to use the write-through cache for all the
+    test-related collections.
+    """
+
+    TEST_INI_FILE = "tests-memcached-writethrough.ini"
+
+
+class TestStorageMemcachedCacheOnly(TestStorageMemcached):
+    """Storage testcases run against the memcached backend, if available.
+
+    These tests are configred to use the cache-only-collection behaviour
+    for all the test-related collections.
+    """
+
+    TEST_INI_FILE = "tests-memcached-cacheonly.ini"
 
 
 if __name__ == "__main__":

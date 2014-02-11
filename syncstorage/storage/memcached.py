@@ -679,8 +679,6 @@ class _CachedManagerBase(object):
             if "payload" in item:
                 bso["payload"] = item["payload"]
                 bso["modified"] = modified
-            else:
-                bso["modified"] = item.get("modified", modified)
             if "sortindex" in item:
                 bso["sortindex"] = item["sortindex"]
             if "ttl" in item:
@@ -688,15 +686,21 @@ class _CachedManagerBase(object):
                 if item["ttl"] is None:
                     bso["ttl"] = None
                 else:
-                    bso["ttl"] = int(modified) + item["ttl"] + 1
-            # Ensure top-level modified time matches the contained items.
-            if bso["modified"] > data["modified"]:
-                data["modified"] = bso["modified"]
+                    bso["ttl"] = int(modified) + item["ttl"]
+            if "modified" in item:
+                bso["modified"] = item["modified"]
+                # Ensure top-level modified time matches the contained items.
+                if bso["modified"] > data["modified"]:
+                    data["modified"] = bso["modified"]
             # Update it in-place, or create if it doesn't exist.
             try:
                 data["items"][bso["id"]].update(bso)
             except KeyError:
                 num_created += 1
+                # Set default payload on newly-created items.
+                bso["modified"] = modified
+                if "payload" not in bso:
+                    bso["payload"] = ""
                 data["items"][bso["id"]] = bso
                 data["modified"] = modified
         # Purge any items that have expired.
@@ -750,12 +754,13 @@ class _CachedManagerBase(object):
             raise CollectionNotFoundError
         return data["modified"]
 
-    def get_items(self, userid, items=None, **kwds):
+    def get_items(self, userid, **kwds):
         # Decode kwds into individual filter values.
         newer = kwds.pop("newer", None)
         limit = kwds.pop("limit", None)
         offset = kwds.pop("offset", None)
         sort = kwds.pop("sort", None)
+        ids = kwds.pop("ids", None)
         for unknown_kwd in kwds:
             raise TypeError("Unknown keyword argument: %s" % (unknown_kwd,))
         # Read all the items out of the cache.
@@ -763,28 +768,25 @@ class _CachedManagerBase(object):
         if data is None:
             raise CollectionNotFoundError
         # Restrict to certain item ids if specified.
-        if items is not None:
-            bsos = (data["items"][item] for item in items)
+        bsos_by_id = data["items"]
+        if ids is not None:
+            bsos = (bsos_by_id[item] for item in ids if item in bsos_by_id)
         else:
-            bsos = data["items"].itervalues()
+            bsos = bsos_by_id.itervalues()
         # Apply the various filters as generator expressions.
         if newer is not None:
             bsos = (bso for bso in bsos if bso["modified"] > newer)
         # Filter out any that have expired.
-        now = int(time.time())
-        later = now + 1
-        bsos = (bso for bso in bsos if bso.get("ttl", later) > now)
+        bsos = self._filter_expired_items(bsos)
         # Sort the resulting list.
         # We always sort so that offset/limit work correctly.
         # Using the id as a secondary key produces a unique ordering.
         bsos = list(bsos)
         if sort == "index":
             key = lambda bso: (bso["sortindex"], bso["id"])
-            reverse = False
         else:
             key = lambda bso: (bso["modified"], bso["id"])
-            reverse = False
-        bsos.sort(key=key, reverse=reverse)
+        bsos.sort(key=key, reverse=True)
         # Trim to the specified offset, if any.
         # Note that we defaulted it to zero above.
         if offset is not None:
@@ -805,13 +807,20 @@ class _CachedManagerBase(object):
             "next_offset": next_offset
         }
 
-    def get_item_ids(self, userid, items=None, **kwds):
-        res = self.get_items(userid, items, **kwds)
+    def _filter_expired_items(self, bsos):
+        now = int(time.time())
+        for bso in bsos:
+            ttl = bso.get("ttl")
+            if ttl is None or ttl > now:
+                yield bso
+
+    def get_item_ids(self, userid, **kwds):
+        res = self.get_items(userid, **kwds)
         res["items"] = [bso["id"] for bso in res["items"]]
         return res
 
     def get_item(self, userid, item):
-        items = self.get_items(userid, [item])["items"]
+        items = self.get_items(userid, ids=[item])["items"]
         if not items:
             raise ItemNotFoundError
         return items[0]
@@ -911,7 +920,14 @@ class CachedManager(_CachedManagerBase):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
             ts = storage.set_items(userid, self.collection, items)
-        self._set_items(userid, items, ts, data, casid)
+        # Update the cached data in-place.
+        # Leave the cache empty if any of posted bsos were missing a payload.
+        # This will cause us to lazily read in the defaults from the db.
+        for item in items:
+            if "payload" not in item:
+                break
+        else:
+            self._set_items(userid, items, ts, data, casid)
         return ts
 
     def del_collection(self, userid):
@@ -929,8 +945,12 @@ class CachedManager(_CachedManagerBase):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
             res = storage.set_item(userid, self.collection, item, bso)
-        bso["id"] = item
-        self._set_items(userid, [bso], res["modified"], data, casid)
+        # Update the cached data in-place.
+        # Leave the cache empty if the posted bso was missing a payload.
+        # This will cause us to lazily read in the defaults from the db.
+        if "payload" in bso:
+            bso["id"] = item
+            self._set_items(userid, [bso], res["modified"], data, casid)
         return res
 
     def del_item(self, userid, item):
