@@ -197,7 +197,7 @@ class TestStorage(StorageFunctionalTestCase):
         #   'index' - Orders by the sortindex descending (highest weight first)
         self.app.delete(self.root + '/storage/col2')
 
-        for index, sortindex in (('0', 1), ('1', 34), ('2', 12)):
+        for index, sortindex in (('0', -1), ('1', 34), ('2', 12)):
             bso = {'id': index, 'payload': 'x', 'sortindex': sortindex}
             self.app.post_json(self.root + '/storage/col2', [bso])
 
@@ -1071,11 +1071,6 @@ class TestStorage(StorageFunctionalTestCase):
             "payload": "TEST",
             "ttl": -1,
         }, status=400)
-        # sortindex cannot be negative
-        self.app.put_json(self.root + "/storage/col2/TEST", {
-            "payload": "TEST",
-            "sortindex": -42,
-        }, status=400)
         # limit cannot be negative
         self.app.put_json(self.root + "/storage/col2/TEST", {"payload": "X"})
         self.app.get(self.root + "/storage/col2?limit=-1", status=400)
@@ -1089,6 +1084,11 @@ class TestStorage(StorageFunctionalTestCase):
         }, headers={
             "X-If-Unmodified-Since": "-3",
         }, status=400)
+        # sortindex actually *can* be negative
+        self.app.put_json(self.root + "/storage/col2/TEST", {
+            "payload": "TEST",
+            "sortindex": -42,
+        }, status=200)
 
     def test_meta_global_sanity(self):
         # Memcache backend is configured to store 'meta' in write-through

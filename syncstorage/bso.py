@@ -19,7 +19,7 @@ FIELD_DEFAULTS = {
 MAX_TTL = 31536000
 MAX_PAYLOAD_SIZE = 256 * 1024
 MAX_SORTINDEX_VALUE = 999999999
-MIN_SORTINDEX_VALUE = 0
+MIN_SORTINDEX_VALUE = -999999999
 VALID_ID_REGEX = re.compile("^[ -~]{1,64}$")  # <=64 printable characters
 
 SCALAR_TYPES = (int, long, basestring, decimal.Decimal)
