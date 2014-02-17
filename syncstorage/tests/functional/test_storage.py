@@ -1038,11 +1038,15 @@ class TestStorage(StorageFunctionalTestCase):
         # The new item should have got a default payload of empty string.
         self.assertEquals(items["TEST2"]["payload"], "x")
         self.assertEquals(items["TEST3"]["payload"], "")
+        ts2 = items["TEST2"]["modified"]
+        ts3 = items["TEST3"]["modified"]
+        self.assertTrue(ts2 < ts3)
 
     def test_bulk_update_of_ttls_without_sending_data(self):
         # Create 5 BSOs with a ttl of 1 second.
         bsos = [{"id": str(i), "payload": "x", "ttl": 1} for i in xrange(5)]
-        self.app.post_json(self.root + "/storage/col2", bsos)
+        r = self.app.post_json(self.root + "/storage/col2", bsos)
+        ts1 = float(r.headers["X-Last-Modified"])
         # Before they expire, bulk-update the ttl to something longer.
         # Also send data for some that don't exist yet.
         # And just to be really tricky, we're also going to update
@@ -1052,6 +1056,7 @@ class TestStorage(StorageFunctionalTestCase):
         bsos[0]["payload"] = "xx"
         r = self.app.post_json(self.root + "/storage/col2", bsos)
         self.assertEquals(len(r.json["success"]), 4)
+        ts2 = float(r.headers["X-Last-Modified"])
         # If we wait then items 0, 1, 2 should have expired.
         # Items 3, 4, 5, 6 should still exist.
         time.sleep(0.8)
@@ -1064,6 +1069,12 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(items["4"]["payload"], "x")
         self.assertEquals(items["5"]["payload"], "")
         self.assertEquals(items["6"]["payload"], "")
+        # All items created or modified by the request should get their
+        # timestamps update.  Just bumping the ttl should not bump timestamp.
+        self.assertEquals(items["3"]["modified"], ts2)
+        self.assertEquals(items["4"]["modified"], ts1)
+        self.assertEquals(items["5"]["modified"], ts2)
+        self.assertEquals(items["6"]["modified"], ts2)
 
     def test_that_negative_integer_fields_are_not_accepted(self):
         # ttls cannot be negative

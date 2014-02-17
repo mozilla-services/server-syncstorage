@@ -371,7 +371,8 @@ class SQLStorage(SyncStorage):
             row = self._prepare_bso_row(session, userid, collectionid,
                                         id, data)
             rows.append(row)
-        session.insert_or_update("bso", rows)
+        defaults = {"modified": ts2bigint(session.timestamp)}
+        session.insert_or_update("bso", rows, defaults)
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
@@ -456,7 +457,8 @@ class SQLStorage(SyncStorage):
         """Creates or updates a single item in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
         row = self._prepare_bso_row(session, userid, collectionid, item, data)
-        num_created = session.insert_or_update("bso", [row])
+        defaults = {"modified": ts2bigint(session.timestamp)}
+        num_created = session.insert_or_update("bso", [row], defaults)
         return {
             "created": bool(num_created),
             "modified": self._touch_collection(session, userid, collectionid)
@@ -705,10 +707,10 @@ class SQLStorageSession(object):
         else:
             self.rollback()
 
-    def insert_or_update(self, table, items):
+    def insert_or_update(self, table, items, defaults=None):
         """Do a bulk insert/update of the given items."""
         assert self._nesting_level > 0, "Session has not been started"
-        return self.connection.insert_or_update(table, items)
+        return self.connection.insert_or_update(table, items, defaults)
 
     def query(self, query, params={}):
         """Execute a database query, returning the rowcount."""

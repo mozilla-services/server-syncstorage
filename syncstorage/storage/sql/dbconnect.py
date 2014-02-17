@@ -95,7 +95,7 @@ def _get_bso_columns(table_name):
         Column("collection", Integer, primary_key=True, nullable=False,
                autoincrement=False),
         Column("sortindex", Integer),
-        Column("modified", BigInteger),
+        Column("modified", BigInteger, nullable=False),
         Column("payload", Text, nullable=False, server_default=""),
         Column("payload_size", Integer, nullable=False,
                server_default=sqltext("0")),
@@ -603,7 +603,7 @@ class DBConnection(object):
             finally:
                 res.close()
 
-    def insert_or_update(self, table, items, annotations=None):
+    def insert_or_update(self, table, items, defaults=None, annotations=None):
         """Perform an efficient bulk "upsert" of the given items.
 
         Given the name of a table and a list of data dicts to insert or update,
@@ -634,11 +634,12 @@ class DBConnection(object):
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
-            return self._upsert_onduplicatekey(table, items, annotations)
+            return self._upsert_onduplicatekey(table, items, defaults,
+                                               annotations)
         else:
-            return self._upsert_generic(table, items, annotations)
+            return self._upsert_generic(table, items, defaults, annotations)
 
-    def _upsert_generic(self, table, items, annotations):
+    def _upsert_generic(self, table, items, defaults, annotations):
         """Upsert a batch of items one at a time, trying INSERT then UPDATE.
 
         This is a tremendously inefficient way to write a batch of items,
@@ -652,8 +653,11 @@ class DBConnection(object):
             try:
                 # Try to insert the item.
                 # If it already exists, this fails with an integrity error.
-                query = insert(table).values(**item)
-                self.execute(query, item, annotations).close()
+                query = insert(table)
+                if defaults is not None:
+                    query = query.values(**defaults)
+                query = query.values(**item)
+                self.execute(query, {}, annotations).close()
                 num_created += 1
             except IntegrityError:
                 # Update the item.
@@ -668,10 +672,10 @@ class DBConnection(object):
                         msg = "Item is missing primary key column %r"
                         raise ValueError(msg % (key.name,))
                 query = query.values(**item)
-                self.execute(query, item, annotations).close()
+                self.execute(query, {}, annotations).close()
         return num_created
 
-    def _upsert_onduplicatekey(self, table, items, annotations):
+    def _upsert_onduplicatekey(self, table, items, defaults, annotations):
         """Upsert a batch of items using the ON DUPLICATE KEY UPDATE syntax.
 
         This is a custom batch upsert implementation based on non-standard
@@ -699,23 +703,33 @@ class DBConnection(object):
         for batch in batches.itervalues():
             # Since we're crafting SQL by hand, assert that each field is
             # actually a plain alphanum field name.  Can't be too careful...
-            fields = batch[0].keys()
-            assert all(SAFE_FIELD_NAME_RE.match(field) for field in fields)
+            update_fields = batch[0].keys()
+            insert_fields = batch[0].keys()
+            if defaults is not None:
+                for field in defaults:
+                    if field not in batch[0]:
+                        insert_fields.append(field)
+            assert all(SAFE_FIELD_NAME_RE.match(f) for f in update_fields)
+            assert all(SAFE_FIELD_NAME_RE.match(f) for f in insert_fields)
             # Each item corresponds to a set of bindparams and a matching
             # entry in the "VALUES" clause of the query.
             query = "INSERT INTO %s (%s) VALUES "\
-                    % (table.name, ",".join(fields))
-            binds = [":%s%%(num)d" % field for field in fields]
+                    % (table.name, ",".join(insert_fields))
+            binds = [":%s%%(num)d" % field for field in insert_fields]
             pattern = "(%s) " % ",".join(binds)
             params = {}
             vclauses = []
             for num, item in enumerate(batch):
                 vclauses.append(pattern % {"num": num})
-                for field, value in item.iteritems():
+                for field in insert_fields:
+                    try:
+                        value = item[field]
+                    except KeyError:
+                        value = defaults[field]
                     params["%s%d" % (field, num)] = value
             query += ",".join(vclauses)
             # The ON DUPLICATE KEY CLAUSE updates all the given fields.
-            updates = ["%s = VALUES(%s)" % (field, field) for field in fields]
+            updates = ["%s = VALUES(%s)" % (f, f) for f in update_fields]
             query += " ON DUPLICATE KEY UPDATE " + ",".join(updates)
             # Now we can execute it as one big query.
             res = self.execute(query, params, annotations)
