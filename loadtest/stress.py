@@ -80,6 +80,8 @@ deleteall_probability = 1 / 100.
 
 class HawkAuth(requests.auth.AuthBase):
 
+    timeskew = 0
+
     def __init__(self, server_url, id, secret):
         self.server_url = server_url
         self.id = id
@@ -90,7 +92,8 @@ class HawkAuth(requests.auth.AuthBase):
         # and loads replaces hostnames with IPs.  Undo all this rubbish
         # so that we can calculate the correct signature.
         req.headers['Host'] = urlparse(self.server_url).netloc
-        hawkauthlib.sign_request(req, self.id, self.secret)
+        params = {"ts": str(int(time.time()) + self.timeskew)}
+        hawkauthlib.sign_request(req, self.id, self.secret, params=params)
         return req
 
 
@@ -105,8 +108,13 @@ class StressTest(TestCase):
         headers = {"content-type": "application/json"}
 
         # Always GET info/collections
+        # This is also a good opportunity to correct for timeskew.
         url = self.endpoint_url + "/info/collections"
         response = self.session.get(url, auth=auth)
+        if response.status_code == 401:
+            server_time = int(float(response.headers["X-Weave-Timestamp"]))
+            HawkAuth.timeskew = server_time - int(time.time())
+            response = self.session.get(url, auth=auth)
         self.assertTrue(response.status_code in (200, 404))
 
         # GET requests to meta/global.
@@ -217,6 +225,20 @@ class StressTest(TestCase):
             response = self.session.get(token_url, headers={
                 "Authorization": "BrowserID " + assertion,
             })
+            # Maybe timeskew between client and server?
+            if response.status_code == 401:
+                server_time = int(response.headers["X-Timestamp"])
+                HawkAuth.timeskew = server_time - int(time.time())
+                assertion = browserid.tests.support.make_assertion(
+                    email=email,
+                    audience=self.server_url,
+                    issuer="mockmyid.com",
+                    issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
+                    exp=int((time.time() + 60 + HawkAuth.timeskew) * 1000)
+                )
+                response = self.session.get(token_url, headers={
+                    "Authorization": "BrowserID " + assertion,
+                })
             response.raise_for_status()
             credentials = response.json()
             self.auth_token = credentials["id"].encode('ascii')
