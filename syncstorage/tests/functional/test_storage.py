@@ -1111,6 +1111,11 @@ class TestStorage(StorageFunctionalTestCase):
         modified_re = r"['\"]modified['\"]:\s*[0-9]+\.[0-9][0-9]\s*[,}]"
         self.assertTrue(re.search(modified_re, res.body))
 
+    def test_that_404_responses_have_a_json_body(self):
+        res = self.app.get(self.root + '/nonexistent/url', status=404)
+        self.assertEquals(res.content_type, "application/json")
+        self.assertEquals(res.json, 0)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""

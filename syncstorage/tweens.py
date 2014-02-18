@@ -15,6 +15,7 @@ except ImportError:
     MemcachedClient = None  # NOQA
 
 
+WEAVE_UNKNOWN_ERROR = 0
 WEAVE_ILLEGAL_METH = 1              # Illegal method/protocol
 WEAVE_MALFORMED_JSON = 6            # Json parse failure
 WEAVE_INVALID_WBO = 8               # Invalid Weave Basic Object
@@ -161,6 +162,34 @@ def convert_cornice_errors_to_respcodes(handler, registry):
     return convert_cornice_errors_to_respcodes_tween
 
 
+def convert_non_json_responses(handler, registry):
+    """Tween to convert non-json response bodies to json.
+
+    The framework can sometimes generate a HTML response page, e.g. for a
+    404 or 401 response.  Clients don't really expect to see HTMl pages,
+    so we intercept them and replace them with a simple json body.
+    """
+
+    def convert_non_json_responses_tween(request):
+        try:
+            response = handler(request)
+        except HTTPException, response:
+            if response.content_type != "application/json":
+                response.body = str(WEAVE_UNKNOWN_ERROR)
+                response.content_length = len(response.body)
+                response.content_type = "application/json"
+            raise
+        else:
+            if response.status_code >= 400:
+                if response.content_type != "application/json":
+                    response.body = str(WEAVE_UNKNOWN_ERROR)
+                    response.content_length = len(response.body)
+                    response.content_type = "application/json"
+            return response
+
+    return convert_non_json_responses_tween
+
+
 def includeme(config):
     """Include all the SyncServer tweens into the given config."""
     config.add_tween("syncstorage.tweens.check_for_blacklisted_nodes")
@@ -168,3 +197,4 @@ def includeme(config):
     config.add_tween("syncstorage.tweens.set_default_accept_header")
     config.add_tween("syncstorage.tweens.fuzz_retry_after_header")
     config.add_tween("syncstorage.tweens.convert_cornice_errors_to_respcodes")
+    config.add_tween("syncstorage.tweens.convert_non_json_responses")
