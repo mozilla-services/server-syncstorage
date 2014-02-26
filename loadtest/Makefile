@@ -26,4 +26,4 @@ bench:
 
 # Run a much bigger bench, by submitting to broker in AWS.
 megabench:
-	./bin/loads-runner --config=./config/megabench.ini --server-url=$(SERVER_URL) stress.StressTest.test_storage_session
+	./bin/loads-runner --config=./config/megabench.ini --user-id=$(USER) --server-url=$(SERVER_URL) stress.StressTest.test_storage_session
