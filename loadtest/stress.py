@@ -104,30 +104,36 @@ class StressTest(TestCase):
     def test_storage_session(self):
         self._generate_token_credentials()
         auth = HawkAuth(self.endpoint_url, self.auth_token, self.auth_secret)
-
-        headers = {"content-type": "application/json"}
+        reqkwds = {
+          "timeout": 120,
+          "auth": auth,
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Confirm-Delete": "1",
+          },
+        }
 
         # Always GET info/collections
         # This is also a good opportunity to correct for timeskew.
         url = self.endpoint_url + "/info/collections"
-        response = self.session.get(url, auth=auth)
+        response = self.session.get(url, **reqkwds)
         if response.status_code == 401:
             server_time = int(float(response.headers["X-Weave-Timestamp"]))
             HawkAuth.timeskew = server_time - int(time.time())
-            response = self.session.get(url, auth=auth)
+            response = self.session.get(url, **reqkwds)
         self.assertTrue(response.status_code in (200, 404))
 
         # GET requests to meta/global.
         num_requests = self._pick_weighted_count(metaglobal_count_distribution)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/meta/global"
-            response = self.session.get(url, auth=auth)
+            response = self.session.get(url, **reqkwds)
             if response.status_code == 404:
                 metapayload = "This is the metaglobal payload which contains"\
                               " some client data that doesnt look much"\
                               " like this"
                 data = json.dumps({"id": "global", "payload": metapayload})
-                response = self.session.put(url, data=data, headers=headers, auth=auth)
+                response = self.session.put(url, data=data, **reqkwds)
             self.assertEqual(response.status_code, 200)
 
         # Occasional reads of client records.
@@ -135,7 +141,7 @@ class StressTest(TestCase):
             url = self.endpoint_url + "/storage/clients"
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            response = self.session.get(url, params=params, auth=auth)
+            response = self.session.get(url, params=params, **reqkwds)
             self.assertTrue(response.status_code in (200, 404))
 
         # Occasional updates to client records.
@@ -144,7 +150,7 @@ class StressTest(TestCase):
             url = self.endpoint_url + "/storage/clients"
             wbo = {'id': 'client' + clientid, 'payload': clientid * 300}
             data = json.dumps([wbo])
-            response = self.session.post(url, data=data, headers=headers, auth=auth)
+            response = self.session.post(url, data=data, **reqkwds)
             self.assertEqual(response.status_code, 200)
             body = response.content
             self.assertTrue(body != '')
@@ -159,7 +165,7 @@ class StressTest(TestCase):
             url = self.endpoint_url + "/storage/" + cols[x]
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            response = self.session.get(url, params=params, auth=auth)
+            response = self.session.get(url, params=params, **reqkwds)
             self.assertTrue(response.status_code in (200, 404))
 
         # PUT requests with 100 WBOs batched together
@@ -176,7 +182,7 @@ class StressTest(TestCase):
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
-            response = self.session.post(url, data=data, headers=headers, auth=auth)
+            response = self.session.post(url, data=data, **reqkwds)
             self.assertEqual(response.status_code, 200)
             body = response.content
             self.assertTrue(body != '')
@@ -192,12 +198,12 @@ class StressTest(TestCase):
             cols = random.sample(collections, num_requests)
             for x in range(num_requests):
                 url = self.endpoint_url + "/storage/" + cols[x]
-                response = self.session.delete(url, headers={"X-Confirm-Delete": "1"}, auth=auth)
+                response = self.session.delete(url, **reqkwds)
                 self.assertTrue(response.status_code in (200, 204))
         else:
             if random.random() <= deleteall_probability:
                 url = self.endpoint_url + "/storage"
-                response = self.session.delete(url, headers={"X-Confirm-Delete": "1"}, auth=auth)
+                response = self.session.delete(url, **reqkwds)
                 self.assertEquals(response.status_code, 200)
 
     def _generate_token_credentials(self):
