@@ -1127,6 +1127,25 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.content_type, "application/json")
         self.assertEquals(res.json, 0)
 
+    def test_that_internal_server_fields_are_not_echoed(self):
+        self.app.post_json(self.root + '/storage/col1',
+                           [{'id': 'one', 'payload': 'blob'}])
+        self.app.put_json(self.root + '/storage/col1/two',
+                          {'payload': 'blub'})
+        res = self.app.get(self.root + '/storage/col1?full=1')
+        self.assertEquals(len(res.json), 2)
+        for item in res.json:
+            self.assertTrue("id" in item)
+            self.assertTrue("payload" in item)
+            self.assertFalse("payload_size" in item)
+            self.assertFalse("ttl" in item)
+        for id in ('one', 'two'):
+            res = self.app.get(self.root + '/storage/col1/' + id)
+            self.assertTrue("id" in res.json)
+            self.assertTrue("payload" in res.json)
+            self.assertFalse("payload_size" in res.json)
+            self.assertFalse("ttl" in res.json)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
