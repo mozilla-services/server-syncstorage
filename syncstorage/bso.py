@@ -82,9 +82,16 @@ class BSO(dict):
                 ttl = int(self['ttl'])
             except ValueError:
                 return False, 'invalid ttl'
-            if ttl < 0 or ttl > MAX_TTL:
+            if ttl < 0:
                 return False, 'invalid ttl'
             self['ttl'] = ttl
+            # XXX TODO: temporary workaround for clients that accidentally
+            # cached a server-side ttl value and are now sending it in
+            # future updates. Since it's invalid, we assume they didn't
+            # actually mean to send one at all.
+            # See https://bugzilla.mozilla.org/show_bug.cgi?id=977397
+            if ttl > MAX_TTL:
+                del self['ttl']
 
         # Check that the sortindex is a valid positive integer.
         # Convert from other types as necessary.

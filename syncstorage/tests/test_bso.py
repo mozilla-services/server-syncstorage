@@ -54,7 +54,14 @@ class TestBSO(unittest2.TestCase):
             data = {'ttl': bad_ttl}
             bso = BSO(data)
             result, failure = bso.validate()
-            self.assertFalse(result)
+            # XXX TODO: ttls that are too large are currently ignored.
+            # See https://bugzilla.mozilla.org/show_bug.cgi?id=977397
+            #self.assertFalse(result)
+            if bad_ttl != 31537000:
+                self.assertFalse(result)
+            else:
+                self.assertTrue(result)
+                self.assertTrue('ttl' not in bso)
 
         data = {'ttl': 3600}
         bso = BSO(data)
