@@ -168,17 +168,22 @@ class StressTest(TestCase):
             response = self.session.get(url, params=params, **reqkwds)
             self.assertTrue(response.status_code in (200, 404))
 
-        # PUT requests with 100 WBOs batched together
+        # PUT requests with several WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
         cols = random.sample(collections, num_requests)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x]
             data = []
-            items_per_batch = 10
+            # Random batch size, but capped at 100 so we skew towards that.
+            items_per_batch = min(random.randint(20, 180), 100)
             for i in range(items_per_batch):
                 id = base64.urlsafe_b64encode(os.urandom(10)).rstrip("=")
                 id += str(int((time.time() % 100) * 100000))
-                payload = self.auth_token * random.randint(50, 200)
+                # Random payload length.  They can be big, but skew small.
+                # This gives min=300, mean=450, max=7000
+                payload_length = min(int(random.paretovariate(3) * 300), 7000)
+                payload_chunks = (payload_length / len(self.auth_token)) + 1
+                payload = (self.auth_token * payload_chunks)[:payload_length]
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
