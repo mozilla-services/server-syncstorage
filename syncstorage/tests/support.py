@@ -51,6 +51,8 @@ def validate_database_query(conn, cursor, statement, *args):
         return
     if statement.startswith("DESCRIBE "):
         return
+    if statement.startswith("DROP "):
+        return
     if "queryName=" not in statement:
         assert False, "SQL query does not have a name: %s" % (statement,)
 

@@ -261,15 +261,21 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "ttl": int(session.timestamp),
         })
-        return self._map_collection_names(session, res)
+        # Some db backends return a Decimal() instance for this aggregate.
+        # We want just a plain old integer.
+        rows = ((row[0], int(row[1])) for row in res)
+        return self._map_collection_names(session, rows)
 
     @with_session
     def get_total_size(self, session, userid, recalculate=False):
         """Returns the total size a user's stored data."""
-        return session.query_scalar("STORAGE_SIZE", {
+        size = session.query_scalar("STORAGE_SIZE", {
             "userid": userid,
             "ttl": int(session.timestamp),
         }, default=0)
+        # Some db backends return a Decimal() instance for this aggregate.
+        # We want just a plain old integer.
+        return int(size)
 
     @with_session
     def delete_storage(self, session, userid):

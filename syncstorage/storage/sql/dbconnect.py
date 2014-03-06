@@ -532,15 +532,16 @@ class DBConnection(object):
                 params.setdefault(param, value)
             query_str = str(compiled)
         # Join all the annotations into a comment string.
-        annotation_items = sorted(annotations.items())
-        annotation_strs = ("%s=%s" % item for item in annotation_items)
-        comment = "/* [" + ", ".join(annotation_strs) + "] */"
-        # Add it to the query, at the front if possible.
-        # SQLite chokes on leading comments, so put it at back on that driver.
-        if self._connector.driver == "sqlite":
-            query_str = query_str + " " + comment
-        else:
-            query_str = comment + " " + query_str
+        if annotations:
+            annotation_items = sorted(annotations.items())
+            annotation_strs = ("%s=%s" % item for item in annotation_items)
+            comment = "/* [" + ", ".join(annotation_strs) + "] */"
+            # Add it to the query, at the front if possible.
+            # SQLite chokes on leading comments, in that case put it at back.
+            if self._connector.driver == "sqlite":
+                query_str = query_str + " " + comment
+            else:
+                query_str = comment + " " + query_str
         return query_str
 
     def query(self, query_name, params=None, annotations=None):
