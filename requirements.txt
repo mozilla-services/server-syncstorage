@@ -28,4 +28,4 @@ zope.deprecation==4.1.0
 zope.interface==4.0.5
 gevent==1.0
 PybrowserID==0.9.1
-http://github.com/mozilla-services/mozservices/archive/d037cab18cbf1635b2da12847dd06660afd7a0ea.zip
+http://github.com/mozilla-services/mozservices/archive/c31d7e0f08ba71ee68516949411a8d92b8a2965d.zip
