@@ -29,4 +29,4 @@ zope.interface==4.0.5
 gevent==1.0
 gunicorn==18.0
 PybrowserID==0.9.1
-http://github.com/mozilla-services/mozservices/archive/c31d7e0f08ba71ee68516949411a8d92b8a2965d.zip
+http://github.com/mozilla-services/mozservices/archive/7abbc6f9c0408bed87b2db7c73404c402827ecb1.zip
