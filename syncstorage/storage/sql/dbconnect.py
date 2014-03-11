@@ -19,6 +19,7 @@ This behaviour is off by default; pass shard=True to enable it.
 
 import os
 import re
+import sys
 import copy
 import urlparse
 import traceback
@@ -43,8 +44,15 @@ from syncstorage.storage.sql import (queries_generic,
                                      queries_mysql)
 
 
+# Regex to match safe database field/column names.
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")
 
+# Regex to match specific kinds of query that are safe to kill.
+# It's a SELECT, INSERT or UPDATE with optional leading comment.
+SAFE_TO_KILL_QUERY = r"^\s*(/\*.*\*/)?\s*(SELECT|INSERT|UPDATE)\s"
+SAFE_TO_KILL_QUERY = re.compile(SAFE_TO_KILL_QUERY, re.I)
+
+# The ttl to use for rows that are never supposed to expire.
 MAX_TTL = 2100000000
 
 metadata = MetaData()
@@ -493,7 +501,7 @@ class DBConnection(object):
             # successfully used as part of this transaction.
             try:
                 query_str = self._render_query(query, params, annotations)
-                return connection.execute(sqltext(query_str), **params)
+                return self._exec_with_cleanup(connection, query_str, **params)
             except DBAPIError, exc:
                 if not is_retryable_db_error(self._connector.engine, exc):
                     raise
@@ -507,13 +515,72 @@ class DBConnection(object):
                 transaction = connection.begin()
                 annotations["retry"] = "1"
                 query_str = self._render_query(query, params, annotations)
-                return connection.execute(sqltext(query_str), **params)
+                return self._exec_with_cleanup(connection, query_str, **params)
         finally:
             # Now that the underlying connection has been used, remember it
             # so that all subsequent queries are part of the same transaction.
             if not session_was_active:
                 self._connection = connection
                 self._transaction = transaction
+
+    def _exec_with_cleanup(self, connection, query_str, **params):
+        """Execution wrapper that kills queries if it is interrupted.
+
+        This is a wrapper around connection.execute() that will clean up
+        any running query if the execution is interrupted by a control-flow
+        exception such as KeyboardInterrupt or gevent.Timeout.
+
+        The cleanup currently works only for the PyMySQL driver.  Other
+        drivers will still execute fine, they just won't get the cleanup.
+        """
+        try:
+            return connection.execute(sqltext(query_str), **params)
+        except Exception:
+            # Normal exceptions are passed straight through.
+            raise
+        except BaseException:
+            # Control-flow exceptions trigger the cleanup logic.
+            exc, val, tb = sys.exc_info()
+            self.logger.debug("query was interrupted by %s", val)
+            # Only cleanup SELECT, INSERT or UPDATE statements.
+            # There are concerns that rolling back DELETEs is too costly.
+            if not SAFE_TO_KILL_QUERY.match(query_str):
+                msg = "  refusing to kill unsafe query: %s"
+                self.logger.debug(msg, query_str[:100])
+                raise
+            try:
+                # The KILL command is specific to MySQL, and this method of
+                # getting the threadid is specific to the PyMySQL driver.
+                # Other drivers will cause an AttributeError, failing through
+                # to the "finally" clause at the end of this block.
+                thread_id = connection.connection.server_thread_id[0]
+                self.logger.debug("  killing connection %d", thread_id)
+                cleanup_query = "KILL %d" % (thread_id,)
+                # Use a freshly-created connection so that we don't block
+                # waiting for something from the pool.  Unfortunately this
+                # requires use of a private API and raw cursor access.
+                cleanup_conn = self._connector.engine.pool._create_connection()
+                try:
+                    cleanup_cursor = cleanup_conn.connection.cursor()
+                    try:
+                        cleanup_cursor.execute(cleanup_query)
+                    except Exception:
+                        msg = "  failed to kill %d"
+                        self.logger.exception(msg, thread_id)
+                        raise
+                    finally:
+                        cleanup_cursor.close()
+                    msg = "  successfully killed %d"
+                    self.logger.debug(msg, thread_id)
+                finally:
+                    cleanup_conn.close()
+            finally:
+                try:
+                    # Don't return this connection to the pool.
+                    connection.invalidate()
+                finally:
+                    # Always re-raise the original error.
+                    raise exc, val, tb
 
     def _render_query(self, query, params, annotations):
         """Render a query into its final string form, to send to database.
