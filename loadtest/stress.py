@@ -21,6 +21,7 @@ import requests.auth
 from loads import TestCase
 
 
+MOCKMYID_DOMAIN = "mockmyid.s3-us-west-2.amazonaws.com"
 MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
     "algorithm": "DS",
     "x": "385cb3509f086e110c5e24bdd395a84b335a09ae",
@@ -225,11 +226,11 @@ class StressTest(TestCase):
             self.auth_secret = tokenlib.get_derived_secret(self.auth_token,
                                                            secret=url.fragment)
         else:
-            email = "user%s@mockmyid.com" % (uid,)
+            email = "user%s@%s" % (uid, MOCKMYID_DOMAIN)
             assertion = browserid.tests.support.make_assertion(
                 email=email,
                 audience=self.server_url,
-                issuer="mockmyid.com",
+                issuer=MOCKMYID_DOMAIN,
                 issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
             )
             token_url = self.server_url + "/1.0/sync/1.5"
@@ -243,7 +244,7 @@ class StressTest(TestCase):
                 assertion = browserid.tests.support.make_assertion(
                     email=email,
                     audience=self.server_url,
-                    issuer="mockmyid.com",
+                    issuer=MOCKMYID_DOMAIN,
                     issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
                     exp=int((time.time() + 60 + HawkAuth.timeskew) * 1000)
                 )
