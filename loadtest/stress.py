@@ -21,6 +21,10 @@ import requests.auth
 from loads import TestCase
 
 
+# Assertions are good for one year (in seconds).
+# This avoids having to deal with clock-skew in tokenserver requests.
+ASSERTION_LIFETIME = 60 * 60 * 24 * 365
+
 MOCKMYID_DOMAIN = "mockmyid.s3-us-west-2.amazonaws.com"
 MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
     "algorithm": "DS",
@@ -227,11 +231,13 @@ class StressTest(TestCase):
                                                            secret=url.fragment)
         else:
             email = "user%s@%s" % (uid, MOCKMYID_DOMAIN)
+            exp = time.time() + ASSERTION_LIFETIME + HawkAuth.timeskew
             assertion = browserid.tests.support.make_assertion(
                 email=email,
                 audience=self.server_url,
                 issuer=MOCKMYID_DOMAIN,
                 issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
+                exp=int(exp * 1000),
             )
             token_url = self.server_url + "/1.0/sync/1.5"
             response = self.session.get(token_url, headers={
@@ -241,12 +247,13 @@ class StressTest(TestCase):
             if response.status_code == 401:
                 server_time = int(response.headers["X-Timestamp"])
                 HawkAuth.timeskew = server_time - int(time.time())
+                exp = time.time() + ASSERTION_LIFETIME + HawkAuth.timeskew
                 assertion = browserid.tests.support.make_assertion(
                     email=email,
                     audience=self.server_url,
                     issuer=MOCKMYID_DOMAIN,
                     issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
-                    exp=int((time.time() + 60 + HawkAuth.timeskew) * 1000)
+                    exp=int(exp * 1000),
                 )
                 response = self.session.get(token_url, headers={
                     "Authorization": "BrowserID " + assertion,
