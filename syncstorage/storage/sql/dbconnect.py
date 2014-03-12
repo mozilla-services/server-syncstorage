@@ -97,11 +97,11 @@ user_collections = Table(
 
 def _get_bso_columns(table_name):
     return (
-        Column("id", String(64), primary_key=True, autoincrement=False),
         Column("userid", Integer, primary_key=True, nullable=False,
                autoincrement=False),
         Column("collection", Integer, primary_key=True, nullable=False,
                autoincrement=False),
+        Column("id", String(64), primary_key=True, autoincrement=False),
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
         Column("payload", Text, nullable=False, server_default=""),
