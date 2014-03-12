@@ -149,7 +149,8 @@ def run_live_functional_tests(TestCaseClass, argv=None):
         os.environ["MOZSVC_TEST_INI_FILE"] = opts.config_file
 
     # If we're not using the tokenserver, the default implementation of
-    # _authenticate will do just fine.
+    # _authenticate will do just fine.  We optionally accept the token
+    # signing secret in the url hash fragement.
     if not opts.use_token_server:
         if opts.email is not None:
             msg = "cant specify email address unless using live tokenserver"
@@ -157,8 +158,19 @@ def run_live_functional_tests(TestCaseClass, argv=None):
         if opts.audience is not None:
             msg = "cant specify audience unless using live tokenserver"
             raise ValueError(msg)
-        os.environ["MOZSVC_TEST_REMOTE"] = url
-        LiveTestCases = TestCaseClass
+        host_url = urlparse.urlparse(url)
+        secret = None
+        if host_url.fragment:
+            secret = host_url.fragment
+            host_url = host_url._replace(fragment="")
+        os.environ["MOZSVC_TEST_REMOTE"] = host_url.geturl()
+
+        class LiveTestCases(TestCaseClass):
+            def _authenticate(self):
+                policy = self.config.registry.getUtility(IAuthenticationPolicy)
+                if secret is not None:
+                    policy.secrets._secrets = [secret]
+                return super(LiveTestCases, self)._authenticate()
 
     # If we're using a live tokenserver, then we need to get some credentials
     # and an endpoint URL.
