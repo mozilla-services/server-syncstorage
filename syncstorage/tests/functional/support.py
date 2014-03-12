@@ -58,6 +58,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
             super(StorageFunctionalTestCase, self)._cleanup_test_databases()
 
 
+MOCKMYID_DOMAIN = "mockmyid.s3-us-west-2.amazonaws.com"
 MOCKMYID_PRIVATE_KEY = None
 MOCKMYID_PRIVATE_KEY_DATA = {
     "algorithm": "DS",
@@ -93,14 +94,14 @@ def authenticate_to_token_server(url, email=None, audience=None):
         from browserid.jwt import DS128Key
         MOCKMYID_PRIVATE_KEY = DS128Key(MOCKMYID_PRIVATE_KEY_DATA)
     if email is None:
-        email = "user_%s@mockmyid.com" % (random.randint(1, 100000),)
+        email = "user%s@%s" % (random.randint(1, 100000), MOCKMYID_DOMAIN)
     if audience is None:
         audience = urlparse.urlparse(url)._replace(path="")
         audience = urlparse.urlunparse(audience)
     assertion = browserid.tests.support.make_assertion(
         email=email,
         audience=audience,
-        issuer="mockmyid.com",
+        issuer=MOCKMYID_DOMAIN,
         issuer_keypair=(None, MOCKMYID_PRIVATE_KEY),
     )
     r = requests.get(url, headers={

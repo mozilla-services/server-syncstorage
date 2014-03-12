@@ -646,6 +646,11 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res.json), 0)
 
     def test_batch(self):
+        # This can't be run against a live server
+        # due to request size limits in nginx.
+        if self.distant:
+            raise unittest2.SkipTest
+
         # Test that batch uploads are correctly processed.
         # The test config has max_count=100.
         # Uploading 70 small objects should succeed.
