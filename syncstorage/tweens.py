@@ -4,7 +4,7 @@
 
 import json
 
-from pyramid.httpexceptions import HTTPException, HTTPServiceUnavailable
+from pyramid.httpexceptions import HTTPException
 
 from syncstorage.util import get_timestamp
 
@@ -34,38 +34,6 @@ def set_x_timestamp_header(handler, registry):
         return response
 
     return set_x_timestamp_header_tween
-
-
-def check_for_blacklisted_nodes(handler, registry):
-    """Tween to check for blacklisted nodes by querying memcache."""
-
-    # Check whether this tween is enabled in the config.
-    if not registry.settings.get("storage.check_blacklisted_nodes", False):
-        return handler
-
-    # Create a memcached client, error out if that's not possible.
-    if MemcachedClient is None:
-        raise ValueError('The "check_blacklisted_nodes" option '
-                         'requires a memcached server')
-
-    servers = registry.settings.get('storage.cache_servers', '127.0.0.1:11211')
-    cache = MemcachedClient(servers.split(','))
-
-    def check_for_blacklisted_nodes_tween(request):
-        # Is it down?  We just error out straight away.
-        host = request.host
-        if cache.get("down:" + host) is not None:
-            raise HTTPServiceUnavailable("Server Problem Detected")
-
-        response = handler(request)
-
-        # Is it backed-off?  We process the request but add a header.
-        backoff = cache.get('backoff:%s' % host)
-        if backoff is not None:
-            response.headers["X-Weave-Backoff"] = str(backoff)
-        return response
-
-    return check_for_blacklisted_nodes_tween
 
 
 def set_default_accept_header(handler, registry):
@@ -169,7 +137,6 @@ def convert_non_json_responses(handler, registry):
 
 def includeme(config):
     """Include all the SyncServer tweens into the given config."""
-    config.add_tween("syncstorage.tweens.check_for_blacklisted_nodes")
     config.add_tween("syncstorage.tweens.set_x_timestamp_header")
     config.add_tween("syncstorage.tweens.set_default_accept_header")
     config.add_tween("syncstorage.tweens.convert_cornice_errors_to_respcodes")

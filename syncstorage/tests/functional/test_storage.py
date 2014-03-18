@@ -675,42 +675,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res['success']), 4)
         self.assertEquals(len(res['failed']), 1)
 
-    def test_blacklisted_nodes(self):
-        # This can't be run against a live server.
-        # XXX TODO: it really doesn't belong in this file; maybe test_wsgi.py?
-        if self.distant:
-            raise unittest2.SkipTest
-
-        settings = self.config.registry.settings
-        old = settings.get('storage.check_blacklisted_nodes', False)
-        settings['storage.check_blacklisted_nodes'] = True
-        try:
-            cache = self.config.registry.get("cache")
-            if cache is None:
-                return   # memcached is probably not installed
-
-            if not cache.set('TEST', 1):
-                return   # memcached server is probably down
-
-            # "backoff:server" will add a X-Weave-Backoff header
-            cache.set('backoff:localhost:80', 2)
-            try:
-                resp = self.app.get(self.root + '/info/collections')
-                self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
-            finally:
-                cache.delete('backoff:localhost:80')
-
-            # "down:server" will make the node unavailable
-            cache.set('down:localhost:80', 1)
-            try:
-                resp = self.app.get(self.root + '/info/collections',
-                                    status=503)
-                self.assertTrue("Server Problem Detected" in resp.body)
-            finally:
-                cache.delete('down:localhost:80')
-        finally:
-            settings['storage.check_blacklisted_nodes'] = old
-
     def test_weird_args(self):
         # pushing some data in col2
         bsos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
