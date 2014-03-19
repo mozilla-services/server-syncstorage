@@ -107,11 +107,8 @@ def get_site_root(request):
     return "It Works!  SyncStorage is successfully running on this host."
 
 
-# We define a service at the root, but don't give it any methods.
-# This will generate a "415 Method Unsupported" for all attempts to use it,
-# which is less confusing than having the root give a "404 Not Found".
 service_root = SyncStorageService(name="service_root",
-                                  path="/")
+                                  path="")
 
 info = SyncStorageService(name="info",
                           path="/info")
@@ -170,6 +167,13 @@ def get_info_usage(request):
 
 @storage.delete(renderer="sync-json")
 def delete_storage(request):
+    storage = request.validated["storage"]
+    storage.delete_storage(request.validated["userid"])
+    return {}
+
+
+@service_root.delete(renderer="sync-json")
+def delete_all(request):
     storage = request.validated["storage"]
     storage.delete_storage(request.validated["userid"])
     return {}

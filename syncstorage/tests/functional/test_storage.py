@@ -52,7 +52,7 @@ class TestStorage(StorageFunctionalTestCase):
         super(TestStorage, self).setUp()
         self.root = '/1.5/%d' % (self.user_id,)
         # Reset the storage to a known state, aka "empty".
-        self.app.delete(self.root + "/storage")
+        self.app.delete(self.root)
 
     def test_get_collections(self):
         # col1 gets 3 items, col2 gets 5 items.
