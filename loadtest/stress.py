@@ -104,7 +104,7 @@ class HawkAuth(requests.auth.AuthBase):
 
 class StressTest(TestCase):
 
-    server_url = "https://token.dev.lcip.org"
+    server_url = "https://token.stage.mozaws.net"
 
     def test_storage_session(self):
         self._generate_token_credentials()

@@ -1,4 +1,4 @@
-SERVER_URL = https://token.dev.lcip.org
+SERVER_URL = https://token.stage.mozaws.net
 
 .PHONY: build test bench
 
@@ -6,6 +6,7 @@ SERVER_URL = https://token.dev.lcip.org
 build:
 	virtualenv --no-site-packages .
 	./bin/pip install gevent
+	./bin/pip install pexpect
 	./bin/pip install https://github.com/mozilla-services/loads/archive/master.zip
 	./bin/pip install PyBrowserID
 	./bin/pip install hawkauthlib
