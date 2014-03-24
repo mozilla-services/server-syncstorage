@@ -24,6 +24,10 @@ import string
 import urllib
 import webtest
 
+from pyramid.interfaces import IAuthenticationPolicy
+
+import tokenlib
+
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.util import json_loads, json_dumps
@@ -1114,6 +1118,41 @@ class TestStorage(StorageFunctionalTestCase):
             self.assertTrue("payload" in res.json)
             self.assertFalse("payload_size" in res.json)
             self.assertFalse("ttl" in res.json)
+
+    def test_accessing_info_collections_with_an_expired_token(self):
+        # This can't be run against a live server because we
+        # have to forge an auth token to test things properly.
+        if self.distant:
+            raise unittest2.SkipTest
+
+        # Write some items while we've got a good token.
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
+        resp = self.app.post_json(self.root + "/storage/col1", bsos)
+        ts = float(resp.headers["X-Last-Modified"])
+
+        # Check that we can read the info correctly.
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(resp.json.keys(), ["col1"])
+        self.assertEquals(resp.json["col1"], ts)
+
+        # Forge an expired token to use for the test.
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        secret = auth_policy._get_token_secrets(self.host_url)[-1]
+        tm = tokenlib.TokenManager(secret=secret)
+        exp = time.time() - 60
+        data = {"uid": self.user_id, "node": self.host_url, "expires": exp}
+        self.auth_token = tm.make_token(data)
+        self.auth_secret = tm.get_derived_secret(self.auth_token)
+
+        # The expired token cannot be used for normal operations.
+        bsos = [{"id": str(i), "payload": "aaa"} for i in xrange(3)]
+        self.app.post_json(self.root + "/storage/col1", bsos, status=401)
+        self.app.get(self.root + "/storage/col1", status=401)
+
+        # But it still allows access to /info/collections.
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(resp.json.keys(), ["col1"])
+        self.assertEquals(resp.json["col1"], ts)
 
 
 class TestStorageMemcached(TestStorage):

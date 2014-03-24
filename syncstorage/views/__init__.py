@@ -51,6 +51,20 @@ def default_acl(request):
     return [(Allow, int(request.matchdict["userid"]), "owner")]
 
 
+def expired_token_acl(request):
+    """ACL allowing holders to expired token to still access the resource.
+
+    This is useful for allowing access to certain non-security-sensitive
+    APIs with less client burden.  It must be a function, not a method on
+    SyncStorageService, because cornice takes a copy of it when constructing
+    the pyramid view.
+    """
+    return [
+        (Allow, int(request.matchdict["userid"]), "owner"),
+        (Allow, "expired:%s" % (request.matchdict["userid"],), "owner")
+    ]
+
+
 class SyncStorageService(MetricsService):
     """Custom Service class to assist DRY in the SyncStorage project.
 
@@ -129,7 +143,8 @@ item = SyncStorageService(name="item",
                           path="/storage/{collection}/{item}")
 
 
-@info_timestamps.get(accept="application/json", renderer="sync-json")
+@info_timestamps.get(accept="application/json", renderer="sync-json",
+                     acl=expired_token_acl)
 def get_info_timestamps(request):
     storage = request.validated["storage"]
     timestamps = storage.get_collection_timestamps(request.validated["userid"])
@@ -294,5 +309,9 @@ def delete_item(request):
 
 
 def includeme(config):
-    config.scan("syncstorage.views")
+    # Commit the config to work around some conflicts raised by cornice,
+    # which also does a config.commit() during view processing.
+    config.commit()
+    config.include("syncstorage.views.authentication")
     config.include("syncstorage.views.renderers")
+    config.scan("syncstorage.views")

@@ -27,7 +27,7 @@ def extract_target_resource(request):
     and "item".
     """
     request.validated["storage"] = get_storage(request)
-    request.validated["userid"] = request.user["uid"]
+    request.validated["userid"] = int(request.matchdict["userid"])
     if "collection" in request.matchdict:
         request.validated["collection"] = request.matchdict["collection"]
     if "item" in request.matchdict:
