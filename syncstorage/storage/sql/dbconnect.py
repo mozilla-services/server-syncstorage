@@ -36,6 +36,7 @@ from sqlalchemy.exc import (DBAPIError, OperationalError,
                             TimeoutError, IntegrityError)
 from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
+from sqlalchemy.dialects import postgresql
 
 from mozsvc.exceptions import BackendError
 
@@ -104,7 +105,7 @@ def _get_bso_columns(table_name):
         Column("id", String(64), primary_key=True, autoincrement=False),
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
-        Column("payload", Text(length=256*1024), nullable=False,
+        Column("payload", Text(length=256*1024).with_variant(postgresql.TEXT(), 'postgresql'), nullable=False,
                server_default=""),
         Column("payload_size", Integer, nullable=False,
                server_default=sqltext("0")),
