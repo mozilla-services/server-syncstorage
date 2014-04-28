@@ -1,0 +1,4 @@
+The following authors have contributed to this project, and agree to license
+their contributions under the MPLv2.0:
+
+* Ryan Kelly <rfkelly@mozilla.com>
