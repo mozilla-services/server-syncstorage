@@ -124,7 +124,7 @@ class TestPurgeTTLScript(StorageTestCase):
 
         storage.set_item(1, "col", "test1", {"payload": "X", "ttl": 0})
         storage.set_item(1, "col", "test2", {"payload": "X", "ttl": 0})
-        storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 10})
+        storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 30})
         self.assertEquals(count_items(), 3)
 
         time.sleep(1)
@@ -134,7 +134,7 @@ class TestPurgeTTLScript(StorageTestCase):
         proc = spawn_script("purgettl.py",
                             "--oneshot",
                             "--backend-interval=0",
-                            "--grace-period=10",
+                            "--grace-period=30",
                             ini_file)
         assert proc.wait() == 0
         self.assertEquals(count_items(), 3)
