@@ -505,7 +505,7 @@ class SQLStorage(SyncStorage):
         })
         if rowcount == 0:
             raise ItemNotFoundError
-        return self._touch_collection(session, userid, collection)
+        return self._touch_collection(session, userid, collectionid)
 
     #
     # Administrative/maintenance methods.

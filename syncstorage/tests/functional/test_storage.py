@@ -458,6 +458,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
+        ts = float(res.headers['X-Last-Modified'])
 
         # deleting item 13
         self.app.delete(self.root + '/storage/col2/13')
@@ -466,6 +467,10 @@ class TestStorage(StorageFunctionalTestCase):
 
         # unexisting item should return a 404
         self.app.delete(self.root + '/storage/col2/12982', status=404)
+
+        # The collection should get an updated timestsamp.
+        res = self.app.get(self.root + '/info/collections')
+        self.assertTrue(ts < float(res.headers['X-Last-Modified']))
 
     def test_delete_storage(self):
         # creating a collection of three
