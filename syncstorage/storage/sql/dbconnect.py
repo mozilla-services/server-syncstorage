@@ -58,6 +58,15 @@ MAX_TTL = 2100000000
 metadata = MetaData()
 
 
+class Table(Table):
+    """Custom Table class that sets some sensible default options."""
+
+    def __new__(cls, *args, **kwds):
+        kwds.setdefault("mysql_engine", "InnoDB")
+        kwds.setdefault("mysql_charset", "latin1")
+        return super(Table, cls).__new__(cls, *args, **kwds)
+
+
 # Table mapping collection_name => collection_id.
 #
 # This table holds the names and corresponding ids of the collections in
