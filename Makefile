@@ -6,7 +6,12 @@ PIP = local/bin/pip
 PIP_CACHE = /tmp/pip-cache.${USER}
 BUILD_TMP = /tmp/syncstorage-build.${USER}
 PYPI = https://pypi.python.org/simple
-INSTALL = $(PIP) install -U -i $(PYPI)
+
+# Hackety-hack around OSX system python bustage.
+# The need for this should go away with a future osx/xcode update.
+ARCHFLAGS = -Wno-error=unused-command-line-argument-hard-error-in-future
+
+INSTALL = ARCHFLAGS=$(ARCHFLAGS) $(PIP) install -U -i $(PYPI)
 
 .PHONY: all build test
 
