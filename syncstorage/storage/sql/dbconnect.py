@@ -105,6 +105,10 @@ user_collections = Table(
 # It is used to create either sharded or non-shareded BSO storage tables,
 # depending on the run-time settings of the application.
 
+PAYLOAD_TYPE = Text(length=256*1024)
+PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
+
+
 def _get_bso_columns(table_name):
     return (
         Column("userid", Integer, primary_key=True, nullable=False,
@@ -114,8 +118,7 @@ def _get_bso_columns(table_name):
         Column("id", String(64), primary_key=True, autoincrement=False),
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
-        Column("payload", Text(length=256*1024).with_variant(postgresql.TEXT(), 'postgresql'), nullable=False,
-               server_default=""),
+        Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
         Column("payload_size", Integer, nullable=False,
                server_default=sqltext("0")),
         Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
