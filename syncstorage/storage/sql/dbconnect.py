@@ -42,6 +42,7 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage.storage.sql import (queries_generic,
                                      queries_sqlite,
+                                     queries_postgres,
                                      queries_mysql)
 
 
@@ -236,6 +237,8 @@ class DBConnector(object):
         self.driver = parsed_sqluri.scheme.lower()
         if "mysql" in self.driver:
             self.driver = "mysql"
+        elif "postgres" in self.driver:
+            self.driver = "postgres"
 
         if self.driver not in ("mysql", "sqlite"):
             msg = "Only MySQL and SQLite databases are officially supported"
@@ -304,6 +307,8 @@ class DBConnector(object):
             query_modules.append(queries_sqlite)
         elif self.driver == "mysql":
             query_modules.append(queries_mysql)
+        elif self.driver == "postgres":
+            query_modules.append(queries_postgres)
         for queries in query_modules:
             for nm in dir(queries):
                 if nm.isupper():
