@@ -2,7 +2,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from pyramid.request import Request
+from pyramid.security import IAuthenticationPolicy
+import hawkauthlib
+
 from webtest import TestApp
+import testfixtures
 
 from syncstorage.storage import get_storage
 from syncstorage.tests.support import StorageTestCase
@@ -33,3 +38,30 @@ class TestWSGIApp(StorageTestCase):
         app = TestApp(self.config.make_wsgi_app())
         r = app.get("/")
         self.assertTrue("It Works!" in r.body)
+
+    def test_metrics_capture(self):
+        app = TestApp(self.config.make_wsgi_app())
+
+        # Monkey-patch the app to make legitimate hawk-signed requests.
+        user_id = 42
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        req = Request.blank("http://localhost/")
+        auth_token, auth_secret = auth_policy.encode_hawk_id(req, user_id)
+
+        def new_do_request(req, *args, **kwds):
+            hawkauthlib.sign_request(req, auth_token, auth_secret)
+            return orig_do_request(req, *args, **kwds)
+
+        orig_do_request = app.do_request
+        app.do_request = new_do_request
+
+        # Make a request that hits the database, capturing its logs.
+        with testfixtures.LogCapture() as logs:
+            app.get("/1.5/42/info/collections")
+
+        # DB usage metrics should have been generated in a log message.
+        for r in logs.records:
+            if "syncstorage.storage.sql.db.execute" in r.__dict__:
+                break
+        else:
+            assert False, "metrics were not collected"

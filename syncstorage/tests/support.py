@@ -10,8 +10,6 @@ import functools
 import sqlalchemy.event
 from sqlalchemy.engine.base import Engine
 
-from metlog.decorators.base import MetlogDecorator
-from mozsvc.metrics import load_metlog_client
 from mozsvc.tests.support import TestCase
 
 
@@ -74,9 +72,6 @@ class StorageTestCase(TestCase):
     def tearDown(self):
         self._cleanup_test_databases()
 
-        # restore MetlogDecorator's `client` property
-        MetlogDecorator.client = self.orig_client
-
         # clear the pyramid threadlocals
         self.config.end()
         super(StorageTestCase, self).tearDown()
@@ -84,13 +79,6 @@ class StorageTestCase(TestCase):
 
     def get_configurator(self):
         config = super(StorageTestCase, self).get_configurator()
-        self.metlog = load_metlog_client(config)
-
-        # override MetlogDecorator's `client` property
-        self.orig_client = MetlogDecorator.client
-        MetlogDecorator.client = self.metlog
-
-        config.registry['metlog'] = self.metlog
         config.include("syncstorage")
         return config
 

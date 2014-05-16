@@ -21,12 +21,11 @@ import os
 import re
 import sys
 import copy
+import logging
 import urlparse
 import traceback
 import functools
 from collections import defaultdict
-
-from pyramid.threadlocal import get_current_registry
 
 from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
@@ -38,12 +37,15 @@ from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
 from sqlalchemy.dialects import postgresql
 
+from mozsvc.metrics import metrics_timer
 from mozsvc.exceptions import BackendError
 
 from syncstorage.storage.sql import (queries_generic,
                                      queries_sqlite,
                                      queries_mysql)
 
+
+logger = logging.getLogger("syncstorage.storage.sql")
 
 # Regex to match safe database field/column names.
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")
@@ -210,6 +212,10 @@ class QueuePoolWithMaxBacklog(QueuePool):
                                               self._pool.max_backlog)
         return new_self
 
+    @metrics_timer("syncstorage.storage.sql.pool.get")
+    def _do_get(self):
+        return QueuePool._do_get(self)
+
 
 class DBConnector(object):
     """Database connector class for SQL access layer.
@@ -239,7 +245,7 @@ class DBConnector(object):
 
         if self.driver not in ("mysql", "sqlite"):
             msg = "Only MySQL and SQLite databases are officially supported"
-            self.logger.warn(msg)
+            logger.warn(msg)
 
         self.shard = shard
         self.shardsize = shardsize
@@ -314,10 +320,6 @@ class DBConnector(object):
         # so that the resulting string is compatible with sqltext().
         self._render_query_dialect = copy.copy(self.engine.dialect)
         self._render_query_dialect.paramstyle = "named"
-
-    @property
-    def logger(self):
-        return get_current_registry()["metlog"]
 
     def connect(self, *args, **kwds):
         """Create a new DBConnection object from this connector."""
@@ -426,7 +428,7 @@ def report_backend_errors(func):
             # Note that this will not not logic errors such as IntegrityError,
             # only unexpected operational errors from the database.
             err = traceback.format_exc()
-            self.logger.error(err)
+            logger.error(err)
             raise BackendError(str(exc))
     return report_backend_errors_wrapper
 
@@ -448,10 +450,6 @@ class DBConnection(object):
         self._connector = connector
         self._connection = None
         self._transaction = None
-
-    @property
-    def logger(self):
-        return self._connector.logger
 
     def __enter__(self):
         return self
@@ -537,6 +535,7 @@ class DBConnection(object):
                 self._connection = connection
                 self._transaction = transaction
 
+    @metrics_timer("syncstorage.storage.sql.db.execute")
     def _exec_with_cleanup(self, connection, query_str, **params):
         """Execution wrapper that kills queries if it is interrupted.
 
@@ -555,12 +554,12 @@ class DBConnection(object):
         except BaseException:
             # Control-flow exceptions trigger the cleanup logic.
             exc, val, tb = sys.exc_info()
-            self.logger.debug("query was interrupted by %s", val)
+            logger.debug("query was interrupted by %s", val)
             # Only cleanup SELECT, INSERT or UPDATE statements.
             # There are concerns that rolling back DELETEs is too costly.
             if not SAFE_TO_KILL_QUERY.match(query_str):
                 msg = "  refusing to kill unsafe query: %s"
-                self.logger.debug(msg, query_str[:100])
+                logger.debug(msg, query_str[:100])
                 raise
             try:
                 # The KILL command is specific to MySQL, and this method of
@@ -568,7 +567,7 @@ class DBConnection(object):
                 # Other drivers will cause an AttributeError, failing through
                 # to the "finally" clause at the end of this block.
                 thread_id = connection.connection.server_thread_id[0]
-                self.logger.debug("  killing connection %d", thread_id)
+                logger.debug("  killing connection %d", thread_id)
                 cleanup_query = "KILL %d" % (thread_id,)
                 # Use a freshly-created connection so that we don't block
                 # waiting for something from the pool.  Unfortunately this
@@ -580,12 +579,12 @@ class DBConnection(object):
                         cleanup_cursor.execute(cleanup_query)
                     except Exception:
                         msg = "  failed to kill %d"
-                        self.logger.exception(msg, thread_id)
+                        logger.exception(msg, thread_id)
                         raise
                     finally:
                         cleanup_cursor.close()
                     msg = "  successfully killed %d"
-                    self.logger.debug(msg, thread_id)
+                    logger.debug(msg, thread_id)
                 finally:
                     cleanup_conn.close()
             finally:

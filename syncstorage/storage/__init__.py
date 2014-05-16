@@ -9,9 +9,12 @@ Abstract interface definition for storage backends.
 
 import sys
 import abc
+import logging
 
 from mozsvc.plugin import resolve_name
-from pyramid.threadlocal import get_current_registry
+
+
+logger = logging.getLogger("syncstorage.storage")
 
 
 class StorageError(Exception):
@@ -507,5 +510,4 @@ def _ignore_import_errors(name):
     """Venusian scan callback that will ignore any ImportError instances."""
     if not issubclass(sys.exc_info()[0], ImportError):
         raise
-    logger = get_current_registry()['metlog']
     logger.exception("Error while scanning package %r" % (name,))
