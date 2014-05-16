@@ -7,9 +7,9 @@ import os
 import re
 
 install_requires = ['SQLALchemy', 'unittest2', 'simplejson', 'pyramid',
-                    'mozsvc', 'cornice', 'pyramid_hawkauth', 'PyMySQL',
-                    'pymysql_sa', 'umemcache', 'metlog-py', 'wsgiproxy',
-                    'webtest', 'requests', 'PyBrowserID']
+                    'mozsvc>=0.8', 'cornice', 'pyramid_hawkauth', 'PyMySQL',
+                    'pymysql_sa', 'umemcache', 'wsgiproxy',
+                    'webtest', 'requests', 'PyBrowserID', 'testfixtures']
 
 entry_points = """
 [paste.app_factory]

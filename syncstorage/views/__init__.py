@@ -2,9 +2,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import logging
+
 from pyramid.security import Allow
 
-from mozsvc.metrics import MetricsService
+from cornice import Service
 
 from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.storage import ConflictError, NotFoundError
@@ -20,6 +22,8 @@ from syncstorage.views.decorators import (convert_storage_errors,
                                           check_precondition_headers,
                                           check_storage_quota)
 
+
+logger = logging.getLogger("syncstorage")
 
 DEFAULT_VALIDATORS = (
     extract_target_resource,
@@ -65,7 +69,7 @@ def expired_token_acl(request):
     ]
 
 
-class SyncStorageService(MetricsService):
+class SyncStorageService(Service):
     """Custom Service class to assist DRY in the SyncStorage project.
 
     This Service subclass provides useful defaults for SyncStorage service
@@ -112,8 +116,7 @@ class SyncStorageService(MetricsService):
 
 # We define a simple "It Works!" view at the site root, so that
 # it's easy to see if the service is correctly running.
-site_root = MetricsService(name="site_root",
-                           path="/")
+site_root = Service(name="site_root", path="/")
 
 
 @site_root.get()
@@ -242,8 +245,8 @@ def post_collection(request):
     except ConflictError:
         raise
     except Exception, e:
-        request.registry["metlog"].error('Could not set items')
-        request.registry["metlog"].error(str(e))
+        logger.error('Could not set items')
+        logger.error(str(e))
         for bso in bsos:
             res["failed"][bso["id"]] = "db error"
     else:

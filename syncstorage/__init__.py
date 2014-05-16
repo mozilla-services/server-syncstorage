@@ -3,13 +3,10 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import mozsvc.config
-import mozsvc.metrics
 
 
 def includeme(config):
     """Install SyncStorage application into the given Pyramid configurator."""
-    # Ensure that we have metlog loaded and ready for use as early as possible.
-    mozsvc.metrics.load_metlog_client(config)
     # Disable cornice default exception-handling views.
     config.registry.settings.setdefault("handle_exceptions", False)
     # Include dependencies from other packages.
@@ -25,8 +22,6 @@ def includeme(config):
 def get_configurator(global_config, **settings):
     """Load a SyncStorge configurator object from deployment settings."""
     config = mozsvc.config.get_configurator(global_config, **settings)
-    # Ensure that we have metlog loaded and ready for use as early as possible.
-    mozsvc.metrics.load_metlog_client(config)
     config.begin()
     try:
         config.include(includeme)

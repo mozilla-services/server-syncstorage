@@ -16,14 +16,13 @@ sharding of the BSO items into multiple tables named "bso0" through "bsoN".
 This behaviour is off by default; pass shard=True to enable it.
 """
 
+import logging
 import functools
 import threading
 import contextlib
 from collections import defaultdict
 
 from sqlalchemy.exc import IntegrityError
-
-from pyramid.threadlocal import get_current_registry
 
 from syncstorage.bso import BSO
 from syncstorage.util import get_timestamp
@@ -35,6 +34,9 @@ from syncstorage.storage import (SyncStorage,
 
 from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
                                                BackendError)
+
+
+logger = logging.getLogger("syncstorage.storage.sql")
 
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.
@@ -122,10 +124,6 @@ class SQLStorage(SyncStorage):
 
         # A thread-local to track active sessions.
         self._tldata = threading.local()
-
-    @property
-    def logger(self):
-        return get_current_registry()["metlog"]
 
     def _get_or_create_session(self):
         """Get an existing session if one exists, or start a new one if not."""
@@ -528,7 +526,7 @@ class SQLStorage(SyncStorage):
         total_affected = 0
         is_incomplete = False
         for table in sorted(tables):
-            self.logger.info("Purging expired items from %s", table)
+            logger.info("Purging expired items from %s", table)
             num_iters = 1
             num_affected = 0
             rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
@@ -538,11 +536,11 @@ class SQLStorage(SyncStorage):
             })
             while rowcount > 0:
                 num_affected += rowcount
-                self.logger.debug("After %d iterations, %s items purged",
-                                  num_iters, num_affected)
+                logger.debug("After %d iterations, %s items purged",
+                             num_iters, num_affected)
                 num_iters += 1
                 if num_iters > 100:
-                    self.logger.debug("Too many iterations, bailing out.")
+                    logger.debug("Too many iterations, bailing out.")
                     is_incomplete = True
                     break
                 rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
@@ -550,8 +548,8 @@ class SQLStorage(SyncStorage):
                     "grace": grace_period,
                     "maxitems": max_per_loop,
                 })
-            self.logger.info("Purged %d expired items from %s",
-                             num_affected, table)
+            logger.info("Purged %d expired items from %s",
+                        num_affected, table)
             total_affected += num_affected
         # Return the required data to the caller.
         # We use "is_incomplete" rather than "is_complete" in the code above
@@ -677,7 +675,7 @@ class SQLStorage(SyncStorage):
         if len(self._collections_by_name) > MAX_COLLECTIONS_CACHE_SIZE:
             msg = "More than %d collections have been created, "\
                   "refusing to cache them all"
-            self.logger.warn(msg % (MAX_COLLECTIONS_CACHE_SIZE,))
+            logger.warn(msg % (MAX_COLLECTIONS_CACHE_SIZE,))
         else:
             self._collections_by_name[collection] = collectionid
             self._collections_by_id[collectionid] = collection
