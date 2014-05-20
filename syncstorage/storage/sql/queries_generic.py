@@ -66,8 +66,12 @@ COLLECTION_NAME = "SELECT name FROM collections "\
 COLLECTION_NAMES = "SELECT collectionid, name FROM collections "\
                    "WHERE collectionid IN %(ids)s"
 
-INSERT_COLLECTION = "INSERT INTO collections (collectionid, name) "\
-                    "VALUES (:collectionid, :name)"
+# This adds a dummy collection at (:id - 1) so the next autoincr value is :id.
+SET_MIN_COLLECTION_ID = "INSERT INTO collections (collectionid, name) "\
+                        "VALUES (:collectionid - 1, \"\")"
+
+CREATE_COLLECTION = "INSERT INTO collections (name) "\
+                    "VALUES (:name)"
 
 INIT_COLLECTION = "INSERT INTO user_collections "\
                   "(userid, collection, last_modified) "\

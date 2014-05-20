@@ -51,6 +51,8 @@ def validate_database_query(conn, cursor, statement, *args):
         return
     if statement.startswith("DROP "):
         return
+    if " pg_class " in statement:
+        return
     if "queryName=" not in statement:
         assert False, "SQL query does not have a name: %s" % (statement,)
 
@@ -90,7 +92,7 @@ class StorageTestCase(TestCase):
                 continue
             while hasattr(storage, "storage"):
                 storage = storage.storage
-            if "mysql" in storage.sqluri:
+            if storage.dbconnector.driver in ("mysql", "postgres"):
                 with storage.dbconnector.connect() as c:
                     c.execute('DROP TABLE bso')
                     c.execute('DROP TABLE user_collections')

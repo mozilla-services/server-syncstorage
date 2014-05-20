@@ -102,17 +102,16 @@ class SQLStorage(SyncStorage):
         self.dbconnector = DBConnector(sqluri, **dbkwds)
 
         # There doesn't seem to be a reliable cross-database way to set the
-        # initial value of an autoincrement column.  Fake it by inserting
-        # a row into the table at the desired start id.
+        # initial value of an autoincrement column.
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
-            zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
             with self.dbconnector.connect() as connection:
-                params = {"collectionid": zeroth_id, "name": ""}
+                params = {"collectionid": FIRST_CUSTOM_COLLECTION_ID}
                 try:
-                    connection.query("INSERT_COLLECTION", params)
+                    connection.query("SET_MIN_COLLECTION_ID", params)
                 except IntegrityError:
-                    pass
+                    if self.dbconnector.driver == "postgres":
+                        raise
 
         # A local in-memory cache for the name => collectionid mapping.
         self._collections_by_name = {}
@@ -479,7 +478,8 @@ class SQLStorage(SyncStorage):
                 session.query("INIT_COLLECTION", params)
             except IntegrityError:
                 # Someone else inserted it at the same time.
-                pass
+                if self.dbconnector.driver == "postgres":
+                    raise
         return session.timestamp
 
     #
@@ -646,12 +646,12 @@ class SQLStorage(SyncStorage):
             # Insert it into the database.  This might raise a conflict
             # if it was inserted concurrently by someone else.
             try:
-                session.query("INSERT_COLLECTION", {
-                    "collectionid": None,
+                session.query("CREATE_COLLECTION", {
                     "name": collection,
                 })
             except IntegrityError:
-                pass
+                if self.dbconnector.driver == "postgres":
+                    raise
             # Read the id that was created concurrently.
             collectionid = self._get_collection_id(session, collection)
 

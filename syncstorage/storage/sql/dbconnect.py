@@ -31,8 +31,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
 from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update, text as sqltext
-from sqlalchemy.exc import (DBAPIError, OperationalError,
-                            TimeoutError, IntegrityError)
+from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
 from sqlalchemy.dialects import postgresql
@@ -42,6 +41,7 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage.storage.sql import (queries_generic,
                                      queries_sqlite,
+                                     queries_postgres,
                                      queries_mysql)
 
 
@@ -242,9 +242,11 @@ class DBConnector(object):
         self.driver = parsed_sqluri.scheme.lower()
         if "mysql" in self.driver:
             self.driver = "mysql"
+        elif "postgres" in self.driver:
+            self.driver = "postgres"
 
-        if self.driver not in ("mysql", "sqlite"):
-            msg = "Only MySQL and SQLite databases are officially supported"
+        if self.driver not in ("mysql", "sqlite", "postgres"):
+            msg = "your db driver is not officially supported"
             logger.warn(msg)
 
         self.shard = shard
@@ -310,6 +312,8 @@ class DBConnector(object):
             query_modules.append(queries_sqlite)
         elif self.driver == "mysql":
             query_modules.append(queries_mysql)
+        elif self.driver == "postgres":
+            query_modules.append(queries_postgres)
         for queries in query_modules:
             for nm in dir(queries):
                 if nm.isupper():
@@ -721,7 +725,7 @@ class DBConnection(object):
             return self._upsert_generic(table, items, defaults, annotations)
 
     def _upsert_generic(self, table, items, defaults, annotations):
-        """Upsert a batch of items one at a time, trying INSERT then UPDATE.
+        """Upsert a batch of items one at a time, trying UPDATE then INSERT.
 
         This is a tremendously inefficient way to write a batch of items,
         but it's guaranteed to work without special cooperation from the
@@ -731,29 +735,30 @@ class DBConnection(object):
         num_created = 0
         for item in items:
             assert item.get("userid") == userid
-            try:
-                # Try to insert the item.
-                # If it already exists, this fails with an integrity error.
+            # Try to update the item.
+            # Use the table's primary key fields in the WHERE clause,
+            # and put all other fields into the UPDATE clause.
+            # We have to do this first as the insert might cause a
+            # conflict and abort the enclosing transacrtion.
+            values = item.copy()
+            query = update(table)
+            for key in table.primary_key:
+                try:
+                    query = query.where(key == values.pop(key.name))
+                except KeyError:
+                    msg = "Item is missing primary key column %r"
+                    raise ValueError(msg % (key.name,))
+            query = query.values(**values)
+            res = self.execute(query, {}, annotations)
+            res.close()
+            # If the item wasnt there, insert it instead.
+            if res.rowcount == 0:
                 query = insert(table)
                 if defaults is not None:
                     query = query.values(**defaults)
                 query = query.values(**item)
                 self.execute(query, {}, annotations).close()
                 num_created += 1
-            except IntegrityError:
-                # Update the item.
-                # Use the table's primary key fields in the WHERE clause,
-                # and put all other fields into the UPDATE clause.
-                item = item.copy()
-                query = update(table)
-                for key in table.primary_key:
-                    try:
-                        query = query.where(key == item.pop(key.name))
-                    except KeyError:
-                        msg = "Item is missing primary key column %r"
-                        raise ValueError(msg % (key.name,))
-                query = query.values(**item)
-                self.execute(query, {}, annotations).close()
         return num_created
 
     def _upsert_onduplicatekey(self, table, items, defaults, annotations):
