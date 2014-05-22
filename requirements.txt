@@ -29,5 +29,5 @@ gevent==1.0
 gunicorn==18.0
 PybrowserID==0.9.1
 testfixtures==3.0.2
-https://github.com/mozilla-services/mozservices/archive/8747025622b772ff646aaa8ce691b78a5a78d7b8.zip
+https://github.com/mozilla-services/mozservices/archive/f279ef02a25755999eada2d7e722d56279ed9fa6.zip
 konfig==0.9
