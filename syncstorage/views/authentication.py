@@ -3,8 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import time
-
-from cef import log_cef, AUTH_FAILURE
+import logging
 
 import tokenlib
 import tokenlib.errors
@@ -12,6 +11,9 @@ import tokenlib.errors
 from zope.interface import implements
 from pyramid.interfaces import IAuthenticationPolicy
 from mozsvc.user import TokenServerAuthenticationPolicy
+
+
+logger = logging.getLogger("syncstorage")
 
 
 DEFAULT_EXPIRED_TOKEN_TIMEOUT = 60 * 60 * 2  # 2 hours, in seconds
@@ -81,9 +83,7 @@ class SyncStorageAuthenticationPolicy(TokenServerAuthenticationPolicy):
                 break
         else:
             # The token failed to validate using any secret.
-            log_cef("Authentication Failed: invalid hawk id", 5,
-                    request.environ, request.registry.settings,
-                    "", signature=AUTH_FAILURE)
+            logger.warn("Authentication Failed: invalid hawk id")
             raise ValueError("invalid Hawk id")
         # Sanity-check the contained data.
         # Any errors raise ValueError, triggering auth failure.
