@@ -2,5 +2,7 @@ The following authors have contributed to this project, and agree to license
 their contributions under the MPLv2.0:
 
 * Ryan Kelly <rfkelly@mozilla.com>
+* Toby Elliott <telliott@mozilla.com>
+* Tarek Ziadé <tarek@mozilla.com>
 * Nicolas Steinmetz <nsteinmetz@gmail.com>
 
