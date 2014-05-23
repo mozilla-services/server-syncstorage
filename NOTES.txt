@@ -1,0 +1,45 @@
+
+We want 100K users on a single machine, each with their own little sqlite db to hold their sync data.
+We want no more than 500 entries in a single directory.
+Let's split by of digits of userid, like this:
+
+    1/23/45678.db
+
+The top level gives a 10-way split and you can use e.g. symlinks to shard them
+across different filesystems.  The second level gives a 100-way split and takes
+us down to ~100 dbs per individual directory.
+
+
+----
+<mostlygeek> rfkelly: well using a sqlite/user would get rid of your randomly seeking all over the f'ing place issue :)
+<mostlygeek> though i wonder if you could pre-allocate them to start at 1MB and then they can just grow... hmm.
+<rfkelly> indeed :-)
+<mostlygeek> rfkelly: oh i pinged you to let you know that i've been running a "INSERT INTO myarchive_table SELECT ..no payload.. from bso"
+<mostlygeek> it's been running for like 4 hours :b
+<rfkelly> lol
+<mostlygeek> server can't seem to get about 5MB / sec read
+<mostlygeek> it's not writing much to the disk since archive is compressed... 
+<mostlygeek> cpu is at like 0% :b
+<mostlygeek> whoever i'm sharing the server w/ is prob not happy
+<mostlygeek> rfkelly: i like the idea of a sqlite test :) 
+<mostlygeek> since we'll probably move a lot of users to hardware eventually
+<mostlygeek> doesn't get cheaper than hardware for us :b
+<rfkelly> yep; well I'll see what I can come up with then :-)
+<mostlygeek> rfkelly: could you split up the files 
+<mostlygeek> so we have about 500/directory
+<rfkelly> yep, standard leading-digits-of-userid directory structure
+<rfkelly> how many users do you want to handle in total?
+<mostlygeek> let's target 100K/machine
+<mostlygeek> so 100K split up 2K directories? 
+<mostlygeek> seems pretty easy
+<rfkelly> *nod*
+<rfkelly> hmm, so one potential thorn here is that sqlite doesn't play nicely with gevent...may have to fiddle with a few deployment details there
+<mostlygeek> ok
+<mostlygeek> um, it'd be nice if we could give multiple base directories
+<mostlygeek> cause rfkelly we usually have multiple disks / machine
+<rfkelly> that's what symlinks are for ;-)
+<mostlygeek> ahhh 
+<mostlygeek> ok well i guess that's good enough for me haha
+<mostlygeek> so /data/[0-3] => disk1, /data/[4-7] => disk2 ... 
+<mostlygeek> that would make life easier 
+<rfkelly> *nod*
