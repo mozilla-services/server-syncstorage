@@ -1290,10 +1290,16 @@ class TestStorageMemcached(TestStorage):
                         storage.cache = storage.cache.cache
 
 
+class TestStoragePaginated(TestStorage):
+    """Storage testcases run using lots of internal pagination."""
+
+    TEST_INI_FILE = "tests-paginated.ini"
+
+
 class TestStorageMemcachedWriteThrough(TestStorageMemcached):
     """Storage testcases run against the memcached backend, if available.
 
-    These tests are configred to use the write-through cache for all the
+    These tests are configured to use the write-through cache for all the
     test-related collections.
     """
 
@@ -1303,7 +1309,7 @@ class TestStorageMemcachedWriteThrough(TestStorageMemcached):
 class TestStorageMemcachedCacheOnly(TestStorageMemcached):
     """Storage testcases run against the memcached backend, if available.
 
-    These tests are configred to use the cache-only-collection behaviour
+    These tests are configured to use the cache-only-collection behaviour
     for all the test-related collections.
     """
 
