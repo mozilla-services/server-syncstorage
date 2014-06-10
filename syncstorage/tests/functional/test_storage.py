@@ -970,17 +970,17 @@ class TestStorage(StorageFunctionalTestCase):
             self.app.get(self.root + view, headers=headers, status=304)
         # XXX TODO: the storage-level timestamp is not tracked correctly
         # after deleting a collection, so this test fails for now.
-        ## Delete a collection.
-        #r = self.app.delete(self.root + "/storage/col2")
-        #ts3 = r.headers["X-Last-Modified"]
-        ## Using the previous timestamp should read the updated data.
-        #headers = {"X-If-Modified-Since": str(ts2)}
-        #for view in INFO_VIEWS:
-        #    self.app.get(self.root + view, headers=headers, status=200)
-        ## Using the new timestamp should produce 304s.
-        #headers = {"X-If-Modified-Since": str(ts3)}
-        #for view in INFO_VIEWS:
-        #    self.app.get(self.root + view, headers=headers, status=304)
+        # # Delete a collection.
+        # r = self.app.delete(self.root + "/storage/col2")
+        # ts3 = r.headers["X-Last-Modified"]
+        # # Using the previous timestamp should read the updated data.
+        # headers = {"X-If-Modified-Since": str(ts2)}
+        # for view in INFO_VIEWS:
+        #     self.app.get(self.root + view, headers=headers, status=200)
+        # # Using the new timestamp should produce 304s.
+        # headers = {"X-If-Modified-Since": str(ts3)}
+        # for view in INFO_VIEWS:
+        #     self.app.get(self.root + view, headers=headers, status=304)
 
     def test_that_x_last_modified_is_sent_for_all_get_requests(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]

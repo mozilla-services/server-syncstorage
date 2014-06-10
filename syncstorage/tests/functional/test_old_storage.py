@@ -334,7 +334,7 @@ class TestOldStorage(StorageFunctionalTestCase):
         self.assertEquals(res.json["payload"], _PLD)
 
         # deleting all with no confirmation
-        #self.app.delete(self.root + '/storage', status=400)
+        # self.app.delete(self.root + '/storage', status=400)
 
         # deleting all for real now
         res = self.app.delete(self.root + '/storage',
@@ -594,11 +594,11 @@ class TestOldStorage(StorageFunctionalTestCase):
         # Batch upload a list with something that's not a WBO
         # It should process the good entry and fail for the bad.
         # XXX TODO: in sync1.5 we just fail the whole request
-        #wbos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
-        #res = self.app.post_json(self.root + '/storage/col2', wbos)
-        #res = res.json
-        #self.assertEquals(len(res['success']), 1)
-        #self.assertEquals(len(res['failed']), 1)
+        # wbos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
+        # res = self.app.post_json(self.root + '/storage/col2', wbos)
+        # res = res.json
+        # self.assertEquals(len(res['success']), 1)
+        # self.assertEquals(len(res['failed']), 1)
 
     def test_that_put_reports_consistent_timestamps(self):
         # This checks for the behaviour reported in Bug 739519, where

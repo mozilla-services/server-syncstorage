@@ -56,7 +56,7 @@ class TestBSO(unittest2.TestCase):
             result, failure = bso.validate()
             # XXX TODO: ttls that are too large are currently ignored.
             # See https://bugzilla.mozilla.org/show_bug.cgi?id=977397
-            #self.assertFalse(result)
+            # self.assertFalse(result)
             if bad_ttl != 31537000:
                 self.assertFalse(result)
             else:
