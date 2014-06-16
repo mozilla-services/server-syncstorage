@@ -314,7 +314,9 @@ class SQLStorage(SyncStorage):
     @with_session
     def get_item_ids(self, session, userid, collection, **params):
         """Returns item ids from a collection."""
-        params["fields"] = ["id"]
+        # Select only the fields we need, including those that might
+        # be used for limit/offset pagination.
+        params["fields"] = ["id", "modified", "sortindex"]
         res = self._find_items(session, userid, collection, **params)
         res["items"] = [item["id"] for item in res["items"]]
         return res
@@ -332,12 +334,9 @@ class SQLStorage(SyncStorage):
         limit = params.get("limit")
         if limit is not None:
             params["limit"] = limit + 1
-        offset = params.get("offset")
+        offset = params.pop("offset", None)
         if offset is not None:
-            try:
-                params["offset"] = offset = int(offset)
-            except ValueError:
-                raise InvalidOffsetError(offset)
+            self.decode_offset(params, offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
         items = [self._row_to_bso(row) for row in rows]
         # If the query returned no results, we don't know whether that's
@@ -348,8 +347,8 @@ class SQLStorage(SyncStorage):
         # Check if we read past the original limit, set next_offset if so.
         next_offset = None
         if limit is not None and len(items) > limit:
-            next_offset = (offset or 0) + limit
             items = items[:-1]
+            next_offset = self.encode_next_offset(params, items)
         return {
             "items": items,
             "next_offset": next_offset,
@@ -364,6 +363,65 @@ class SQLStorage(SyncStorage):
         if ts is not None:
             item["modified"] = bigint2ts(ts)
         return BSO(item)
+
+    def encode_next_offset(self, params, items):
+        """Encode an "offset token" for resuming query at the given item.
+
+        When sorting by timestamp, we can be more efficient than using a simple
+        numeric offset.  We figure out an upper-bound on the timestamp and use
+        that to exclude previously-seen results, then do a smaller numeric
+        offset relative to that position.  The result is a pair of integers
+        encoded as "bound:offset".  Since we limit the number of items that
+        can have the same timestamp, this provides fairly good pagination
+        granularity.
+
+        When sorting by sortindex, we cannot use an index anyway, and we have
+        no bound on the number of items that might share a single sortindex.
+        There's therefore not much to be gained by trying to be clever, and
+        we just use a simple numeric offset.
+        """
+        # Use a simple numeric offset for sortindex ordering.
+        if params.get("sort", None) == "index":
+            return str(params.get("offset", 0) + len(items))
+        # Find an appropriate upper bound for faster timestamp ordering.
+        bound = items[-1]["modified"]
+        bound_as_bigint = ts2bigint(bound)
+        # Count how many previous items have that same timestamp, and hence
+        # will need to be skipped over.  The number of matches here is limited
+        # by upload batch size, so no danger of long-running iteration.
+        offset = 1
+        i = len(items) - 2
+        while i >= 0 and items[i]["modified"] == bound:
+            offset += 1
+            i -= 1
+        # All items have the same timestamp, we may also need to skip some
+        # items from the previous batch.  This should only occur with a very
+        # small "limit" parameter, e.g. during testing.
+        if i < 0:
+            prev_bound = params.get("older", None)
+            if prev_bound == bound_as_bigint:
+                offset += params["offset"]
+        # Encode them as a simple pair of integers.
+        return "%d:%d" % (bound_as_bigint, offset)
+
+    def decode_offset(self, params, offset):
+        """Decode an "offset token" into appropriate query parameters.
+
+        This essentially decodes the result of encode_offset(), adjusting the
+        query parameters so that we can efficiently seek to the next available
+        item based on the previous query.
+        """
+        try:
+            if params.get("sort", None) == "index":
+                # When sorting by sortindex, it's just a numeric offset.
+                params["offset"] = int(offset)
+            else:
+                # When sorting by timestamp, it's a (bound, offset) pair.
+                bound, offset = offset.split(":", 1)
+                params["older"] = int(bound)
+                params["offset"] = int(offset)
+        except ValueError:
+            raise InvalidOffsetError(offset)
 
     @with_session
     def set_items(self, session, userid, collection, items):

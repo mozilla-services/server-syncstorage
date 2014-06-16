@@ -196,6 +196,47 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
+        # "offset" again, this time ordering by timestamp.
+        query_url = self.root + '/storage/col2?sort=newest'
+        res = self.app.get(query_url)
+        all_items = res.json
+        self.assertEquals(len(all_items), 10)
+
+        res = self.app.get(query_url + '&limit=2')
+        self.assertEquals(res.json, all_items[:2])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[2:5])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[5:])
+        self.assertTrue("X-Weave-Next-Offset" not in res.headers)
+
+        res = self.app.get(query_url + '&limit=10000&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[5:])
+
+        # "offset" once more, this time with no explicit ordering
+        query_url = self.root + '/storage/col2?'
+        res = self.app.get(query_url)
+        all_items = res.json
+        self.assertEquals(len(all_items), 10)
+
+        res = self.app.get(query_url + '&limit=2')
+        self.assertEquals(res.json, all_items[:2])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[2:5])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[5:])
+        self.assertTrue("X-Weave-Next-Offset" not in res.headers)
+
+        res = self.app.get(query_url + '&limit=10000&offset=' + next_offset)
+
         # "sort"
         #   'newest' - Orders by timestamp number (newest first)
         #   'index' - Orders by the sortindex descending (highest weight first)

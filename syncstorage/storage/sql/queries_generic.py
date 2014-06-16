@@ -96,7 +96,7 @@ def FIND_ITEMS(bso, params):
     as a simple string.  We need to include/exclude various WHERE clauses
     based on the values provided at runtime.
     """
-    fields = params.pop("fields", None)
+    fields = params.get("fields", None)
     if fields is None:
         query = select([bso])
     else:
@@ -106,28 +106,29 @@ def FIND_ITEMS(bso, params):
     # Filter by the various query parameters.
     if "ids" in params:
         # Sadly, we can't use a bindparam in an "IN" expression.
-        query = query.where(bso.c.id.in_(params.pop("ids")))
+        query = query.where(bso.c.id.in_(params.get("ids")))
     if "newer" in params:
         query = query.where(bso.c.modified > bindparam("newer"))
+    if "older" in params:
+        query = query.where(bso.c.modified <= bindparam("older"))
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work consistently.
     # The default order is by timestamp, which if efficient due to the index.
-    # NOTE: ideally we would sort by "id" here as secondary column, to be sure
-    # that we produce a consistent order.  But we don't want to bloat the size
-    # of the index, so for now we  hope that the DB is smart enough to return
-    # things in a consistent-enough order.
-    sort = params.pop("sort", None)
+    # NOTE: ideally we would sort by "id" here as secondary column, to get a
+    # consistent total ordering.  But we don't want to bloat the index, so
+    # we just assume that the db gives results in a consistent order.
+    sort = params.get("sort", None)
     if sort == 'index':
         query = query.order_by(bso.c.sortindex.desc())
     else:
         query = query.order_by(bso.c.modified.desc())
     # Apply limit and/or offset.
-    limit = params.pop("limit", None)
+    limit = params.get("limit", None)
     if limit is not None:
         query = query.limit(limit)
-    offset = params.pop("offset", None)
+    offset = params.get("offset", None)
     if offset is not None:
         query = query.offset(offset)
     return query
