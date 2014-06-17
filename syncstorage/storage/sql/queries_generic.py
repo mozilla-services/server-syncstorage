@@ -112,14 +112,17 @@ def FIND_ITEMS(bso, params):
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
-    # We always sort by *something*, so that limit/offset work correctly.
+    # We always sort by *something*, so that limit/offset work consistently.
     # The default order is by timestamp, which if efficient due to the index.
-    # Using the id as a secondary key produces a unique ordering.
+    # NOTE: ideally we would sort by "id" here as secondary column, to be sure
+    # that we produce a consistent order.  But we don't want to bloat the size
+    # of the index, so for now we  hope that the DB is smart enough to return
+    # things in a consistent-enough order.
     sort = params.pop("sort", None)
     if sort == 'index':
-        query = query.order_by(bso.c.sortindex.desc(), bso.c.id.desc())
+        query = query.order_by(bso.c.sortindex.desc())
     else:
-        query = query.order_by(bso.c.modified.desc(), bso.c.id.desc())
+        query = query.order_by(bso.c.modified.desc())
     # Apply limit and/or offset.
     limit = params.pop("limit", None)
     if limit is not None:
