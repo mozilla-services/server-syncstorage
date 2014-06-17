@@ -225,7 +225,11 @@ class StressTest(TestCase):
         if url.fragment:
             endpoint = url._replace(fragment="", path="/1.5/" + str(uid))
             self.endpoint_url = urlunparse(endpoint)
-            data = {"uid": uid, "node": urlunparse(url._replace(fragment=""))}
+            data = {
+                "uid": uid,
+                "node": urlunparse(url._replace(fragment="")),
+                "expires": time.time() + ASSERTION_LIFETIME,
+            }
             self.auth_token = tokenlib.make_token(data, secret=url.fragment)
             self.auth_secret = tokenlib.get_derived_secret(self.auth_token,
                                                            secret=url.fragment)
