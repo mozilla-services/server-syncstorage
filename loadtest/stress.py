@@ -63,14 +63,13 @@ clients_distribution = [80, 15, 4, 1]
 collections = ['bookmarks', 'forms', 'passwords', 'history', 'prefs']
 
 # The distribution of GET operations to meta/global per test run.
-# 40% will do 0 GETs, 60% will do 1 GET, etc...
 metaglobal_count_distribution = [40, 60, 0, 0, 0]
 
 # The distribution of GET operations per test run.
 get_count_distribution = [71, 15, 7, 4, 3]
 
 # The distribution of POST operations per test run.
-post_count_distribution = [0, 0, 67, 18, 9, 4, 2]
+post_count_distribution = [0, 0, 0, 0, 0, 0, 67, 18, 9, 4, 2]
 
 # The distribution of DELETE operations per test run.
 delete_count_distribution = [99, 1, 0, 0, 0]
