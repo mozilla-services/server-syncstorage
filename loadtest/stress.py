@@ -67,20 +67,17 @@ collections = ['bookmarks', 'forms', 'passwords', 'history', 'prefs']
 metaglobal_count_distribution = [40, 60, 0, 0, 0]
 
 # The distribution of GET operations per test run.
-# 71% will do 0 GETs, 15% will do 1 GET, etc...
 get_count_distribution = [71, 15, 7, 4, 3]
 
 # The distribution of POST operations per test run.
-# 67% will do 0 POSTs, 18% will do 1 POST, etc...
-post_count_distribution = [67, 18, 9, 4, 2]
+post_count_distribution = [0, 0, 67, 18, 9, 4, 2]
 
 # The distribution of DELETE operations per test run.
-# 99% will do 0 DELETEs, 1% will do 1 DELETE, etc...
 delete_count_distribution = [99, 1, 0, 0, 0]
 
 # The probability that we'll try to do a full DELETE of all data.
 # Expressed as a float between 0 and 1.
-deleteall_probability = 1 / 100.
+deleteall_probability = 10 / 100.
 
 
 class HawkAuth(requests.auth.AuthBase):
@@ -167,7 +164,7 @@ class StressTest(TestCase):
         num_requests = self._pick_weighted_count(get_count_distribution)
         cols = random.sample(collections, num_requests)
         for x in range(num_requests):
-            url = self.endpoint_url + "/storage/" + cols[x]
+            url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
             response = self.session.get(url, params=params, **reqkwds)
@@ -177,7 +174,7 @@ class StressTest(TestCase):
         num_requests = self._pick_weighted_count(post_count_distribution)
         cols = random.sample(collections, num_requests)
         for x in range(num_requests):
-            url = self.endpoint_url + "/storage/" + cols[x]
+            url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
             data = []
             # Random batch size, but capped at 100 so we skew towards that.
             items_per_batch = min(random.randint(20, 180), 100)
@@ -207,7 +204,7 @@ class StressTest(TestCase):
         if num_requests:
             cols = random.sample(collections, num_requests)
             for x in range(num_requests):
-                url = self.endpoint_url + "/storage/" + cols[x]
+                url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
                 response = self.session.delete(url, **reqkwds)
                 self.assertTrue(response.status_code in (200, 204))
         else:
