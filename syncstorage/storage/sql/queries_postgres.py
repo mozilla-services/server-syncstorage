@@ -53,3 +53,8 @@ END IF;
 END;
 $do$;
 """.strip()
+
+
+PURGE_SOME_EXPIRED_ITEMS = \
+    "DELETE FROM %(bso)s "\
+    "WHERE ttl < (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) - :grace)"
