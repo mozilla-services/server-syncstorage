@@ -161,7 +161,7 @@ class StressTest(TestCase):
 
         # GET requests to individual collections.
         num_requests = self._pick_weighted_count(get_count_distribution)
-        cols = random.sample(collections, num_requests)
+        cols = random.sample(collections * num_requests, num_requests)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
             newer = int(time.time() - random.randint(3600, 360000))
@@ -171,7 +171,7 @@ class StressTest(TestCase):
 
         # PUT requests with several WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
-        cols = random.sample(collections, num_requests)
+        cols = random.sample(collections * num_requests, num_requests)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
             data = []
@@ -201,7 +201,7 @@ class StressTest(TestCase):
         # a full reset and delete all the data.  Never both in the same run.
         num_requests = self._pick_weighted_count(delete_count_distribution)
         if num_requests:
-            cols = random.sample(collections, num_requests)
+            cols = random.sample(collections * num_requests, num_requests)
             for x in range(num_requests):
                 url = self.endpoint_url + "/storage/" + cols[x % len(cols)]
                 response = self.session.delete(url, **reqkwds)
