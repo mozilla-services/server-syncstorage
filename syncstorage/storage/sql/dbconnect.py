@@ -429,8 +429,9 @@ def report_backend_errors(func):
                 raise
             # An unexpected database-level error.
             # Log the error, then normalize it into a BackendError instance.
-            # Note that this will not not logic errors such as IntegrityError,
-            # only unexpected operational errors from the database.
+            # Note that this will not catch logic errors such as e.g. an
+            # IntegrityError, only unexpected operational errors from the
+            # database such as e.g. disconnects and timeouts.
             err = traceback.format_exc()
             logger.error(err)
             raise BackendError(str(exc))
