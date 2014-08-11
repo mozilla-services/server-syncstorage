@@ -388,8 +388,10 @@ def is_retryable_db_error(engine, exc):
     except AttributeError:
         pass
     else:
-        # MySQL Lock Wait Timeout errors can be safely retried.
-        if mysql_error_code == 1205:
+        # The following MySQL lock-related errors can be safely retried:
+        #    1205: lock wait timeout exceeded
+        #    1213: deadlock found when trying to get lock
+        if mysql_error_code in (1205, 1213):
             return True
     # Any other error is assumed not to be retryable.  Better safe than sorry.
     return False
@@ -433,6 +435,7 @@ def report_backend_errors(func):
             # IntegrityError, only unexpected operational errors from the
             # database such as e.g. disconnects and timeouts.
             err = traceback.format_exc()
+            err = "Caught operational db error: %s\n%s" % (exc, err)
             logger.error(err)
             raise BackendError(str(exc))
     return report_backend_errors_wrapper

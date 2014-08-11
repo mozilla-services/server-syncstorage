@@ -59,6 +59,26 @@ def bigint2ts(bigint):
     return get_timestamp(bigint / 1000.0)
 
 
+def convert_db_errors(func):
+    """Method decorator to convert db errors into app-level errors.
+
+    This is a convenience wrapper to convert some database-level error messages
+    into corresponding app-level errors.  Currently it implements only a single
+    mapping, from lock-related db errors to a ConflictError instance.
+    """
+    @functools.wraps(func)
+    def convert_db_errors_wrapper(*args, **kwds):
+        try:
+            return func(*args, **kwds)
+        except BackendError, e:
+            # There is no standard exception to detect lock-wait timeouts,
+            # so we report any operational db error that has "lock" in it.
+            if "lock" in str(e).lower():
+                raise ConflictError
+            raise
+    return convert_db_errors_wrapper
+
+
 def with_session(func):
     """Method decorator to magic a "session" object into existence.
 
@@ -167,14 +187,8 @@ class SQLStorage(SyncStorage):
                 return
             # Begin a transaction and take a lock in the database.
             params = {"userid": userid, "collectionid": collectionid}
-            try:
-                session.query("BEGIN_TRANSACTION_READ")
-                ts = session.query_scalar("LOCK_COLLECTION_READ", params)
-            except BackendError, e:
-                # There is no standard exception to detect lock-wait timeouts.
-                if "lock" in str(e).lower():
-                    raise ConflictError
-                raise
+            session.query("BEGIN_TRANSACTION_READ")
+            ts = session.query_scalar("LOCK_COLLECTION_READ", params)
             if ts is not None:
                 ts = bigint2ts(ts)
                 session.cache[(userid, collectionid)].last_modified = ts
@@ -197,14 +211,8 @@ class SQLStorage(SyncStorage):
             if locked == 0:
                 raise RuntimeError("Can't escalate read-lock to write-lock")
             params = {"userid": userid, "collectionid": collectionid}
-            try:
-                session.query("BEGIN_TRANSACTION_WRITE")
-                ts = session.query_scalar("LOCK_COLLECTION_WRITE", params)
-            except BackendError, e:
-                # There is no standard exception to detect lock-wait timeouts.
-                if "lock" in str(e).lower():
-                    raise ConflictError
-                raise
+            session.query("BEGIN_TRANSACTION_WRITE")
+            ts = session.query_scalar("LOCK_COLLECTION_WRITE", params)
             if ts is not None:
                 ts = bigint2ts(ts)
                 # Forbid the write if it would not properly incr the timestamp.
@@ -769,26 +777,31 @@ class SQLStorageSession(object):
         else:
             self.rollback()
 
+    @convert_db_errors
     def insert_or_update(self, table, items, defaults=None):
         """Do a bulk insert/update of the given items."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.insert_or_update(table, items, defaults)
 
+    @convert_db_errors
     def query(self, query, params={}):
         """Execute a database query, returning the rowcount."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query(query, params)
 
+    @convert_db_errors
     def query_scalar(self, query, params={}, default=None):
         """Execute a database query, returning a single scalar value."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query_scalar(query, params, default)
 
+    @convert_db_errors
     def query_fetchone(self, query, params={}):
         """Execute a database query, returning the first result."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query_fetchone(query, params)
 
+    @convert_db_errors
     def query_fetchall(self, query, params={}):
         """Execute a database query, returning iterator over the results."""
         assert self._nesting_level > 0, "Session has not been started"
@@ -806,6 +819,7 @@ class SQLStorageSession(object):
             self.storage._tldata.session = self
         self._nesting_level += 1
 
+    @convert_db_errors
     def commit(self):
         """Successfully exit the context of this session.
 
@@ -823,6 +837,7 @@ class SQLStorageSession(object):
                 msg = "You must unlock all collections before ending a session"
                 raise RuntimeError(msg)
 
+    @convert_db_errors
     def rollback(self):
         """Unsuccessfully exit the context of this session.
 
