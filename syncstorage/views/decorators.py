@@ -5,8 +5,8 @@
 import time
 
 from pyramid.httpexceptions import (HTTPNotFound,
-                                    HTTPConflict,
                                     HTTPNotModified,
+                                    HTTPServiceUnavailable,
                                     HTTPPreconditionFailed)
 
 from syncstorage.storage import (ConflictError,
@@ -34,8 +34,15 @@ def convert_storage_errors(viewfunc, request):
     try:
         return viewfunc(request)
     except ConflictError:
+        # NOTE:  the protocol specification states that we should return
+        # a "409 Conflict" response here, but clients currently do not
+        # handle these respones very well:
+        #   * desktop bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959034
+        #   * android bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959032
+        # For now we return a "503 Service Unavailable" which will trigger
+        # approximately the desired behaviour of "quietly try again later".
         headers = {"Retry-After": str(RETRY_AFTER)}
-        raise HTTPConflict(headers=headers)
+        raise HTTPServiceUnavailable(headers=headers)
     except NotFoundError:
         raise HTTPNotFound
     except InvalidOffsetError:
