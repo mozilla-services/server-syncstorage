@@ -52,7 +52,7 @@ def sleep_and_retry_on_conflict(viewfunc, request):
 
     This makes things a bit easier for clients (and for the tests!) when
     doing closely-spaced writes.  They might fail because the timestamp has
-    progressed sufficiently; this lets it progress and then tries again.
+    not progressed sufficiently; this lets it progress and then tries again.
     """
     start = time.time()
     try:
