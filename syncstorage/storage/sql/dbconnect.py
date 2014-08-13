@@ -27,6 +27,7 @@ import traceback
 import functools
 from collections import defaultdict
 
+import sqlalchemy.event
 from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
 from sqlalchemy.pool import NullPool, QueuePool
@@ -324,6 +325,17 @@ class DBConnector(object):
         # so that the resulting string is compatible with sqltext().
         self._render_query_dialect = copy.copy(self.engine.dialect)
         self._render_query_dialect.paramstyle = "named"
+
+        # PyMySQL Connection objects hold a reference to their most recent
+        # Result object, which can cause large datasets to remain in memory.
+        # Explicitly clear it when returning a connection to the pool.
+        if parsed_sqluri.scheme.lower().startswith("pymysql"):
+
+            def clear_result_on_pool_checkin(conn, conn_record):
+                conn._result = None
+
+            sqlalchemy.event.listen(self.engine.pool, "checkin",
+                                    clear_result_on_pool_checkin)
 
     def connect(self, *args, **kwds):
         """Create a new DBConnection object from this connector."""
