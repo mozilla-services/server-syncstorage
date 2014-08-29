@@ -332,7 +332,8 @@ class DBConnector(object):
         if parsed_sqluri.scheme.lower().startswith("pymysql"):
 
             def clear_result_on_pool_checkin(conn, conn_record):
-                conn._result = None
+                if conn:
+                    conn._result = None
 
             sqlalchemy.event.listen(self.engine.pool, "checkin",
                                     clear_result_on_pool_checkin)
