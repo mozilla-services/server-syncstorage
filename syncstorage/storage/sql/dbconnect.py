@@ -403,8 +403,13 @@ def is_retryable_db_error(engine, exc):
     else:
         # The following MySQL lock-related errors can be safely retried:
         #    1205: lock wait timeout exceeded
+        #    1206: lock table full
         #    1213: deadlock found when trying to get lock
-        if mysql_error_code in (1205, 1213):
+        #    1689: lock aborted
+        # We also retry the following, which seems to occasionally surface
+        # due to a bug in TokuDB's handling of INSERT ON DUPLICATE KEY UDPATE:
+        #    1032: could not find record in table
+        if mysql_error_code in (1205, 1206, 1213, 1689, 1032):
             return True
     # Any other error is assumed not to be retryable.  Better safe than sorry.
     return False
