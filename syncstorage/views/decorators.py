@@ -3,6 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import time
+import logging
 
 from pyramid.httpexceptions import (HTTPNotFound,
                                     HTTPNotModified,
@@ -16,6 +17,8 @@ from syncstorage.storage import (ConflictError,
 from syncstorage.views.util import (make_decorator,
                                     json_error,
                                     get_resource_timestamp)
+
+logger = logging.getLogger("syncstorage")
 
 ONE_KB = 1024
 ONE_MB = 1024 * 1024
@@ -39,10 +42,19 @@ def convert_storage_errors(viewfunc, request):
         # handle these respones very well:
         #   * desktop bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959034
         #   * android bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959032
-        # For now we return a "503 Service Unavailable" which will trigger
-        # approximately the desired behaviour of "quietly try again later".
-        headers = {"Retry-After": str(RETRY_AFTER)}
-        raise HTTPServiceUnavailable(headers=headers)
+        if request.method != "POST" or "bsos" not in request.validated:
+            # For most requests we instead return a "503 Service Unavailable"
+            # gives approximately the right client retry behaviour.
+            headers = {"Retry-After": str(RETRY_AFTER)}
+            raise HTTPServiceUnavailable(headers=headers)
+        else:
+            # For bulk POST operations we can report the error in the response
+            # body, and let the client continue with the rest of its sync.
+            logger.error("ConflictError on POST request")
+            res = {'success': [], 'failed': {}}
+            for bso in request.validated["bsos"]:
+                res["failed"][bso["id"]] = "conflict"
+            return res
     except NotFoundError:
         raise HTTPNotFound
     except InvalidOffsetError:

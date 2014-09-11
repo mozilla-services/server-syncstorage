@@ -33,6 +33,7 @@ from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.util import json_loads, json_dumps
 from syncstorage.views.validators import BATCH_MAX_COUNT
 from syncstorage.tweens import WEAVE_INVALID_WBO
+from syncstorage.storage import ConflictError
 
 from mozsvc.exceptions import BackendError
 
@@ -1289,6 +1290,52 @@ class TestStorageMemcached(TestStorage):
                     if isinstance(storage.cache, BadCache):
                         storage.cache = storage.cache.cache
 
+    def test_write_tabs_ConflictError(self):
+        # This can't be run against a live server.
+        if self.distant:
+            raise unittest2.SkipTest
+
+        class BadCache(object):
+            """Cache client stub that raises ConflictError on write."""
+
+            def __init__(self, cache):
+                self.cache = cache
+
+            def cas(self, key, *args, **kw):
+                if key.endswith(":tabs"):
+                    raise ConflictError()
+                return self.cache.cas(key, *args, **kw)
+
+            def __getattr__(self, attr):
+                return getattr(self.cache, attr)
+
+        try:
+            for key in self.config.registry:
+                if key.startswith("syncstorage:storage:"):
+                    storage = self.config.registry[key]
+                    storage.cache = BadCache(storage.cache)
+
+            # send two bsos in the 'tabs' collection
+            bso1 = {'id': 'sure', 'payload': _PLD}
+            bso2 = {'id': 'thing', 'payload': _PLD}
+            bsos = [bso1, bso2]
+
+            # on batch, we get back a 200 - but only failures
+            res = self.app.post_json(self.root + '/storage/tabs', bsos)
+            self.assertEqual(len(res.json['failed']), 2)
+            self.assertEqual(len(res.json['success']), 0)
+            self.assertEqual(res.json['failed']['sure'], 'conflict')
+
+            # on single PUT, we get a 503
+            self.app.put_json(self.root + '/storage/tabs/sure', bso1,
+                              status=503)
+        finally:
+            for key in self.config.registry:
+                if key.startswith("syncstorage:storage:"):
+                    storage = self.config.registry[key]
+                    if isinstance(storage.cache, BadCache):
+                        storage.cache = storage.cache.cache
+
 
 class TestStoragePaginated(TestStorage):
     """Storage testcases run using lots of internal pagination."""
@@ -1304,6 +1351,11 @@ class TestStorageMemcachedWriteThrough(TestStorageMemcached):
     """
 
     TEST_INI_FILE = "tests-memcached-writethrough.ini"
+
+    def test_write_tabs_ConflictError(self):
+        # ConflictErrors in the cache are ignored in write-through mode,
+        # since it can just lazily re-populate from the db.
+        pass
 
 
 class TestStorageMemcachedCacheOnly(TestStorageMemcached):
