@@ -580,12 +580,12 @@ class DBConnection(object):
         except BaseException:
             # Control-flow exceptions trigger the cleanup logic.
             exc, val, tb = sys.exc_info()
-            logger.debug("query was interrupted by %s", val)
+            logger.warn("query was interrupted by %s", val)
             # Only cleanup SELECT, INSERT or UPDATE statements.
             # There are concerns that rolling back DELETEs is too costly.
             if not SAFE_TO_KILL_QUERY.match(query_str):
                 msg = "  refusing to kill unsafe query: %s"
-                logger.debug(msg, query_str[:100])
+                logger.warn(msg, query_str[:100])
                 raise
             try:
                 # The KILL command is specific to MySQL, and this method of
@@ -593,7 +593,7 @@ class DBConnection(object):
                 # Other drivers will cause an AttributeError, failing through
                 # to the "finally" clause at the end of this block.
                 thread_id = connection.connection.server_thread_id[0]
-                logger.debug("  killing connection %d", thread_id)
+                logger.warn("  killing connection %d", thread_id)
                 cleanup_query = "KILL %d" % (thread_id,)
                 # Use a freshly-created connection so that we don't block
                 # waiting for something from the pool.  Unfortunately this
@@ -610,7 +610,7 @@ class DBConnection(object):
                     finally:
                         cleanup_cursor.close()
                     msg = "  successfully killed %d"
-                    logger.debug(msg, thread_id)
+                    logger.warn(msg, thread_id)
                 finally:
                     cleanup_conn.close()
             finally:
