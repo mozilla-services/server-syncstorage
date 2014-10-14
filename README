@@ -12,7 +12,7 @@ to be useful in isolation.  It also supports a version of the Sync protocol
 that is not yet used in production.
 
 If you want to run a self-hosted version of the Sync Server for use with
-existing versions of Firfox, you should start from here:
+existing versions of Firefox, you should start from here:
 
    * https://docs.services.mozilla.com/howtos/run-sync.html
 

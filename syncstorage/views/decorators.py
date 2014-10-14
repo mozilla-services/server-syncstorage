@@ -3,10 +3,11 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import time
+import logging
 
 from pyramid.httpexceptions import (HTTPNotFound,
-                                    HTTPConflict,
                                     HTTPNotModified,
+                                    HTTPServiceUnavailable,
                                     HTTPPreconditionFailed)
 
 from syncstorage.storage import (ConflictError,
@@ -16,6 +17,8 @@ from syncstorage.storage import (ConflictError,
 from syncstorage.views.util import (make_decorator,
                                     json_error,
                                     get_resource_timestamp)
+
+logger = logging.getLogger("syncstorage")
 
 ONE_KB = 1024
 ONE_MB = 1024 * 1024
@@ -34,8 +37,24 @@ def convert_storage_errors(viewfunc, request):
     try:
         return viewfunc(request)
     except ConflictError:
-        headers = {"Retry-After": str(RETRY_AFTER)}
-        raise HTTPConflict(headers=headers)
+        # NOTE:  the protocol specification states that we should return
+        # a "409 Conflict" response here, but clients currently do not
+        # handle these respones very well:
+        #   * desktop bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959034
+        #   * android bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959032
+        if request.method != "POST" or "bsos" not in request.validated:
+            # For most requests we instead return a "503 Service Unavailable"
+            # gives approximately the right client retry behaviour.
+            headers = {"Retry-After": str(RETRY_AFTER)}
+            raise HTTPServiceUnavailable(headers=headers)
+        else:
+            # For bulk POST operations we can report the error in the response
+            # body, and let the client continue with the rest of its sync.
+            logger.error("ConflictError on POST request")
+            res = {'success': [], 'failed': {}}
+            for bso in request.validated["bsos"]:
+                res["failed"][bso["id"]] = "conflict"
+            return res
     except NotFoundError:
         raise HTTPNotFound
     except InvalidOffsetError:
@@ -52,7 +71,7 @@ def sleep_and_retry_on_conflict(viewfunc, request):
 
     This makes things a bit easier for clients (and for the tests!) when
     doing closely-spaced writes.  They might fail because the timestamp has
-    progressed sufficiently; this lets it progress and then tries again.
+    not progressed sufficiently; this lets it progress and then tries again.
     """
     start = time.time()
     try:

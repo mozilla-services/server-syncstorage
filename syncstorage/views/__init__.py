@@ -9,6 +9,7 @@ from pyramid.security import Allow
 from cornice import Service
 
 from syncstorage.bso import VALID_ID_REGEX
+from syncstorage.util import get_timestamp
 from syncstorage.storage import ConflictError, NotFoundError
 
 from syncstorage.views.validators import (extract_target_resource,
@@ -21,6 +22,7 @@ from syncstorage.views.decorators import (convert_storage_errors,
                                           with_collection_lock,
                                           check_precondition_headers,
                                           check_storage_quota)
+from syncstorage.views.util import get_resource_timestamp
 
 
 logger = logging.getLogger("syncstorage")
@@ -31,13 +33,14 @@ DEFAULT_VALIDATORS = (
     extract_query_params,
 )
 
-DEFAULT_DECORATORS = (
-    convert_storage_errors,
-    sleep_and_retry_on_conflict,
-    with_collection_lock,
-    check_precondition_headers,
-    check_storage_quota,
-)
+
+def default_decorators(func):
+    func = check_storage_quota(func)
+    func = check_precondition_headers(func)
+    func = with_collection_lock(func)
+    func = sleep_and_retry_on_conflict(func)
+    func = convert_storage_errors(func)
+    return func
 
 
 BSO_ID_REGEX = VALID_ID_REGEX.pattern.lstrip("^").rstrip("$")
@@ -103,16 +106,6 @@ class SyncStorageService(Service):
         path = "/{api:1\\.5}/{userid:[0-9]{1,10}}" + path
         return path
 
-    def get_view_wrapper(self, kwds):
-        """Get view wrapper to appply the default decorators."""
-
-        def view_wrapper(viewfunc):
-            for decorator in reversed(DEFAULT_DECORATORS):
-                viewfunc = decorator(viewfunc)
-            return viewfunc
-
-        return view_wrapper
-
 
 # We define a simple "It Works!" view at the site root, so that
 # it's easy to see if the service is correctly running.
@@ -148,6 +141,7 @@ item = SyncStorageService(name="item",
 
 @info_timestamps.get(accept="application/json", renderer="sync-json",
                      acl=expired_token_acl)
+@default_decorators
 def get_info_timestamps(request):
     storage = request.validated["storage"]
     timestamps = storage.get_collection_timestamps(request.validated["userid"])
@@ -156,6 +150,7 @@ def get_info_timestamps(request):
 
 
 @info_counts.get(accept="application/json", renderer="sync-json")
+@default_decorators
 def get_info_counts(request):
     storage = request.validated["storage"]
     counts = storage.get_collection_counts(request.validated["userid"])
@@ -164,6 +159,7 @@ def get_info_counts(request):
 
 
 @info_quota.get(accept="application/json", renderer="sync-json")
+@default_decorators
 def get_info_quota(request):
     storage = request.validated["storage"]
     used = storage.get_total_size(request.validated["userid"]) / ONE_KB
@@ -174,6 +170,7 @@ def get_info_quota(request):
 
 
 @info_usage.get(accept="application/json", renderer="sync-json")
+@default_decorators
 def get_info_usage(request):
     storage = request.validated["storage"]
     sizes = storage.get_collection_sizes(request.validated["userid"])
@@ -184,6 +181,7 @@ def get_info_usage(request):
 
 
 @storage.delete(renderer="sync-json")
+@default_decorators
 def delete_storage(request):
     storage = request.validated["storage"]
     storage.delete_storage(request.validated["userid"])
@@ -191,6 +189,7 @@ def delete_storage(request):
 
 
 @service_root.delete(renderer="sync-json")
+@default_decorators
 def delete_all(request):
     storage = request.validated["storage"]
     storage.delete_storage(request.validated["userid"])
@@ -199,6 +198,67 @@ def delete_all(request):
 
 @collection.get(accept="application/json", renderer="sync-json")
 @collection.get(accept="application/newlines", renderer="sync-newlines")
+@convert_storage_errors
+def get_collection_with_internal_pagination(request):
+    """Get the contents of a collection, in a respectful manner.
+
+    We provide a client-driven pagination API, but some clients don't
+    use it.  Instead they make humungous queries such as "give me all
+    100,000 history items as a single batch" and unfortunately, we have
+    to comply.
+
+    This wrapper view breaks up such requests so that they use the
+    pagination API internally, which is more respectful of server
+    resources and avoids bogging down queries from other users.
+    """
+    try:
+        settings = request.registry.settings
+        batch_size = settings.get("storage.pagination_batch_size")
+        # If we're not doing internal pagination, fulfill it directly.
+        if batch_size is None:
+            return get_collection(request)
+        # If the request is already limited, fulfill it directly.
+        limit = request.validated.get("limit", None)
+        if limit is not None and limit < batch_size:
+            return get_collection(request)
+        # Otherwise, we'll have to paginate internally for reduce db load.
+        items = []
+        request.validated["limit"] = batch_size
+        while True:
+            # Do the actual fetch, knowing it won't be too big.
+            res = get_collection(request)
+            items.extend(res)
+            if limit is not None:
+                max_left = limit - len(items)
+                # If we've fetched up to the requested limit then stop,
+                # leaving the X-Weave-Next-Offset header intact.
+                if max_left <= 0:
+                    break
+                request.validated["limit"] = min(max_left, batch_size)
+            # Check Next-Offset to see if we've fetched all available items.
+            try:
+                offset = request.response.headers.pop("X-Weave-Next-Offset")
+            except KeyError:
+                break
+            # Fetch again, using the given offset token and sanity-checking
+            # that the collection has not been concurrently modified.
+            # Taking a collection lock here would defeat the point of this
+            # pagination, which is to free up db resources.
+            request.validated["offset"] = offset
+            if "if_unmodified_since" not in request.validated:
+                last_modified = request.response.headers["X-Last-Modified"]
+                last_modified = get_timestamp(last_modified)
+                request.validated["if_unmodified_since"] = last_modified
+        return items
+    except NotFoundError:
+        # For b/w compat, non-existent collections must return an empty list.
+        return []
+
+
+@sleep_and_retry_on_conflict
+@with_collection_lock
+@check_precondition_headers
+@check_storage_quota
 def get_collection(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
@@ -210,22 +270,24 @@ def get_collection(request):
         if name in request.validated:
             filters[name] = request.validated[name]
 
-    # For b/w compat, non-existent collections must return an empty list.
-    try:
-        if request.validated.get("full", False):
-            res = storage.get_items(userid, collection, **filters)
-        else:
-            res = storage.get_item_ids(userid, collection, **filters)
-        next_offset = res.get("next_offset")
-        if next_offset is not None:
-            request.response.headers["X-Weave-Next-Offset"] = str(next_offset)
-        return res["items"]
-    except NotFoundError:
-        return []
+    if request.validated.get("full", False):
+        res = storage.get_items(userid, collection, **filters)
+    else:
+        res = storage.get_item_ids(userid, collection, **filters)
+    next_offset = res.get("next_offset")
+    if next_offset is not None:
+        request.response.headers["X-Weave-Next-Offset"] = str(next_offset)
+    # Ensure that X-Last-Modified is present, since it's needed when
+    # doing pagination.  This lookup is essentially free since we already
+    # loaded and cached the timestamp when taking the collection lock.
+    ts = get_resource_timestamp(request)
+    request.response.headers["X-Last-Modified"] = str(ts)
+    return res["items"]
 
 
 @collection.post(accept="application/json", renderer="sync-json",
                  validators=DEFAULT_VALIDATORS + (parse_multiple_bsos,))
+@default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
@@ -258,6 +320,7 @@ def post_collection(request):
 
 
 @collection.delete(renderer="sync-json")
+@default_decorators
 def delete_collection(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
@@ -277,6 +340,7 @@ def delete_collection(request):
 
 
 @item.get(accept="application/json", renderer="sync-json")
+@default_decorators
 def get_item(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
@@ -287,6 +351,7 @@ def get_item(request):
 
 @item.put(renderer="sync-json",
           validators=DEFAULT_VALIDATORS + (parse_single_bso,))
+@default_decorators
 def put_item(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
@@ -301,6 +366,7 @@ def put_item(request):
 
 
 @item.delete(renderer="sync-json")
+@default_decorators
 def delete_item(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]

@@ -59,6 +59,26 @@ def bigint2ts(bigint):
     return get_timestamp(bigint / 1000.0)
 
 
+def convert_db_errors(func):
+    """Method decorator to convert db errors into app-level errors.
+
+    This is a convenience wrapper to convert some database-level error messages
+    into corresponding app-level errors.  Currently it implements only a single
+    mapping, from lock-related db errors to a ConflictError instance.
+    """
+    @functools.wraps(func)
+    def convert_db_errors_wrapper(*args, **kwds):
+        try:
+            return func(*args, **kwds)
+        except BackendError, e:
+            # There is no standard exception to detect lock-wait timeouts,
+            # so we report any operational db error that has "lock" in it.
+            if "lock" in str(e).lower():
+                raise ConflictError
+            raise
+    return convert_db_errors_wrapper
+
+
 def with_session(func):
     """Method decorator to magic a "session" object into existence.
 
@@ -102,17 +122,16 @@ class SQLStorage(SyncStorage):
         self.dbconnector = DBConnector(sqluri, **dbkwds)
 
         # There doesn't seem to be a reliable cross-database way to set the
-        # initial value of an autoincrement column.  Fake it by inserting
-        # a row into the table at the desired start id.
+        # initial value of an autoincrement column.
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
-            zeroth_id = FIRST_CUSTOM_COLLECTION_ID - 1
             with self.dbconnector.connect() as connection:
-                params = {"collectionid": zeroth_id, "name": ""}
+                params = {"collectionid": FIRST_CUSTOM_COLLECTION_ID}
                 try:
-                    connection.query("INSERT_COLLECTION", params)
+                    connection.query("SET_MIN_COLLECTION_ID", params)
                 except IntegrityError:
-                    pass
+                    if self.dbconnector.driver == "postgres":
+                        raise
 
         # A local in-memory cache for the name => collectionid mapping.
         self._collections_by_name = {}
@@ -168,14 +187,8 @@ class SQLStorage(SyncStorage):
                 return
             # Begin a transaction and take a lock in the database.
             params = {"userid": userid, "collectionid": collectionid}
-            try:
-                session.query("BEGIN_TRANSACTION_READ")
-                ts = session.query_scalar("LOCK_COLLECTION_READ", params)
-            except BackendError, e:
-                # There is no standard exception to detect lock-wait timeouts.
-                if "lock" in str(e).lower():
-                    raise ConflictError
-                raise
+            session.query("BEGIN_TRANSACTION_READ")
+            ts = session.query_scalar("LOCK_COLLECTION_READ", params)
             if ts is not None:
                 ts = bigint2ts(ts)
                 session.cache[(userid, collectionid)].last_modified = ts
@@ -198,14 +211,8 @@ class SQLStorage(SyncStorage):
             if locked == 0:
                 raise RuntimeError("Can't escalate read-lock to write-lock")
             params = {"userid": userid, "collectionid": collectionid}
-            try:
-                session.query("BEGIN_TRANSACTION_WRITE")
-                ts = session.query_scalar("LOCK_COLLECTION_WRITE", params)
-            except BackendError, e:
-                # There is no standard exception to detect lock-wait timeouts.
-                if "lock" in str(e).lower():
-                    raise ConflictError
-                raise
+            session.query("BEGIN_TRANSACTION_WRITE")
+            ts = session.query_scalar("LOCK_COLLECTION_WRITE", params)
             if ts is not None:
                 ts = bigint2ts(ts)
                 # Forbid the write if it would not properly incr the timestamp.
@@ -314,7 +321,9 @@ class SQLStorage(SyncStorage):
     @with_session
     def get_item_ids(self, session, userid, collection, **params):
         """Returns item ids from a collection."""
-        params["fields"] = ["id"]
+        # Select only the fields we need, including those that might
+        # be used for limit/offset pagination.
+        params["fields"] = ["id", "modified", "sortindex"]
         res = self._find_items(session, userid, collection, **params)
         res["items"] = [item["id"] for item in res["items"]]
         return res
@@ -332,12 +341,9 @@ class SQLStorage(SyncStorage):
         limit = params.get("limit")
         if limit is not None:
             params["limit"] = limit + 1
-        offset = params.get("offset")
+        offset = params.pop("offset", None)
         if offset is not None:
-            try:
-                params["offset"] = offset = int(offset)
-            except ValueError:
-                raise InvalidOffsetError(offset)
+            self.decode_offset(params, offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
         items = [self._row_to_bso(row) for row in rows]
         # If the query returned no results, we don't know whether that's
@@ -348,8 +354,8 @@ class SQLStorage(SyncStorage):
         # Check if we read past the original limit, set next_offset if so.
         next_offset = None
         if limit is not None and len(items) > limit:
-            next_offset = (offset or 0) + limit
             items = items[:-1]
+            next_offset = self.encode_next_offset(params, items)
         return {
             "items": items,
             "next_offset": next_offset,
@@ -364,6 +370,65 @@ class SQLStorage(SyncStorage):
         if ts is not None:
             item["modified"] = bigint2ts(ts)
         return BSO(item)
+
+    def encode_next_offset(self, params, items):
+        """Encode an "offset token" for resuming query at the given item.
+
+        When sorting by timestamp, we can be more efficient than using a simple
+        numeric offset.  We figure out an upper-bound on the timestamp and use
+        that to exclude previously-seen results, then do a smaller numeric
+        offset relative to that position.  The result is a pair of integers
+        encoded as "bound:offset".  Since we limit the number of items that
+        can have the same timestamp, this provides fairly good pagination
+        granularity.
+
+        When sorting by sortindex, we cannot use an index anyway, and we have
+        no bound on the number of items that might share a single sortindex.
+        There's therefore not much to be gained by trying to be clever, and
+        we just use a simple numeric offset.
+        """
+        # Use a simple numeric offset for sortindex ordering.
+        if params.get("sort", None) == "index":
+            return str(params.get("offset", 0) + len(items))
+        # Find an appropriate upper bound for faster timestamp ordering.
+        bound = items[-1]["modified"]
+        bound_as_bigint = ts2bigint(bound)
+        # Count how many previous items have that same timestamp, and hence
+        # will need to be skipped over.  The number of matches here is limited
+        # by upload batch size, so no danger of long-running iteration.
+        offset = 1
+        i = len(items) - 2
+        while i >= 0 and items[i]["modified"] == bound:
+            offset += 1
+            i -= 1
+        # All items have the same timestamp, we may also need to skip some
+        # items from the previous batch.  This should only occur with a very
+        # small "limit" parameter, e.g. during testing.
+        if i < 0:
+            prev_bound = params.get("older", None)
+            if prev_bound == bound_as_bigint:
+                offset += params["offset"]
+        # Encode them as a simple pair of integers.
+        return "%d:%d" % (bound_as_bigint, offset)
+
+    def decode_offset(self, params, offset):
+        """Decode an "offset token" into appropriate query parameters.
+
+        This essentially decodes the result of encode_offset(), adjusting the
+        query parameters so that we can efficiently seek to the next available
+        item based on the previous query.
+        """
+        try:
+            if params.get("sort", None) == "index":
+                # When sorting by sortindex, it's just a numeric offset.
+                params["offset"] = int(offset)
+            else:
+                # When sorting by timestamp, it's a (bound, offset) pair.
+                bound, offset = offset.split(":", 1)
+                params["older"] = int(bound)
+                params["offset"] = int(offset)
+        except ValueError:
+            raise InvalidOffsetError(offset)
 
     @with_session
     def set_items(self, session, userid, collection, items):
@@ -421,7 +486,8 @@ class SQLStorage(SyncStorage):
                 session.query("INIT_COLLECTION", params)
             except IntegrityError:
                 # Someone else inserted it at the same time.
-                pass
+                if self.dbconnector.driver == "postgres":
+                    raise
         return session.timestamp
 
     #
@@ -588,12 +654,12 @@ class SQLStorage(SyncStorage):
             # Insert it into the database.  This might raise a conflict
             # if it was inserted concurrently by someone else.
             try:
-                session.query("INSERT_COLLECTION", {
-                    "collectionid": None,
+                session.query("CREATE_COLLECTION", {
                     "name": collection,
                 })
             except IntegrityError:
-                pass
+                if self.dbconnector.driver == "postgres":
+                    raise
             # Read the id that was created concurrently.
             collectionid = self._get_collection_id(session, collection)
 
@@ -711,26 +777,31 @@ class SQLStorageSession(object):
         else:
             self.rollback()
 
+    @convert_db_errors
     def insert_or_update(self, table, items, defaults=None):
         """Do a bulk insert/update of the given items."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.insert_or_update(table, items, defaults)
 
+    @convert_db_errors
     def query(self, query, params={}):
         """Execute a database query, returning the rowcount."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query(query, params)
 
+    @convert_db_errors
     def query_scalar(self, query, params={}, default=None):
         """Execute a database query, returning a single scalar value."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query_scalar(query, params, default)
 
+    @convert_db_errors
     def query_fetchone(self, query, params={}):
         """Execute a database query, returning the first result."""
         assert self._nesting_level > 0, "Session has not been started"
         return self.connection.query_fetchone(query, params)
 
+    @convert_db_errors
     def query_fetchall(self, query, params={}):
         """Execute a database query, returning iterator over the results."""
         assert self._nesting_level > 0, "Session has not been started"
@@ -748,6 +819,7 @@ class SQLStorageSession(object):
             self.storage._tldata.session = self
         self._nesting_level += 1
 
+    @convert_db_errors
     def commit(self):
         """Successfully exit the context of this session.
 
@@ -765,6 +837,7 @@ class SQLStorageSession(object):
                 msg = "You must unlock all collections before ending a session"
                 raise RuntimeError(msg)
 
+    @convert_db_errors
     def rollback(self):
         """Unsuccessfully exit the context of this session.
 

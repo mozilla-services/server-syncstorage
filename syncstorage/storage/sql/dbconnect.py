@@ -27,12 +27,12 @@ import traceback
 import functools
 from collections import defaultdict
 
+import sqlalchemy.event
 from sqlalchemy import create_engine
 from sqlalchemy.util.queue import Queue
 from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update, text as sqltext
-from sqlalchemy.exc import (DBAPIError, OperationalError,
-                            TimeoutError, IntegrityError)
+from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
 from sqlalchemy.dialects import postgresql
@@ -42,6 +42,7 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage.storage.sql import (queries_generic,
                                      queries_sqlite,
+                                     queries_postgres,
                                      queries_mysql)
 
 
@@ -242,9 +243,11 @@ class DBConnector(object):
         self.driver = parsed_sqluri.scheme.lower()
         if "mysql" in self.driver:
             self.driver = "mysql"
+        elif "postgres" in self.driver:
+            self.driver = "postgres"
 
-        if self.driver not in ("mysql", "sqlite"):
-            msg = "Only MySQL and SQLite databases are officially supported"
+        if self.driver not in ("mysql", "sqlite", "postgres"):
+            msg = "your db driver is not officially supported"
             logger.warn(msg)
 
         self.shard = shard
@@ -310,6 +313,8 @@ class DBConnector(object):
             query_modules.append(queries_sqlite)
         elif self.driver == "mysql":
             query_modules.append(queries_mysql)
+        elif self.driver == "postgres":
+            query_modules.append(queries_postgres)
         for queries in query_modules:
             for nm in dir(queries):
                 if nm.isupper():
@@ -320,6 +325,18 @@ class DBConnector(object):
         # so that the resulting string is compatible with sqltext().
         self._render_query_dialect = copy.copy(self.engine.dialect)
         self._render_query_dialect.paramstyle = "named"
+
+        # PyMySQL Connection objects hold a reference to their most recent
+        # Result object, which can cause large datasets to remain in memory.
+        # Explicitly clear it when returning a connection to the pool.
+        if parsed_sqluri.scheme.lower().startswith("pymysql"):
+
+            def clear_result_on_pool_checkin(conn, conn_record):
+                if conn:
+                    conn._result = None
+
+            sqlalchemy.event.listen(self.engine.pool, "checkin",
+                                    clear_result_on_pool_checkin)
 
     def connect(self, *args, **kwds):
         """Create a new DBConnection object from this connector."""
@@ -384,8 +401,15 @@ def is_retryable_db_error(engine, exc):
     except AttributeError:
         pass
     else:
-        # MySQL Lock Wait Timeout errors can be safely retried.
-        if mysql_error_code == 1205:
+        # The following MySQL lock-related errors can be safely retried:
+        #    1205: lock wait timeout exceeded
+        #    1206: lock table full
+        #    1213: deadlock found when trying to get lock
+        #    1689: lock aborted
+        # We also retry the following, which seems to occasionally surface
+        # due to a bug in TokuDB's handling of INSERT ON DUPLICATE KEY UDPATE:
+        #    1032: could not find record in table
+        if mysql_error_code in (1205, 1206, 1213, 1689, 1032):
             return True
     # Any other error is assumed not to be retryable.  Better safe than sorry.
     return False
@@ -425,9 +449,11 @@ def report_backend_errors(func):
                 raise
             # An unexpected database-level error.
             # Log the error, then normalize it into a BackendError instance.
-            # Note that this will not not logic errors such as IntegrityError,
-            # only unexpected operational errors from the database.
+            # Note that this will not catch logic errors such as e.g. an
+            # IntegrityError, only unexpected operational errors from the
+            # database such as e.g. disconnects and timeouts.
             err = traceback.format_exc()
+            err = "Caught operational db error: %s\n%s" % (exc, err)
             logger.error(err)
             raise BackendError(str(exc))
     return report_backend_errors_wrapper
@@ -554,12 +580,12 @@ class DBConnection(object):
         except BaseException:
             # Control-flow exceptions trigger the cleanup logic.
             exc, val, tb = sys.exc_info()
-            logger.debug("query was interrupted by %s", val)
+            logger.warn("query was interrupted by %s", val)
             # Only cleanup SELECT, INSERT or UPDATE statements.
             # There are concerns that rolling back DELETEs is too costly.
             if not SAFE_TO_KILL_QUERY.match(query_str):
                 msg = "  refusing to kill unsafe query: %s"
-                logger.debug(msg, query_str[:100])
+                logger.warn(msg, query_str[:100])
                 raise
             try:
                 # The KILL command is specific to MySQL, and this method of
@@ -567,7 +593,7 @@ class DBConnection(object):
                 # Other drivers will cause an AttributeError, failing through
                 # to the "finally" clause at the end of this block.
                 thread_id = connection.connection.server_thread_id[0]
-                logger.debug("  killing connection %d", thread_id)
+                logger.warn("  killing connection %d", thread_id)
                 cleanup_query = "KILL %d" % (thread_id,)
                 # Use a freshly-created connection so that we don't block
                 # waiting for something from the pool.  Unfortunately this
@@ -584,7 +610,7 @@ class DBConnection(object):
                     finally:
                         cleanup_cursor.close()
                     msg = "  successfully killed %d"
-                    logger.debug(msg, thread_id)
+                    logger.warn(msg, thread_id)
                 finally:
                     cleanup_conn.close()
             finally:
@@ -721,7 +747,7 @@ class DBConnection(object):
             return self._upsert_generic(table, items, defaults, annotations)
 
     def _upsert_generic(self, table, items, defaults, annotations):
-        """Upsert a batch of items one at a time, trying INSERT then UPDATE.
+        """Upsert a batch of items one at a time, trying UPDATE then INSERT.
 
         This is a tremendously inefficient way to write a batch of items,
         but it's guaranteed to work without special cooperation from the
@@ -731,29 +757,30 @@ class DBConnection(object):
         num_created = 0
         for item in items:
             assert item.get("userid") == userid
-            try:
-                # Try to insert the item.
-                # If it already exists, this fails with an integrity error.
+            # Try to update the item.
+            # Use the table's primary key fields in the WHERE clause,
+            # and put all other fields into the UPDATE clause.
+            # We have to do this first as the insert might cause a
+            # conflict and abort the enclosing transacrtion.
+            values = item.copy()
+            query = update(table)
+            for key in table.primary_key:
+                try:
+                    query = query.where(key == values.pop(key.name))
+                except KeyError:
+                    msg = "Item is missing primary key column %r"
+                    raise ValueError(msg % (key.name,))
+            query = query.values(**values)
+            res = self.execute(query, {}, annotations)
+            res.close()
+            # If the item wasnt there, insert it instead.
+            if res.rowcount == 0:
                 query = insert(table)
                 if defaults is not None:
                     query = query.values(**defaults)
                 query = query.values(**item)
                 self.execute(query, {}, annotations).close()
                 num_created += 1
-            except IntegrityError:
-                # Update the item.
-                # Use the table's primary key fields in the WHERE clause,
-                # and put all other fields into the UPDATE clause.
-                item = item.copy()
-                query = update(table)
-                for key in table.primary_key:
-                    try:
-                        query = query.where(key == item.pop(key.name))
-                    except KeyError:
-                        msg = "Item is missing primary key column %r"
-                        raise ValueError(msg % (key.name,))
-                query = query.values(**item)
-                self.execute(query, {}, annotations).close()
         return num_created
 
     def _upsert_onduplicatekey(self, table, items, defaults, annotations):

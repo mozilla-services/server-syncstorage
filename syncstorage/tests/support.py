@@ -51,6 +51,8 @@ def validate_database_query(conn, cursor, statement, *args):
         return
     if statement.startswith("DROP "):
         return
+    if " pg_class " in statement:
+        return
     if "queryName=" not in statement:
         assert False, "SQL query does not have a name: %s" % (statement,)
 
@@ -63,6 +65,17 @@ class StorageTestCase(TestCase):
         # Put a fresh UUID into the environment.
         # This can be used in e.g. config files to create unique paths.
         os.environ["MOZSVC_UUID"] = str(uuid.uuid4())
+        # Ensure a default sqluri if none is provided in the environment.
+        # We use an in-memory sqlite db by default, except for tests that
+        # explicitly require an on-disk file.
+        if "MOZSVC_SQLURI" not in os.environ:
+            os.environ["MOZSVC_SQLURI"] = "sqlite:///:memory:"
+        if "MOZSVC_ONDISK_SQLURI" not in os.environ:
+            ondisk_sqluri = os.environ["MOZSVC_SQLURI"]
+            if ":memory:" in ondisk_sqluri:
+                ondisk_sqluri = "sqlite:////tmp/tests-sync-%s.db"
+                ondisk_sqluri %= (os.environ["MOZSVC_UUID"],)
+            os.environ["MOZSVC_ONDISK_SQLURI"] = ondisk_sqluri
         # Allow subclasses to override default ini file.
         if hasattr(self, "TEST_INI_FILE"):
             if "MOZSVC_TEST_INI_FILE" not in os.environ:
@@ -71,7 +84,6 @@ class StorageTestCase(TestCase):
 
     def tearDown(self):
         self._cleanup_test_databases()
-
         # clear the pyramid threadlocals
         self.config.end()
         super(StorageTestCase, self).tearDown()
@@ -84,17 +96,20 @@ class StorageTestCase(TestCase):
 
     def _cleanup_test_databases(self):
         """Clean up any database used during the tests."""
-        # Find any in-use mysql database and drop the tables.
+        # Find and clean up any in-use databases
         for key, storage in self.config.registry.iteritems():
             if not key.startswith("syncstorage:storage:"):
                 continue
             while hasattr(storage, "storage"):
                 storage = storage.storage
-            if "mysql" in storage.sqluri:
+            # For server-based dbs, drop the tables to clear them.
+            if storage.dbconnector.driver in ("mysql", "postgres"):
                 with storage.dbconnector.connect() as c:
                     c.execute('DROP TABLE bso')
                     c.execute('DROP TABLE user_collections')
                     c.execute('DROP TABLE collections')
+            # Explicitly free any pooled connections.
+            storage.dbconnector.engine.dispose()
         # Find any sqlite database files and delete them.
         for key, value in self.config.registry.settings.iteritems():
             if key.endswith(".sqluri"):
