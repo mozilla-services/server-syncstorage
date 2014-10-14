@@ -107,6 +107,7 @@ class StressTest(TestCase):
         auth = HawkAuth(self.endpoint_url, self.auth_token, self.auth_secret)
         reqkwds = {
           "timeout": 120,
+          "verify": False,  # disabled to allow testing by IP address
           "auth": auth,
           "headers": {
             "Content-Type": "application/json",
