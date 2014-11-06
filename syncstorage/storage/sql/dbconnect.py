@@ -37,7 +37,7 @@ from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
 from sqlalchemy.dialects import postgresql
 
-from mozsvc.metrics import metrics_timer
+from mozsvc.metrics import metrics_timer, annotate_request
 from mozsvc.exceptions import BackendError
 
 from syncstorage.storage.sql import (queries_generic,
@@ -401,14 +401,21 @@ def is_retryable_db_error(engine, exc):
     except AttributeError:
         pass
     else:
+        # We're seeing a sporadic bug in production with TokuDB, where an
+        # INSERT ON DUPLICATE KEY UPDATE will sometimes error out with:
+        #    1032: could not find record in table
+        # The below flags such errors in the request metrics log, so we can
+        # easily track which requests are triggering the error.
+        # See https://bugzilla.mozilla.org/show_bug.cgi?id=1057892
+        if mysql_error_code == 1032:
+            metric_name = "syncstorage.storage.sql.tokudb_error"
+            annotate_request(None, metric_name, 1)
         # The following MySQL lock-related errors can be safely retried:
         #    1205: lock wait timeout exceeded
         #    1206: lock table full
         #    1213: deadlock found when trying to get lock
         #    1689: lock aborted
-        # We also retry the following, which seems to occasionally surface
-        # due to a bug in TokuDB's handling of INSERT ON DUPLICATE KEY UDPATE:
-        #    1032: could not find record in table
+        # We also retry the TokuDB ON DUPLICATE KEY error noted above.
         if mysql_error_code in (1205, 1206, 1213, 1689, 1032):
             return True
     # Any other error is assumed not to be retryable.  Better safe than sorry.
@@ -741,6 +748,14 @@ class DBConnection(object):
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
+            # We are seeing a sporadic bug in production where using
+            # ON DUPLICATE KEY errors out.  This workaround avoids it
+            # in the common case of PUT /meta/global (collection id
+            # 6 is the "meta" collection in production).
+            # See https://bugzilla.mozilla.org/show_bug.cgi?id=1057892
+            if len(items) == 1 and items[0]["collection"] == 6:
+                return self._upsert_generic(table, items, defaults,
+                                            annotations)
             return self._upsert_onduplicatekey(table, items, defaults,
                                                annotations)
         else:
