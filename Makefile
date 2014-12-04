@@ -19,14 +19,12 @@ all:	build
 
 build:
 	$(VIRTUALENV) --no-site-packages --distribute ./local
-	$(INSTALL) Distribute
-	$(INSTALL) pip
-	$(INSTALL) nose
-	$(INSTALL) flake8
+	$(INSTALL) --upgrade Distribute pip
 	$(INSTALL) -r requirements.txt
 	$(PYTHON) ./setup.py develop
 
 test:
+	$(INSTALL) nose flake8
 	# Check that flake8 passes before bothering to run anything.
 	# This can really cut down time wasted by typos etc.
 	./local/bin/flake8 syncstorage
