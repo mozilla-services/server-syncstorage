@@ -748,14 +748,6 @@ class DBConnection(object):
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
         if self._connector.driver == "mysql":
-            # We are seeing a sporadic bug in production where using
-            # ON DUPLICATE KEY errors out.  This workaround avoids it
-            # in the common case of PUT /meta/global (collection id
-            # 6 is the "meta" collection in production).
-            # See https://bugzilla.mozilla.org/show_bug.cgi?id=1057892
-            if len(items) == 1 and items[0]["collection"] == 6:
-                return self._upsert_generic(table, items, defaults,
-                                            annotations)
             return self._upsert_onduplicatekey(table, items, defaults,
                                                annotations)
         else:
