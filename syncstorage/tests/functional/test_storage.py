@@ -1141,6 +1141,12 @@ class TestStorage(StorageFunctionalTestCase):
         # It should have a properly-formatted "modified" field.
         modified_re = r"['\"]modified['\"]:\s*[0-9]+\.[0-9][0-9]\s*[,}]"
         self.assertTrue(re.search(modified_re, res.body))
+        # Any client-specified "modified" field should be ignored
+        res = self.app.put_json(self.root + '/storage/meta/global',
+                                {'payload': 'blob', 'modified': 12})
+        ts = float(res.headers['X-Weave-Timestamp'])
+        res = self.app.get(self.root + '/storage/meta/global')
+        self.assertEquals(res.json['modified'], ts)
 
     def test_that_404_responses_have_a_json_body(self):
         res = self.app.get(self.root + '/nonexistent/url', status=404)

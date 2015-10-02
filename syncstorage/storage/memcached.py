@@ -687,11 +687,6 @@ class _CachedManagerBase(object):
                     bso["ttl"] = None
                 else:
                     bso["ttl"] = int(modified) + item["ttl"]
-            if "modified" in item:
-                bso["modified"] = item["modified"]
-                # Ensure top-level modified time matches the contained items.
-                if bso["modified"] > data["modified"]:
-                    data["modified"] = bso["modified"]
             # Update it in-place, or create if it doesn't exist.
             try:
                 data["items"][bso["id"]].update(bso)
