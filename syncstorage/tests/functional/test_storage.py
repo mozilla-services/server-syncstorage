@@ -197,8 +197,29 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
-        # "offset" again, this time ordering by timestamp.
+        # "offset" again, this time ordering by descending timestamp.
         query_url = self.root + '/storage/col2?sort=newest'
+        res = self.app.get(query_url)
+        all_items = res.json
+        self.assertEquals(len(all_items), 10)
+
+        res = self.app.get(query_url + '&limit=2')
+        self.assertEquals(res.json, all_items[:2])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[2:5])
+
+        next_offset = res.headers["X-Weave-Next-Offset"]
+        res = self.app.get(query_url + '&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[5:])
+        self.assertTrue("X-Weave-Next-Offset" not in res.headers)
+
+        res = self.app.get(query_url + '&limit=10000&offset=' + next_offset)
+        self.assertEquals(res.json, all_items[5:])
+
+        # "offset" again, this time ordering by ascending timestamp.
+        query_url = self.root + '/storage/col2?sort=oldest'
         res = self.app.get(query_url)
         all_items = res.json
         self.assertEquals(len(all_items), 10)
@@ -239,8 +260,9 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(query_url + '&limit=10000&offset=' + next_offset)
 
         # "sort"
-        #   'newest' - Orders by timestamp number (newest first)
-        #   'index' - Orders by the sortindex descending (highest weight first)
+        #   'newest': Orders by timestamp number (newest first)
+        #   'oldest': Orders by timestamp number (oldest first)
+        #   'index':  Orders by the sortindex descending (highest weight first)
         self.app.delete(self.root + '/storage/col2')
 
         for index, sortindex in (('0', -1), ('1', 34), ('2', 12)):
@@ -250,6 +272,10 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2?sort=newest')
         res = res.json
         self.assertEquals(res, ['2', '1', '0'])
+
+        res = self.app.get(self.root + '/storage/col2?sort=oldest')
+        res = res.json
+        self.assertEquals(res, ['0', '1', '2'])
 
         res = self.app.get(self.root + '/storage/col2?sort=index')
         res = res.json
@@ -1206,6 +1232,47 @@ class TestStorage(StorageFunctionalTestCase):
         resp = self.app.get(self.root + '/info/collections')
         self.assertEquals(resp.json.keys(), ["col1"])
         self.assertEquals(resp.json["col1"], ts)
+
+    def test_pagination_with_newer_and_sort_by_oldest(self):
+        # Twelve bsos with three different modification times.
+        NUM_ITEMS = 12
+        bsos = []
+        timestamps = []
+        for i in range(NUM_ITEMS):
+            bso = {'id': str(i), 'payload': 'x'}
+            bsos.append(bso)
+            if i % 4 == 3:
+                res = self.app.post_json(self.root + '/storage/col2', bsos)
+                ts = float(res.headers["X-Last-Modified"])
+                timestamps.append((i, ts))
+                bsos = []
+
+        # Try with several different pagination sizes,
+        # to hit various boundary conditions.
+        for limit in (2, 3, 4, 5, 6):
+            for (start, ts) in timestamps:
+                query_url = self.root + '/storage/col2?full=true&sort=oldest'
+                query_url += '&newer=%s&limit=%s' % (ts, limit)
+
+                # Paginated-ly fetch all items.
+                items = []
+                res = self.app.get(query_url)
+                for item in res.json:
+                    if items:
+                        assert items[-1]['modified'] <= item['modified']
+                    items.append(item)
+                next_offset = res.headers.get('X-Weave-Next-Offset')
+                while next_offset is not None:
+                    res = self.app.get(query_url + "&offset=" + next_offset)
+                    for item in res.json:
+                        assert items[-1]['modified'] <= item['modified']
+                        items.append(item)
+                    next_offset = res.headers.get('X-Weave-Next-Offset')
+
+                # They should all be in order, starting from the item
+                # *after* the one that was used for the newer= timestamp.
+                self.assertEquals(sorted(int(item['id']) for item in items),
+                                  range(start + 1, NUM_ITEMS))
 
 
 class TestStorageMemcached(TestStorage):

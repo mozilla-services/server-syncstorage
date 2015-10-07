@@ -122,7 +122,7 @@ def extract_query_params(request):
 
     sort = request.GET.get("sort")
     if sort is not None:
-        if sort not in ("newest", "index"):
+        if sort not in ("newest", "oldest", "index"):
             msg = "Invalid value for sort: %r" % (sort,)
             request.errors.add("querystring", "sort", msg)
         else:

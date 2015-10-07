@@ -113,8 +113,10 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.id.in_(params.get("ids")))
     if "newer" in params:
         query = query.where(bso.c.modified > bindparam("newer"))
-    if "older" in params:
-        query = query.where(bso.c.modified <= bindparam("older"))
+    if "newer_eq" in params:
+        query = query.where(bso.c.modified >= bindparam("newer_eq"))
+    if "older_eq" in params:
+        query = query.where(bso.c.modified <= bindparam("older_eq"))
     if "ttl" in params:
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
@@ -126,6 +128,8 @@ def FIND_ITEMS(bso, params):
     sort = params.get("sort", None)
     if sort == 'index':
         query = query.order_by(bso.c.sortindex.desc())
+    elif sort == 'oldest':
+        query = query.order_by(bso.c.modified.asc())
     else:
         query = query.order_by(bso.c.modified.desc())
     # Apply limit and/or offset.

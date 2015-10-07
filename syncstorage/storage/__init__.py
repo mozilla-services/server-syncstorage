@@ -222,7 +222,7 @@ class SyncStorage(object):
             newer: float; only return items newer than this timestamp.
             limit: integer; return at most this many items.
             offset: string; an offset vale previously returned as next_offset.
-            sort: sort order for results; one of "newer" or "index".
+            sort: sort order for results; one of "newest", "oldest" or "index".
 
         Returns:
             A dict with the following keys:
@@ -246,7 +246,7 @@ class SyncStorage(object):
             newer: float; only return items newer than this timestamp.
             limit: integer; return at most this many items.
             offset: string; an offset vale previously returned as next_offset.
-            sort: sort order for results; one of "oldest", "newer" or "index".
+            sort: sort order for results; one of "newest", "oldest" or "index".
 
         Returns:
             A dict with the following keys:

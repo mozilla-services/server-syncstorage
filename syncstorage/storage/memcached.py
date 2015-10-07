@@ -778,10 +778,12 @@ class _CachedManagerBase(object):
         # Using the id as a secondary key produces a unique ordering.
         bsos = list(bsos)
         if sort == "index":
+            reverse = True
             key = lambda bso: (bso["sortindex"], bso["id"])
         else:
+            reverse = False if sort == "oldest" else True
             key = lambda bso: (bso["modified"], bso["id"])
-        bsos.sort(key=key, reverse=True)
+        bsos.sort(key=key, reverse=reverse)
         # Trim to the specified offset, if any.
         # Note that we defaulted it to zero above.
         if offset is not None:

@@ -387,8 +387,9 @@ class SQLStorage(SyncStorage):
         There's therefore not much to be gained by trying to be clever, and
         we just use a simple numeric offset.
         """
+        sort = params.get("sort", None)
         # Use a simple numeric offset for sortindex ordering.
-        if params.get("sort", None) == "index":
+        if sort == "index":
             return str(params.get("offset", 0) + len(items))
         # Find an appropriate upper bound for faster timestamp ordering.
         bound = items[-1]["modified"]
@@ -401,11 +402,14 @@ class SQLStorage(SyncStorage):
         while i >= 0 and items[i]["modified"] == bound:
             offset += 1
             i -= 1
-        # All items have the same timestamp, we may also need to skip some
-        # items from the previous batch.  This should only occur with a very
-        # small "limit" parameter, e.g. during testing.
+        # If all items in this batch have the same timestamp, we may also need
+        # to skip some items from the previous batch.  This should only occur
+        # with a very small "limit" parameter, e.g. during testing.
         if i < 0:
-            prev_bound = params.get("older", None)
+            if sort == "oldest":
+                prev_bound = params.get("newer_eq", None)
+            else:
+                prev_bound = params.get("older_eq", None)
             if prev_bound == bound_as_bigint:
                 offset += params["offset"]
         # Encode them as a simple pair of integers.
@@ -418,15 +422,23 @@ class SQLStorage(SyncStorage):
         query parameters so that we can efficiently seek to the next available
         item based on the previous query.
         """
+        sort = params.get("sort", None)
         try:
-            if params.get("sort", None) == "index":
+            if sort == "index":
                 # When sorting by sortindex, it's just a numeric offset.
                 params["offset"] = int(offset)
             else:
                 # When sorting by timestamp, it's a (bound, offset) pair.
-                bound, offset = offset.split(":", 1)
-                params["older"] = int(bound)
-                params["offset"] = int(offset)
+                bound, offset = map(int, offset.split(":", 1))
+                # Queries with "newer" should always produce bound > newer
+                if bound < params.get("newer", bound):
+                    raise InvalidOffsetError(offset)
+                # The bound determines the starting point of the sort order.
+                params["offset"] = offset
+                if sort == "oldest":
+                    params["newer_eq"] = int(bound)
+                else:
+                    params["older_eq"] = int(bound)
         except ValueError:
             raise InvalidOffsetError(offset)
 
