@@ -12,7 +12,7 @@ build:
 	virtualenv --no-site-packages .
 	$(INSTALL) gevent
 	$(INSTALL) pexpect
-	$(INSTALL) configparser==3.3.0r2
+	$(INSTALL) configparser==3.5.0b2
 	$(INSTALL) https://github.com/mozilla-services/loads/archive/master.zip
 	$(INSTALL) PyBrowserID
 	$(INSTALL) hawkauthlib
