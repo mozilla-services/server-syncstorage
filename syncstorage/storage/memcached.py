@@ -79,6 +79,14 @@ def _key(*names):
     return ":".join(map(str, names))
 
 
+def bso_sort_key_index(bso):
+    return (bso["sortindex"], bso["id"])
+
+
+def bso_sort_key_modified(bso):
+    return (bso["modified"], bso["id"])
+
+
 class MemcachedClient(MemcachedClient):
     """MemcachedClient that can handle decimal.Decimal instances."""
 
@@ -779,10 +787,10 @@ class _CachedManagerBase(object):
         bsos = list(bsos)
         if sort == "index":
             reverse = True
-            key = lambda bso: (bso["sortindex"], bso["id"])
+            key = bso_sort_key_index
         else:
             reverse = False if sort == "oldest" else True
-            key = lambda bso: (bso["modified"], bso["id"])
+            key = bso_sort_key_modified
         bsos.sort(key=key, reverse=reverse)
         # Trim to the specified offset, if any.
         # Note that we defaulted it to zero above.
