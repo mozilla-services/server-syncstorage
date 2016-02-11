@@ -98,6 +98,10 @@ class SyncStorageAuthenticationPolicy(TokenServerAuthenticationPolicy):
             raise ValueError(msg % (token_node_name,))
         # Calculate the matching request-signing secret.
         key = tokenlib.get_derived_secret(tokenid, secret=secret)
+
+        request.metrics["fxa_uid"] = data.get("fxa_uid")
+        request.metrics["device_id"] = data.get("device_id")
+
         return userid, key
 
 
