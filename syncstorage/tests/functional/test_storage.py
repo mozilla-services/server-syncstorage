@@ -31,9 +31,13 @@ import tokenlib
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.util import json_loads, json_dumps
-from syncstorage.views.validators import BATCH_MAX_COUNT
 from syncstorage.tweens import WEAVE_INVALID_WBO
 from syncstorage.storage import ConflictError
+from syncstorage.views.validators import (
+    BATCH_MAX_IDS,
+    DEFAULT_BATCH_MAX_COUNT,
+    DEFAULT_BATCH_MAX_BYTES,
+)
 
 from mozsvc.exceptions import BackendError
 
@@ -724,27 +728,35 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_batch(self):
         # This can't be run against a live server
-        # due to request size limits in nginx.
+        # due to request size limits in nginx and
+        # the fact that it reads config variables.
         if self.distant:
             raise unittest2.SkipTest
 
+        settings = self.config.registry.settings
+
         # Test that batch uploads are correctly processed.
-        # The test config has max_count=100.
-        # Uploading 70 small objects should succeed.
-        bsos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
+        # Uploading max_count-5 small objects should succeed.
+        max_count = settings.get("storage.batch_max_count",
+                                 DEFAULT_BATCH_MAX_COUNT)
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
-        self.assertEquals(len(res['success']), 70)
+        self.assertEquals(len(res['success']), max_count - 5)
         self.assertEquals(len(res['failed']), 0)
-        # The test config has max_count=100.
-        # Uploading 105 items should produce five failures.
-        bsos = [{'id': str(i), 'payload': _PLD} for i in range(105)]
+
+        # Uploading max_count+5 items should produce five failures.
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count + 5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
-        self.assertEquals(len(res['success']), 100)
+        self.assertEquals(len(res['success']), max_count)
         self.assertEquals(len(res['failed']), 5)
+
         # The test config has max_bytes=1M.
         # Uploading 5 210MB items should produce one failure.
+        max_bytes = settings.get("storage.batch_max_bytes",
+                                 DEFAULT_BATCH_MAX_BYTES)
+        self.assertEquals(max_bytes, 1024 * 1024)
         bsos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
                 for i in range(5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
@@ -964,17 +976,17 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + "/storage/col2/1", bso)
 
         # Getting with less than the limit works OK.
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT - 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS - 1))
         res = self.app.get(self.root + "/storage/col2?ids=" + ids)
         self.assertEquals(res.json, ["1"])
 
         # Getting with equal to the limit works OK.
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS))
         res = self.app.get(self.root + "/storage/col2?ids=" + ids)
         self.assertEquals(res.json, ["1"])
 
         # Getting with more than the limit fails.
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT + 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS + 1))
         self.app.get(self.root + "/storage/col2?ids=" + ids, status=400)
 
     def test_that_batch_deletes_are_limited_to_max_number_of_ids(self):
@@ -982,17 +994,17 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Deleting with less than the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT - 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS - 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids)
 
         # Deleting with equal to the limit works OK.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS))
         self.app.delete(self.root + "/storage/col2?ids=" + ids)
 
         # Deleting with more than the limit fails.
         self.app.put_json(self.root + "/storage/col2/1", bso)
-        ids = ",".join(str(i) for i in xrange(BATCH_MAX_COUNT + 1))
+        ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS + 1))
         self.app.delete(self.root + "/storage/col2?ids=" + ids, status=400)
 
     def test_that_expired_items_can_be_overwritten_via_PUT(self):

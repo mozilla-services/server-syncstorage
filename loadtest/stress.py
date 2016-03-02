@@ -45,6 +45,9 @@ MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
 })
 
 
+# Maximum number of items to upload in a single POST.
+BATCH_MAX_COUNT = 100
+
 # Each run reads clients collection 10% of the time.
 # (This only happens when a differnt client writes a record, which is rare).
 client_get_probability = 10 / 100.
@@ -179,8 +182,9 @@ class StressTest(TestCase):
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x]
             data = []
-            # Random batch size, but capped at 100 so we skew towards that.
-            items_per_batch = min(random.randint(20, 180), 100)
+            # Random batch size, skewed slightly towards the upper limit.
+            items_per_batch = min(random.randint(20, BATCH_MAX_COUNT + 80),
+                                  BATCH_MAX_COUNT)
             for i in range(items_per_batch):
                 id = base64.urlsafe_b64encode(os.urandom(10)).rstrip("=")
                 id += str(int((time.time() % 100) * 100000))

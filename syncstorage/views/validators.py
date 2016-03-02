@@ -7,9 +7,9 @@ from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
 
 
-BATCH_MAX_COUNT = 100
-
-BATCH_MAX_BYTES = 1024 * 1024
+BATCH_MAX_IDS = 100
+DEFAULT_BATCH_MAX_COUNT = BATCH_MAX_IDS
+DEFAULT_BATCH_MAX_BYTES = 1024 * 1024
 
 
 def extract_target_resource(request):
@@ -131,9 +131,9 @@ def extract_query_params(request):
     ids = request.GET.get("ids")
     if ids is not None:
         ids = [id.strip() for id in ids.split(",")]
-        if len(ids) > BATCH_MAX_COUNT:
+        if len(ids) > BATCH_MAX_IDS:
             msg = 'Cannot process more than %s BSOs at a time'
-            msg = msg % (BATCH_MAX_COUNT,)
+            msg = msg % (BATCH_MAX_IDS,)
             request.errors.add("querysting", "items", msg)
         else:
             for id in ids:
@@ -173,6 +173,11 @@ def parse_multiple_bsos(request):
     if not isinstance(bso_datas, (tuple, list)):
         request.errors.add("body", "bsos", "Input data was not a list")
         return
+
+    BATCH_MAX_COUNT = request.registry.settings.get("storage.batch_max_count",
+                                                    DEFAULT_BATCH_MAX_COUNT)
+    BATCH_MAX_BYTES = request.registry.settings.get("storage.batch_max_bytes",
+                                                    DEFAULT_BATCH_MAX_BYTES)
 
     valid_bsos = {}
     invalid_bsos = {}

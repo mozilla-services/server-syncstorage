@@ -378,9 +378,8 @@ class SQLStorage(SyncStorage):
         numeric offset.  We figure out an upper-bound on the timestamp and use
         that to exclude previously-seen results, then do a smaller numeric
         offset relative to that position.  The result is a pair of integers
-        encoded as "bound:offset".  Since we limit the number of items that
-        can have the same timestamp, this provides fairly good pagination
-        granularity.
+        encoded as "bound:offset" with efficient pagination granularity
+        limited by the number of items with the same timestamp.
 
         When sorting by sortindex, we cannot use an index anyway, and we have
         no bound on the number of items that might share a single sortindex.
@@ -396,7 +395,7 @@ class SQLStorage(SyncStorage):
         bound_as_bigint = ts2bigint(bound)
         # Count how many previous items have that same timestamp, and hence
         # will need to be skipped over.  The number of matches here is limited
-        # by upload batch size, so no danger of long-running iteration.
+        # by upload batch size.
         offset = 1
         i = len(items) - 2
         while i >= 0 and items[i]["modified"] == bound:
