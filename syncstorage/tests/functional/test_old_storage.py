@@ -20,6 +20,10 @@ from decimal import Decimal
 
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
+from syncstorage.views.validators import (
+    DEFAULT_BATCH_MAX_COUNT,
+    DEFAULT_BATCH_MAX_BYTES,
+)
 
 WEAVE_INVALID_WBO = 8
 
@@ -412,20 +416,24 @@ class TestOldStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res.json), 0)
 
     def test_batch(self):
+        settings = self.config.registry.settings
+        max_count = settings.get("storage.batch_max_count",
+                                 DEFAULT_BATCH_MAX_COUNT)
+        max_bytes = settings.get("storage.batch_max_bytes",
+                                 DEFAULT_BATCH_MAX_BYTES)
+        self.assertEquals(max_bytes, 1024 * 1024)
         # Test that batch uploads are correctly processed.
-        # The test config has max_count=100.
-        # Uploading 70 small objects should succeed with 3 database writes.
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(70)]
+        # Uploading max_count-5 small objects should succeed.
+        wbos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
         res = self.app.post_json(self.root + '/storage/col2', wbos)
         res = res.json
-        self.assertEquals(len(res['success']), 70)
+        self.assertEquals(len(res['success']), max_count - 5)
         self.assertEquals(len(res['failed']), 0)
-        # The test config has max_count=100.
-        # Uploading 105 items should produce five failures.
-        wbos = [{'id': str(i), 'payload': _PLD} for i in range(105)]
+        # Uploading max_count+5 items should produce five failures.
+        wbos = [{'id': str(i), 'payload': 'X'} for i in range(max_count + 5)]
         res = self.app.post_json(self.root + '/storage/col2', wbos)
         res = res.json
-        self.assertEquals(len(res['success']), 100)
+        self.assertEquals(len(res['success']), max_count)
         self.assertEquals(len(res['failed']), 5)
         # The test config has max_bytes=1M.
         # Uploading 5 210MB items should produce one failure.
