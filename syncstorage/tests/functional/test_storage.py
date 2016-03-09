@@ -1360,12 +1360,9 @@ class TestStorageMemcached(TestStorage):
             bso2 = {'id': 'thing', 'payload': _PLD}
             bsos = [bso1, bso2]
 
-            # on batch, we get back a 200 - but only failures
-            res = self.app.post_json(self.root + '/storage/tabs', bsos)
-            self.assertEqual(len(res.json['failed']), 2)
-            self.assertEqual(len(res.json['success']), 0)
-
-            # on single PUT, we get a 503
+            # we get a 503 for both POST and PUT
+            self.app.post_json(self.root + '/storage/tabs', bsos,
+                               status=503)
             self.app.put_json(self.root + '/storage/tabs/sure', bso1,
                               status=503)
         finally:
@@ -1405,11 +1402,9 @@ class TestStorageMemcached(TestStorage):
             bso2 = {'id': 'thing', 'payload': _PLD}
             bsos = [bso1, bso2]
 
-            # on batch, we get back a 200 - but only failures
-            res = self.app.post_json(self.root + '/storage/tabs', bsos)
-            self.assertEqual(len(res.json['failed']), 2)
-            self.assertEqual(len(res.json['success']), 0)
-            self.assertEqual(res.json['failed']['sure'], 'conflict')
+            # on batch, we get back a 503
+            self.app.post_json(self.root + '/storage/tabs', bsos,
+                               status=503)
 
             # on single PUT, we get a 503
             self.app.put_json(self.root + '/storage/tabs/sure', bso1,

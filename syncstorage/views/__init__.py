@@ -10,7 +10,7 @@ from cornice import Service
 
 from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.util import get_timestamp
-from syncstorage.storage import ConflictError, NotFoundError
+from syncstorage.storage import NotFoundError
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
@@ -302,19 +302,10 @@ def post_collection(request):
     for (id, error) in invalid_bsos.iteritems():
         res["failed"][id] = error
 
-    try:
-        ts = storage.set_items(userid, collection, bsos)
-    except ConflictError:
-        raise
-    except Exception, e:
-        logger.error('Could not set items')
-        logger.error(str(e))
-        for bso in bsos:
-            res["failed"][bso["id"]] = "db error"
-    else:
-        res["success"].extend([bso["id"] for bso in bsos])
-        res['modified'] = ts
-        request.response.headers["X-Last-Modified"] = str(ts)
+    ts = storage.set_items(userid, collection, bsos)
+    res["success"].extend([bso["id"] for bso in bsos])
+    res['modified'] = ts
+    request.response.headers["X-Last-Modified"] = str(ts)
 
     return res
 
