@@ -14,8 +14,10 @@ from urlparse import urlparse, urlunparse
 
 import tokenlib
 import hawkauthlib
-import browserid.jwt
-import browserid.tests.support
+from browserid import jwt
+from browserid.tests.support import (get_keypair)
+from browserid.utils import (encode_bytes, bundle_certs_and_assertion,
+                             to_int, to_hex)
 import requests.auth
 
 from loads import TestCase
@@ -26,7 +28,7 @@ from loads import TestCase
 ASSERTION_LIFETIME = 60 * 60 * 24 * 365
 
 MOCKMYID_DOMAIN = "mockmyid.s3-us-west-2.amazonaws.com"
-MOCKMYID_PRIVATE_KEY = browserid.jwt.DS128Key({
+MOCKMYID_PRIVATE_KEY = jwt.DS128Key({
     "algorithm": "DS",
     "x": "385cb3509f086e110c5e24bdd395a84b335a09ae",
     "y": "738ec929b559b604a232a9b55a5295afc368063bb9c20fac4e53a74970a4db795"
@@ -84,6 +86,58 @@ delete_count_distribution = [99, 1, 0, 0, 0]
 # The probability that we'll try to do a full DELETE of all data.
 # Expressed as a float between 0 and 1.
 deleteall_probability = 1 / 100.
+
+def make_assertion(email, audience, issuer=None, exp=None,
+                    assertion_sig=None, certificate_sig=None,
+                    new_style=True, email_keypair=None, issuer_keypair=None,
+                    device_id=None, generation=0):
+    """Generate a new dummy assertion for the given email address.
+
+    This method lets you generate BrowserID assertions using dummy private
+    keys. Called with just an email and audience it will generate an assertion
+    from login.persona.org.
+
+    By specifying the "exp", "assertion_sig" or "certificate_sig" arguments
+    it is possible generate invalid assertions for testing purposes.
+    """
+    if issuer is None:
+        issuer = "login.persona.org"
+    if exp is None:
+        exp = int((time.time() + 60) * 1000)
+    # Get private key for the email address itself.
+    if email_keypair is None:
+        email_keypair = get_keypair(email)
+    email_pub, email_priv = email_keypair
+    # Get private key for the hostname so we can sign it.
+    if issuer_keypair is None:
+        issuer_keypair = get_keypair(issuer)
+    iss_pub, iss_priv = issuer_keypair
+
+    # Generate the assertion, signed with email's public key.
+    assertion = {
+        "exp": exp,
+        "aud": audience,
+    }
+    assertion = jwt.generate(assertion, email_priv)
+    if assertion_sig is not None:
+        assertion = ".".join(assertion.split(".")[:-1] +
+                                [encode_bytes(assertion_sig)])
+    # Generate the certificate signing the email's public key
+    # with the issuer's public key.
+    certificate = {
+        "iss": issuer,
+        "exp": exp,
+        "principal": {"email": email},
+        "public-key": email_pub,
+        "fxa-generation": generation,
+        "fxa-deviceId": device_id
+    }
+    certificate = jwt.generate(certificate, iss_priv)
+    if certificate_sig is not None:
+        certificate = ".".join(certificate.split(".")[:-1] +
+                                [encode_bytes(certificate_sig)])
+    # Combine them into a BrowserID bundled assertion.
+    return bundle_certs_and_assertion([certificate], assertion, new_style)
 
 
 class HawkAuth(requests.auth.AuthBase):
@@ -240,7 +294,7 @@ class StressTest(TestCase):
         else:
             email = "user%s@%s" % (uid, MOCKMYID_DOMAIN)
             exp = time.time() + ASSERTION_LIFETIME + HawkAuth.timeskew
-            assertion = browserid.tests.support.make_assertion(
+            assertion = make_assertion(
                 email=email,
                 audience=self.server_url,
                 issuer=MOCKMYID_DOMAIN,
@@ -256,7 +310,7 @@ class StressTest(TestCase):
                 server_time = int(response.headers["X-Timestamp"])
                 HawkAuth.timeskew = server_time - int(time.time())
                 exp = time.time() + ASSERTION_LIFETIME + HawkAuth.timeskew
-                assertion = browserid.tests.support.make_assertion(
+                assertion = make_assertion(
                     email=email,
                     audience=self.server_url,
                     issuer=MOCKMYID_DOMAIN,
