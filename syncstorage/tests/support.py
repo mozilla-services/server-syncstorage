@@ -108,6 +108,8 @@ class StorageTestCase(TestCase):
                     c.execute('DROP TABLE bso')
                     c.execute('DROP TABLE user_collections')
                     c.execute('DROP TABLE collections')
+                    c.execute('DROP TABLE batch_uploads')
+                    c.execute('DROP TABLE batch_upload_items')
             # Explicitly free any pooled connections.
             storage.dbconnector.engine.dispose()
         # Find any sqlite database files and delete them.

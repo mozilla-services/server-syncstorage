@@ -23,6 +23,7 @@ import random
 import string
 import urllib
 import webtest
+import math
 
 from pyramid.interfaces import IAuthenticationPolicy
 
@@ -1285,6 +1286,49 @@ class TestStorage(StorageFunctionalTestCase):
                 # *after* the one that was used for the newer= timestamp.
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
+
+    def test_transactions(self):
+        endpoint = self.root + '/storage/col2'
+        bso1 = {'id': '12', 'payload': 'elegance'}
+        bso2 = {'id': '13', 'payload': 'slovenly'}
+        bsos = [bso1, bso2]
+        self.app.post_json(endpoint, bsos)
+
+        bso3 = {'id': 'a', 'payload': 'internal'}
+        bso4 = {'id': 'b', 'payload': 'pancreas'}
+        resp = self.app.post_json(endpoint + '?batch=true', [bso3, bso4])
+        batch = resp.json["batch"]
+        # This is sooooo going to break when it's run at just the wrong time
+        # and will result in a seriously confused person at the keyboard.
+        guess = float(resp.headers["X-Weave-Timestamp"])
+        self.assertEqual(batch / 1000, math.floor(guess))
+
+        # make sure we don't have the pending commit
+        resp = self.app.get(endpoint)
+        res = resp.json
+        res.sort()
+        self.assertEquals(res, ['12', '13'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
+
+        bso5 = {'id': 'c', 'payload': 'tinsel'}
+        bso6 = {'id': '13', 'payload': 'portnoy'}
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint + commit, [bso5, bso6])
+        self.assertEquals(resp.json["modified"],
+                          float(resp.headers['X-Weave-Timestamp']))
+
+        # make sure the changes apply
+        resp = self.app.get(endpoint)
+        res = resp.json
+        res.sort()
+        self.assertEquals(res, ['12', '13', 'a', 'b', 'c'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
+        resp = self.app.get(endpoint + '/13')
+        self.assertEquals(resp.json["payload"], 'portnoy')
+
+        # invalid transaction ID
+        bso7 = {'id': 'd', 'payload': 'burrito'}
+        resp = self.app.post_json(endpoint + '?batch=sammich', [bso7])
 
 
 class TestStorageMemcached(TestStorage):

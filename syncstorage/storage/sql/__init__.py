@@ -456,6 +456,54 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
+    def create_transaction(self, session, userid, collection):
+        """Creates a transaction in batch_uploads table"""
+        collectionid = self._get_collection_id(session, collection)
+        batchid = ts2bigint(session.timestamp)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CREATE_TRANSACTION", params)
+        return batchid
+
+    @with_session
+    def append_items_to_transaction(self, session, batchid, userid,
+                                    collection, items):
+        """Inserts items into batch_upload_items"""
+        rows = []
+        for data in items:
+            id_ = data["id"]
+            row = self._prepare_bui_row(session, batchid, id_, data)
+            rows.append(row)
+        defaults = {"modified": ts2bigint(session.timestamp)}
+        session.insert_or_update("batch_upload_items", rows, defaults)
+        return session.timestamp
+
+    @with_session
+    def commit_transaction(self, session, batchid, userid, collection):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid,
+            "default_ttl": MAX_TTL
+        }
+        session.query("COMMIT_TRANSACTION", params)
+        return self._touch_collection(session, userid, collectionid)
+
+    @with_session
+    def close_transaction(self, session, batchid, userid, collection):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CLOSE_TRANSACTION", params)
+
+    @with_session
     def delete_collection(self, session, userid, collection):
         """Deletes an entire collection."""
         collectionid = self._get_collection_id(session, collection)
@@ -551,9 +599,13 @@ class SQLStorage(SyncStorage):
         row["userid"] = userid
         row["collection"] = collectionid
         row["id"] = item
+        self._prepare_common_row(session, data, row)
+        return row
+
+    def _prepare_common_row(self, session, data, row):
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
-        # If a payload is provided, make sure to update dependant fields.
+        # If a payload is provided, make sure to update dependent fields.
         if "payload" in data:
             row["modified"] = ts2bigint(session.timestamp)
             row["payload"] = data["payload"]
@@ -566,6 +618,12 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = MAX_TTL
             else:
                 row["ttl"] = data["ttl"] + int(session.timestamp)
+
+    def _prepare_bui_row(self, session, batchid, item, data):
+        row = {}
+        row["item"] = item
+        row["batch"] = batchid
+        self._prepare_common_row(session, data, row)
         return row
 
     @with_session

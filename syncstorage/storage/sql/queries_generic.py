@@ -12,6 +12,7 @@ In addition to standard bindparam syntax, the query loader supports some
 string interpolation variables with special meaning:
 
     * %(bso)s:   insert the name of the user's sharded BSO storage table
+    * %(bui)s:   insert the name of the user's sharded batch_upload_items table
     * %(ids)s:   insert a list of items matching the "ids" query parameter.
 
 """
@@ -92,6 +93,47 @@ DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
 
+CREATE_TRANSACTION = "INSERT INTO batch_uploads (batch, userid, collection) "\
+                     "VALUES (:batch, :userid, :collection)"
+
+VALID_TRANSACTION = "SELECT open FROM batch_uploads WHERE batch = :batch " \
+                    "AND userid = :userid AND collection = collection"
+
+APPEND_ITEMS_TO_TRANSACTION = "INSERT INTO batch_upload_items "\
+                              "  (batch, item, sortindex, modified, payload, "\
+                              "   payload_size, ttl) "\
+                              "VALUES "\
+                              "  (:batchid, :item, :sortindex, :modified, "\
+                              "   :payload, :payload_size, :ttl) "\
+                              "ON DUPLICATE KEY UPDATE "\
+                              "  sortindex = VALUES(sortindex), "\
+                              "  payload = VALUES(payload), "\
+                              "  payload_size = VALUES(payload_size) "\
+                              "  ttl = VALUES(ttl)"
+
+COMMIT_TRANSACTION = "INSERT INTO %(bso)s "\
+                     "  (userid, collection, id, sortindex, modified, "\
+                     "   payload, payload_size, ttl) "\
+                     "SELECT "\
+                     "  :userid, :collection, item, sortindex, modified, "\
+                     "  COALESCE(payload, \"\"), COALESCE(payload_size, 0), "\
+                     "  COALESCE(ttl, ttl + :default_ttl) "\
+                     "FROM %(batch_upload_items)s "\
+                     "WHERE batch = :batch "\
+                     "ON DUPLICATE KEY UPDATE "\
+                     "  sortindex = COALESCE(VALUES(%(bso)s.sortindex), " \
+                     "                   %(batch_upload_items)s.sortindex), " \
+                     "  payload = COALESCE(VALUES(%(bso)s.payload), " \
+                     "                   %(batch_upload_items)s.payload), "\
+                     "  payload_size = COALESCE(VALUES(%(bso)s.payload_size),"\
+                     "                 %(batch_upload_items)s.payload_size), "\
+                     "  ttl = COALESCE(VALUES(%(bso)s.ttl), " \
+                     "                 %(batch_upload_items)s.ttl)"
+
+CLOSE_TRANSACTION = "UPDATE batch_uploads SET open = FALSE " \
+                    "WHERE batch = :batch AND userid = :userid " \
+                    "AND collection = :collection"
+
 
 def FIND_ITEMS(bso, params):
     """Item search query.
@@ -163,3 +205,8 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 # version using DELETE <blah> LIMIT 1000.
 PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
                            "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "
+
+PURGE_TRANSACTIONS = "DELETE FROM batch_uploads WHERE batch < :batch"
+
+PURGE_TRANSACTION_CONTENTS = "DELETE FROM batch_upload_items WHERE batch < " \
+                             ":batch"

@@ -146,6 +146,31 @@ def extract_query_params(request):
         request.validated["full"] = True
 
 
+def extract_transaction_state(request):
+    """Validator to extract the transaction state of a request for slightly
+    tidier code in the views.
+
+    If the "batch" parameter is has no value or has a value of "true" then
+    a new transaction will be created.
+
+    If the "commit" parameter is has a value of "true", this transaction
+    is to be committed and deleted.
+    """
+    request.validated["batch"] = False
+    batch_id = request.GET.get("batch")
+    if batch_id is not None:
+        if batch_id == "true":
+            batch_id = True
+        request.validated["batch"] = batch_id
+    elif batch_id is None and "batch" in request.GET:
+        request.validated["batch"] = True
+
+    request.validated["commit"] = False
+    commit = request.GET.get("commit")
+    if commit is not None and commit == "true":
+        request.validated["commit"] = True
+
+
 def parse_multiple_bsos(request):
     """Validator to parse a list of BSOs from the request body.
 

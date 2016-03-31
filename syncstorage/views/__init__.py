@@ -5,16 +5,20 @@
 import logging
 
 from pyramid.security import Allow
+from pyramid.httpexceptions import (HTTPBadRequest, HTTPServiceUnavailable)
 
 from cornice import Service
 
 from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.util import get_timestamp
-from syncstorage.storage import ConflictError, NotFoundError
+from syncstorage.storage import (ConflictError,
+                                 NotFoundError,
+                                 InvalidTransaction)
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
                                           extract_query_params,
+                                          extract_transaction_state,
                                           parse_multiple_bsos,
                                           parse_single_bso)
 from syncstorage.views.decorators import (convert_storage_errors,
@@ -130,6 +134,8 @@ info_usage = SyncStorageService(name="info_usage",
                                 path="/info/collection_usage")
 info_counts = SyncStorageService(name="info_counts",
                                  path="/info/collection_counts")
+info_configuration = SyncStorageService(name="info_configuration",
+                                        path="/info/configuration")
 
 storage = SyncStorageService(name="storage",
                              path="/storage")
@@ -178,6 +184,19 @@ def get_info_usage(request):
         sizes[collection] = size / ONE_KB
     request.response.headers["X-Weave-Records"] = str(len(sizes))
     return sizes
+
+
+@info_configuration.get(accept="application/json", renderer="sync-json")
+@default_decorators
+def get_info_configuration(request):
+    settings = request.registry.settings
+    limits = {}
+    limits["max_request_bytes"] = settings.get("storage.max_request_bytes")
+    limits["max_post_records"] = settings.get("storage.max_post_records")
+    limits["max_post_bytes"] = settings.get("max_post_bytes")
+    limits["max_batch_records"] = settings.get("max_batch_records")
+    limits["max_batch_bytes"] = settings.get("max_batch_bytes")
+    return limits
 
 
 @storage.delete(renderer="sync-json")
@@ -286,7 +305,8 @@ def get_collection(request):
 
 
 @collection.post(accept="application/json", renderer="sync-json",
-                 validators=DEFAULT_VALIDATORS + (parse_multiple_bsos,))
+                 validators=DEFAULT_VALIDATORS + (extract_transaction_state,
+                                                  parse_multiple_bsos))
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
@@ -294,6 +314,9 @@ def post_collection(request):
     collection = request.validated["collection"]
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
+
+    if request.validated["batch"] or request.validated["commit"]:
+        return post_collection_transaction(request)
 
     res = {'success': [], 'failed': {}}
 
@@ -316,6 +339,84 @@ def post_collection(request):
         res['modified'] = ts
         request.response.headers["X-Last-Modified"] = str(ts)
 
+    return res
+
+
+def post_collection_transaction(request):
+    storage = request.validated["storage"]
+    userid = request.validated["userid"]
+    collection = request.validated["collection"]
+    bsos = request.validated["bsos"]
+    invalid_bsos = request.validated["invalid_bsos"]
+    batch = request.validated["batch"]
+    commit = request.validated["commit"]
+
+    # The "batch" key is set only on a multi-POST batch request prior to a
+    # commit.  The "modified" key is only set upon a successful commit.
+    # The two flags are mutually exclusive.
+    # Any failures at all mean cancelling the transaction completely.
+    res = {'success': [], 'failed': {}}
+
+    # If there are any parsing failures, we won't even start a transaction.
+    if len(invalid_bsos):
+        for (id, error) in invalid_bsos.iteritems():
+            res["failed"][id] = error
+        # if batch and batch is not True:
+        #     storage.delete_transaction(batch)
+        return res
+
+    try:
+        if batch is True:
+            try:
+                batch = storage.create_transaction(userid, collection)
+            except ConflictError, e:
+                # ConflictError here means a client is spamming requests,
+                # I think.
+                logger.error('Collision in transaction creation!')
+                logger.error(e)
+                raise HTTPServiceUnavailable('Too many transactions opened')
+            except Exception, e:
+                logger.error('Could not create transaction')
+                logger.error(e)
+                raise
+
+        try:
+            ts = storage.append_items_to_transaction(batch, userid,
+                                                     collection, bsos)
+        except InvalidTransaction:
+            raise HTTPBadRequest("Invalid or expired transaction ID")
+        except ConflictError:
+            raise
+        except Exception, e:
+            logger.error('Could not append to transaction'
+                         '("{0}")'.format(batch))
+            logger.error(str(e))
+            for bso in bsos:
+                res["failed"][bso["id"]] = "db error"
+            raise
+
+        if commit:
+            try:
+                storage.commit_transaction(batch, userid, collection)
+                res['modified'] = ts
+                request.response.headers["X-Last-Modified"] = str(ts)
+            except ConflictError:
+                raise
+            except Exception, e:
+                logger.error("Could not commit transaction")
+                logger.error(e)
+                raise
+            finally:
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error: commit"
+        else:
+            res["batch"] = batch
+        res["success"].extend([bso["id"] for bso in bsos])
+    except ConflictError:
+        raise
+    finally:
+        if batch and batch is not True:
+            storage.close_transaction(batch, userid, collection)
     return res
 
 

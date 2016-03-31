@@ -34,7 +34,7 @@ from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update, text as sqltext
 from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
-                        MetaData, Column, Table, Index)
+                        MetaData, Column, Table, Index, Boolean)
 from sqlalchemy.dialects import postgresql
 
 from mozsvc.metrics import metrics_timer, annotate_request
@@ -112,19 +112,33 @@ PAYLOAD_TYPE = Text(length=256*1024)
 PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
 
 
-def _get_bso_columns(table_name):
+# Common column definitions between BSO and batch upload item tables
+
+def _common_columns(ttl):
     return (
+        Column("sortindex", Integer),
+        Column("modified", BigInteger, nullable=False),
+        # MySQL no likey "DEFAULT ''".  Results in an error:
+        #     ERROR 1101 (42000): BLOB, TEXT, GEOMETRY or JSON column 'payload'
+        #                         can't have a default value
+        # Column("payload", PAYLOAD_TYPE, nullable=False),
+        Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
+        Column("payload_size", Integer, nullable=False,
+               server_default=sqltext("0")),
+        Column("ttl", Integer, server_default=sqltext(str(ttl)))
+    )
+
+
+def _get_bso_columns(table_name):
+    identifiers = (
         Column("userid", Integer, primary_key=True, nullable=False,
                autoincrement=False),
         Column("collection", Integer, primary_key=True, nullable=False,
                autoincrement=False),
-        Column("id", String(64), primary_key=True, autoincrement=False),
-        Column("sortindex", Integer),
-        Column("modified", BigInteger, nullable=False),
-        Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
-        Column("payload_size", Integer, nullable=False,
-               server_default=sqltext("0")),
-        Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
+        Column("id", String(64), primary_key=True, autoincrement=False)
+    )
+    common = _common_columns(MAX_TTL)
+    indexes = (
         # Declare indexes.
         # We need to include the tablename in the index name due to sharding,
         # because index names in sqlite are global, not per-table.
@@ -137,6 +151,7 @@ def _get_bso_columns(table_name):
         # Clients almost always filter on "modified" using the above index,
         # and cannot take advantage of a separate index for sorting.
     )
+    return identifiers + common + indexes
 
 
 #  If the storage controller is not doing sharding based on userid,
@@ -144,21 +159,85 @@ def _get_bso_columns(table_name):
 
 bso = Table("bso", metadata, *_get_bso_columns("bso"))
 
+# Table mapping (user_id, collection_id) => batch IDs
+
+batch_uploads = Table(
+    "batch_uploads",
+    metadata,
+    Column("batch", BigInteger, primary_key=True, nullable=False),
+    Column("userid", Integer, nullable=False, autoincrement=False),
+    Column("collection", Integer, nullable=False, autoincrement=False),
+    Column("open", Boolean, default=True)
+)
+
+# Column definitions for batch upload item table(s)
+#
+# These columns hold the batched uploads until either the client declares a
+# commit or the TTL expires.
+
+
+def _get_batch_item_columns(table_name):
+    identifiers = (
+        Column("batch", BigInteger, primary_key=True, nullable=False,
+               autoincrement=False),
+        Column("item", String(64), primary_key=True, nullable=False,
+               autoincrement=False)
+    )
+    common = _common_columns(MAX_TTL)
+    indexes = (
+        # Declare indexes.
+        # We need to include the tablename in the index name due to sharding,
+        # because index names in sqlite are global, not per-table.
+        # Index on "ttl" for easy pruning of expired items.
+        Index("%s_ttl_idx" % (table_name,), "ttl"),
+        # Index on "modified" for easy filtering by timestamp.
+        Index("%s_batch_mod_idx" % (table_name,),
+              "batch", "modified"),
+        # There is intentinally no index on "sortindex".
+        # Clients almost always filter on "modified" using the above index,
+        # and cannot take advantage of a separate index for sorting.
+    )
+    return identifiers + common + indexes
+
+
+bui = Table("batch_upload_items", metadata,
+            *_get_batch_item_columns("batch_upload_items"))
+
+
 #  If the storage controller is doing sharding based on userid,
 #  then it will use the below functions to select a table from "bso0"
-#  to "bsoN" for each userid.
+#  to "bsoN" for each userid.  Ditto for batch_upload_items.
 
 BSO_SHARDS = {}
+BUI_SHARDS = {}
+
+
+def get_sharded_table(index, which="bso"):
+    """Get the Table object for table bso and batch_upload_items<N>."""
+    global BSO_SHARDS, BUI_SHARDS
+    if which == "bso":
+        shards = BSO_SHARDS
+        columns_func = _get_bso_columns
+    elif which == "batch_upload_items":
+        shards = BUI_SHARDS
+        columns_func = _get_batch_item_columns
+    else:
+        raise ValueError("Invalid sharded table type: %s" % (which))
+
+    table = shards.get(index)
+    if table is None:
+        table_name = "%s%d" % (which, index)
+        table = Table(table_name, metadata, *columns_func(table_name))
+        shards[index] = table
+    return table
 
 
 def get_bso_table(index):
-    """Get the Table object for table bso<N>."""
-    bso = BSO_SHARDS.get(index)
-    if bso is None:
-        table_name = "bso%d" % (index,)
-        bso = Table(table_name, metadata, *_get_bso_columns(table_name))
-        BSO_SHARDS[index] = bso
-    return bso
+    return get_sharded_table(index)
+
+
+def get_batch_item_table(index):
+    return get_sharded_table(index, which="batch_upload_items")
 
 
 class _QueueWithMaxBacklog(Queue):
@@ -297,12 +376,16 @@ class DBConnector(object):
         if create_tables:
             collections.create(self.engine, checkfirst=True)
             user_collections.create(self.engine, checkfirst=True)
+            batch_uploads.create(self.engine, checkfirst=True)
             if not self.shard:
                 bso.create(self.engine, checkfirst=True)
+                bui.create(self.engine, checkfirst=True)
             else:
                 for idx in xrange(self.shardsize):
                     bsoN = get_bso_table(idx)
                     bsoN.create(self.engine, checkfirst=True)
+                    buiN = get_batch_item_table(idx)
+                    buiN.create(self.engine, checkfirst=True)
 
         # Load the pre-built queries to use with this database backend.
         # Currently we have a generic set of queries, and some queries specific
@@ -371,6 +454,11 @@ class DBConnector(object):
                 qvars["bso"] = params["bso"]
             else:
                 qvars["bso"] = self.get_bso_table(params["userid"])
+        if "%(batch_upload_items)s" in query:
+            if "batch_upload_items" in params:
+                qvars["batch_upload_items"] = params["batch_upload_items"]
+            else:
+                qvars["batch_upload_items"] = self.get_batch_item_table(params["userid"])  # noqa
         if "%(ids)s" in query:
             bindparams = []
             for i, id in enumerate(params["ids"]):
@@ -385,6 +473,12 @@ class DBConnector(object):
         """Get the BSO table object for the given userid."""
         if not self.shard or userid is None:
             return bso
+        return get_bso_table(userid % self.shardsize)
+
+    def get_batch_item_table(self, userid):
+        """Get the batch_upload_items table object for the given userid."""
+        if not self.shard or userid is None:
+            return bui
         return get_bso_table(userid % self.shardsize)
 
 
@@ -744,6 +838,8 @@ class DBConnection(object):
         userid = items[0].get("userid")
         if table == "bso":
             table = self._connector.get_bso_table(userid)
+        elif table == "batch_upload_items":
+            table = self._connector.get_batch_item_table(userid)
         else:
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.

@@ -47,6 +47,12 @@ class InvalidOffsetError(StorageError, ValueError):
     pass
 
 
+class InvalidTransaction(StorageError, ValueError):
+    """Exception raised when a request contains an invalid transaction
+       identifier"""
+    pass
+
+
 class SyncStorage(object):
     """Abstract Base Class for storage backends.
 
@@ -305,6 +311,63 @@ class SyncStorage(object):
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
             CollectionNotFoundError: the user has no such collection.
+        """
+
+    @abc.abstractmethod
+    def create_transaction(self, userid, collection):
+        """Creates a transaction for multi-POST batch uploads.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+
+        Returns:
+            The new transaction's ID as a BigInteger timestamp.
+        """
+
+    @abc.abstractmethod
+    def append_items_to_transaction(self, batchid, userid, collection, items):
+        """Creates or updates multiple items from a multi-POST batch to a
+        transaction.
+
+        Args:
+            batchid: big integer batch identifier for this transaction
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+            items: a list of dicts giving data for each item.
+
+        Returns:
+            The new last-modified timestamp for the transaction.
+
+        Raises:
+            ConflictError: the operation conflicted with a concurrent write.
+        """
+
+    @abc.abstractmethod
+    def commit_transaction(self, batchid, userid, collection):
+        """Commits the pending transaction.
+
+        Args:
+            batchid: big integer batch identifier for this transaction
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+
+        Returns:
+            The new last-modified timestamp for the collection.
+
+
+        Raises:
+            ConflictError: the operation conflicted with a concurrent write.
+        """
+
+    @abc.abstractmethod
+    def close_transaction(self, batchid, userid, collection):
+        """Close a specific transaction.
+
+        Args:
+            batchid: big integer batch identifier for this transaction
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
         """
 
     #
