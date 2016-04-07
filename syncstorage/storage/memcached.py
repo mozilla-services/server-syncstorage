@@ -58,7 +58,8 @@ from syncstorage.storage import (SyncStorage,
                                  ConflictError,
                                  CollectionNotFoundError,
                                  ItemNotFoundError,
-                                 InvalidOffsetError)
+                                 InvalidOffsetError,
+                                 InvalidBatch)
 
 from pyramid.settings import aslist
 
@@ -106,7 +107,7 @@ class MemcachedStorage(SyncStorage):
     The SyncStorage implementation wraps another storage backend to provide
     a caching layer.  You may specify the following arguments:
 
-        * storage:  the underlying SyncStorage object that is to be wrapped.a
+        * storage:  the underlying SyncStorage object that is to be wrapped.
         * cache_servers:  a list of memcached server URLs.
         * cached_collections:  a list of names of collections that should
                                be duplicated into memcache for fast access.
@@ -351,6 +352,35 @@ class MemcachedStorage(SyncStorage):
             ts = colmgr.del_items(userid, items)
             update(ts, ts)
             return ts
+
+    def create_batch(self, userid, collection):
+        """Creates batch for a give user's collection."""
+        colmgr = self._get_collection_manager(collection)
+        return colmgr.create_batch(userid)
+
+    def valid_batch(self, userid, collection, batchid):
+        """Verifies that a batch ID is valid"""
+        colmgr = self._get_collection_manager(collection)
+        return colmgr.valid_batch(userid, batchid)
+
+    def append_items_to_batch(self, userid, collection, batchid, items):
+        """Appends items to the pending batch."""
+        colmgr = self._get_collection_manager(collection)
+        ts = colmgr.append_items_to_batch(userid, batchid, items)
+        return ts
+
+    def apply_batch(self, userid, collection, batchid):
+        """Applies the batch"""
+        colmgr = self._get_collection_manager(collection)
+        # prevts = colmgr.get_timestamp(userid)
+        with self._mark_collection_dirty(userid, collection):
+            ts = colmgr.apply_batch(userid, batchid)
+            # Lazy update should occur on following get_item/s
+        return ts
+
+    def close_batch(self, userid, collection, batchid):
+        colmgr = self._get_collection_manager(collection)
+        return colmgr.close_batch(userid, batchid)
 
     #
     # Items APIs
@@ -609,6 +639,27 @@ class UncachedManager(object):
     def del_item(self, userid, item):
         storage = self.owner.storage
         return storage.delete_item(userid, self.collection, item)
+
+    def create_batch(self, userid):
+        storage = self.owner.storage
+        return storage.create_batch(userid, self.collection)
+
+    def valid_batch(self, userid, batchid):
+        storage = self.owner.storage
+        return storage.valid_batch(userid, self.collection, batchid)
+
+    def append_items_to_batch(self, userid, batchid, items):
+        storage = self.owner.storage
+        return storage.append_items_to_batch(userid, self.collection, batchid,
+                                             items)
+
+    def apply_batch(self, userid, batchid):
+        storage = self.owner.storage
+        return storage.apply_batch(userid, self.collection, batchid)
+
+    def close_batch(self, userid, batchid):
+        storage = self.owner.storage
+        return storage.close_batch(userid, self.collection, batchid)
 
 
 class _CachedManagerBase(object):
@@ -880,6 +931,85 @@ class CacheOnlyManager(_CachedManagerBase):
             raise ItemNotFoundError
         return modified
 
+    def get_batches_key(self, userid):
+        return _key(userid, "c", self.collection, "batches")
+
+    def get_cached_batches(self, userid):
+        return self.cache.gets(self.get_batches_key(userid))
+
+    def create_batch(self, userid):
+        bdata, bcasid = self.get_cached_batches(userid)
+        batch = get_timestamp()
+        batchid = int(batch * 1000)
+        if not bdata:
+            bdata = {}
+        if batchid in bdata:
+            raise ConflictError
+        bdata[batchid] = {"user": userid,
+                          "modified": batch,
+                          # FIXME Rough guesstimate of the maximum
+                          #       reasonable life span of a batch
+                          "expires": int(batch) + 2 * 3600,
+                          "items": []}
+        key = self.get_batches_key(userid)
+        if not self.cache.cas(key, bdata, bcasid):
+            raise ConflictError
+        return batchid
+
+    def valid_batch(self, userid, batch):
+        ts = get_timestamp()
+        batchid = str(batch)
+        bdata, bcasid = self.get_cached_batches(userid)
+
+        if batchid not in bdata or bdata[batchid]["expires"] < ts:
+            self.close_batch(userid, batchid)
+            return False
+        return True
+
+    def append_items_to_batch(self, userid, batch, items):
+        modified = get_timestamp()
+        batchid = str(batch)
+        bdata, bcasid = self.get_cached_batches(userid)
+        # Invalid, closed, or expired batch
+        if (not bdata or
+                batchid not in bdata or
+                bdata[batchid]["expires"] <= int(modified)):
+            raise InvalidBatch(batch, modified, bdata)
+
+        bdata[batchid]["items"].extend(items)
+        bdata[batchid]["modified"] = modified
+        key = self.get_batches_key(userid)
+        if not self.cache.cas(key, bdata, bcasid):
+            raise ConflictError
+        return modified
+
+    def apply_batch(self, userid, batch):
+        modified = get_timestamp()
+        batchid = str(batch)
+        bdata, bcasid = self.get_cached_batches(userid)
+        # Invalid, closed, or expired batch
+        if (not bdata or
+                batchid not in bdata or
+                bdata[batchid]["expires"] <= int(modified)):
+            raise InvalidBatch(batch, modified, bdata)
+
+        data, casid = self.get_cached_data(userid)
+        self._set_items(userid, bdata[batchid]["items"], modified, data, casid)
+        return modified
+
+    def close_batch(self, userid, batch):
+        batchid = str(batch)
+        bdata, bcasid = self.get_cached_batches(userid)
+        key = self.get_batches_key(userid)
+
+        if batchid in bdata:
+            try:
+                del bdata[batchid]
+            except KeyError:
+                return
+        if not self.cache.cas(key, bdata, bcasid):
+            raise ConflictError
+
 
 class CachedManager(_CachedManagerBase):
     """Object for managing storage of a collection in both cache and store.
@@ -965,6 +1095,35 @@ class CachedManager(_CachedManagerBase):
         self._del_items(userid, [item], ts, data, casid)
         return ts
 
+    def create_batch(self, userid):
+        storage = self.storage
+        with self._mark_dirty(userid) as (data, casid):
+            batchid_ts = storage.create_batch(userid, self.collection)
+        return batchid_ts
+
+    def valid_batch(self, userid, batchid):
+        storage = self.storage
+        with self._mark_dirty(userid) as (data, casid):
+            valid = storage.valid_batch(userid, self.collection, batchid)
+        return valid
+
+    def append_items_to_batch(self, userid, batchid, items):
+        storage = self.storage
+        with self._mark_dirty(userid) as (data, casid):
+            ts = storage.append_items_to_batch(userid, self.collection,
+                                               batchid, items)
+        return ts
+
+    def apply_batch(self, userid, batchid):
+        storage = self.storage
+        with self._mark_dirty(userid) as (data, casid):
+            ts = storage.apply_batch(userid, self.collection, batchid)
+        return ts
+
+    def close_batch(self, userid, batchid):
+        storage = self.storage
+        storage.close_batch(userid, self.collection, batchid)
+
     @contextlib.contextmanager
     def _mark_dirty(self, userid):
         """Context manager to temporarily remove the cached data during write.
@@ -1011,7 +1170,7 @@ class CachedManager(_CachedManagerBase):
     def _del_items(self, userid, *args):
         """Update cached data with deleted items, or clear it on conflict.
 
-        This method extends the base class _set_items method so that any
+        This method extends the base class _del_items method so that any
         failures are not bubbled up to the calling code.  By the time this
         method is called the write has already succeeded in the underlying
         store, so instead of reporting an error because of the cache, we

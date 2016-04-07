@@ -34,7 +34,7 @@ from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update, text as sqltext
 from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
-                        MetaData, Column, Table, Index, Boolean)
+                        MetaData, Column, Table, Index)
 from sqlalchemy.dialects import postgresql
 
 from mozsvc.metrics import metrics_timer, annotate_request
@@ -165,9 +165,9 @@ batch_uploads = Table(
     "batch_uploads",
     metadata,
     Column("batch", BigInteger, primary_key=True, nullable=False),
-    Column("userid", Integer, nullable=False, autoincrement=False),
-    Column("collection", Integer, nullable=False, autoincrement=False),
-    Column("open", Boolean, default=True)
+    Column("userid", Integer, primary_key=True, nullable=False,
+           autoincrement=False),
+    Column("collection", Integer, nullable=False)
 )
 
 # Column definitions for batch upload item table(s)
@@ -180,24 +180,11 @@ def _get_batch_item_columns(table_name):
     identifiers = (
         Column("batch", BigInteger, primary_key=True, nullable=False,
                autoincrement=False),
-        Column("item", String(64), primary_key=True, nullable=False,
+        Column("id", String(64), primary_key=True, nullable=False,
                autoincrement=False)
     )
     common = _common_columns(MAX_TTL)
-    indexes = (
-        # Declare indexes.
-        # We need to include the tablename in the index name due to sharding,
-        # because index names in sqlite are global, not per-table.
-        # Index on "ttl" for easy pruning of expired items.
-        Index("%s_ttl_idx" % (table_name,), "ttl"),
-        # Index on "modified" for easy filtering by timestamp.
-        Index("%s_batch_mod_idx" % (table_name,),
-              "batch", "modified"),
-        # There is intentinally no index on "sortindex".
-        # Clients almost always filter on "modified" using the above index,
-        # and cannot take advantage of a separate index for sorting.
-    )
-    return identifiers + common + indexes
+    return identifiers + common
 
 
 bui = Table("batch_upload_items", metadata,
@@ -454,11 +441,11 @@ class DBConnector(object):
                 qvars["bso"] = params["bso"]
             else:
                 qvars["bso"] = self.get_bso_table(params["userid"])
-        if "%(batch_upload_items)s" in query:
-            if "batch_upload_items" in params:
-                qvars["batch_upload_items"] = params["batch_upload_items"]
+        if "%(bui)s" in query:
+            if "bui" in params:
+                qvars["bui"] = params["bui"]
             else:
-                qvars["batch_upload_items"] = self.get_batch_item_table(params["userid"])  # noqa
+                qvars["bui"] = self.get_batch_item_table(params["userid"])
         if "%(ids)s" in query:
             bindparams = []
             for i, id in enumerate(params["ids"]):
@@ -479,7 +466,7 @@ class DBConnector(object):
         """Get the batch_upload_items table object for the given userid."""
         if not self.shard or userid is None:
             return bui
-        return get_bso_table(userid % self.shardsize)
+        return get_batch_item_table(userid % self.shardsize)
 
 
 def is_retryable_db_error(engine, exc):

@@ -23,10 +23,10 @@ LOCK_COLLECTION_WRITE = "SELECT last_modified FROM user_collections "\
 PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
                            "WHERE ttl < (strftime('%%s', 'now') - :grace) "
 
-COMMIT_TRANSACTION = "INSERT OR REPLACE INTO %(bso)s " \
+APPLY_BATCH = "INSERT OR REPLACE INTO %(bso)s " \
                      "  (userid, collection, id, modified, sortindex, " \
                      "   payload, payload_size, ttl) " \
-                     "SELECT userid, collection, item, modified, " \
+                     "SELECT userid, collection, id, modified, " \
                      "  sortindex, COALESCE(payload, \"\"), " \
                      "  COALESCE(payload_size, 0), " \
                      "  COALESCE(ttl, default_ttl) " \
@@ -35,11 +35,7 @@ COMMIT_TRANSACTION = "INSERT OR REPLACE INTO %(bso)s " \
                      "         :default_ttl AS default_ttl " \
                      "  FROM batch_uploads WHERE batch = :batch "\
                      ") LEFT JOIN ( " \
-                     "  SELECT item, modified, sortindex, payload, " \
+                     "  SELECT id, modified, sortindex, payload, " \
                      "         payload_size, ttl " \
-                     "  FROM %(batch_upload_items)s " \
+                     "  FROM %(bui)s " \
                      ") ON batch"
-
-CLOSE_TRANSACTION = "UPDATE batch_uploads SET open = 0 " \
-                    "WHERE batch = :batch AND userid = :userid " \
-                    "AND collection = :collection"

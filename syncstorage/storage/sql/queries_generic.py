@@ -93,17 +93,17 @@ DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
 
-CREATE_TRANSACTION = "INSERT INTO batch_uploads (batch, userid, collection) "\
+CREATE_BATCH = "INSERT INTO batch_uploads (batch, userid, collection) "\
                      "VALUES (:batch, :userid, :collection)"
 
-VALID_TRANSACTION = "SELECT open FROM batch_uploads WHERE batch = :batch " \
-                    "AND userid = :userid AND collection = collection"
+VALID_BATCH = "SELECT batch FROM batch_uploads WHERE batch = :batch " \
+                    "AND userid = :userid AND collection = :collection"
 
-APPEND_ITEMS_TO_TRANSACTION = "INSERT INTO batch_upload_items "\
-                              "  (batch, item, sortindex, modified, payload, "\
+APPEND_ITEMS_TO_BATCH = "INSERT INTO %(bui)s "\
+                              "  (batch, id, sortindex, modified, payload, "\
                               "   payload_size, ttl) "\
                               "VALUES "\
-                              "  (:batchid, :item, :sortindex, :modified, "\
+                              "  (:batchid, :id, :sortindex, :modified, "\
                               "   :payload, :payload_size, :ttl) "\
                               "ON DUPLICATE KEY UPDATE "\
                               "  sortindex = VALUES(sortindex), "\
@@ -111,28 +111,27 @@ APPEND_ITEMS_TO_TRANSACTION = "INSERT INTO batch_upload_items "\
                               "  payload_size = VALUES(payload_size) "\
                               "  ttl = VALUES(ttl)"
 
-COMMIT_TRANSACTION = "INSERT INTO %(bso)s "\
+APPLY_BATCH = "INSERT INTO %(bso)s "\
                      "  (userid, collection, id, sortindex, modified, "\
                      "   payload, payload_size, ttl) "\
                      "SELECT "\
-                     "  :userid, :collection, item, sortindex, modified, "\
+                     "  :userid, :collection, id, sortindex, :modified, "\
                      "  COALESCE(payload, \"\"), COALESCE(payload_size, 0), "\
                      "  COALESCE(ttl, ttl + :default_ttl) "\
-                     "FROM %(batch_upload_items)s "\
+                     "FROM %(bui)s "\
                      "WHERE batch = :batch "\
                      "ON DUPLICATE KEY UPDATE "\
-                     "  sortindex = COALESCE(VALUES(%(bso)s.sortindex), " \
-                     "                   %(batch_upload_items)s.sortindex), " \
-                     "  payload = COALESCE(VALUES(%(bso)s.payload), " \
-                     "                   %(batch_upload_items)s.payload), "\
-                     "  payload_size = COALESCE(VALUES(%(bso)s.payload_size),"\
-                     "                 %(batch_upload_items)s.payload_size), "\
-                     "  ttl = COALESCE(VALUES(%(bso)s.ttl), " \
-                     "                 %(batch_upload_items)s.ttl)"
+                     "  sortindex = COALESCE(VALUES(%(bui)s.sortindex), " \
+                     "                   %(bso)s.sortindex), " \
+                     "  payload = COALESCE(VALUES(%(bui)s.payload), " \
+                     "                   %(bso)s.payload), "\
+                     "  payload_size = COALESCE(VALUES(%(bui)s.payload_size),"\
+                     "                 %(bso)s.payload_size), "\
+                     "  ttl = COALESCE(VALUES(%(bui)s.ttl), " \
+                     "                 %(bso)s.ttl)"
 
-CLOSE_TRANSACTION = "UPDATE batch_uploads SET open = FALSE " \
-                    "WHERE batch = :batch AND userid = :userid " \
-                    "AND collection = :collection"
+CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
+              "AND userid = :userid AND collection = :collection"
 
 
 def FIND_ITEMS(bso, params):
@@ -206,7 +205,6 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
                            "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "
 
-PURGE_TRANSACTIONS = "DELETE FROM batch_uploads WHERE batch < :batch"
+PURGE_BATCHES = "DELETE FROM batch_uploads WHERE batch < :batch"
 
-PURGE_TRANSACTION_CONTENTS = "DELETE FROM batch_upload_items WHERE batch < " \
-                             ":batch"
+PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s WHERE batch < :batch"

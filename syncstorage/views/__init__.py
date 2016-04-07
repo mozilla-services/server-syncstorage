@@ -5,7 +5,6 @@
 import logging
 
 from pyramid.security import Allow
-from pyramid.httpexceptions import (HTTPBadRequest, HTTPServiceUnavailable)
 
 from cornice import Service
 
@@ -13,12 +12,12 @@ from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.util import get_timestamp
 from syncstorage.storage import (ConflictError,
                                  NotFoundError,
-                                 InvalidTransaction)
+                                 InvalidBatch)
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
                                           extract_query_params,
-                                          extract_transaction_state,
+                                          extract_batch_state,
                                           parse_multiple_bsos,
                                           parse_single_bso)
 from syncstorage.views.decorators import (convert_storage_errors,
@@ -305,7 +304,7 @@ def get_collection(request):
 
 
 @collection.post(accept="application/json", renderer="sync-json",
-                 validators=DEFAULT_VALIDATORS + (extract_transaction_state,
+                 validators=DEFAULT_VALIDATORS + (extract_batch_state,
                                                   parse_multiple_bsos))
 @default_decorators
 def post_collection(request):
@@ -316,7 +315,7 @@ def post_collection(request):
     invalid_bsos = request.validated["invalid_bsos"]
 
     if request.validated["batch"] or request.validated["commit"]:
-        return post_collection_transaction(request)
+        return post_collection_batch(request)
 
     res = {'success': [], 'failed': {}}
 
@@ -342,7 +341,7 @@ def post_collection(request):
     return res
 
 
-def post_collection_transaction(request):
+def post_collection_batch(request):
     storage = request.validated["storage"]
     userid = request.validated["userid"]
     collection = request.validated["collection"]
@@ -351,72 +350,78 @@ def post_collection_transaction(request):
     batch = request.validated["batch"]
     commit = request.validated["commit"]
 
+    # Bail early if we have nonsensical arguments
+    if not batch:
+        raise InvalidBatch
+
     # The "batch" key is set only on a multi-POST batch request prior to a
     # commit.  The "modified" key is only set upon a successful commit.
     # The two flags are mutually exclusive.
-    # Any failures at all mean cancelling the transaction completely.
+    # Any failures at all mean cancelling the batch completely.
     res = {'success': [], 'failed': {}}
 
-    # If there are any parsing failures, we won't even start a transaction.
+    # If there are any parsing failures, we won't even start a batch.
     if len(invalid_bsos):
         for (id, error) in invalid_bsos.iteritems():
             res["failed"][id] = error
         # if batch and batch is not True:
-        #     storage.delete_transaction(batch)
+        #     storage.delete_batch(batch)
         return res
 
     try:
         if batch is True:
             try:
-                batch = storage.create_transaction(userid, collection)
+                batch = storage.create_batch(userid, collection)
             except ConflictError, e:
                 # ConflictError here means a client is spamming requests,
                 # I think.
-                logger.error('Collision in transaction creation!')
-                logger.error(e)
-                raise HTTPServiceUnavailable('Too many transactions opened')
-            except Exception, e:
-                logger.error('Could not create transaction')
+                logger.error('Collision in batch creation!')
                 logger.error(e)
                 raise
+            except Exception, e:
+                logger.error('Could not create batch')
+                logger.error(e)
+                raise
+        else:
+            i = storage.valid_batch(userid, collection, batch)
+            if not i:
+                raise InvalidBatch
 
-        try:
-            ts = storage.append_items_to_transaction(batch, userid,
-                                                     collection, bsos)
-        except InvalidTransaction:
-            raise HTTPBadRequest("Invalid or expired transaction ID")
-        except ConflictError:
-            raise
-        except Exception, e:
-            logger.error('Could not append to transaction'
-                         '("{0}")'.format(batch))
-            logger.error(str(e))
-            for bso in bsos:
-                res["failed"][bso["id"]] = "db error"
-            raise
-
-        if commit:
+        if bsos:
             try:
-                storage.commit_transaction(batch, userid, collection)
-                res['modified'] = ts
-                request.response.headers["X-Last-Modified"] = str(ts)
+                ts = storage.append_items_to_batch(userid, collection, batch,
+                                                   bsos)
+                res["success"].extend([bso["id"] for bso in bsos])
             except ConflictError:
                 raise
             except Exception, e:
-                logger.error("Could not commit transaction")
-                logger.error(e)
-                raise
-            finally:
+                logger.error('Could not append to batch("{0}")'.format(batch))
+                logger.error(str(e))
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error"
+                raise e
+
+        if commit:
+            try:
+                ts = storage.apply_batch(userid, collection, batch)
+                res['modified'] = ts
+                request.response.headers["X-Last-Modified"] = str(ts)
+                storage.close_batch(userid, collection, batch)
+            except ConflictError:
                 for bso in bsos:
                     res["failed"][bso["id"]] = "db error: commit"
+                raise
+            except Exception, e:
+                logger.error("Could not apply batch")
+                logger.error(e)
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error: commit"
+                raise
         else:
             res["batch"] = batch
-        res["success"].extend([bso["id"] for bso in bsos])
     except ConflictError:
         raise
-    finally:
-        if batch and batch is not True:
-            storage.close_transaction(batch, userid, collection)
+
     return res
 
 

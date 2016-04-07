@@ -23,7 +23,7 @@ import random
 import string
 import urllib
 import webtest
-import math
+# import math
 
 from pyramid.interfaces import IAuthenticationPolicy
 
@@ -1287,12 +1287,22 @@ class TestStorage(StorageFunctionalTestCase):
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
 
-    def test_transactions(self):
+    def test_batches(self):
+
+        def close_enough(val1, val2):
+            if abs(val1 - val2) < 0.05:
+                return True
+            return "abs(%f - %f) = %f" % (val1, val2, abs(val1 - val2))
+
         endpoint = self.root + '/storage/col2'
+
         bso1 = {'id': '12', 'payload': 'elegance'}
         bso2 = {'id': '13', 'payload': 'slovenly'}
         bsos = [bso1, bso2]
         self.app.post_json(endpoint, bsos)
+
+        resp = self.app.get(endpoint + '/12')
+        orig_modified = resp.headers['X-Last-Modified']
 
         bso3 = {'id': 'a', 'payload': 'internal'}
         bso4 = {'id': 'b', 'payload': 'pancreas'}
@@ -1300,8 +1310,8 @@ class TestStorage(StorageFunctionalTestCase):
         batch = resp.json["batch"]
         # This is sooooo going to break when it's run at just the wrong time
         # and will result in a seriously confused person at the keyboard.
-        guess = float(resp.headers["X-Weave-Timestamp"])
-        self.assertEqual(batch / 1000, math.floor(guess))
+        guess = float(resp.headers["X-Last-Modified"])
+        self.assertTrue(close_enough(batch / 1000, guess))
 
         # make sure we don't have the pending commit
         resp = self.app.get(endpoint)
@@ -1309,6 +1319,7 @@ class TestStorage(StorageFunctionalTestCase):
         res.sort()
         self.assertEquals(res, ['12', '13'])
         self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
+        self.assertEquals(orig_modified, resp.headers['X-Last-Modified'])
 
         bso5 = {'id': 'c', 'payload': 'tinsel'}
         bso6 = {'id': '13', 'payload': 'portnoy'}
@@ -1326,9 +1337,25 @@ class TestStorage(StorageFunctionalTestCase):
         resp = self.app.get(endpoint + '/13')
         self.assertEquals(resp.json["payload"], 'portnoy')
 
-        # invalid transaction ID
-        bso7 = {'id': 'd', 'payload': 'burrito'}
-        resp = self.app.post_json(endpoint + '?batch=sammich', [bso7])
+        # empty commit POST
+        bso7 = {'id': 'a', 'payload': 'burrito'}
+        bso8 = {'id': 'e', 'payload': 'chocolate'}
+        resp = self.app.post_json(endpoint + '?batch=true', [bso7, bso8])
+        batch = resp.json["batch"]
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint + commit, [])
+        self.assertEquals(resp.json["modified"],
+                          float(resp.headers['X-Weave-Timestamp']))
+
+    def test_we_dont_need_no_stinkin_batches(self):
+        endpoint = self.root + '/storage/col2'
+
+        # invalid batch ID
+        bso1 = {'id': 'e', 'payload': 'pantomime'}
+        self.app.post_json(endpoint + '?batch=sammich', [bso1], status=400)
+
+        # commit with no batch ID
+        self.app.post_json(endpoint + '?commit=true', [], status=400)
 
 
 class TestStorageMemcached(TestStorage):

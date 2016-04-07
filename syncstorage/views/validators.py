@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import re
+
 from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
@@ -10,6 +12,7 @@ from syncstorage.storage import get_storage
 BATCH_MAX_IDS = 100
 DEFAULT_BATCH_MAX_COUNT = BATCH_MAX_IDS
 DEFAULT_BATCH_MAX_BYTES = 1024 * 1024
+TRUE_REGEX = re.compile("^true$", re.I)
 
 
 def extract_target_resource(request):
@@ -146,29 +149,39 @@ def extract_query_params(request):
         request.validated["full"] = True
 
 
-def extract_transaction_state(request):
-    """Validator to extract the transaction state of a request for slightly
+def extract_batch_state(request):
+    """Validator to extract the batch state of a request for slightly
     tidier code in the views.
 
     If the "batch" parameter is has no value or has a value of "true" then
-    a new transaction will be created.
+    a new batch will be created.
 
-    If the "commit" parameter is has a value of "true", this transaction
+    If the "commit" parameter is has a value of "true", this batch
     is to be committed and deleted.
     """
     request.validated["batch"] = False
     batch_id = request.GET.get("batch")
     if batch_id is not None:
-        if batch_id == "true":
+        if TRUE_REGEX.match(batch_id):
             batch_id = True
+        else:
+            try:
+                batch_id = int(batch_id)
+            except ValueError:
+                msg = "Invalid batch ID: \"%s\"" % (batch_id,)
+                request.errors.add("batch", "id", msg)
         request.validated["batch"] = batch_id
     elif batch_id is None and "batch" in request.GET:
         request.validated["batch"] = True
 
     request.validated["commit"] = False
     commit = request.GET.get("commit")
-    if commit is not None and commit == "true":
-        request.validated["commit"] = True
+    if commit is not None:
+        if TRUE_REGEX.match(commit):
+            request.validated["commit"] = True
+        else:
+            msg = "commit parameter must be \"true\" to apply batches"
+            request.errors.add("batch", "commit", msg)
 
 
 def parse_multiple_bsos(request):

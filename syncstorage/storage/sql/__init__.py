@@ -35,6 +35,8 @@ from syncstorage.storage import (SyncStorage,
 from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
                                                BackendError)
 
+from mozsvc.metrics import metrics_timer
+
 
 logger = logging.getLogger("syncstorage.storage.sql")
 
@@ -456,8 +458,8 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
-    def create_transaction(self, session, userid, collection):
-        """Creates a transaction in batch_uploads table"""
+    def create_batch(self, session, userid, collection):
+        """Creates a batch in batch_uploads table"""
         collectionid = self._get_collection_id(session, collection)
         batchid = ts2bigint(session.timestamp)
         params = {
@@ -465,12 +467,24 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "collection": collectionid
         }
-        session.query("CREATE_TRANSACTION", params)
+        session.query("CREATE_BATCH", params)
         return batchid
 
     @with_session
-    def append_items_to_transaction(self, session, batchid, userid,
-                                    collection, items):
+    def valid_batch(self, session, userid, collection, batchid):
+        """Checks to see if the batch ID is valid and still open"""
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        valid = session.query_scalar("VALID_BATCH", params=params)
+        return valid
+
+    @with_session
+    def append_items_to_batch(self, session, userid, collection, batchid,
+                              items):
         """Inserts items into batch_upload_items"""
         rows = []
         for data in items:
@@ -481,27 +495,29 @@ class SQLStorage(SyncStorage):
         session.insert_or_update("batch_upload_items", rows, defaults)
         return session.timestamp
 
+    @metrics_timer("syncstorage.storage.sql.db.execute.apply_batch")
     @with_session
-    def commit_transaction(self, session, batchid, userid, collection):
+    def apply_batch(self, session, userid, collection, batchid):
         collectionid = self._get_collection_id(session, collection)
         params = {
             "batch": batchid,
             "userid": userid,
             "collection": collectionid,
-            "default_ttl": MAX_TTL
+            "default_ttl": MAX_TTL,
+            "modified": session.timestamp
         }
-        session.query("COMMIT_TRANSACTION", params)
+        session.query("APPLY_BATCH", params)
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
-    def close_transaction(self, session, batchid, userid, collection):
+    def close_batch(self, session, userid, collection, batchid):
         collectionid = self._get_collection_id(session, collection)
         params = {
             "batch": batchid,
             "userid": userid,
             "collection": collectionid
         }
-        session.query("CLOSE_TRANSACTION", params)
+        session.query("CLOSE_BATCH", params)
 
     @with_session
     def delete_collection(self, session, userid, collection):
@@ -598,11 +614,11 @@ class SQLStorage(SyncStorage):
         row = {}
         row["userid"] = userid
         row["collection"] = collectionid
-        row["id"] = item
-        self._prepare_common_row(session, data, row)
+        self._prepare_common_row(session, data, item, row)
         return row
 
-    def _prepare_common_row(self, session, data, row):
+    def _prepare_common_row(self, session, data, item, row):
+        row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
         # If a payload is provided, make sure to update dependent fields.
@@ -621,9 +637,8 @@ class SQLStorage(SyncStorage):
 
     def _prepare_bui_row(self, session, batchid, item, data):
         row = {}
-        row["item"] = item
         row["batch"] = batchid
-        self._prepare_common_row(session, data, row)
+        self._prepare_common_row(session, data, item, row)
         return row
 
     @with_session
