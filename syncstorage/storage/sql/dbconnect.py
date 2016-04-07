@@ -121,7 +121,13 @@ def _common_columns(ttl):
         # MySQL no likey "DEFAULT ''".  Results in an error:
         #     ERROR 1101 (42000): BLOB, TEXT, GEOMETRY or JSON column 'payload'
         #                         can't have a default value
-        # Column("payload", PAYLOAD_TYPE, nullable=False),
+        #
+        # By adding the following lines to my.cnf you can turn the fatal error
+        # into a warning:
+        #
+        # [mysqld]
+        # sql_mode=MYSQL40
+        #
         Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
         Column("payload_size", Integer, nullable=False,
                server_default=sqltext("0")),

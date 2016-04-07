@@ -115,8 +115,7 @@ APPLY_BATCH = "INSERT INTO %(bso)s "\
                      "  (userid, collection, id, sortindex, modified, "\
                      "   payload, payload_size, ttl) "\
                      "SELECT "\
-                     "  :userid, :collection, id, sortindex, " \
-                     "  GREATEST(modified, :modified), "\
+                     "  :userid, :collection, id, sortindex, :modified, " \
                      "  COALESCE(payload, \"\"), COALESCE(payload_size, 0), "\
                      "  COALESCE(ttl, ttl + :default_ttl) "\
                      "FROM %(bui)s "\
