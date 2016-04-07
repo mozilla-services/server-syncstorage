@@ -504,7 +504,7 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "collection": collectionid,
             "default_ttl": MAX_TTL,
-            "modified": session.timestamp
+            "modified": ts2bigint(session.timestamp)
         }
         session.query("APPLY_BATCH", params)
         return self._touch_collection(session, userid, collectionid)

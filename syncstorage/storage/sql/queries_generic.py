@@ -115,20 +115,21 @@ APPLY_BATCH = "INSERT INTO %(bso)s "\
                      "  (userid, collection, id, sortindex, modified, "\
                      "   payload, payload_size, ttl) "\
                      "SELECT "\
-                     "  :userid, :collection, id, sortindex, :modified, "\
+                     "  :userid, :collection, id, sortindex, " \
+                     "  GREATEST(modified, :modified), "\
                      "  COALESCE(payload, \"\"), COALESCE(payload_size, 0), "\
                      "  COALESCE(ttl, ttl + :default_ttl) "\
                      "FROM %(bui)s "\
                      "WHERE batch = :batch "\
                      "ON DUPLICATE KEY UPDATE "\
-                     "  sortindex = COALESCE(VALUES(%(bui)s.sortindex), " \
-                     "                   %(bso)s.sortindex), " \
-                     "  payload = COALESCE(VALUES(%(bui)s.payload), " \
-                     "                   %(bso)s.payload), "\
-                     "  payload_size = COALESCE(VALUES(%(bui)s.payload_size),"\
-                     "                 %(bso)s.payload_size), "\
-                     "  ttl = COALESCE(VALUES(%(bui)s.ttl), " \
-                     "                 %(bso)s.ttl)"
+                     "  sortindex = COALESCE(VALUES(sortindex), " \
+                     "                       %(bso)s.sortindex), " \
+                     "  modified = :modified, " \
+                     "  payload = COALESCE(VALUES(payload), " \
+                     "                     %(bso)s.payload), "\
+                     "  payload_size = COALESCE(VALUES(payload_size),"\
+                     "                          %(bso)s.payload_size), "\
+                     "  ttl = COALESCE(VALUES(ttl), %(bso)s.ttl)"
 
 CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
               "AND userid = :userid AND collection = :collection"

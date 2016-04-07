@@ -32,10 +32,11 @@ APPLY_BATCH = "INSERT OR REPLACE INTO %(bso)s " \
                      "  COALESCE(ttl, default_ttl) " \
                      "FROM ( " \
                      "  SELECT batch, userid, collection, " \
+                     "         :modified AS modified, " \
                      "         :default_ttl AS default_ttl " \
                      "  FROM batch_uploads WHERE batch = :batch "\
                      ") LEFT JOIN ( " \
-                     "  SELECT id, modified, sortindex, payload, " \
+                     "  SELECT id, sortindex, payload, " \
                      "         payload_size, ttl " \
                      "  FROM %(bui)s " \
                      ") ON batch"

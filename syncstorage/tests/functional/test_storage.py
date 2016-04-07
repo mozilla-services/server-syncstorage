@@ -1287,12 +1287,13 @@ class TestStorage(StorageFunctionalTestCase):
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
 
-    def test_batches(self):
+    def assertCloseEnough(self, val1, val2, delta=0.05):
+        if abs(val1 - val2) < delta:
+            return True
+        raise AssertionError("abs(%.2f - %.2f) = %.2f > %.2f"
+                             % (val1, val2, abs(val1 - val2), delta))
 
-        def close_enough(val1, val2):
-            if abs(val1 - val2) < 0.05:
-                return True
-            return "abs(%f - %f) = %f" % (val1, val2, abs(val1 - val2))
+    def test_batches(self):
 
         endpoint = self.root + '/storage/col2'
 
@@ -1310,10 +1311,10 @@ class TestStorage(StorageFunctionalTestCase):
         batch = resp.json["batch"]
         # This is sooooo going to break when it's run at just the wrong time
         # and will result in a seriously confused person at the keyboard.
-        guess = float(resp.headers["X-Last-Modified"])
-        self.assertTrue(close_enough(batch / 1000, guess))
+        # guess = float(resp.headers["X-Last-Modified"])
+        # self.assertCloseEnough(batch / 1000, guess)
 
-        # make sure we don't have the pending commit
+        # make sure we don't get the pending batch
         resp = self.app.get(endpoint)
         res = resp.json
         res.sort()
@@ -1323,35 +1324,55 @@ class TestStorage(StorageFunctionalTestCase):
 
         bso5 = {'id': 'c', 'payload': 'tinsel'}
         bso6 = {'id': '13', 'payload': 'portnoy'}
+        bso0 = {'id': '14', 'payload': 'itsybitsy'}
         commit = '?batch={0}&commit=true'.format(batch)
-        resp = self.app.post_json(endpoint + commit, [bso5, bso6])
-        self.assertEquals(resp.json["modified"],
-                          float(resp.headers['X-Weave-Timestamp']))
+        resp = self.app.post_json(endpoint + commit, [bso5, bso6, bso0])
+        committed = resp.json['modified']
+        self.assertEquals(resp.json['modified'],
+                          float(resp.headers['X-Last-Modified']))
 
-        # make sure the changes apply
+        # make sure the changes applied
         resp = self.app.get(endpoint)
         res = resp.json
         res.sort()
-        self.assertEquals(res, ['12', '13', 'a', 'b', 'c'])
-        self.assertEquals(int(resp.headers['X-Weave-Records']), 5)
+        self.assertEquals(res, ['12', '13', '14', 'a', 'b', 'c'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 6)
         resp = self.app.get(endpoint + '/13')
-        self.assertEquals(resp.json["payload"], 'portnoy')
+        self.assertEquals(resp.json['payload'], 'portnoy')
+        self.assertEquals(committed, float(resp.headers['X-Last-Modified']))
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/c')
+        self.assertEquals(resp.json['payload'], 'tinsel')
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/14')
+        self.assertEquals(resp.json['payload'], 'itsybitsy')
+        self.assertEquals(committed, resp.json['modified'])
 
         # empty commit POST
         bso7 = {'id': 'a', 'payload': 'burrito'}
         bso8 = {'id': 'e', 'payload': 'chocolate'}
         resp = self.app.post_json(endpoint + '?batch=true', [bso7, bso8])
         batch = resp.json["batch"]
+        time.sleep(1)
         commit = '?batch={0}&commit=true'.format(batch)
-        resp = self.app.post_json(endpoint + commit, [])
-        self.assertEquals(resp.json["modified"],
-                          float(resp.headers['X-Weave-Timestamp']))
+
+        resp1 = self.app.post_json(endpoint + commit, [])
+        committed = resp1.json['modified']
+        self.assertEquals(committed, float(resp1.headers['X-Last-Modified']))
+
+        resp2 = self.app.get(endpoint + '/a')
+        self.assertEquals(committed, float(resp2.headers['X-Last-Modified']))
+        self.assertEquals(committed, resp2.json['modified'])
+        self.assertEquals(resp2.json['payload'], 'burrito')
+
+        resp3 = self.app.get(endpoint + '/e')
+        self.assertEquals(committed, resp3.json['modified'])
 
     def test_we_dont_need_no_stinkin_batches(self):
         endpoint = self.root + '/storage/col2'
 
         # invalid batch ID
-        bso1 = {'id': 'e', 'payload': 'pantomime'}
+        bso1 = {'id': 'f', 'payload': 'pantomime'}
         self.app.post_json(endpoint + '?batch=sammich', [bso1], status=400)
 
         # commit with no batch ID

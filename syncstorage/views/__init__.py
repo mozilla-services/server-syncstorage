@@ -389,8 +389,7 @@ def post_collection_batch(request):
 
         if bsos:
             try:
-                ts = storage.append_items_to_batch(userid, collection, batch,
-                                                   bsos)
+                storage.append_items_to_batch(userid, collection, batch, bsos)
                 res["success"].extend([bso["id"] for bso in bsos])
             except ConflictError:
                 raise
@@ -399,7 +398,7 @@ def post_collection_batch(request):
                 logger.error(str(e))
                 for bso in bsos:
                     res["failed"][bso["id"]] = "db error"
-                raise e
+                raise
 
         if commit:
             try:
