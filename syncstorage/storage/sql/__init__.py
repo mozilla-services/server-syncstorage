@@ -453,7 +453,11 @@ class SQLStorage(SyncStorage):
             row = self._prepare_bso_row(session, userid, collectionid,
                                         id, data)
             rows.append(row)
-        defaults = {"modified": ts2bigint(session.timestamp)}
+        defaults = {
+            "modified": ts2bigint(session.timestamp),
+            "payload": "",
+            "payload_size": 0,
+        }
         session.insert_or_update("bso", rows, defaults)
         return self._touch_collection(session, userid, collectionid)
 
@@ -491,7 +495,11 @@ class SQLStorage(SyncStorage):
             id_ = data["id"]
             row = self._prepare_bui_row(session, batchid, id_, data)
             rows.append(row)
-        defaults = {"modified": ts2bigint(session.timestamp)}
+        defaults = {
+            "modified": ts2bigint(session.timestamp),
+            "payload": "",
+            "payload_size": 0,
+        }
         session.insert_or_update("batch_upload_items", rows, defaults)
         return session.timestamp
 
@@ -602,7 +610,11 @@ class SQLStorage(SyncStorage):
         """Creates or updates a single item in a collection."""
         collectionid = self._get_collection_id(session, collection, create=1)
         row = self._prepare_bso_row(session, userid, collectionid, item, data)
-        defaults = {"modified": ts2bigint(session.timestamp)}
+        defaults = {
+            "modified": ts2bigint(session.timestamp),
+            "payload": "",
+            "payload_size": 0,
+        }
         num_created = session.insert_or_update("bso", [row], defaults)
         return {
             "created": bool(num_created),

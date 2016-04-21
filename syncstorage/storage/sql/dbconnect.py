@@ -118,19 +118,10 @@ def _common_columns(ttl):
     return (
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
-        # MySQL no likey "DEFAULT ''".  Results in an error:
-        #     ERROR 1101 (42000): BLOB, TEXT, GEOMETRY or JSON column 'payload'
-        #                         can't have a default value
-        #
-        # By adding the following lines to my.cnf you can turn the fatal error
-        # into a warning:
-        #
-        # [mysqld]
-        # sql_mode=MYSQL40
-        #
-        Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
-        Column("payload_size", Integer, nullable=False,
-               server_default=sqltext("0")),
+        # I'd like to default these to the emptry string and zero,
+        # but MySQL doesn't let you set a default on a TEXT column...
+        Column("payload", PAYLOAD_TYPE, nullable=False),
+        Column("payload_size", Integer, nullable=False),
         Column("ttl", Integer, server_default=sqltext(str(ttl)))
     )
 
