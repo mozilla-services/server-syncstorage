@@ -1298,6 +1298,7 @@ class TestStorage(StorageFunctionalTestCase):
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
 
+
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
 
