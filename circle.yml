@@ -1,0 +1,65 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  cache_directories:
+    - "~/docker"
+
+  override:
+    - docker info
+
+    # Build the container, using Circle's Docker cache. Only use 1 image per
+    # day to keep the cache size down.
+    - I="image-$(date +%j).tgz"; if [[ -e ~/docker/$I ]]; then echo "Loading $I"; pigz -d -c ~/docker/$I | docker load; fi
+
+    # Create a version.json file for the app to serve; copy it to the CircleCI
+    # artifacts directory for debugging.
+    - >
+        printf '{"commit":"%s","version":"%s","source":"https://github.com/%s/%s","build":"%s"}\n' 
+        "$CIRCLE_SHA1" 
+        "$CIRCLE_TAG"
+        "$CIRCLE_PROJECT_USERNAME" 
+        "$CIRCLE_PROJECT_REPONAME" 
+        "$CIRCLE_BUILD_URL"
+        > version.json
+    - cp version.json $CIRCLE_ARTIFACTS
+
+    # build the actual deployment container
+    - docker build -t app:build .
+    - docker images --no-trunc | awk '/^app/ {print $3}' | tee $CIRCLE_ARTIFACTS/docker-image-shasum256.txt
+
+    # Clean up any old images; save the new one.
+    - I="image-$(date +%j).tgz"; mkdir -p ~/docker; rm ~/docker/*; docker save app:build | pigz --fast -c > ~/docker/$I; ls -l ~/docker
+
+test:
+  override:
+  - docker run -it app:build test_flake8
+  - docker run -it app:build test_nose
+  - docker run -it app:build test_functional
+
+# Tag and push the container to Docker Hub.
+deployment:
+    #  hub_all:
+    #    branch: "/.*/"
+    #    commands:
+    #      - "[ ! -z $DOCKERHUB_REPO ]"
+    #      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+    #      - "docker tag app:build ${DOCKERHUB_REPO}:unstable"
+    #      - "docker push ${DOCKERHUB_REPO}:unstable"
+  hub_latest:
+    branch: "master"
+    commands:
+      - "[ ! -z $DOCKERHUB_REPO ]"
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - "docker tag app:build ${DOCKERHUB_REPO}:latest"
+      - "docker push ${DOCKERHUB_REPO}:latest"
+  hub_releases:
+    tag: /.*/
+    commands:
+      - "[ ! -z $DOCKERHUB_REPO ]"
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - "docker tag app:build ${DOCKERHUB_REPO}:${CIRCLE_TAG}"
+      - "docker images"
+      - "docker push ${DOCKERHUB_REPO}:${CIRCLE_TAG}"
+
