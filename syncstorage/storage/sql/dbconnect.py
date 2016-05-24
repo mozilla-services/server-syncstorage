@@ -121,9 +121,10 @@ def _get_bso_columns(table_name):
         Column("id", String(64), primary_key=True, autoincrement=False),
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
-        Column("payload", PAYLOAD_TYPE, nullable=False, server_default=""),
-        Column("payload_size", Integer, nullable=False,
-               server_default=sqltext("0")),
+        # I'd like to default these to the emptry string and zero,
+        # but MySQL doesn't let you set a default on a TEXT column...
+        Column("payload", PAYLOAD_TYPE, nullable=False),
+        Column("payload_size", Integer, nullable=False),
         Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
         # Declare indexes.
         # We need to include the tablename in the index name due to sharding,
