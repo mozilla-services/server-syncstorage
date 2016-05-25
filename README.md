@@ -1,6 +1,6 @@
-===================================================
-Storage Engine for Firefox Sync Server, version 1.5
-===================================================
+[![CircleCI](https://circleci.com/gh/mozilla-services/server-syncstorage.svg?style=svg)](https://circleci.com/gh/mozilla-services/server-syncstorage)
+
+# Storage Engine for Firefox Sync Server, version 1.5
 
 This is the storage engine for version 1.5 of the Firefox Sync Server.
 It implements the API defined at:

@@ -10,6 +10,6 @@ tailored to MySQL.
 
 # MySQL's non-standard DELETE ORDER BY LIMIT is incredibly useful here.
 
-PURGE_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
-                      "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "\
-                      "ORDER BY ttl LIMIT :maxitems"
+PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
+                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "\
+                           "ORDER BY ttl LIMIT :maxitems"
