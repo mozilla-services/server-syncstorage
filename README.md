@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/mostlygeek/server-syncstorage.svg?style=svg)](https://circleci.com/gh/mostlygeek/server-syncstorage)
+[![CircleCI](https://circleci.com/gh/mozilla-services/server-syncstorage.svg?style=svg)](https://circleci.com/gh/mozilla-services/server-syncstorage)
 
 # Storage Engine for Firefox Sync Server, version 1.5
 
