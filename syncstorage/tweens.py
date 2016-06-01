@@ -19,6 +19,7 @@ WEAVE_ILLEGAL_METH = 1              # Illegal method/protocol
 WEAVE_MALFORMED_JSON = 6            # Json parse failure
 WEAVE_INVALID_WBO = 8               # Invalid Weave Basic Object
 WEAVE_OVER_QUOTA = 14               # User over quota
+WEAVE_SIZE_LIMIT_EXCEEDED = 17      # Size limit exceeded
 
 
 def set_x_timestamp_header(handler, registry):

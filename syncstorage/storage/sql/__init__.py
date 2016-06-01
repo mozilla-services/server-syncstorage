@@ -495,7 +495,11 @@ class SQLStorage(SyncStorage):
             id_ = data["id"]
             row = self._prepare_bui_row(session, batchid, id_, data)
             rows.append(row)
-        defaults = {"modified": ts2bigint(session.timestamp)}
+        defaults = {
+            "modified": ts2bigint(session.timestamp),
+            "payload": "",
+            "payload_size": 0,
+        }
         session.insert_or_update("batch_upload_items", rows, defaults)
         return session.timestamp
 
