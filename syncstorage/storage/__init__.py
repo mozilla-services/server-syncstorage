@@ -47,6 +47,12 @@ class InvalidOffsetError(StorageError, ValueError):
     pass
 
 
+class InvalidBatch(StorageError, ValueError):
+    """Exception raised when a request contains an invalid batch
+       identifier"""
+    pass
+
+
 class SyncStorage(object):
     """Abstract Base Class for storage backends.
 
@@ -305,6 +311,77 @@ class SyncStorage(object):
         Raises:
             ConflictError: the operation conflicted with a concurrent write.
             CollectionNotFoundError: the user has no such collection.
+        """
+
+    @abc.abstractmethod
+    def create_batch(self, userid, collection):
+        """Creates a batch for multi-POST batch uploads.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+
+        Returns:
+            The new batch's ID as a BigInteger timestamp.
+        """
+
+    @abc.abstractmethod
+    def valid_batch(self, userid, collection, batchid):
+        """Verifies that a batch ID exists for a given user's collection.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+            batchid: big integer batch identifier for this batch
+
+        Returns:
+            A value if the batch exists and is still valid and None if the
+            batch ID doesn't exist or is expired or closed.
+        """
+
+    @abc.abstractmethod
+    def append_items_to_batch(self, userid, collection, batchid, items):
+        """Creates or updates multiple items from a multi-POST batch to a
+        batch.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+            batchid: big integer batch identifier for this batch
+            items: a list of dicts giving data for each item.
+
+        Returns:
+            The new last-modified timestamp for the batch.
+
+        Raises:
+            ConflictError: the operation conflicted with a concurrent write.
+        """
+
+    @abc.abstractmethod
+    def apply_batch(self, userid, collection, batchid):
+        """Applies the pending batch.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+            batchid: big integer batch identifier for this batch
+
+        Returns:
+            The new last-modified timestamp for the collection.
+
+
+        Raises:
+            ConflictError: the operation conflicted with a concurrent write.
+        """
+
+    @abc.abstractmethod
+    def close_batch(self, userid, collection, batchid):
+        """Close a specific batch.
+
+        Args:
+            userid: integer identifying the user in the storage.
+            collection: name of the collection.
+            batchid: big integer batch identifier for this batch
         """
 
     #

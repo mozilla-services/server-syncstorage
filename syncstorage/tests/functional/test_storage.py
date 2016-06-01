@@ -23,6 +23,7 @@ import random
 import string
 import urllib
 import webtest
+# import math
 
 from pyramid.interfaces import IAuthenticationPolicy
 
@@ -31,7 +32,7 @@ import tokenlib
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.util import json_loads, json_dumps
-from syncstorage.tweens import WEAVE_INVALID_WBO
+from syncstorage.tweens import WEAVE_INVALID_WBO, WEAVE_SIZE_LIMIT_EXCEEDED
 from syncstorage.storage import ConflictError
 from syncstorage.views.validators import (
     BATCH_MAX_IDS,
@@ -1285,6 +1286,258 @@ class TestStorage(StorageFunctionalTestCase):
                 # *after* the one that was used for the newer= timestamp.
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
+
+    def assertCloseEnough(self, val1, val2, delta=0.05):
+        if abs(val1 - val2) < delta:
+            return True
+        raise AssertionError("abs(%.2f - %.2f) = %.2f > %.2f"
+                             % (val1, val2, abs(val1 - val2), delta))
+
+    def test_batches(self):
+
+        endpoint = self.root + '/storage/col2'
+
+        bso1 = {'id': '12', 'payload': 'elegance'}
+        bso2 = {'id': '13', 'payload': 'slovenly'}
+        bsos = [bso1, bso2]
+        self.app.post_json(endpoint, bsos)
+
+        resp = self.app.get(endpoint + '/12')
+        orig_modified = resp.headers['X-Last-Modified']
+
+        bso3 = {'id': 'a', 'payload': 'internal'}
+        bso4 = {'id': 'b', 'payload': 'pancreas'}
+        resp = self.app.post_json(endpoint + '?batch=true', [bso3, bso4])
+        batch = resp.json["batch"]
+        # This is sooooo going to break when it's run at just the wrong time
+        # and will result in a seriously confused person at the keyboard.
+        # guess = float(resp.headers["X-Last-Modified"])
+        # self.assertCloseEnough(batch / 1000, guess)
+
+        # make sure we don't get the pending batch
+        resp = self.app.get(endpoint)
+        res = resp.json
+        res.sort()
+        self.assertEquals(res, ['12', '13'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 2)
+        self.assertEquals(orig_modified, resp.headers['X-Last-Modified'])
+
+        bso5 = {'id': 'c', 'payload': 'tinsel'}
+        bso6 = {'id': '13', 'payload': 'portnoy'}
+        bso0 = {'id': '14', 'payload': 'itsybitsy'}
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint + commit, [bso5, bso6, bso0])
+        committed = resp.json['modified']
+        self.assertEquals(resp.json['modified'],
+                          float(resp.headers['X-Last-Modified']))
+
+        # make sure the changes applied
+        resp = self.app.get(endpoint)
+        res = resp.json
+        res.sort()
+        self.assertEquals(res, ['12', '13', '14', 'a', 'b', 'c'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 6)
+        resp = self.app.get(endpoint + '/13')
+        self.assertEquals(resp.json['payload'], 'portnoy')
+        self.assertEquals(committed, float(resp.headers['X-Last-Modified']))
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/c')
+        self.assertEquals(resp.json['payload'], 'tinsel')
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/14')
+        self.assertEquals(resp.json['payload'], 'itsybitsy')
+        self.assertEquals(committed, resp.json['modified'])
+
+        # empty commit POST
+        bso7 = {'id': 'a', 'payload': 'burrito'}
+        bso8 = {'id': 'e', 'payload': 'chocolate'}
+        resp = self.app.post_json(endpoint + '?batch=true', [bso7, bso8])
+        batch = resp.json["batch"]
+        time.sleep(1)
+        commit = '?batch={0}&commit=true'.format(batch)
+
+        resp1 = self.app.post_json(endpoint + commit, [])
+        committed = resp1.json['modified']
+        self.assertEquals(committed, float(resp1.headers['X-Last-Modified']))
+
+        resp2 = self.app.get(endpoint + '/a')
+        self.assertEquals(committed, float(resp2.headers['X-Last-Modified']))
+        self.assertEquals(committed, resp2.json['modified'])
+        self.assertEquals(resp2.json['payload'], 'burrito')
+
+        resp3 = self.app.get(endpoint + '/e')
+        self.assertEquals(committed, resp3.json['modified'])
+
+    def test_we_dont_need_no_stinkin_batches(self):
+        endpoint = self.root + '/storage/col2'
+
+        # invalid batch ID
+        bso1 = {'id': 'f', 'payload': 'pantomime'}
+        self.app.post_json(endpoint + '?batch=sammich', [bso1], status=400)
+
+        # commit with no batch ID
+        self.app.post_json(endpoint + '?commit=true', [], status=400)
+
+    def test_batch_size_limits(self):
+        limits = self.app.get(self.root + '/info/configuration')
+        self.assertTrue('max_post_records' in limits)
+        self.assertTrue('max_post_bytes' in limits)
+        self.assertTrue('max_batch_records' in limits)
+        self.assertTrue('max_batch_bytes' in limits)
+
+        endpoint = self.root + '/storage/col2?batch=true'
+
+        res = self.app.post_json(endpoint, [], headers={
+          'X-Weave-Records': str(limits['max_post_records'] + 1)
+        })
+        self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
+
+        res = self.app.post_json(endpoint, [], headers={
+          'X-Weave-Batch-Records': str(limits['max_batch_records'] + 1)
+        })
+        self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
+
+        res = self.app.post_json(endpoint, [], headers={
+          'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
+        })
+        self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
+
+        res = self.app.post_json(endpoint, [], headers={
+          'X-Weave-Batch-Bytes': str(limits['max_batch_bytes'] + 1)
+        })
+        self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
+
+    def test_batch_partial_update(self):
+        collection = self.root + '/storage/col2'
+        bsos = [
+          {'id': 'a', 'payload': 'aai'},
+          {'id': 'b', 'payload': 'bee', 'sortindex': 17}
+        ]
+        resp = self.app.post_json(collection, bsos)
+        orig_ts = float(resp.headers['X-Last-Modified'])
+
+        # Update one, and add a new one.
+        bsos = [
+          {'id': 'b', 'payload': 'bii'},
+          {'id': 'c', 'payload': 'sea'},
+        ]
+        resp = self.app.post_json(collection + '?batch=true', bsos)
+        batch = resp.json["batch"]
+
+        # The updated item hasn't been written yet.
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 2)
+        self.assertEquals(res[0]['payload'], 'aai')
+        self.assertEquals(res[1]['payload'], 'bee')
+        self.assertEquals(res[0]['modified'], orig_ts)
+        self.assertEquals(res[1]['modified'], orig_ts)
+        self.assertEquals(res[1]['sortindex'], 17)
+
+        endpoint = collection + '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint, [])
+        commit_ts = float(resp.headers['X-Last-Modified'])
+
+        # The changes have now been applied.
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 3)
+        self.assertEquals(res[0]['payload'], 'aai')
+        self.assertEquals(res[1]['payload'], 'bii')
+        self.assertEquals(res[2]['payload'], 'sea')
+        self.assertEquals(res[0]['modified'], orig_ts)
+        self.assertEquals(res[1]['modified'], commit_ts)
+        self.assertEquals(res[2]['modified'], commit_ts)
+
+        # Fields not touched by the batch, should have been preserved.
+        self.assertEquals(res[1]['sortindex'], 17)
+
+    def test_batch_ttl_update(self):
+        collection = self.root + '/storage/col2'
+        bsos = [
+          {'id': 'a', 'payload': 'ayy'},
+          {'id': 'b', 'payload': 'bea'},
+          {'id': 'c', 'payload': 'see'}
+        ]
+        resp = self.app.post_json(collection, bsos)
+
+        # Bump ttls as a series of individual batch operations.
+        resp = self.app.post_json(collection + '?batch=true', [], status=202)
+        batch = resp.json["batch"]
+        endpoint = collection + '?batch={0}'.format(batch)
+        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
+                                  status=202)
+        resp = self.app.post_json(endpoint, [{'id': 'b', 'ttl': 2}],
+                                  status=202)
+        resp = self.app.post_json(endpoint + '&commit=true', [],
+                                  status=200)
+
+        # The payloads should be unchanged
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 3)
+        self.assertEquals(res[0]['payload'], 'ayy')
+        self.assertEquals(res[1]['payload'], 'bea')
+        self.assertEquals(res[2]['payload'], 'see')
+
+        # If we wait, the ttls should kick in
+        time.sleep(2.1)
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        self.assertEquals(len(res), 1)
+        self.assertEquals(res[0]['payload'], 'see')
+
+    def test_batch_ttl_is_based_on_commit_timestamp(self):
+        collection = self.root + '/storage/col2'
+
+        resp = self.app.post_json(collection + '?batch=true', [], status=202)
+        batch = resp.json["batch"]
+        endpoint = collection + '?batch={0}'.format(batch)
+        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
+                                  status=202)
+
+        time.sleep(1)
+
+        resp = self.app.post_json(endpoint + '&commit=true', [],
+                                  status=200)
+
+        # Wait a little; the ttl should not kick in just yet.
+        time.sleep(1.1)
+        resp = self.app.get(collection)
+        res = resp.json
+        self.assertEquals(len(res), 1)
+        self.assertEquals(res[0], 'a')
+
+        # Wait some more, and the ttl should kick in.
+        time.sleep(1.1)
+        resp = self.app.get(collection)
+        res = resp.json
+        self.assertEquals(len(res), 0)
+
+    def test_batch_with_immediate_commit(self):
+        collection = self.root + '/storage/col2'
+        bsos = [
+          {'id': 'a', 'payload': 'aih'},
+          {'id': 'b', 'payload': 'bie'},
+          {'id': 'c', 'payload': 'cee'}
+        ]
+        resp = self.app.post_json(collection, bsos)
+
+        resp = self.app.post_json(collection + '?batch=true&commit=true', bsos,
+                                  status=200)
+        self.assertTrue('batch' not in resp.json)
+        self.assertTrue('modified' in resp.json)
+
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 3)
+        self.assertEquals(res[0]['payload'], 'aih')
+        self.assertEquals(res[1]['payload'], 'bie')
+        self.assertEquals(res[2]['payload'], 'cee')
 
 
 class TestStorageMemcached(TestStorage):

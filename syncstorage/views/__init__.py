@@ -10,11 +10,14 @@ from cornice import Service
 
 from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.util import get_timestamp
-from syncstorage.storage import ConflictError, NotFoundError
+from syncstorage.storage import (ConflictError,
+                                 NotFoundError,
+                                 InvalidBatch)
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
                                           extract_query_params,
+                                          extract_batch_state,
                                           parse_multiple_bsos,
                                           parse_single_bso)
 from syncstorage.views.decorators import (convert_storage_errors,
@@ -130,6 +133,8 @@ info_usage = SyncStorageService(name="info_usage",
                                 path="/info/collection_usage")
 info_counts = SyncStorageService(name="info_counts",
                                  path="/info/collection_counts")
+info_configuration = SyncStorageService(name="info_configuration",
+                                        path="/info/configuration")
 
 storage = SyncStorageService(name="storage",
                              path="/storage")
@@ -178,6 +183,19 @@ def get_info_usage(request):
         sizes[collection] = size / ONE_KB
     request.response.headers["X-Weave-Records"] = str(len(sizes))
     return sizes
+
+
+@info_configuration.get(accept="application/json", renderer="sync-json")
+@default_decorators
+def get_info_configuration(request):
+    settings = request.registry.settings
+    limits = {}
+    limits["max_request_bytes"] = settings.get("storage.max_request_bytes")
+    limits["max_post_records"] = settings.get("storage.max_post_records")
+    limits["max_post_bytes"] = settings.get("max_post_bytes")
+    limits["max_batch_records"] = settings.get("max_batch_records")
+    limits["max_batch_bytes"] = settings.get("max_batch_bytes")
+    return limits
 
 
 @storage.delete(renderer="sync-json")
@@ -286,7 +304,8 @@ def get_collection(request):
 
 
 @collection.post(accept="application/json", renderer="sync-json",
-                 validators=DEFAULT_VALIDATORS + (parse_multiple_bsos,))
+                 validators=DEFAULT_VALIDATORS + (extract_batch_state,
+                                                  parse_multiple_bsos))
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
@@ -294,6 +313,9 @@ def post_collection(request):
     collection = request.validated["collection"]
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
+
+    if request.validated["batch"] or request.validated["commit"]:
+        return post_collection_batch(request)
 
     res = {'success': [], 'failed': {}}
 
@@ -315,6 +337,92 @@ def post_collection(request):
         res["success"].extend([bso["id"] for bso in bsos])
         res['modified'] = ts
         request.response.headers["X-Last-Modified"] = str(ts)
+
+    return res
+
+
+def post_collection_batch(request):
+    storage = request.validated["storage"]
+    userid = request.validated["userid"]
+    collection = request.validated["collection"]
+    bsos = request.validated["bsos"]
+    invalid_bsos = request.validated["invalid_bsos"]
+    batch = request.validated["batch"]
+    commit = request.validated["commit"]
+
+    request.response.status = 202
+
+    # Bail early if we have nonsensical arguments
+    if not batch:
+        raise InvalidBatch
+
+    # The "batch" key is set only on a multi-POST batch request prior to a
+    # commit.  The "modified" key is only set upon a successful commit.
+    # The two flags are mutually exclusive.
+    # Any failures at all mean cancelling the batch completely.
+    res = {'success': [], 'failed': {}}
+
+    # If there are any parsing failures, we won't even start a batch.
+    if len(invalid_bsos):
+        for (id, error) in invalid_bsos.iteritems():
+            res["failed"][id] = error
+        # if batch and batch is not True:
+        #     storage.delete_batch(batch)
+        return res
+
+    try:
+        if batch is True:
+            try:
+                batch = storage.create_batch(userid, collection)
+            except ConflictError, e:
+                # ConflictError here means a client is spamming requests,
+                # I think.
+                logger.error('Collision in batch creation!')
+                logger.error(e)
+                raise
+            except Exception, e:
+                logger.error('Could not create batch')
+                logger.error(e)
+                raise
+        else:
+            i = storage.valid_batch(userid, collection, batch)
+            if not i:
+                raise InvalidBatch
+
+        if bsos:
+            try:
+                storage.append_items_to_batch(userid, collection, batch, bsos)
+                res["success"].extend([bso["id"] for bso in bsos])
+            except ConflictError:
+                raise
+            except Exception, e:
+                logger.error('Could not append to batch("{0}")'.format(batch))
+                logger.error(str(e))
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error"
+                raise
+
+        if commit:
+            try:
+                ts = storage.apply_batch(userid, collection, batch)
+                res['modified'] = ts
+                request.response.headers["X-Last-Modified"] = str(ts)
+                storage.close_batch(userid, collection, batch)
+                request.response.status = 200
+            except ConflictError:
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error: commit"
+                raise
+            except Exception, e:
+                logger.error("Could not apply batch")
+                logger.error(e)
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error: commit"
+                raise
+        else:
+            res["batch"] = batch
+    except ConflictError:
+        raise
 
     return res
 

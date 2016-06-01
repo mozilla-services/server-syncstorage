@@ -184,12 +184,12 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
 
         # Purging with a long grace period will not remove them.
         res = self.storage.purge_expired_items(grace_period=100)
-        self.assertEquals(res["num_purged"], 0)
+        self.assertEquals(res["num_bso_rows_purged"], 0)
         self.assertEquals(count_items(), 2005)
         self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
 
         # Purging with no grace period should remove them from the database.
         res = self.storage.purge_expired_items(grace_period=0)
-        self.assertEquals(res["num_purged"], 2000)
+        self.assertEquals(res["num_bso_rows_purged"], 2000)
         self.assertEquals(count_items(), 5)
         self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)

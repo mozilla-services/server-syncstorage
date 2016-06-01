@@ -12,6 +12,7 @@ In addition to standard bindparam syntax, the query loader supports some
 string interpolation variables with special meaning:
 
     * %(bso)s:   insert the name of the user's sharded BSO storage table
+    * %(bui)s:   insert the name of the user's sharded batch_upload_items table
     * %(ids)s:   insert a list of items matching the "ids" query parameter.
 
 """
@@ -92,6 +93,46 @@ DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
 
+CREATE_BATCH = "INSERT INTO batch_uploads (batch, userid, collection) "\
+                     "VALUES (:batch, :userid, :collection)"
+
+VALID_BATCH = "SELECT batch FROM batch_uploads WHERE batch = :batch " \
+                    "AND userid = :userid AND collection = :collection"
+
+APPEND_ITEMS_TO_BATCH = "INSERT INTO %(bui)s "\
+                              "  (batch, id, sortindex, modified, payload, "\
+                              "   payload_size, ttl) "\
+                              "VALUES "\
+                              "  (:batchid, :id, :sortindex, :modified, "\
+                              "   :payload, :payload_size, :ttl) "\
+                              "ON DUPLICATE KEY UPDATE "\
+                              "  sortindex = VALUES(sortindex), "\
+                              "  payload = VALUES(payload), "\
+                              "  payload_size = VALUES(payload_size) "\
+                              "  ttl = VALUES(ttl)"
+
+APPLY_BATCH = "INSERT INTO %(bso)s "\
+                     "  (userid, collection, id, sortindex, modified, "\
+                     "   payload, payload_size, ttl) "\
+                     "SELECT "\
+                     "  :userid, :collection, id, sortindex, :modified, " \
+                     "  COALESCE(payload, \"\"), COALESCE(payload_size, 0), "\
+                     "  COALESCE(ttl, ttl + :default_ttl) "\
+                     "FROM %(bui)s "\
+                     "WHERE batch = :batch "\
+                     "ON DUPLICATE KEY UPDATE "\
+                     "  sortindex = COALESCE(VALUES(sortindex), " \
+                     "                       %(bso)s.sortindex), " \
+                     "  modified = :modified, " \
+                     "  payload = COALESCE(VALUES(payload), " \
+                     "                     %(bso)s.payload), "\
+                     "  payload_size = COALESCE(VALUES(payload_size),"\
+                     "                          %(bso)s.payload_size), "\
+                     "  ttl = COALESCE(VALUES(ttl), %(bso)s.ttl)"
+
+CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
+              "AND userid = :userid AND collection = :collection"
+
 
 def FIND_ITEMS(bso, params):
     """Item search query.
@@ -162,4 +203,12 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 # case winds up deleting all expired items.  There is a MySQL-specific
 # version using DELETE <blah> LIMIT 1000.
 PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
-                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "
+                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) " \
+                           "LIMIT :maxitems"
+
+PURGE_BATCHES = "DELETE FROM batch_uploads WHERE batch < " \
+                "   (UNIX_TIMESTAMP() - :grace) * 1000 LIMIT :maxitems"
+
+PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s " \
+                       "WHERE batch < (UNIX_TIMESTAMP() - :grace) * 1000" \
+                       "LIMIT :maxitems"

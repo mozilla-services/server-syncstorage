@@ -35,6 +35,8 @@ from syncstorage.storage import (SyncStorage,
 from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
                                                BackendError)
 
+from mozsvc.metrics import metrics_timer
+
 
 logger = logging.getLogger("syncstorage.storage.sql")
 
@@ -460,6 +462,72 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
+    def create_batch(self, session, userid, collection):
+        """Creates a batch in batch_uploads table"""
+        collectionid = self._get_collection_id(session, collection)
+        batchid = ts2bigint(session.timestamp)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CREATE_BATCH", params)
+        return batchid
+
+    @with_session
+    def valid_batch(self, session, userid, collection, batchid):
+        """Checks to see if the batch ID is valid and still open"""
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        valid = session.query_scalar("VALID_BATCH", params=params)
+        return valid
+
+    @with_session
+    def append_items_to_batch(self, session, userid, collection, batchid,
+                              items):
+        """Inserts items into batch_upload_items"""
+        rows = []
+        for data in items:
+            id_ = data["id"]
+            row = self._prepare_bui_row(session, batchid, id_, data)
+            rows.append(row)
+        defaults = {
+            "modified": ts2bigint(session.timestamp),
+            "payload": "",
+            "payload_size": 0,
+        }
+        session.insert_or_update("batch_upload_items", rows, defaults)
+        return session.timestamp
+
+    @metrics_timer("syncstorage.storage.sql.db.execute.apply_batch")
+    @with_session
+    def apply_batch(self, session, userid, collection, batchid):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid,
+            "default_ttl": MAX_TTL,
+            "modified": ts2bigint(session.timestamp)
+        }
+        session.query("APPLY_BATCH", params)
+        return self._touch_collection(session, userid, collectionid)
+
+    @with_session
+    def close_batch(self, session, userid, collection, batchid):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CLOSE_BATCH", params)
+
+    @with_session
     def delete_collection(self, session, userid, collection):
         """Deletes an entire collection."""
         collectionid = self._get_collection_id(session, collection)
@@ -558,10 +626,14 @@ class SQLStorage(SyncStorage):
         row = {}
         row["userid"] = userid
         row["collection"] = collectionid
+        self._prepare_common_row(session, data, item, row)
+        return row
+
+    def _prepare_common_row(self, session, data, item, row):
         row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
-        # If a payload is provided, make sure to update dependant fields.
+        # If a payload is provided, make sure to update dependent fields.
         if "payload" in data:
             row["modified"] = ts2bigint(session.timestamp)
             row["payload"] = data["payload"]
@@ -574,6 +646,11 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = MAX_TTL
             else:
                 row["ttl"] = data["ttl"] + int(session.timestamp)
+
+    def _prepare_bui_row(self, session, batchid, item, data):
+        row = {}
+        row["batch"] = batchid
+        self._prepare_common_row(session, data, item, row)
         return row
 
     @with_session
@@ -593,55 +670,91 @@ class SQLStorage(SyncStorage):
     #
     # Administrative/maintenance methods.
     #
+    def purge_expired_items(self, grace_period=0, max_per_loop=1000):
+        """Purges items with an expired TTL from the bso and batch_upload_items
+           table(s).
 
-    @with_session
-    def purge_expired_items(self, session, grace_period=0, max_per_loop=1000):
-        """Purges items with an expired TTL from the database."""
-        # Get the set of all BSO tables in the database.
-        # This will be different depending on whether sharding is done.
-        if not self.dbconnector.shard:
-            tables = set(("bso",))
-        else:
-            tables = set(self.dbconnector.get_bso_table(i).name
-                         for i in xrange(self.dbconnector.shardsize))
-            assert len(tables) == self.dbconnector.shardsize
-        # Purge each table in turn, summing rowcounts.
-        # We set an upper limit on the number of iterations, to avoid
-        # getting stuck indefinitely on a single table.
-        total_affected = 0
+           The grace period for batch_upload_items is hard coded to 1.5 time
+           the current upper limit(2 hours) for a batch session's lifetime.
+        """
+
+        table_sets = {"bso": {"replace": "bso",
+                              "query": "PURGE_SOME_EXPIRED_ITEMS",
+                              "total_affected": 0},
+                      "batch_upload_items": {"replace": "bui",
+                                             "query": "PURGE_BATCH_CONTENTS",
+                                             "total_affected": 0,
+                                             "grace_period": 3 * 60 * 60}}
+
+        total_batches_purged = 0
+        batches_purged = max_per_loop + 1
         is_incomplete = False
-        for table in sorted(tables):
-            logger.info("Purging expired items from %s", table)
-            num_iters = 1
-            num_affected = 0
-            rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
-                "bso": table,
-                "grace": grace_period,
-                "maxitems": max_per_loop,
-            })
-            while rowcount > 0:
-                num_affected += rowcount
-                logger.debug("After %d iterations, %s items purged",
-                             num_iters, num_affected)
-                num_iters += 1
-                if num_iters > 100:
-                    logger.debug("Too many iterations, bailing out.")
-                    is_incomplete = True
-                    break
-                rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
-                    "bso": table,
-                    "grace": grace_period,
-                    "maxitems": max_per_loop,
-                })
-            logger.info("Purged %d expired items from %s",
-                        num_affected, table)
-            total_affected += num_affected
+
+        for table_type in ("bso", "batch_upload_items"):
+            tabula = table_sets[table_type]
+            if table_type == "batch_upload_items":
+                # Tidy up the batch_uploads table first
+                if batches_purged <= max_per_loop:
+                    with self._get_or_create_session() as session:
+                        batches_purged = session.query("PURGE_BATCHES", {
+                            "grace": tabula["grace_period"],
+                            "maxitems": max_per_loop,
+                        })
+                    total_batches_purged += batches_purged
+
+            if not self.dbconnector.shard:
+                tables = set((table_type,))
+            else:
+                shard_func = self.dbconnector.get_bso_table
+                if table_type == "batch_upload_items":
+                    shard_func = self.dbconnector.get_batch_item_table
+                tables = set(shard_func(i).name
+                             for i in xrange(self.dbconnector.shardsize))
+                assert len(tables) == self.dbconnector.shardsize
+            # Purge each table in turn, summing rowcounts.
+            # We set an upper limit on the number of iterations, to avoid
+            # getting stuck indefinitely on a single table.
+            for table in sorted(tables):
+                logger.info("Purging expired items from %s", table)
+                num_iters = 1
+                num_affected = 0
+                with self._get_or_create_session() as session:
+                    rowcount = session.query(tabula["query"], {
+                        tabula["replace"]: table,
+                        "grace": tabula.get("grace_period", grace_period),
+                        "maxitems": max_per_loop,
+                    })
+                while rowcount > 0:
+                    num_affected += rowcount
+                    logger.debug("After %d iterations, %s items purged",
+                                 num_iters, num_affected)
+                    num_iters += 1
+                    if num_iters > 100:
+                        logger.debug("Too many iterations on %s, bailing outXS"
+                                     % table)
+                        is_incomplete = True
+                        break
+                    with self._get_or_create_session() as session:
+                        rowcount = session.query(tabula["query"], {
+                            tabula["replace"]: table,
+                            "grace": tabula.get("grace_period", grace_period),
+                            "maxitems": max_per_loop,
+                        })
+                logger.info("Purged %d expired items from %s",
+                            num_affected, table)
+                tabula["total_affected"] += num_affected
+
+        logger.info("Purged %d expired batches from "
+                    "batch_uploads" % total_batches_purged)
+
         # Return the required data to the caller.
         # We use "is_incomplete" rather than "is_complete" in the code above
         # because we expect that, most of the time, the purge will complete.
         # So it's more efficient to flag the case when it doesn't.
         return {
-            "num_purged": total_affected,
+            "batches_purged": total_batches_purged,
+            "num_bso_rows_purged": table_sets["bso"]["total_affected"],
+            "num_bui_rows_purged": table_sets["batch_upload_items"]["total_affected"],  # noqa
             "is_complete": not is_incomplete,
         }
 
