@@ -40,3 +40,13 @@ APPLY_BATCH = "INSERT OR REPLACE INTO %(bso)s " \
                      "         payload_size, ttl " \
                      "  FROM %(bui)s " \
                      ") ON batch"
+
+
+PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s WHERE ttl < " \
+                           "(SELECT strftime('%%s', 'now') - :grace)"
+
+PURGE_BATCHES = "DELETE FROM batch_uploads WHERE batch < " \
+                "   (SELECT strftime('%%s', 'now') - :grace) * 1000"
+
+PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s WHERE batch < " \
+                       "(SELECT strftime('%%s', 'now') - :grace) * 1000"

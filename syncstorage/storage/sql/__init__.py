@@ -670,55 +670,91 @@ class SQLStorage(SyncStorage):
     #
     # Administrative/maintenance methods.
     #
+    def purge_expired_items(self, grace_period=0, max_per_loop=1000):
+        """Purges items with an expired TTL from the bso and batch_upload_items
+           table(s).
 
-    @with_session
-    def purge_expired_items(self, session, grace_period=0, max_per_loop=1000):
-        """Purges items with an expired TTL from the database."""
-        # Get the set of all BSO tables in the database.
-        # This will be different depending on whether sharding is done.
-        if not self.dbconnector.shard:
-            tables = set(("bso",))
-        else:
-            tables = set(self.dbconnector.get_bso_table(i).name
-                         for i in xrange(self.dbconnector.shardsize))
-            assert len(tables) == self.dbconnector.shardsize
-        # Purge each table in turn, summing rowcounts.
-        # We set an upper limit on the number of iterations, to avoid
-        # getting stuck indefinitely on a single table.
-        total_affected = 0
+           The grace period for batch_upload_items is hard coded to 1.5 time
+           the current upper limit(2 hours) for a batch session's lifetime.
+        """
+
+        table_sets = {"bso": {"replace": "bso",
+                              "query": "PURGE_SOME_EXPIRED_ITEMS",
+                              "total_affected": 0},
+                      "batch_upload_items": {"replace": "bui",
+                                             "query": "PURGE_BATCH_CONTENTS",
+                                             "total_affected": 0,
+                                             "grace_period": 3 * 60 * 60}}
+
+        total_batches_purged = 0
+        batches_purged = max_per_loop + 1
         is_incomplete = False
-        for table in sorted(tables):
-            logger.info("Purging expired items from %s", table)
-            num_iters = 1
-            num_affected = 0
-            rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
-                "bso": table,
-                "grace": grace_period,
-                "maxitems": max_per_loop,
-            })
-            while rowcount > 0:
-                num_affected += rowcount
-                logger.debug("After %d iterations, %s items purged",
-                             num_iters, num_affected)
-                num_iters += 1
-                if num_iters > 100:
-                    logger.debug("Too many iterations, bailing out.")
-                    is_incomplete = True
-                    break
-                rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
-                    "bso": table,
-                    "grace": grace_period,
-                    "maxitems": max_per_loop,
-                })
-            logger.info("Purged %d expired items from %s",
-                        num_affected, table)
-            total_affected += num_affected
+
+        for table_type in ("bso", "batch_upload_items"):
+            tabula = table_sets[table_type]
+            if table_type == "batch_upload_items":
+                # Tidy up the batch_uploads table first
+                if batches_purged <= max_per_loop:
+                    with self._get_or_create_session() as session:
+                        batches_purged = session.query("PURGE_BATCHES", {
+                            "grace": tabula["grace_period"],
+                            "maxitems": max_per_loop,
+                        })
+                    total_batches_purged += batches_purged
+
+            if not self.dbconnector.shard:
+                tables = set((table_type,))
+            else:
+                shard_func = self.dbconnector.get_bso_table
+                if table_type == "batch_upload_items":
+                    shard_func = self.dbconnector.get_batch_item_table
+                tables = set(shard_func(i).name
+                             for i in xrange(self.dbconnector.shardsize))
+                assert len(tables) == self.dbconnector.shardsize
+            # Purge each table in turn, summing rowcounts.
+            # We set an upper limit on the number of iterations, to avoid
+            # getting stuck indefinitely on a single table.
+            for table in sorted(tables):
+                logger.info("Purging expired items from %s", table)
+                num_iters = 1
+                num_affected = 0
+                with self._get_or_create_session() as session:
+                    rowcount = session.query(tabula["query"], {
+                        tabula["replace"]: table,
+                        "grace": tabula.get("grace_period", grace_period),
+                        "maxitems": max_per_loop,
+                    })
+                while rowcount > 0:
+                    num_affected += rowcount
+                    logger.debug("After %d iterations, %s items purged",
+                                 num_iters, num_affected)
+                    num_iters += 1
+                    if num_iters > 100:
+                        logger.debug("Too many iterations on %s, bailing outXS"
+                                     % table)
+                        is_incomplete = True
+                        break
+                    with self._get_or_create_session() as session:
+                        rowcount = session.query(tabula["query"], {
+                            tabula["replace"]: table,
+                            "grace": tabula.get("grace_period", grace_period),
+                            "maxitems": max_per_loop,
+                        })
+                logger.info("Purged %d expired items from %s",
+                            num_affected, table)
+                tabula["total_affected"] += num_affected
+
+        logger.info("Purged %d expired batches from "
+                    "batch_uploads" % total_batches_purged)
+
         # Return the required data to the caller.
         # We use "is_incomplete" rather than "is_complete" in the code above
         # because we expect that, most of the time, the purge will complete.
         # So it's more efficient to flag the case when it doesn't.
         return {
-            "num_purged": total_affected,
+            "batches_purged": total_batches_purged,
+            "num_bso_rows_purged": table_sets["bso"]["total_affected"],
+            "num_bui_rows_purged": table_sets["batch_upload_items"]["total_affected"],  # noqa
             "is_complete": not is_incomplete,
         }
 

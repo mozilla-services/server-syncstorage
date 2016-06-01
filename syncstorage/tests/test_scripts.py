@@ -112,20 +112,61 @@ class TestPurgeTTLScript(StorageTestCase):
         key = "syncstorage:storage:host:another-test-host"
         storage = self.config.registry[key]
 
-        def count_items():
-            COUNT_ITEMS = "select count(*) from %(bso)s "\
-                          "/* queryName=COUNT_ITEMS */"
+        def count_items(query):
             total_items = 0
             for i in xrange(storage.dbconnector.shardsize):
                 with storage.dbconnector.connect() as c:
-                    res = c.execute(COUNT_ITEMS % {"bso": "bso" + str(i)})
+                    res = c.execute(query % {"bso": "bso" + str(i),
+                                             "bui": "batch_upload_items" + str(i)})  # noqa
                     total_items += res.fetchall()[0][0]
             return total_items
+
+        def count_bso_items():
+            return count_items("select count(*) from %(bso)s "
+                               "/* queryName=COUNT_BSO_ITEMS */")
+
+        def count_bui_items():
+            return count_items("SELECT COUNT(*) FROM %(bui)s "
+                               "/* queryName=COUNT_BUI_ITEMS /*")
 
         storage.set_item(1, "col", "test1", {"payload": "X", "ttl": 0})
         storage.set_item(1, "col", "test2", {"payload": "X", "ttl": 0})
         storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 30})
-        self.assertEquals(count_items(), 3)
+        self.assertEquals(count_bso_items(), 3)
+
+        # Have to get a little creative here to insert old enough batch IDs
+        # Three hours plus one second to make sure it'll be wiped
+        batchid = int((time.time() - ((3 * 60 * 60))) * 1000)
+        with storage.dbconnector.connect() as c:
+            c.execute("INSERT INTO batch_uploads (batch, userid, "
+                      "collection) VALUES (:batch, :userid, :collection) "
+                      "/* queryName=purgeBatchId */",
+                      {"batch": batchid, "userid": 1, "collection": 1})
+        storage.append_items_to_batch(1, "col", batchid,
+                                      [{"id": "test1", "payload": "Y",
+                                        "ttl": 0},
+                                       {"id": "test2", "payload": "Y",
+                                        "ttl": 0},
+                                       {"id": "test3", "payload": "Y",
+                                        "ttl": 30}])
+        batchid = int((time.time() + 1 - (3 * 60 * 60)) * 1000)
+        with storage.dbconnector.connect() as c:
+            c.execute("INSERT INTO batch_uploads (batch, userid, "
+                      "collection) VALUES (:batch, :userid, :collection) "
+                      "/* queryName=purgeBatchId */",
+                      {"batch": batchid, "userid": 2, "collection": 1})
+        storage.append_items_to_batch(2, "col", batchid,
+                                      [{"id": "test4", "payload": "A",
+                                        "ttl": 0}])
+        batchid = storage.create_batch(3, "col")
+        storage.append_items_to_batch(3, "col", batchid,
+                                      [{"id": "test5", "payload": "Z",
+                                        "ttl": 0},
+                                       {"id": "test6", "payload": "Z",
+                                        "ttl": 0},
+                                       {"id": "test7", "payload": "Z",
+                                        "ttl": 30}])
+        self.assertEquals(count_bui_items(), 7)
 
         time.sleep(1)
 
@@ -137,7 +178,11 @@ class TestPurgeTTLScript(StorageTestCase):
                             "--grace-period=30",
                             ini_file)
         assert proc.wait() == 0
-        self.assertEquals(count_items(), 3)
+        self.assertEquals(count_bso_items(), 3)
+        self.assertEquals(count_bui_items(), 4)
+
+        # Necessary for batch_upload_items purging to test reliably
+        time.sleep(1)
 
         # Short grace period == not purged
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
@@ -147,4 +192,5 @@ class TestPurgeTTLScript(StorageTestCase):
                             "--grace-period=0",
                             ini_file)
         assert proc.wait() == 0
-        self.assertEquals(count_items(), 1)
+        self.assertEquals(count_bso_items(), 1)
+        self.assertEquals(count_bui_items(), 3)

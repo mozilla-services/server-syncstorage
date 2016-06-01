@@ -11,5 +11,9 @@ tailored to MySQL.
 # MySQL's non-standard DELETE ORDER BY LIMIT is incredibly useful here.
 
 PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
-                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "\
+                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) " \
                            "ORDER BY ttl LIMIT :maxitems"
+
+PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s " \
+                       "WHERE batch < (UNIX_TIMESTAMP() - :grace) * 1000 " \
+                       "ORDER BY ttl LIMIT :maxitems"

@@ -442,7 +442,7 @@ class DBConnector(object):
             if "bui" in params:
                 qvars["bui"] = params["bui"]
             else:
-                qvars["bui"] = self.get_batch_item_table(params["userid"])
+                qvars["bui"] = self.get_batch_item_table(params["batch"])
         if "%(ids)s" in query:
             bindparams = []
             for i, id in enumerate(params["ids"]):
@@ -459,11 +459,11 @@ class DBConnector(object):
             return bso
         return get_bso_table(userid % self.shardsize)
 
-    def get_batch_item_table(self, userid):
+    def get_batch_item_table(self, batchid):
         """Get the batch_upload_items table object for the given userid."""
-        if not self.shard or userid is None:
+        if not self.shard or batchid is None:
             return bui
-        return get_batch_item_table(userid % self.shardsize)
+        return get_batch_item_table(batchid % self.shardsize)
 
 
 def is_retryable_db_error(engine, exc):
@@ -817,13 +817,16 @@ class DBConnection(object):
         if not items:
             return 0
         # Find the table object into which we're inserting.
-        # To work properly with sharding, all items must have same userid
-        # so that we can select a single BSO table.
-        userid = items[0].get("userid")
         if table == "bso":
+            # To work properly with sharding, all items must have same userid
+            # so that we can select a single BSO table.
+            userid = items[0].get("userid")
             table = self._connector.get_bso_table(userid)
         elif table == "batch_upload_items":
-            table = self._connector.get_batch_item_table(userid)
+            # To work properly with sharding all items must have same batchid
+            # so that we can select a single BUI table.
+            batchid = items[0].get("batch")
+            table = self._connector.get_batch_item_table(batchid)
         else:
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.
