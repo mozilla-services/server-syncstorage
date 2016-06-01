@@ -350,6 +350,8 @@ def post_collection_batch(request):
     batch = request.validated["batch"]
     commit = request.validated["commit"]
 
+    request.response.status = 202
+
     # Bail early if we have nonsensical arguments
     if not batch:
         raise InvalidBatch
@@ -406,6 +408,7 @@ def post_collection_batch(request):
                 res['modified'] = ts
                 request.response.headers["X-Last-Modified"] = str(ts)
                 storage.close_batch(userid, collection, batch)
+                request.response.status = 200
             except ConflictError:
                 for bso in bsos:
                     res["failed"][bso["id"]] = "db error: commit"
