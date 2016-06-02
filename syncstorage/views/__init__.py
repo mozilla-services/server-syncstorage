@@ -190,11 +190,11 @@ def get_info_usage(request):
 def get_info_configuration(request):
     settings = request.registry.settings
     limits = {}
-    limits["max_request_bytes"] = settings.get("storage.max_request_bytes")
-    limits["max_post_records"] = settings.get("storage.max_post_records")
-    limits["max_post_bytes"] = settings.get("max_post_bytes")
-    limits["max_batch_records"] = settings.get("max_batch_records")
-    limits["max_batch_bytes"] = settings.get("max_batch_bytes")
+    limits["max_request_bytes"] = settings.get("storage.max_request_bytes", 0)
+    limits["max_post_records"] = settings.get("storage.max_post_records", 0)
+    limits["max_post_bytes"] = settings.get("max_post_bytes", 0)
+    limits["max_batch_records"] = settings.get("max_batch_records", 0)
+    limits["max_batch_bytes"] = settings.get("max_batch_bytes", 0)
     return limits
 
 
