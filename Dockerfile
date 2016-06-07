@@ -13,9 +13,9 @@ CMD ["server"]
 # install / cache dependencies first
 COPY requirements.txt /app/requirements.txt
 
-# install depenencies, cleanup and add libstdc++ back in since
+# install dependencies, cleanup and add libstdc++ back in since
 # we the app needs to link to it
-RUN apk add --update build-base && \
+RUN apk add --update build-base ca-certificates && \
     pip install -r requirements.txt && \
     apk del --purge build-base gcc && \
     apk add libstdc++

@@ -5,7 +5,7 @@ case "$1" in
     server)
         _SETTINGS_FILE=${SYNC_SETTINGS_FILE:-"/app/example.ini"}
 
-        if [ ! -e $_SETTINGS_FILE ]; then 
+        if [ ! -e $_SETTINGS_FILE ]; then
             echo "Could not find ini file: $_SETTINGS_FILE"
             exit 1
         fi
@@ -42,12 +42,12 @@ case "$1" in
     test_functional)
         echo "test - functional"
         # run functional tests
-	    export MOZSVC_SQLURI=sqlite:///:memory: 
+	    export MOZSVC_SQLURI=sqlite:///:memory:
         gunicorn --paste ./syncstorage/tests/tests.ini \
             --workers 1 \
-            --worker-class mozsvc.gunicorn_worker.MozSvcGeventWorker & 
+            --worker-class mozsvc.gunicorn_worker.MozSvcGeventWorker &
 
-        SERVER_PID=$! 
+        SERVER_PID=$!
         sleep 2
 
         $0 test_endpoint http://localhost:5000
@@ -56,7 +56,7 @@ case "$1" in
         ;;
 
     test_endpoint)
-        python syncstorage/tests/functional/test_storage.py $2
+        exec python syncstorage/tests/functional/test_storage.py $2
         ;;
 
     *)
