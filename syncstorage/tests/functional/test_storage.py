@@ -34,11 +34,8 @@ from syncstorage.tests.functional.support import run_live_functional_tests
 from syncstorage.util import json_loads, json_dumps
 from syncstorage.tweens import WEAVE_INVALID_WBO, WEAVE_SIZE_LIMIT_EXCEEDED
 from syncstorage.storage import ConflictError
-from syncstorage.views.validators import (
-    BATCH_MAX_IDS,
-    DEFAULT_BATCH_MAX_COUNT,
-    DEFAULT_BATCH_MAX_BYTES,
-)
+from syncstorage.views.validators import BATCH_MAX_IDS
+from syncstorage.views.util import get_limit_config
 
 from mozsvc.exceptions import BackendError
 
@@ -734,12 +731,9 @@ class TestStorage(StorageFunctionalTestCase):
         if self.distant:
             raise unittest2.SkipTest
 
-        settings = self.config.registry.settings
-
         # Test that batch uploads are correctly processed.
         # Uploading max_count-5 small objects should succeed.
-        max_count = settings.get("storage.batch_max_count",
-                                 DEFAULT_BATCH_MAX_COUNT)
+        max_count = get_limit_config(self.config, 'max_post_records')
         bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
@@ -755,8 +749,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # The test config has max_bytes=1M.
         # Uploading 5 210MB items should produce one failure.
-        max_bytes = settings.get("storage.batch_max_bytes",
-                                 DEFAULT_BATCH_MAX_BYTES)
+        max_bytes = get_limit_config(self.config, 'max_post_bytes')
         self.assertEquals(max_bytes, 1024 * 1024)
         bsos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
                 for i in range(5)]
@@ -1378,34 +1371,33 @@ class TestStorage(StorageFunctionalTestCase):
         # commit with no batch ID
         self.app.post_json(endpoint + '?commit=true', [], status=400)
 
-    # @unittest2.skip("for the moment")
     def test_batch_size_limits(self):
         limits = self.app.get(self.root + '/info/configuration').json
         self.assertTrue('max_post_records' in limits)
         self.assertTrue('max_post_bytes' in limits)
-        self.assertTrue('max_batch_records' in limits)
-        self.assertTrue('max_batch_bytes' in limits)
+        self.assertTrue('max_total_records' in limits)
+        self.assertTrue('max_total_bytes' in limits)
 
         endpoint = self.root + '/storage/col2?batch=true'
 
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Records': str(limits['max_post_records'] + 1)
-        })
+        }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
         res = self.app.post_json(endpoint, [], headers={
-          'X-Weave-Batch-Records': str(limits['max_batch_records'] + 1)
-        })
+          'X-Weave-Total-Records': str(limits['max_total_records'] + 1)
+        }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
-        })
+        }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
         res = self.app.post_json(endpoint, [], headers={
-          'X-Weave-Batch-Bytes': str(limits['max_batch_bytes'] + 1)
-        })
+          'X-Weave-Total-Bytes': str(limits['max_total_bytes'] + 1)
+        }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
     def test_batch_partial_update(self):

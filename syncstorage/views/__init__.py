@@ -25,7 +25,7 @@ from syncstorage.views.decorators import (convert_storage_errors,
                                           with_collection_lock,
                                           check_precondition_headers,
                                           check_storage_quota)
-from syncstorage.views.util import get_resource_timestamp
+from syncstorage.views.util import get_resource_timestamp, get_limit_config
 
 
 logger = logging.getLogger("syncstorage")
@@ -188,13 +188,16 @@ def get_info_usage(request):
 @info_configuration.get(accept="application/json", renderer="sync-json")
 @default_decorators
 def get_info_configuration(request):
-    settings = request.registry.settings
+    LIMIT_NAMES = (
+        "max_request_bytes",
+        "max_post_records",
+        "max_post_bytes",
+        "max_total_records",
+        "max_total_bytes",
+    )
     limits = {}
-    limits["max_request_bytes"] = settings.get("storage.max_request_bytes", 0)
-    limits["max_post_records"] = settings.get("storage.max_post_records", 0)
-    limits["max_post_bytes"] = settings.get("max_post_bytes", 0)
-    limits["max_batch_records"] = settings.get("max_batch_records", 0)
-    limits["max_batch_bytes"] = settings.get("max_batch_bytes", 0)
+    for name in LIMIT_NAMES:
+        limits[name] = get_limit_config(request, name)
     return limits
 
 
