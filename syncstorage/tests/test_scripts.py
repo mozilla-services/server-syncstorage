@@ -149,7 +149,7 @@ class TestPurgeTTLScript(StorageTestCase):
                                         "ttl": 0},
                                        {"id": "test3", "payload": "Y",
                                         "ttl": 30}])
-        batchid = int((time.time() + 1 - (3 * 60 * 60)) * 1000)
+        batchid = int((time.time() + 2 - (3 * 60 * 60)) * 1000)
         with storage.dbconnector.connect() as c:
             c.execute("INSERT INTO batch_uploads (batch, userid, "
                       "collection) VALUES (:batch, :userid, :collection) "
@@ -182,7 +182,7 @@ class TestPurgeTTLScript(StorageTestCase):
         self.assertEquals(count_bui_items(), 4)
 
         # Necessary for batch_upload_items purging to test reliably
-        time.sleep(1)
+        time.sleep(2)
 
         # Short grace period == not purged
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
