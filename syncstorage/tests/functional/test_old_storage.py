@@ -20,10 +20,7 @@ from decimal import Decimal
 
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
-from syncstorage.views.validators import (
-    DEFAULT_BATCH_MAX_COUNT,
-    DEFAULT_BATCH_MAX_BYTES,
-)
+from syncstorage.views.util import get_limit_config
 
 WEAVE_INVALID_WBO = 8
 
@@ -416,11 +413,8 @@ class TestOldStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res.json), 0)
 
     def test_batch(self):
-        settings = self.config.registry.settings
-        max_count = settings.get("storage.batch_max_count",
-                                 DEFAULT_BATCH_MAX_COUNT)
-        max_bytes = settings.get("storage.batch_max_bytes",
-                                 DEFAULT_BATCH_MAX_BYTES)
+        max_count = get_limit_config(self.config, "max_post_records")
+        max_bytes = get_limit_config(self.config, "max_post_bytes")
         self.assertEquals(max_bytes, 1024 * 1024)
         # Test that batch uploads are correctly processed.
         # Uploading max_count-5 small objects should succeed.

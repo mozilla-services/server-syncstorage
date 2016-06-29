@@ -68,6 +68,8 @@ def convert_cornice_errors_to_respcodes(handler, registry):
         try:
             if body["status"] == "quota-exceeded":
                 return WEAVE_OVER_QUOTA
+            if body["status"] == "size-limit-exceeded":
+                return WEAVE_SIZE_LIMIT_EXCEEDED
             error = body["errors"][0]
             if error["location"] == "body":
                 if error["name"] in ("bso", "bsos"):

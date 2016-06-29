@@ -7,11 +7,10 @@ import re
 from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
+from syncstorage.views.util import json_error, get_limit_config
 
 
 BATCH_MAX_IDS = 100
-DEFAULT_BATCH_MAX_COUNT = BATCH_MAX_IDS
-DEFAULT_BATCH_MAX_BYTES = 1024 * 1024
 TRUE_REGEX = re.compile("^true$", re.I)
 
 
@@ -183,6 +182,24 @@ def extract_batch_state(request):
             msg = "commit parameter must be \"true\" to apply batches"
             request.errors.add("batch", "commit", msg)
 
+    LIMITS = (
+      ("X-Weave-Records", "max_post_records"),
+      ("X-Weave-Bytes", "max_post_bytes"),
+      ("X-Weave-Total-Records", "max_total_records"),
+      ("X-Weave-Total-Bytes", "max_total_bytes"),
+    )
+    for (header, setting) in LIMITS:
+        try:
+            count = int(request.headers[header])
+        except ValueError:
+            msg = "Invalid integer value: %s" % (request.headers[header],)
+            request.errors.add("header", header, msg)
+            continue
+        except KeyError:
+            continue
+        if count > get_limit_config(request, setting):
+            raise json_error(400, "size-limit-exceeded")
+
 
 def parse_multiple_bsos(request):
     """Validator to parse a list of BSOs from the request body.
@@ -212,10 +229,8 @@ def parse_multiple_bsos(request):
         request.errors.add("body", "bsos", "Input data was not a list")
         return
 
-    BATCH_MAX_COUNT = request.registry.settings.get("storage.batch_max_count",
-                                                    DEFAULT_BATCH_MAX_COUNT)
-    BATCH_MAX_BYTES = request.registry.settings.get("storage.batch_max_bytes",
-                                                    DEFAULT_BATCH_MAX_BYTES)
+    BATCH_MAX_COUNT = get_limit_config(request, "max_post_records")
+    BATCH_MAX_BYTES = get_limit_config(request, "max_post_bytes")
 
     valid_bsos = {}
     invalid_bsos = {}
