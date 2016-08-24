@@ -4,6 +4,8 @@
 
 import logging
 
+from base64 import b64encode
+
 from pyramid.security import Allow
 
 from cornice import Service
@@ -423,7 +425,7 @@ def post_collection_batch(request):
                     res["failed"][bso["id"]] = "db error: commit"
                 raise
         else:
-            res["batch"] = batch
+            res["batch"] = b64encode(str(batch))
     except ConflictError:
         raise
 

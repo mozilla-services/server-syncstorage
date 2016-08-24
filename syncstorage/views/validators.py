@@ -4,6 +4,8 @@
 
 import re
 
+from base64 import b64decode
+
 from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
@@ -165,10 +167,13 @@ def extract_batch_state(request):
             batch_id = True
         else:
             try:
-                batch_id = int(batch_id)
-            except ValueError:
-                msg = "Invalid batch ID: \"%s\"" % (batch_id,)
-                request.errors.add("batch", "id", msg)
+                batch_id = int(b64decode(batch_id))
+            except TypeError:
+                try:
+                    batch_id = int(batch_id)
+                except ValueError:
+                    msg = "Invalid batch ID: \"%s\"" % (batch_id,)
+                    request.errors.add("batch", "id", msg)
         request.validated["batch"] = batch_id
     elif batch_id is None and "batch" in request.GET:
         request.validated["batch"] = True
