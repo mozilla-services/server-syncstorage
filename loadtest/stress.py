@@ -183,7 +183,10 @@ class StressTest(TestCase):
         # "transactional".  Increase the frequency of "transactional" requests
         # by changing the modulo 10 to something like modulo 5(~20%) or
         # modulo 3(~30%).
-        transact = int(random.paretovariate(1) * 100) % 10 == 0
+        # transact = int(random.paretovariate(1) * 100) % 10 == 0
+        #
+        # Let's do roughly 50% for fun.
+        transact = random.randint(0, 1)
         batch_id = None
         committing = False
         # Collections should be a single static entry if we're "transactional"
