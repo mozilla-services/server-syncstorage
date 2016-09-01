@@ -212,7 +212,11 @@ class StressTest(TestCase):
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
+            response_code = 200
             if transact:
+                # Batch uploads only return a 200 on commit.  An Accepted(202)
+                # is returned for batch creation & appends
+                response_code = 202
                 if x == 0:
                     committing = False
                     url += "?batch=true"
@@ -220,10 +224,11 @@ class StressTest(TestCase):
                     url += "?commit=true&batch=%s" % batch_id
                     committing = True
                     batch_id = None
+                    response_code = 200
                 else:
                     url += "?batch=%s" % batch_id
             response = self.session.post(url, data=data, **reqkwds)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, response_code)
             body = response.content
             self.assertTrue(body != '')
             result = json.loads(body)
