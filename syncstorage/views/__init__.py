@@ -10,7 +10,7 @@ from pyramid.security import Allow
 
 from cornice import Service
 
-from syncstorage.bso import VALID_ID_REGEX
+from syncstorage.bso import VALID_ID_REGEX, MAX_PAYLOAD_SIZE
 from syncstorage.util import get_timestamp
 from syncstorage.storage import (ConflictError,
                                  NotFoundError,
@@ -200,6 +200,8 @@ def get_info_configuration(request):
     limits = {}
     for name in LIMIT_NAMES:
         limits[name] = get_limit_config(request, name)
+    # This limit is hard-coded for now.
+    limits["max_record_payload_bytes"] = MAX_PAYLOAD_SIZE
     return limits
 
 
