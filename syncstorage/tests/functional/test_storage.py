@@ -1377,6 +1377,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue('max_post_bytes' in limits)
         self.assertTrue('max_total_records' in limits)
         self.assertTrue('max_total_bytes' in limits)
+        self.assertTrue('max_record_payload_bytes' in limits)
 
         endpoint = self.root + '/storage/col2?batch=true'
 
