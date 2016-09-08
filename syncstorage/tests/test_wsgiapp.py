@@ -34,12 +34,7 @@ class TestWSGIApp(StorageTestCase):
         sqluri = get_storage(req).sqluri
         self.assertTrue(sqluri.startswith("sqlite:////tmp/another-test-host-"))
 
-    def test_the_it_works_page(self):
-        app = TestApp(self.config.make_wsgi_app())
-        r = app.get("/")
-        self.assertTrue("It Works!" in r.body)
-
-    def test_metrics_capture(self):
+    def _make_test_app(self):
         app = TestApp(self.config.make_wsgi_app())
 
         # Monkey-patch the app to make legitimate hawk-signed requests.
@@ -55,6 +50,16 @@ class TestWSGIApp(StorageTestCase):
         orig_do_request = app.do_request
         app.do_request = new_do_request
 
+        return app
+
+    def test_the_it_works_page(self):
+        app = self._make_test_app()
+        r = app.get("/")
+        self.assertTrue("It Works!" in r.body)
+
+    def test_metrics_capture(self):
+        app = self._make_test_app()
+
         # Make a request that hits the database, capturing its logs.
         with testfixtures.LogCapture() as logs:
             app.get("/1.5/42/info/collections")
@@ -65,3 +70,25 @@ class TestWSGIApp(StorageTestCase):
                 break
         else:
             assert False, "metrics were not collected"
+
+    def test_logging_of_invalid_bsos(self):
+        app = self._make_test_app()
+
+        # Make a request with an invalid bso, capturing its logs
+        with testfixtures.LogCapture() as logs:
+            app.post_json("/1.5/42/storage/bookmarks", [
+                {"id": "valid1", "payload": "thisisok"},
+                {"id": "invalid", "payload": "TOOBIG" * 1024 * 128},
+                {"id": "valid2", "payload": "thisisoktoo"},
+            ])
+
+        # An error log should have been generated
+        for r in logs.records:
+            if r.name == "syncstorage.views.validators":
+                expect_message = "Invalid BSO 42/bookmarks/invalid" \
+                    " (payload too large):" \
+                    " BSO({\"id\": \"invalid\", \"payload_size\": 786432})"
+                self.assertEqual(r.getMessage(), expect_message)
+                break
+        else:
+            assert False, "log was not generated"

@@ -5,6 +5,7 @@
 """
 
 import re
+import json
 import decimal
 
 FIELDS = set(('id', 'collection', 'sortindex', 'modified',
@@ -51,6 +52,10 @@ class BSO(dict):
                 continue
 
             self[name] = value
+
+    def __str__(self):
+        fields = dict((k, v) for (k, v) in self.iteritems() if k != 'payload')
+        return "BSO(%s)" % (json.dumps(fields, sort_keys=True),)
 
     def validate(self):
         """Validates the values the BSO has."""
@@ -110,7 +115,8 @@ class BSO(dict):
         if payload is not None:
             if not isinstance(payload, basestring):
                 return False, 'payload not a string'
-            if len(payload.encode("utf8")) > MAX_PAYLOAD_SIZE:
+            self['payload_size'] = len(payload.encode("utf8"))
+            if self['payload_size'] > MAX_PAYLOAD_SIZE:
                 return False, 'payload too large'
 
         return True, None
