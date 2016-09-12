@@ -6,6 +6,9 @@ from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
 
+import logging
+logger = logging.getLogger("syncstorage.views.validators")
+
 
 BATCH_MAX_IDS = 100
 DEFAULT_BATCH_MAX_COUNT = BATCH_MAX_IDS
@@ -204,6 +207,11 @@ def parse_multiple_bsos(request):
         consistent, msg = bso.validate()
         if not consistent:
             invalid_bsos[id] = msg
+            # Log status on how many invalid BSOs we get, and why.
+            logmsg = "Invalid BSO %s/%s/%s (%s): %s"
+            userid = request.matchdict["userid"]
+            collection = request.matchdict.get("collection")
+            logger.info(logmsg, userid, collection, id, msg, bso)
             continue
 
         if count >= BATCH_MAX_COUNT:
