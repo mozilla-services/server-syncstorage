@@ -465,7 +465,19 @@ class SQLStorage(SyncStorage):
     def create_batch(self, session, userid, collection):
         """Creates a batch in batch_uploads table"""
         collectionid = self._get_collection_id(session, collection)
-        batchid = ts2bigint(session.timestamp)
+        # Careful, there's some weirdness here!
+        #
+        # Sync timestamps are in seconds and quantized to two decimal places,
+        # so when we convert one to a bigint in milliseconds, the final digit
+        # is always zero. But we want to use the lower digits of the batchid
+        # for sharding writes via (batchid % num_tables), and leaving it as
+        # zero would skew the sharding distribution.
+        #
+        # So we mix in the lowest digit of the uid to improve the distribution
+        # while still letting us treat these ids as millisecond timestamps.
+        # It's yuck, but it works and it keeps the weirdness contained to this
+        # single line of code.
+        batchid = ts2bigint(session.timestamp) + (userid % 10)
         params = {
             "batch": batchid,
             "userid": userid,
