@@ -1038,11 +1038,14 @@ class CachedManager(_CachedManagerBase):
             try:
                 storage = self.storage
                 collection = self.collection
+                ttl_base = int(get_timestamp())
                 with self.owner.lock_for_read(userid, collection):
                     ts = storage.get_collection_timestamp(userid, collection)
                     data["modified"] = ts
                     data["items"] = {}
                     for bso in storage.get_items(userid, collection)["items"]:
+                        if bso.get("ttl") is not None:
+                            bso["ttl"] = ttl_base + bso["ttl"]
                         data["items"][bso["id"]] = bso
                 if add_if_missing:
                     self.cache.add(key, data)

@@ -347,7 +347,7 @@ class SQLStorage(SyncStorage):
         if offset is not None:
             self.decode_offset(params, offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
-        items = [self._row_to_bso(row) for row in rows]
+        items = [self._row_to_bso(row, int(session.timestamp)) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
         # timestamp and let it raise CollectionNotFoundError if necessary.
@@ -363,14 +363,18 @@ class SQLStorage(SyncStorage):
             "next_offset": next_offset,
         }
 
-    def _row_to_bso(self, row):
+    def _row_to_bso(self, row, timestamp):
         """Convert a database table row into a BSO object."""
         item = dict(row)
-        for key in ("userid", "collection", "payload_size", "ttl",):
+        for key in ("userid", "collection", "payload_size",):
             item.pop(key, None)
         ts = item.get("modified")
         if ts is not None:
             item["modified"] = bigint2ts(ts)
+        # Convert the ttl back into an offset from the current time.
+        ttl = item.get("ttl")
+        if ttl is not None:
+            item["ttl"] = ttl - timestamp
         return BSO(item)
 
     def encode_next_offset(self, params, items):
@@ -615,7 +619,7 @@ class SQLStorage(SyncStorage):
         })
         if row is None:
             raise ItemNotFoundError
-        return self._row_to_bso(row)
+        return self._row_to_bso(row, int(session.timestamp))
 
     @with_session
     def set_item(self, session, userid, collection, item, data):
