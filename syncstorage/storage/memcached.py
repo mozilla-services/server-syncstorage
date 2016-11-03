@@ -59,7 +59,8 @@ from syncstorage.storage import (SyncStorage,
                                  CollectionNotFoundError,
                                  ItemNotFoundError,
                                  InvalidOffsetError,
-                                 InvalidBatch)
+                                 InvalidBatch,
+                                 BATCH_LIFETIME)
 
 from pyramid.settings import aslist
 
@@ -944,23 +945,31 @@ class CacheOnlyManager(_CachedManagerBase):
             raise ItemNotFoundError
         return modified
 
-    def get_cached_batches(self, userid):
-        return self.cache.gets(self.get_batches_key(userid))
+    def get_cached_batches(self, userid, ts=None):
+        if ts is None:
+            ts = get_timestamp()
+        ts = int(ts)
+        bdata, bcasid = self.cache.gets(self.get_batches_key(userid))
+        # Remove any expired batches, but let the
+        # calling code write it back out to memcache.
+        if bdata:
+            for batchid, batch in bdata.items():
+                if batch["created"] + BATCH_LIFETIME < ts:
+                    del bdata[batchid]
+        return bdata, bcasid
 
     def create_batch(self, userid):
-        bdata, bcasid = self.get_cached_batches(userid)
-        batch = get_timestamp()
-        batchid = int(batch * 1000)
+        ts = get_timestamp()
+        bdata, bcasid = self.get_cached_batches(userid, ts)
+        batchid = int(ts * 1000)
         if not bdata:
             bdata = {}
         if batchid in bdata:
             raise ConflictError
-        bdata[batchid] = {"user": userid,
-                          "modified": batch,
-                          # FIXME Rough guesstimate of the maximum
-                          #       reasonable life span of a batch
-                          "expires": int(batch) + 2 * 3600,
-                          "items": []}
+        bdata[batchid] = {
+            "created": int(ts),
+            "items": []
+        }
         key = self.get_batches_key(userid)
         if not self.cache.cas(key, bdata, bcasid):
             raise ConflictError
@@ -969,27 +978,20 @@ class CacheOnlyManager(_CachedManagerBase):
     def valid_batch(self, userid, batch):
         ts = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid)
-
-        if not bdata or batchid not in bdata:
+        bdata, bcasid = self.get_cached_batches(userid, ts)
+        if not bdata:
             return False
-        if bdata[batchid]["expires"] < ts:
-            self.close_batch(userid, batchid)
-            return False
-        return True
+        return (batchid in bdata)
 
     def append_items_to_batch(self, userid, batch, items):
         modified = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid)
+        bdata, bcasid = self.get_cached_batches(userid, modified)
         # Invalid, closed, or expired batch
-        if (not bdata or
-                batchid not in bdata or
-                bdata[batchid]["expires"] <= int(modified)):
-            raise InvalidBatch(batch, modified, bdata)
+        if not bdata or batchid not in bdata:
+            raise InvalidBatch(batch)
 
         bdata[batchid]["items"].extend(items)
-        bdata[batchid]["modified"] = modified
         key = self.get_batches_key(userid)
         if not self.cache.cas(key, bdata, bcasid):
             raise ConflictError
@@ -998,12 +1000,10 @@ class CacheOnlyManager(_CachedManagerBase):
     def apply_batch(self, userid, batch):
         modified = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid)
+        bdata, bcasid = self.get_cached_batches(userid, modified)
         # Invalid, closed, or expired batch
-        if (not bdata or
-                batchid not in bdata or
-                bdata[batchid]["expires"] <= int(modified)):
-            raise InvalidBatch(batch, modified, bdata)
+        if not bdata or batchid not in bdata:
+            raise InvalidBatch(batch)
 
         data, casid = self.get_cached_data(userid)
         self._set_items(userid, bdata[batchid]["items"], modified, data, casid)

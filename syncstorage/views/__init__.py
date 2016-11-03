@@ -385,8 +385,6 @@ def post_collection_batch(request):
             try:
                 batch = storage.create_batch(userid, collection)
             except ConflictError, e:
-                # ConflictError here means a client is spamming requests,
-                # I think.
                 logger.error('Collision in batch creation!')
                 logger.error(e)
                 raise

@@ -178,14 +178,8 @@ class StressTest(TestCase):
 
         # POST requests with several WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
-        # Shallower distribution(for now) of "transactional" style batch
-        # uploads.  Looking for roughly 10% of batch POSTs to be
-        # "transactional".  Increase the frequency of "transactional" requests
-        # by changing the modulo 10 to something like modulo 5(~20%) or
-        # modulo 3(~30%).
-        # transact = int(random.paretovariate(1) * 100) % 10 == 0
-        #
-        # Let's do roughly 50% for fun.
+
+        # Let's do roughly 50% transactional batches.
         transact = random.randint(0, 1)
         batch_id = None
         committing = False

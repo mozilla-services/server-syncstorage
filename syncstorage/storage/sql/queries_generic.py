@@ -251,14 +251,19 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 # The idea is to delete them in small batches to keep overhead low.
 # Unfortunately there's no generic way to achieve this in SQL so the default
 # case winds up deleting all expired items.  There is a MySQL-specific
-# version using DELETE <blah> LIMIT 1000.
-PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
-                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) " \
-                           "LIMIT :maxitems"
+# version using DELETE <ttlblah> LIMIT 1000.
 
-PURGE_BATCHES = "DELETE FROM batch_uploads WHERE batch < " \
-                "   (UNIX_TIMESTAMP() - :grace) * 1000 LIMIT :maxitems"
+PURGE_SOME_EXPIRED_ITEMS = """
+    DELETE FROM %(bso)s
+    WHERE ttl < (UNIX_TIMESTAMP() - :grace)
+"""
 
-PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s " \
-                       "WHERE batch < (UNIX_TIMESTAMP() - :grace) * 1000" \
-                       "LIMIT :maxitems"
+PURGE_BATCHES = """
+    DELETE FROM batch_uploads
+    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+"""
+
+PURGE_BATCH_CONTENTS = """
+    DELETE FROM %(bui)s
+    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+"""
