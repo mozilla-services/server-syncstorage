@@ -114,28 +114,22 @@ PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
 
 # Common column definitions between BSO and batch upload item tables
 
-def _common_columns(ttl):
-    return (
-        Column("sortindex", Integer),
-        Column("modified", BigInteger, nullable=False),
-        # I'd like to default these to the emptry string and zero,
-        # but MySQL doesn't let you set a default on a TEXT column...
-        Column("payload", PAYLOAD_TYPE, nullable=False),
-        Column("payload_size", Integer, nullable=False),
-        Column("ttl", Integer, server_default=sqltext(str(ttl)))
-    )
-
-
 def _get_bso_columns(table_name):
-    identifiers = (
+    return (
         Column("userid", Integer, primary_key=True, nullable=False,
                autoincrement=False),
         Column("collection", Integer, primary_key=True, nullable=False,
                autoincrement=False),
-        Column("id", String(64), primary_key=True, autoincrement=False)
-    )
-    common = _common_columns(MAX_TTL)
-    indexes = (
+        Column("id", String(64), primary_key=True, autoincrement=False),
+        Column("sortindex", Integer),
+        Column("modified", BigInteger, nullable=False),
+        # I'd like to default this to the emptry string, but
+        # MySQL doesn't let you set a default on a TEXT column.
+        Column("payload", PAYLOAD_TYPE, nullable=False),
+        Column("payload_size", Integer, nullable=False,
+               server_default=sqltext("0")),
+        Column("ttl", Integer, nullable=False,
+               server_default=sqltext(str(MAX_TTL))),
         # Declare indexes.
         # We need to include the tablename in the index name due to sharding,
         # because index names in sqlite are global, not per-table.
@@ -148,7 +142,6 @@ def _get_bso_columns(table_name):
         # Clients almost always filter on "modified" using the above index,
         # and cannot take advantage of a separate index for sorting.
     )
-    return identifiers + common + indexes
 
 
 #  If the storage controller is not doing sharding based on userid,
@@ -174,14 +167,20 @@ batch_uploads = Table(
 
 
 def _get_batch_item_columns(table_name):
-    identifiers = (
+    return (
         Column("batch", BigInteger, primary_key=True, nullable=False,
                autoincrement=False),
         Column("id", String(64), primary_key=True, nullable=False,
-               autoincrement=False)
+               autoincrement=False),
+        # All these need to be nullable, because the batch upload
+        # may or may not set each individual field of each item.
+        # Also note that there's no "modified" column because the
+        # modification timestamp gets set on batch commit.
+        Column("sortindex", Integer, nullable=True),
+        Column("payload", PAYLOAD_TYPE, nullable=True),
+        Column("payload_size", Integer, nullable=True),
+        Column("ttl_offset", Integer, nullable=True)
     )
-    common = _common_columns(MAX_TTL)
-    return identifiers + common
 
 
 bui = Table("batch_upload_items", metadata,

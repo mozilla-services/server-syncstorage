@@ -99,25 +99,86 @@ CREATE_BATCH = "INSERT INTO batch_uploads (batch, userid, collection) "\
 VALID_BATCH = "SELECT batch FROM batch_uploads WHERE batch = :batch " \
                     "AND userid = :userid AND collection = :collection"
 
-APPLY_BATCH = "INSERT OR REPLACE INTO %(bso)s" \
-              "    (userid, collection, id, sortindex, payload," \
-              "     payload_size, ttl, modified)" \
-              "  SELECT booey.userid, booey.collection, booey.id," \
-              "     COALESCE(booey.sortindex, %(bso)s.sortindex)," \
-              "     COALESCE(booey.payload, %(bso)s.payload, '')," \
-              "     COALESCE(booey.payload_size, %(bso)s.payload_size, 0)," \
-              "     COALESCE(booey.ttl, %(bso)s.ttl, 2100000000)," \
-              "     :modified" \
-              "  FROM (SELECT batch_uploads.batch, batch_uploads.userid," \
-              "               batch_uploads.collection, %(bui)s.id," \
-              "               sortindex, payload, payload_size, ttl" \
-              "        FROM %(bui)s" \
-              "        LEFT JOIN batch_uploads" \
-              "        ON %(bui)s.batch = batch_uploads.batch" \
-              "        WHERE %(bui)s.batch = :batch) AS booey" \
-              "  LEFT JOIN %(bso)s ON booey.userid = %(bso)s.userid AND" \
-              "                   booey.collection = %(bso)s.collection AND" \
-              "                   booey.id = %(bso)s.id"
+# The semantics we want for applying a batch are roughly
+# those of an UPSERT, but there's no good generic way
+# to do that.  This is a best-effort, inefficient fallback
+# using only portable SQL syntax, that applies the batch in two
+# parts:
+#
+#  * Update any existing rows in-place, using subselects to
+#    access the data for each such row found.
+#  * Insert any new rows with a single INSERT ... SELECT.
+#
+# Yes, it's horrible, and made even more so due to the need to deal
+# with partial updates.  For production use we expect a db-specific
+# reimplementation that can do this in a single efficient query.
+
+APPLY_BATCH_UPDATE = """
+    UPDATE %(bso)s
+    SET
+        sortindex = COALESCE(
+            (SELECT sortindex FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.sortindex
+        ),
+        payload = COALESCE(
+            (SELECT payload FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.payload,
+            ''
+        ),
+        payload_size = COALESCE(
+            (SELECT payload_size FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.payload_size,
+            0
+        ),
+        ttl = COALESCE(
+            (SELECT ttl_offset + :ttl_base FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.ttl,
+            :default_ttl
+        ),
+        modified = :modified
+    WHERE
+        userid = (
+            SELECT userid FROM batch_uploads WHERE batch = :batch
+        ) AND
+        collection = (
+            SELECT collection FROM batch_uploads WHERE batch = :batch
+        ) AND
+        id IN (
+            SELECT id FROM %(bui)s WHERE batch = :batch
+        )
+"""
+
+APPLY_BATCH_INSERT = """
+    INSERT INTO %(bso)s
+        (userid, collection, id, sortindex, payload,
+        payload_size, ttl, modified)
+    SELECT
+       batch_uploads.userid,
+       batch_uploads.collection,
+       %(bui)s.id,
+       %(bui)s.sortindex,
+       COALESCE(%(bui)s.payload, ''),
+       COALESCE(%(bui)s.payload_size, 0),
+       COALESCE(%(bui)s.ttl_offset + :ttl_base, :default_ttl),
+       :modified
+    FROM batch_uploads
+    LEFT JOIN %(bui)s
+    ON
+        %(bui)s.batch = batch_uploads.batch
+    WHERE
+        batch_uploads.batch = :batch AND
+        %(bui)s.id NOT IN (
+            SELECT id
+            FROM %(bso)s
+            WHERE
+                userid = batch_uploads.userid AND
+                collection = batch_uploads.collection
+        )
+"""
 
 CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
               "AND userid = :userid AND collection = :collection"

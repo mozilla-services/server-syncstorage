@@ -297,6 +297,8 @@ def get_collection(request):
 
     if request.validated.get("full", False):
         res = storage.get_items(userid, collection, **filters)
+        for bso in res["items"]:
+            bso.pop("ttl", None)
     else:
         res = storage.get_item_ids(userid, collection, **filters)
     next_offset = res.get("next_offset")
@@ -461,7 +463,9 @@ def get_item(request):
     userid = request.validated["userid"]
     collection = request.validated["collection"]
     item = request.validated["item"]
-    return storage.get_item(userid, collection, item)
+    bso = storage.get_item(userid, collection, item)
+    bso.pop("ttl", None)
+    return bso
 
 
 @item.put(renderer="sync-json",

@@ -347,7 +347,7 @@ class SQLStorage(SyncStorage):
         if offset is not None:
             self.decode_offset(params, offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
-        items = [self._row_to_bso(row) for row in rows]
+        items = [self._row_to_bso(row, int(session.timestamp)) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
         # timestamp and let it raise CollectionNotFoundError if necessary.
@@ -363,14 +363,18 @@ class SQLStorage(SyncStorage):
             "next_offset": next_offset,
         }
 
-    def _row_to_bso(self, row):
+    def _row_to_bso(self, row, timestamp):
         """Convert a database table row into a BSO object."""
         item = dict(row)
-        for key in ("userid", "collection", "payload_size", "ttl",):
+        for key in ("userid", "collection", "payload_size",):
             item.pop(key, None)
         ts = item.get("modified")
         if ts is not None:
             item["modified"] = bigint2ts(ts)
+        # Convert the ttl back into an offset from the current time.
+        ttl = item.get("ttl")
+        if ttl is not None:
+            item["ttl"] = ttl - timestamp
         return BSO(item)
 
     def encode_next_offset(self, params, items):
@@ -507,12 +511,7 @@ class SQLStorage(SyncStorage):
             id_ = data["id"]
             row = self._prepare_bui_row(session, batchid, id_, data)
             rows.append(row)
-        defaults = {
-            "modified": ts2bigint(session.timestamp),
-            "payload": "",
-            "payload_size": 0,
-        }
-        session.insert_or_update("batch_upload_items", rows, defaults)
+        session.insert_or_update("batch_upload_items", rows)
         return session.timestamp
 
     @metrics_timer("syncstorage.storage.sql.db.execute.apply_batch")
@@ -524,9 +523,11 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "collection": collectionid,
             "default_ttl": MAX_TTL,
+            "ttl_base": int(session.timestamp),
             "modified": ts2bigint(session.timestamp)
         }
-        session.query("APPLY_BATCH", params)
+        session.query("APPLY_BATCH_UPDATE", params)
+        session.query("APPLY_BATCH_INSERT", params)
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
@@ -615,7 +616,7 @@ class SQLStorage(SyncStorage):
         })
         if row is None:
             raise ItemNotFoundError
-        return self._row_to_bso(row)
+        return self._row_to_bso(row, int(session.timestamp))
 
     @with_session
     def set_item(self, session, userid, collection, item, data):
@@ -638,10 +639,6 @@ class SQLStorage(SyncStorage):
         row = {}
         row["userid"] = userid
         row["collection"] = collectionid
-        self._prepare_common_row(session, data, item, row)
-        return row
-
-    def _prepare_common_row(self, session, data, item, row):
         row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
@@ -658,11 +655,23 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = MAX_TTL
             else:
                 row["ttl"] = data["ttl"] + int(session.timestamp)
+        return row
 
     def _prepare_bui_row(self, session, batchid, item, data):
         row = {}
         row["batch"] = batchid
-        self._prepare_common_row(session, data, item, row)
+        row["id"] = item
+        if "sortindex" in data:
+            row["sortindex"] = data["sortindex"]
+        # If a payload is provided, make sure to update dependent fields.
+        if "payload" in data:
+            row["payload"] = data["payload"]
+            row["payload_size"] = len(data["payload"])
+        # If provided, ttl will be an offset in seconds.
+        # Store the raw offset, we'll add it to the commit time
+        # to get the absolute timestamp.
+        if "ttl" in data:
+            row["ttl_offset"] = data["ttl"]
         return row
 
     @with_session
