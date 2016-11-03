@@ -23,6 +23,7 @@ import random
 import string
 import urllib
 import webtest
+import contextlib
 # import math
 
 from pyramid.interfaces import IAuthenticationPolicy
@@ -60,6 +61,16 @@ class TestStorage(StorageFunctionalTestCase):
         self.root = '/1.5/%d' % (self.user_id,)
         # Reset the storage to a known state, aka "empty".
         self.app.delete(self.root)
+
+    @contextlib.contextmanager
+    def _switch_user(self):
+        orig_root = self.root
+        try:
+            with super(TestStorage, self)._switch_user():
+                self.root = '/1.5/%d' % (self.user_id,)
+                yield
+        finally:
+            self.root = orig_root
 
     def test_get_collections(self):
         # col1 gets 3 items, col2 gets 5 items.
@@ -1570,13 +1581,79 @@ class TestStorage(StorageFunctionalTestCase):
         # should be committed including only the successful items.
         # It is the client's responsibility to detect that some items
         # failed, and decide whether to commit the batch.
-
         resp = self.app.get(collection + '?full=1')
         res = resp.json
         res.sort(key=lambda bso: bso['id'])
         self.assertEquals(len(res), 2)
         self.assertEquals(res[0]['payload'], 'aai')
         self.assertEquals(res[1]['payload'], 'sea')
+
+    def test_batch_id_is_correctly_scoped_to_a_collection(self):
+        collection1 = self.root + '/storage/col1'
+        bsos = [
+          {'id': 'a', 'payload': 'aih'},
+          {'id': 'b', 'payload': 'bie'},
+          {'id': 'c', 'payload': 'cee'}
+        ]
+        resp = self.app.post_json(collection1 + '?batch=true', bsos)
+        batch = resp.json['batch']
+
+        # I should not be able to add to that batch in a different collection.
+        endpoint2 = self.root + '/storage/col2?batch={0}'.format(batch)
+        resp = self.app.post_json(endpoint2, [{'id': 'd', 'payload': 'dii'}],
+                                  status=400)
+
+        # I should not be able to commit that batch in a different collection.
+        resp = self.app.post_json(endpoint2 + '&commit=true', [],
+                                  status=400)
+
+        # I should still be able to use the batch in the correct collection.
+        endpoint1 = collection1 + '?batch={0}'.format(batch)
+        resp = self.app.post_json(endpoint1, [{'id': 'd', 'payload': 'dii'}])
+        resp = self.app.post_json(endpoint1 + '&commit=true', [])
+
+        resp = self.app.get(collection1 + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 4)
+        self.assertEquals(res[0]['payload'], 'aih')
+        self.assertEquals(res[1]['payload'], 'bie')
+        self.assertEquals(res[2]['payload'], 'cee')
+        self.assertEquals(res[3]['payload'], 'dii')
+
+    def test_batch_id_is_correctly_scoped_to_a_user(self):
+        collection = self.root + '/storage/col1'
+        bsos = [
+          {'id': 'a', 'payload': 'aih'},
+          {'id': 'b', 'payload': 'bie'},
+          {'id': 'c', 'payload': 'cee'}
+        ]
+        resp = self.app.post_json(collection + '?batch=true', bsos)
+        batch = resp.json['batch']
+
+        with self._switch_user():
+            # I should not be able to add to that batch as a different user.
+            endpoint = self.root + '/storage/col1?batch={0}'.format(batch)
+            resp = self.app.post_json(endpoint, [{'id': 'd', 'payload': 'di'}],
+                                      status=400)
+
+            # I should not be able to commit that batch as a different user.
+            resp = self.app.post_json(endpoint + '&commit=true', [],
+                                      status=400)
+
+        # I should still be able to use the batch in the original user.
+        endpoint = collection + '?batch={0}'.format(batch)
+        resp = self.app.post_json(endpoint, [{'id': 'd', 'payload': 'di'}])
+        resp = self.app.post_json(endpoint + '&commit=true', [])
+
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 4)
+        self.assertEquals(res[0]['payload'], 'aih')
+        self.assertEquals(res[1]['payload'], 'bie')
+        self.assertEquals(res[2]['payload'], 'cee')
+        self.assertEquals(res[3]['payload'], 'di')
 
 
 class TestStorageMemcached(TestStorage):
@@ -1801,6 +1878,18 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         self.assertTrue('max_total_records' not in limits)
         self.assertTrue('max_total_bytes' not in limits)
         self.assertTrue('max_record_payload_bytes' in limits)
+
+    def test_batch_with_failing_bsos(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_id_is_correctly_scoped_to_a_user(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_id_is_correctly_scoped_to_a_collection(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
 
 
 class TestStorageMemcachedWriteThrough(TestStorageMemcached):
