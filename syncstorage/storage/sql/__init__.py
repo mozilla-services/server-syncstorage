@@ -511,12 +511,7 @@ class SQLStorage(SyncStorage):
             id_ = data["id"]
             row = self._prepare_bui_row(session, batchid, id_, data)
             rows.append(row)
-        defaults = {
-            "modified": ts2bigint(session.timestamp),
-            "payload": "",
-            "payload_size": 0,
-        }
-        session.insert_or_update("batch_upload_items", rows, defaults)
+        session.insert_or_update("batch_upload_items", rows)
         return session.timestamp
 
     @metrics_timer("syncstorage.storage.sql.db.execute.apply_batch")
@@ -530,7 +525,8 @@ class SQLStorage(SyncStorage):
             "default_ttl": MAX_TTL,
             "modified": ts2bigint(session.timestamp)
         }
-        session.query("APPLY_BATCH", params)
+        session.query("APPLY_BATCH_UPDATE", params)
+        session.query("APPLY_BATCH_INSERT", params)
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
@@ -667,6 +663,8 @@ class SQLStorage(SyncStorage):
         row = {}
         row["batch"] = batchid
         self._prepare_common_row(session, data, item, row)
+        # There's no "modified" column in the bui table.
+        row.pop("modified", None)
         return row
 
     @with_session

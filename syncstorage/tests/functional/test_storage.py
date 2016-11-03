@@ -1448,7 +1448,6 @@ class TestStorage(StorageFunctionalTestCase):
         # Fields not touched by the batch, should have been preserved.
         self.assertEquals(res[1]['sortindex'], 17)
 
-    @unittest2.skip("for the moment")
     def test_batch_ttl_update(self):
         collection = self.root + '/storage/col2'
         bsos = [
