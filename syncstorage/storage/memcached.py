@@ -154,9 +154,11 @@ class MemcachedStorage(SyncStorage):
         """
         yield _key(userid, "metadata")
         for colmgr in self.cached_collections.itervalues():
-            yield colmgr.get_key(userid)
+            for key in colmgr.iter_cache_keys(userid):
+                yield key
         for colmgr in self.cache_only_collections.itervalues():
-            yield colmgr.get_key(userid)
+            for key in colmgr.iter_cache_keys(userid):
+                yield key
 
     def _get_collection_manager(self, collection):
         """Get a collection-management object for the named collection.
@@ -677,6 +679,9 @@ class _CachedManagerBase(object):
     def get_key(self, userid):
         return _key(userid, "c", self.collection)
 
+    def iter_cache_keys(self, userid):
+        yield self.get_key(userid)
+
     @property
     def storage(self):
         return self.owner.storage
@@ -893,6 +898,14 @@ class CacheOnlyManager(_CachedManagerBase):
     internally and uses CAS to avoid conflicting writes.
     """
 
+    def get_batches_key(self, userid):
+        return _key(userid, "c", self.collection, "batches")
+
+    def iter_cache_keys(self, userid):
+        for key in super(CacheOnlyManager, self).iter_cache_keys(userid):
+            yield key
+        yield self.get_batches_key(userid)
+
     def get_cached_data(self, userid):
         return self.cache.gets(self.get_key(userid))
 
@@ -930,9 +943,6 @@ class CacheOnlyManager(_CachedManagerBase):
         if num_deleted == 0:
             raise ItemNotFoundError
         return modified
-
-    def get_batches_key(self, userid):
-        return _key(userid, "c", self.collection, "batches")
 
     def get_cached_batches(self, userid):
         return self.cache.gets(self.get_batches_key(userid))
