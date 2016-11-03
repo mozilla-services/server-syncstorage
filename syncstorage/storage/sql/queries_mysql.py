@@ -16,7 +16,7 @@ PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
 
 PURGE_BATCH_CONTENTS = "DELETE FROM %(bui)s " \
                        "WHERE batch < (UNIX_TIMESTAMP() - :grace) * 1000 " \
-                       "ORDER BY ttl LIMIT :maxitems"
+                       "ORDER BY batch LIMIT :maxitems"
 
 # MySQL's non-standard ON DUPLICATE KEY UPDATE means we can
 # apply a batch efficiently with a single query.
