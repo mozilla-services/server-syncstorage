@@ -910,7 +910,18 @@ class TestStorage(StorageFunctionalTestCase):
     def test_handling_of_invalid_bso_fields(self):
         coll_url = self.root + "/storage/col2"
         # Invalid ID - unacceptable characters.
+        # The newline cases are especially nuanced because \n
+        # gets special treatment from the regex library.
         bso = {"id": "A\nB", "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        bso = {"id": "A\n", "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        bso = {"id": "\nN", "payload": "testing"}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["failed"] and not res.json["success"])
+        bso = {"id": "A\tB", "payload": "testing"}
         res = self.app.post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         # Invalid ID - empty string is not acceptable.
@@ -1534,6 +1545,38 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res[0]['payload'], 'aih')
         self.assertEquals(res[1]['payload'], 'bie')
         self.assertEquals(res[2]['payload'], 'cee')
+
+    def test_batch_with_failing_bsos(self):
+        collection = self.root + '/storage/col2'
+        bsos = [
+          {'id': 'a', 'payload': 'aai'},
+          {'id': 'b\n', 'payload': 'i am invalid', 'sortindex': 17}
+        ]
+        resp = self.app.post_json(collection + '?batch=true', bsos)
+        self.assertEqual(len(resp.json['failed']), 1)
+        self.assertEqual(len(resp.json['success']), 1)
+        batch = resp.json["batch"]
+
+        bsos = [
+          {'id': 'c', 'payload': 'sea'},
+          {'id': 'd', 'payload': 'dii', 'ttl': -12},
+        ]
+        endpoint = collection + '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint, bsos)
+        self.assertEqual(len(resp.json['failed']), 1)
+        self.assertEqual(len(resp.json['success']), 1)
+
+        # To correctly match semantics of batchless POST, the batch
+        # should be committed including only the successful items.
+        # It is the client's responsibility to detect that some items
+        # failed, and decide whether to commit the batch.
+
+        resp = self.app.get(collection + '?full=1')
+        res = resp.json
+        res.sort(key=lambda bso: bso['id'])
+        self.assertEquals(len(res), 2)
+        self.assertEquals(res[0]['payload'], 'aai')
+        self.assertEquals(res[1]['payload'], 'sea')
 
 
 class TestStorageMemcached(TestStorage):

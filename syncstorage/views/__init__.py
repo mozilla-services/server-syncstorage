@@ -375,16 +375,10 @@ def post_collection_batch(request):
     # The "batch" key is set only on a multi-POST batch request prior to a
     # commit.  The "modified" key is only set upon a successful commit.
     # The two flags are mutually exclusive.
-    # Any failures at all mean cancelling the batch completely.
     res = {'success': [], 'failed': {}}
 
-    # If there are any parsing failures, we won't even start a batch.
-    if len(invalid_bsos):
-        for (id, error) in invalid_bsos.iteritems():
-            res["failed"][id] = error
-        # if batch and batch is not True:
-        #     storage.delete_batch(batch)
-        return res
+    for (id, error) in invalid_bsos.iteritems():
+        res["failed"][id] = error
 
     try:
         if batch is True:
@@ -408,33 +402,32 @@ def post_collection_batch(request):
         if bsos:
             try:
                 storage.append_items_to_batch(userid, collection, batch, bsos)
-                res["success"].extend([bso["id"] for bso in bsos])
             except ConflictError:
                 raise
             except Exception, e:
                 logger.error('Could not append to batch("{0}")'.format(batch))
-                logger.error(str(e))
+                logger.error(e)
                 for bso in bsos:
                     res["failed"][bso["id"]] = "db error"
-                raise
+            else:
+                res["success"].extend([bso["id"] for bso in bsos])
 
         if commit:
             try:
                 ts = storage.apply_batch(userid, collection, batch)
-                res['modified'] = ts
-                request.response.headers["X-Last-Modified"] = str(ts)
-                storage.close_batch(userid, collection, batch)
-                request.response.status = 200
-            except ConflictError:
-                for bso in bsos:
-                    res["failed"][bso["id"]] = "db error: commit"
+            except ConflictError, e:
+                logger.error('Collision in batch commit!')
+                logger.error(e)
                 raise
             except Exception, e:
                 logger.error("Could not apply batch")
                 logger.error(e)
-                for bso in bsos:
-                    res["failed"][bso["id"]] = "db error: commit"
                 raise
+            else:
+                res['modified'] = ts
+                request.response.headers["X-Last-Modified"] = str(ts)
+                storage.close_batch(userid, collection, batch)
+                request.response.status = 200
         else:
             res["batch"] = b64encode(str(batch))
     except ConflictError:

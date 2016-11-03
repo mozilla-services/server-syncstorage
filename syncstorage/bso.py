@@ -69,6 +69,11 @@ class BSO(dict):
             try:
                 if not VALID_ID_REGEX.match(value):
                     return False, 'invalid id'
+                # A regex like /^[blah]$/ can happily match a string
+                # with a trailing newline because of how the '$' is
+                # interpreted.  Guard against it explicitly.
+                if value[-1] == '\n':
+                    return False, 'invalid id'
             except TypeError:
                 return False, 'invalid id'
             # Make sure it's stored as a bytestring, not a unicode object.
