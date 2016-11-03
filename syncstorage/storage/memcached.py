@@ -1025,7 +1025,7 @@ class CachedManager(_CachedManagerBase):
     underlying store.
     """
 
-    def get_cached_data(self, userid, add_if_missing=True):
+    def get_cached_data(self, userid, refresh_if_missing=True):
         """Get the cached collection data, pulling into cache if missing.
 
         This method returns the cached collection data, populating it from
@@ -1033,7 +1033,7 @@ class CachedManager(_CachedManagerBase):
         """
         key = self.get_key(userid)
         data, casid = self.cache.gets(key)
-        if data is None:
+        if data is None and refresh_if_missing:
             data = {}
             try:
                 storage = self.storage
@@ -1047,24 +1047,25 @@ class CachedManager(_CachedManagerBase):
                         if bso.get("ttl") is not None:
                             bso["ttl"] = ttl_base + bso["ttl"]
                         data["items"][bso["id"]] = bso
-                if add_if_missing:
-                    self.cache.add(key, data)
-                    data, casid = self.cache.gets(key)
+                self.cache.add(key, data)
+                data, casid = self.cache.gets(key)
             except CollectionNotFoundError:
                 data = None
         return data, casid
 
     def set_items(self, userid, items):
         storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            ts = storage.set_items(userid, self.collection, items)
-        # Update the cached data in-place.
         # Leave the cache empty if any of posted bsos were missing a payload.
         # This will cause us to lazily read in the defaults from the db.
+        refresh_if_missing = True
         for item in items:
             if "payload" not in item:
+                refresh_if_missing = False
                 break
-        else:
+        with self._mark_dirty(userid, refresh_if_missing) as (data, casid):
+            ts = storage.set_items(userid, self.collection, items)
+        # Update the cached data in-place to reflect the changes.
+        if refresh_if_missing:
             self._set_items(userid, items, ts, data, casid)
         return ts
 
@@ -1076,17 +1077,22 @@ class CachedManager(_CachedManagerBase):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
             ts = storage.delete_items(userid, self.collection, items)
-        self._del_items(userid, items, ts, data, casid)
+        # Update the cached data, if there was any present.
+        if data is not None:
+            self._del_items(userid, items, ts, data, casid)
         return ts
 
     def set_item(self, userid, item, bso):
         storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            res = storage.set_item(userid, self.collection, item, bso)
-        # Update the cached data in-place.
         # Leave the cache empty if the posted bso was missing a payload.
         # This will cause us to lazily read in the defaults from the db.
-        if "payload" in bso:
+        refresh_if_missing = True
+        if "payload" not in bso:
+            refresh_if_missing = False
+        with self._mark_dirty(userid, refresh_if_missing) as (data, casid):
+            res = storage.set_item(userid, self.collection, item, bso)
+        # Update the cached data in-place to reflect the change.
+        if refresh_if_missing:
             bso["id"] = item
             self._set_items(userid, [bso], res["modified"], data, casid)
         return res
@@ -1095,31 +1101,28 @@ class CachedManager(_CachedManagerBase):
         storage = self.storage
         with self._mark_dirty(userid) as (data, casid):
             ts = storage.delete_item(userid, self.collection, item)
-        self._del_items(userid, [item], ts, data, casid)
+        # Update the cached data, if there was any present.
+        if data is not None:
+            self._del_items(userid, [item], ts, data, casid)
         return ts
 
     def create_batch(self, userid):
-        storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            batchid_ts = storage.create_batch(userid, self.collection)
-        return batchid_ts
+        return self.storage.create_batch(userid, self.collection)
 
     def valid_batch(self, userid, batchid):
-        storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            valid = storage.valid_batch(userid, self.collection, batchid)
-        return valid
+        return self.storage.valid_batch(userid, self.collection, batchid)
 
     def append_items_to_batch(self, userid, batchid, items):
-        storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            ts = storage.append_items_to_batch(userid, self.collection,
-                                               batchid, items)
-        return ts
+        # Since the items do not appear in the collection until we
+        # apply the batch, we don't need to mark anything dirty here.
+        return self.storage.append_items_to_batch(userid, self.collection,
+                                                  batchid, items)
 
     def apply_batch(self, userid, batchid):
+        # Applying the batch will render our cached data inaccurate.
+        # Just leave it emptied, and lazily re-populate on next fetch.
         storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
+        with self._mark_dirty(userid):
             ts = storage.apply_batch(userid, self.collection, batchid)
         return ts
 
@@ -1128,7 +1131,7 @@ class CachedManager(_CachedManagerBase):
         storage.close_batch(userid, self.collection, batchid)
 
     @contextlib.contextmanager
-    def _mark_dirty(self, userid):
+    def _mark_dirty(self, userid, refresh_if_missing=False):
         """Context manager to temporarily remove the cached data during write.
 
         All operations that may modify the underlying collection should be
@@ -1141,7 +1144,7 @@ class CachedManager(_CachedManagerBase):
         """
         # Grab the current cache state so we can pass it to calling function.
         key = self.get_key(userid)
-        data, casid = self.get_cached_data(userid, add_if_missing=False)
+        data, casid = self.get_cached_data(userid, refresh_if_missing)
         # Remove it from the cache so that we don't serve stale data.
         # A CAS-DELETE here would be nice, but memcached doesn't have one.
         if data is not None:
@@ -1153,7 +1156,8 @@ class CachedManager(_CachedManagerBase):
         except StorageError:
             # If they get a storage-related error, it's safe to rollback
             # the cache. For any other sort of error we leave the cache clear.
-            self.cache.add(key, data)
+            if data is not None:
+                self.cache.add(key, data)
             raise
 
     def _set_items(self, userid, *args):
