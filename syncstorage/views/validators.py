@@ -160,6 +160,12 @@ def extract_batch_state(request):
     If the "commit" parameter is has a value of "true", this batch
     is to be committed and deleted.
     """
+    # Don't extract or validate any of these params
+    # if the batch-upload feature is disabled.
+    settings = request.registry.settings
+    if not settings.get("storage.batch_upload_enabled", False):
+        return
+
     request.validated["batch"] = False
     batch_id = request.GET.get("batch")
     if batch_id is not None:
