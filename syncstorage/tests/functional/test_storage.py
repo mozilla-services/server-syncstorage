@@ -1448,7 +1448,6 @@ class TestStorage(StorageFunctionalTestCase):
         # Fields not touched by the batch, should have been preserved.
         self.assertEquals(res[1]['sortindex'], 17)
 
-    @unittest2.skip("for the moment")
     def test_batch_ttl_update(self):
         collection = self.root + '/storage/col2'
         bsos = [
@@ -1459,13 +1458,11 @@ class TestStorage(StorageFunctionalTestCase):
         resp = self.app.post_json(collection, bsos)
 
         # Bump ttls as a series of individual batch operations.
-        resp = self.app.post_json(collection + '?batch=true', [], status=202)
+        resp = self.app.post_json(collection + '?batch=true', [])
         batch = resp.json["batch"]
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
-                                  status=202)
-        resp = self.app.post_json(endpoint, [{'id': 'b', 'ttl': 2}],
-                                  status=202)
+        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}])
+        resp = self.app.post_json(endpoint, [{'id': 'b', 'ttl': 2}])
         resp = self.app.post_json(endpoint + '&commit=true', [],
                                   status=200)
 
@@ -1485,15 +1482,13 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res), 1)
         self.assertEquals(res[0]['payload'], 'see')
 
-    @unittest2.skip("for the moment")
     def test_batch_ttl_is_based_on_commit_timestamp(self):
         collection = self.root + '/storage/col2'
 
-        resp = self.app.post_json(collection + '?batch=true', [], status=202)
+        resp = self.app.post_json(collection + '?batch=true', [])
         batch = resp.json["batch"]
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
-                                  status=202)
+        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}])
 
         time.sleep(1)
 
