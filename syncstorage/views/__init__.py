@@ -190,13 +190,18 @@ def get_info_usage(request):
 @info_configuration.get(accept="application/json", renderer="sync-json")
 @default_decorators
 def get_info_configuration(request):
-    LIMIT_NAMES = (
-        "max_request_bytes",
-        "max_post_records",
-        "max_post_bytes",
-        "max_total_records",
-        "max_total_bytes",
-    )
+    # Don't return batch-related limits if the feature isn't enabled.
+    if request.registry.settings.get("storage.batch_upload_enabled", False):
+        LIMIT_NAMES = (
+            "max_post_records",
+            "max_post_bytes",
+            "max_total_records",
+            "max_total_bytes",
+        )
+    else:
+        LIMIT_NAMES = (
+            "max_request_bytes",
+        )
     limits = {}
     for name in LIMIT_NAMES:
         limits[name] = get_limit_config(request, name)
@@ -321,8 +326,10 @@ def post_collection(request):
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
 
-    if request.validated["batch"] or request.validated["commit"]:
-        return post_collection_batch(request)
+    # For initial rollout, disable batch uploads by default.
+    if request.registry.settings.get("storage.batch_upload_enabled", False):
+        if request.validated["batch"] or request.validated["commit"]:
+            return post_collection_batch(request)
 
     res = {'success': [], 'failed': {}}
 

@@ -1677,6 +1677,89 @@ class TestStoragePaginated(TestStorage):
     TEST_INI_FILE = "tests-paginated.ini"
 
 
+class TestStorageWithBatchUploadDisabled(TestStorage):
+    """Storage testcases run with batch uploads disabled via feature flag."""
+
+    TEST_INI_FILE = "tests-no-batch.ini"
+
+    def test_batches(self):
+        # This is the same sequence of requests as the master
+        # test, but without the checks for batch semantics.
+        # It lets us know that batch stuff is properly ignored.
+
+        endpoint = self.root + '/storage/col2'
+
+        bso1 = {'id': '12', 'payload': 'elegance'}
+        bso2 = {'id': '13', 'payload': 'slovenly'}
+        bsos = [bso1, bso2]
+        self.app.post_json(endpoint, bsos)
+
+        bso3 = {'id': 'a', 'payload': 'internal'}
+        bso4 = {'id': 'b', 'payload': 'pancreas'}
+        resp = self.app.post_json(endpoint + '?batch=true', [bso3, bso4])
+        assert 'batch' not in resp.json
+        batch = '123456'
+
+        bso5 = {'id': 'c', 'payload': 'tinsel'}
+        bso6 = {'id': '13', 'payload': 'portnoy'}
+        bso0 = {'id': '14', 'payload': 'itsybitsy'}
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.app.post_json(endpoint + commit, [bso5, bso6, bso0])
+        assert 'batch' not in resp.json
+        committed = resp.json['modified']
+        self.assertEquals(resp.json['modified'],
+                          float(resp.headers['X-Last-Modified']))
+
+        # make sure the changes applied
+        resp = self.app.get(endpoint)
+        res = resp.json
+        res.sort()
+        self.assertEquals(res, ['12', '13', '14', 'a', 'b', 'c'])
+        self.assertEquals(int(resp.headers['X-Weave-Records']), 6)
+        resp = self.app.get(endpoint + '/13')
+        self.assertEquals(resp.json['payload'], 'portnoy')
+        self.assertEquals(committed, float(resp.headers['X-Last-Modified']))
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/c')
+        self.assertEquals(resp.json['payload'], 'tinsel')
+        self.assertEquals(committed, resp.json['modified'])
+        resp = self.app.get(endpoint + '/14')
+        self.assertEquals(resp.json['payload'], 'itsybitsy')
+        self.assertEquals(committed, resp.json['modified'])
+        assert 'batch' not in resp.json
+
+    def test_we_dont_need_no_stinkin_batches(self):
+        endpoint = self.root + '/storage/col2'
+
+        # invalid batch ID is not an error when preffed off
+        bso1 = {'id': 'f', 'payload': 'pantomime'}
+        self.app.post_json(endpoint + '?batch=sammich', [bso1])
+
+        # commit with no batch ID is not an error when preffed off
+        self.app.post_json(endpoint + '?commit=true', [])
+
+    def test_batch_partial_update(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_ttl_update(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_ttl_is_based_on_commit_timestamp(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_size_limits(self):
+        limits = self.app.get(self.root + '/info/configuration').json
+        # Without batch uploads, many config limits are not present.
+        self.assertTrue('max_post_records' not in limits)
+        self.assertTrue('max_post_bytes' not in limits)
+        self.assertTrue('max_total_records' not in limits)
+        self.assertTrue('max_total_bytes' not in limits)
+        self.assertTrue('max_record_payload_bytes' in limits)
+
+
 class TestStorageMemcachedWriteThrough(TestStorageMemcached):
     """Storage testcases run against the memcached backend, if available.
 
