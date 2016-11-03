@@ -24,7 +24,7 @@ ONE_KB = 1024
 ONE_MB = 1024 * 1024
 
 # How long the client should wait before retrying a conflicting write.
-RETRY_AFTER = 5
+RETRY_AFTER = 10
 
 
 @make_decorator
@@ -42,19 +42,8 @@ def convert_storage_errors(viewfunc, request):
         # handle these respones very well:
         #   * desktop bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959034
         #   * android bug: https://bugzilla.mozilla.org/show_bug.cgi?id=959032
-        if request.method != "POST" or "bsos" not in request.validated:
-            # For most requests we instead return a "503 Service Unavailable"
-            # gives approximately the right client retry behaviour.
-            headers = {"Retry-After": str(RETRY_AFTER)}
-            raise HTTPServiceUnavailable(headers=headers)
-        else:
-            # For bulk POST operations we can report the error in the response
-            # body, and let the client continue with the rest of its sync.
-            logger.error("ConflictError on POST request")
-            res = {'success': [], 'failed': {}}
-            for bso in request.validated["bsos"]:
-                res["failed"][bso["id"]] = "conflict"
-            return res
+        headers = {"Retry-After": str(RETRY_AFTER)}
+        raise HTTPServiceUnavailable(headers=headers)
     except NotFoundError:
         raise HTTPNotFound
     except InvalidOffsetError:
