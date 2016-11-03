@@ -971,7 +971,9 @@ class CacheOnlyManager(_CachedManagerBase):
         batchid = str(batch)
         bdata, bcasid = self.get_cached_batches(userid)
 
-        if batchid not in bdata or bdata[batchid]["expires"] < ts:
+        if not bdata or batchid not in bdata:
+            return False
+        if bdata[batchid]["expires"] < ts:
             self.close_batch(userid, batchid)
             return False
         return True
@@ -1012,11 +1014,10 @@ class CacheOnlyManager(_CachedManagerBase):
         bdata, bcasid = self.get_cached_batches(userid)
         key = self.get_batches_key(userid)
 
-        if batchid in bdata:
-            try:
-                del bdata[batchid]
-            except KeyError:
-                return
+        try:
+            del bdata[batchid]
+        except KeyError:
+            return
         if not self.cache.cas(key, bdata, bcasid):
             raise ConflictError
 
