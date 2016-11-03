@@ -134,7 +134,7 @@ APPLY_BATCH_UPDATE = """
             0
         ),
         ttl = COALESCE(
-            (SELECT ttl FROM %(bui)s WHERE
+            (SELECT ttl_offset + :ttl_base FROM %(bui)s WHERE
                 batch = :batch AND id = %(bso)s.id),
             %(bso)s.ttl,
             :default_ttl
@@ -163,7 +163,7 @@ APPLY_BATCH_INSERT = """
        %(bui)s.sortindex,
        COALESCE(%(bui)s.payload, ''),
        COALESCE(%(bui)s.payload_size, 0),
-       COALESCE(%(bui)s.ttl, :default_ttl),
+       COALESCE(%(bui)s.ttl_offset + :ttl_base, :default_ttl),
        :modified
     FROM batch_uploads
     LEFT JOIN %(bui)s

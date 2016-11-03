@@ -179,7 +179,7 @@ def _get_batch_item_columns(table_name):
         Column("sortindex", Integer, nullable=True),
         Column("payload", PAYLOAD_TYPE, nullable=True),
         Column("payload_size", Integer, nullable=True),
-        Column("ttl", Integer, nullable=True)
+        Column("ttl_offset", Integer, nullable=True)
     )
 
 

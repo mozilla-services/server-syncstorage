@@ -1484,30 +1484,31 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res), 1)
         self.assertEquals(res[0]['payload'], 'see')
 
-    @unittest2.skip("for the moment")
     def test_batch_ttl_is_based_on_commit_timestamp(self):
         collection = self.root + '/storage/col2'
 
         resp = self.app.post_json(collection + '?batch=true', [], status=202)
         batch = resp.json["batch"]
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
+        resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 3}],
                                   status=202)
 
-        time.sleep(1)
+        # Put some time between upload timestamp and commit timestamp.
+        time.sleep(1.5)
 
         resp = self.app.post_json(endpoint + '&commit=true', [],
                                   status=200)
 
-        # Wait a little; the ttl should not kick in just yet.
-        time.sleep(1.1)
+        # Wait a little; if ttl is taken from the time of the commit
+        # then it should not kick in just yet.
+        time.sleep(1.6)
         resp = self.app.get(collection)
         res = resp.json
         self.assertEquals(len(res), 1)
         self.assertEquals(res[0], 'a')
 
         # Wait some more, and the ttl should kick in.
-        time.sleep(1.1)
+        time.sleep(1.6)
         resp = self.app.get(collection)
         res = resp.json
         self.assertEquals(len(res), 0)

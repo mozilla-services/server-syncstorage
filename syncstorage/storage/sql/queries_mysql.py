@@ -29,7 +29,7 @@ APPLY_BATCH_INSERT = """
         ttl, payload, payload_size)
     SELECT
         :userid, :collection, id, :modified, sortindex,
-        COALESCE(ttl, :default_ttl),
+        COALESCE(ttl_offset + :ttl_base, :default_ttl),
         COALESCE(payload, ''),
         COALESCE(payload_size, 0)
     FROM %(bui)s
@@ -38,7 +38,7 @@ APPLY_BATCH_INSERT = """
         modified = :modified,
         sortindex = COALESCE(%(bui)s.sortindex,
                              %(bso)s.sortindex),
-        ttl = COALESCE(%(bui)s.ttl,
+        ttl = COALESCE(%(bui)s.ttl_offset + :ttl_base,
                        %(bso)s.ttl),
         payload = COALESCE(%(bui)s.payload,
                            %(bso)s.payload),

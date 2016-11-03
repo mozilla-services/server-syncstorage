@@ -49,7 +49,7 @@ APPLY_BATCH_INSERT = """
        COALESCE(%(bui)s.sortindex, existing.sortindex),
        COALESCE(%(bui)s.payload, existing.payload, ''),
        COALESCE(%(bui)s.payload_size, existing.payload_size, 0),
-       COALESCE(%(bui)s.ttl, existing.ttl, :default_ttl),
+       COALESCE(%(bui)s.ttl_offset + :ttl_base, existing.ttl, :default_ttl),
        :modified
     FROM batch_uploads
     LEFT JOIN %(bui)s

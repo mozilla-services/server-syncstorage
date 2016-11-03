@@ -523,6 +523,7 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "collection": collectionid,
             "default_ttl": MAX_TTL,
+            "ttl_base": int(session.timestamp),
             "modified": ts2bigint(session.timestamp)
         }
         session.query("APPLY_BATCH_UPDATE", params)
@@ -638,10 +639,6 @@ class SQLStorage(SyncStorage):
         row = {}
         row["userid"] = userid
         row["collection"] = collectionid
-        self._prepare_common_row(session, data, item, row)
-        return row
-
-    def _prepare_common_row(self, session, data, item, row):
         row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
@@ -658,13 +655,23 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = MAX_TTL
             else:
                 row["ttl"] = data["ttl"] + int(session.timestamp)
+        return row
 
     def _prepare_bui_row(self, session, batchid, item, data):
         row = {}
         row["batch"] = batchid
-        self._prepare_common_row(session, data, item, row)
-        # There's no "modified" column in the bui table.
-        row.pop("modified", None)
+        row["id"] = item
+        if "sortindex" in data:
+            row["sortindex"] = data["sortindex"]
+        # If a payload is provided, make sure to update dependent fields.
+        if "payload" in data:
+            row["payload"] = data["payload"]
+            row["payload_size"] = len(data["payload"])
+        # If provided, ttl will be an offset in seconds.
+        # Store the raw offset, we'll add it to the commit time
+        # to get the absolute timestamp.
+        if "ttl" in data:
+            row["ttl_offset"] = data["ttl"]
         return row
 
     @with_session
