@@ -1575,7 +1575,7 @@ class TestStorage(StorageFunctionalTestCase):
         endpoint = collection + '?batch={0}&commit=true'.format(batch)
         resp = self.app.post_json(endpoint, bsos)
         self.assertEqual(len(resp.json['failed']), 1)
-        self.assertEqual(len(resp.json['success']), 1)
+        self.assertEqual(len(resp.json['success']), 2)
 
         # To correctly match semantics of batchless POST, the batch
         # should be committed including only the successful items.
