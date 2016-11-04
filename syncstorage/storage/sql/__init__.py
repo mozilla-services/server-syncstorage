@@ -336,6 +336,8 @@ class SQLStorage(SyncStorage):
             params["ttl"] = int(session.timestamp)
         if "newer" in params:
             params["newer"] = ts2bigint(params["newer"])
+        if "older" in params:
+            params["older"] = ts2bigint(params["older"])
         # We always fetch one more item than necessary, so we can tell whether
         # there are additional items to be fetched with next_offset.
         limit = params.get("limit")
@@ -431,6 +433,9 @@ class SQLStorage(SyncStorage):
                 bound, offset = map(int, offset.split(":", 1))
                 # Queries with "newer" should always produce bound > newer
                 if bound < params.get("newer", bound):
+                    raise InvalidOffsetError(offset)
+                # Queries with "older" should always produce bound < older
+                if bound > params.get("older", bound):
                     raise InvalidOffsetError(offset)
                 # The bound determines the starting point of the sort order.
                 params["offset"] = offset

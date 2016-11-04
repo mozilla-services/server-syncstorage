@@ -760,6 +760,7 @@ class _CachedManagerBase(object):
     def get_items(self, userid, **kwds):
         # Decode kwds into individual filter values.
         newer = kwds.pop("newer", None)
+        older = kwds.pop("older", None)
         limit = kwds.pop("limit", None)
         offset = kwds.pop("offset", None)
         sort = kwds.pop("sort", None)
@@ -779,6 +780,8 @@ class _CachedManagerBase(object):
         # Apply the various filters as generator expressions.
         if newer is not None:
             bsos = (bso for bso in bsos if bso["modified"] > newer)
+        if older is not None:
+            bsos = (bso for bso in bsos if bso["modified"] < older)
         # Filter out any that have expired.
         bsos = self._filter_expired_items(bsos)
         # Sort the resulting list.
