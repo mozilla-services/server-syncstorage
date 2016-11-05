@@ -19,6 +19,7 @@ WEAVE_ILLEGAL_METH = 1              # Illegal method/protocol
 WEAVE_MALFORMED_JSON = 6            # Json parse failure
 WEAVE_INVALID_WBO = 8               # Invalid Weave Basic Object
 WEAVE_OVER_QUOTA = 14               # User over quota
+WEAVE_SIZE_LIMIT_EXCEEDED = 17      # Size limit exceeded
 
 
 def set_x_timestamp_header(handler, registry):
@@ -67,6 +68,8 @@ def convert_cornice_errors_to_respcodes(handler, registry):
         try:
             if body["status"] == "quota-exceeded":
                 return WEAVE_OVER_QUOTA
+            if body["status"] == "size-limit-exceeded":
+                return WEAVE_SIZE_LIMIT_EXCEEDED
             error = body["errors"][0]
             if error["location"] == "body":
                 if error["name"] in ("bso", "bsos"):

@@ -4,17 +4,22 @@
 
 import logging
 
+from base64 import b64encode
+
 from pyramid.security import Allow
 
 from cornice import Service
 
-from syncstorage.bso import VALID_ID_REGEX
+from syncstorage.bso import VALID_ID_REGEX, MAX_PAYLOAD_SIZE
 from syncstorage.util import get_timestamp
-from syncstorage.storage import NotFoundError
+from syncstorage.storage import (ConflictError,
+                                 NotFoundError,
+                                 InvalidBatch)
 
 from syncstorage.views.validators import (extract_target_resource,
                                           extract_precondition_headers,
                                           extract_query_params,
+                                          extract_batch_state,
                                           parse_multiple_bsos,
                                           parse_single_bso)
 from syncstorage.views.decorators import (convert_storage_errors,
@@ -22,7 +27,7 @@ from syncstorage.views.decorators import (convert_storage_errors,
                                           with_collection_lock,
                                           check_precondition_headers,
                                           check_storage_quota)
-from syncstorage.views.util import get_resource_timestamp
+from syncstorage.views.util import get_resource_timestamp, get_limit_config
 
 
 logger = logging.getLogger("syncstorage")
@@ -130,6 +135,8 @@ info_usage = SyncStorageService(name="info_usage",
                                 path="/info/collection_usage")
 info_counts = SyncStorageService(name="info_counts",
                                  path="/info/collection_counts")
+info_configuration = SyncStorageService(name="info_configuration",
+                                        path="/info/configuration")
 
 storage = SyncStorageService(name="storage",
                              path="/storage")
@@ -178,6 +185,29 @@ def get_info_usage(request):
         sizes[collection] = size / ONE_KB
     request.response.headers["X-Weave-Records"] = str(len(sizes))
     return sizes
+
+
+@info_configuration.get(accept="application/json", renderer="sync-json")
+@default_decorators
+def get_info_configuration(request):
+    # Don't return batch-related limits if the feature isn't enabled.
+    if request.registry.settings.get("storage.batch_upload_enabled", False):
+        LIMIT_NAMES = (
+            "max_post_records",
+            "max_post_bytes",
+            "max_total_records",
+            "max_total_bytes",
+        )
+    else:
+        LIMIT_NAMES = (
+            "max_request_bytes",
+        )
+    limits = {}
+    for name in LIMIT_NAMES:
+        limits[name] = get_limit_config(request, name)
+    # This limit is hard-coded for now.
+    limits["max_record_payload_bytes"] = MAX_PAYLOAD_SIZE
+    return limits
 
 
 @storage.delete(renderer="sync-json")
@@ -272,6 +302,8 @@ def get_collection(request):
 
     if request.validated.get("full", False):
         res = storage.get_items(userid, collection, **filters)
+        for bso in res["items"]:
+            bso.pop("ttl", None)
     else:
         res = storage.get_item_ids(userid, collection, **filters)
     next_offset = res.get("next_offset")
@@ -286,7 +318,8 @@ def get_collection(request):
 
 
 @collection.post(accept="application/json", renderer="sync-json",
-                 validators=DEFAULT_VALIDATORS + (parse_multiple_bsos,))
+                 validators=DEFAULT_VALIDATORS + (extract_batch_state,
+                                                  parse_multiple_bsos))
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
@@ -294,6 +327,11 @@ def post_collection(request):
     collection = request.validated["collection"]
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
+
+    # For initial rollout, disable batch uploads by default.
+    if request.registry.settings.get("storage.batch_upload_enabled", False):
+        if request.validated["batch"] or request.validated["commit"]:
+            return post_collection_batch(request)
 
     res = {'success': [], 'failed': {}}
 
@@ -306,6 +344,83 @@ def post_collection(request):
     res["success"].extend([bso["id"] for bso in bsos])
     res['modified'] = ts
     request.response.headers["X-Last-Modified"] = str(ts)
+
+    return res
+
+
+def post_collection_batch(request):
+    storage = request.validated["storage"]
+    userid = request.validated["userid"]
+    collection = request.validated["collection"]
+    bsos = request.validated["bsos"]
+    invalid_bsos = request.validated["invalid_bsos"]
+    batch = request.validated["batch"]
+    commit = request.validated["commit"]
+
+    request.response.status = 202
+
+    # Bail early if we have nonsensical arguments
+    if not batch:
+        raise InvalidBatch
+
+    # The "batch" key is set only on a multi-POST batch request prior to a
+    # commit.  The "modified" key is only set upon a successful commit.
+    # The two flags are mutually exclusive.
+    res = {'success': [], 'failed': {}}
+
+    for (id, error) in invalid_bsos.iteritems():
+        res["failed"][id] = error
+
+    try:
+        if batch is True:
+            try:
+                batch = storage.create_batch(userid, collection)
+            except ConflictError, e:
+                logger.error('Collision in batch creation!')
+                logger.error(e)
+                raise
+            except Exception, e:
+                logger.error('Could not create batch')
+                logger.error(e)
+                raise
+        else:
+            i = storage.valid_batch(userid, collection, batch)
+            if not i:
+                raise InvalidBatch
+
+        if bsos:
+            try:
+                storage.append_items_to_batch(userid, collection, batch, bsos)
+            except ConflictError:
+                raise
+            except Exception, e:
+                logger.error('Could not append to batch("{0}")'.format(batch))
+                logger.error(e)
+                for bso in bsos:
+                    res["failed"][bso["id"]] = "db error"
+            else:
+                res["success"].extend([bso["id"] for bso in bsos])
+
+        if commit:
+            try:
+                ts = storage.apply_batch(userid, collection, batch)
+            except ConflictError, e:
+                logger.error('Collision in batch commit!')
+                logger.error(e)
+                raise
+            except Exception, e:
+                logger.error("Could not apply batch")
+                logger.error(e)
+                raise
+            else:
+                res['modified'] = ts
+                request.response.headers["X-Last-Modified"] = str(ts)
+                storage.close_batch(userid, collection, batch)
+                request.response.status = 200
+        else:
+            res["batch"] = b64encode(str(batch))
+    except ConflictError:
+        raise
 
     return res
 
@@ -337,7 +452,9 @@ def get_item(request):
     userid = request.validated["userid"]
     collection = request.validated["collection"]
     item = request.validated["item"]
-    return storage.get_item(userid, collection, item)
+    bso = storage.get_item(userid, collection, item)
+    bso.pop("ttl", None)
+    return bso
 
 
 @item.put(renderer="sync-json",

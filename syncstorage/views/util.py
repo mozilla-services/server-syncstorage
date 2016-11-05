@@ -86,3 +86,19 @@ def get_resource_timestamp(request):
         return storage.get_item_timestamp(userid, collection, item)
     except NotFoundError:
         return 0
+
+
+DEFAULT_LIMITS = {}
+DEFAULT_LIMITS["max_request_bytes"] = 1024 * 1024
+DEFAULT_LIMITS["max_post_records"] = 100
+DEFAULT_LIMITS["max_post_bytes"] = DEFAULT_LIMITS["max_request_bytes"]
+DEFAULT_LIMITS["max_total_records"] = 100 * DEFAULT_LIMITS["max_post_records"]
+DEFAULT_LIMITS["max_total_bytes"] = 100 * DEFAULT_LIMITS["max_post_bytes"]
+
+
+def get_limit_config(request, limit):
+    """Get the configured value for the named size limit."""
+    try:
+        return request.registry.settings["storage." + limit]
+    except KeyError:
+        return DEFAULT_LIMITS[limit]

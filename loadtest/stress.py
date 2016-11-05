@@ -96,7 +96,7 @@ class HawkAuth(requests.auth.AuthBase):
         self.secret = secret
 
     def __call__(self, req):
-        # Requets doesn't seem to include the port in the Host header,
+        # Request doesn't seem to include the port in the Host header,
         # and loads replaces hostnames with IPs.  Undo all this rubbish
         # so that we can calculate the correct signature.
         req.headers['Host'] = urlparse(self.server_url).netloc
@@ -176,9 +176,19 @@ class StressTest(TestCase):
             response = self.session.get(url, params=params, **reqkwds)
             self.assertTrue(response.status_code in (200, 404))
 
-        # PUT requests with several WBOs batched together
+        # POST requests with several WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
-        cols = random.sample(collections, num_requests)
+
+        # Let's do roughly 50% transactional batches.
+        transact = random.randint(0, 1)
+        batch_id = None
+        committing = False
+        # Collections should be a single static entry if we're "transactional"
+        if transact:
+            col = random.sample(collections, 1)[0]
+            cols = [col for x in xrange(num_requests)]
+        else:
+            cols = random.sample(collections, num_requests)
         for x in range(num_requests):
             url = self.endpoint_url + "/storage/" + cols[x]
             data = []
@@ -196,13 +206,30 @@ class StressTest(TestCase):
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
+            response_code = 200
+            if transact:
+                # Batch uploads only return a 200 on commit.  An Accepted(202)
+                # is returned for batch creation & appends
+                response_code = 202
+                if x == 0:
+                    committing = False
+                    url += "?batch=true"
+                elif x == num_requests - 1:
+                    url += "?commit=true&batch=%s" % batch_id
+                    committing = True
+                    batch_id = None
+                    response_code = 200
+                else:
+                    url += "?batch=%s" % batch_id
             response = self.session.post(url, data=data, **reqkwds)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, response_code)
             body = response.content
             self.assertTrue(body != '')
             result = json.loads(body)
             self.assertEquals(len(result["success"]), items_per_batch)
             self.assertEquals(len(result["failed"]), 0)
+            if transact and not committing:
+                batch_id = result["batch"]
 
         # DELETE requests.
         # We might choose to delete some individual collections, or to do

@@ -52,6 +52,19 @@ class StorageTestsMixin(object):
         res = self.storage.get_item(_UID, 'col', 'o')
         self.assertEquals(res['payload'], _PLD)
 
+    def test_batches(self):
+        self.assertRaises(CollectionNotFoundError,
+                          self.storage.get_items, _UID, 'col')
+        self.storage.set_item(_UID, 'col', 'o', {'payload': 'trance'})
+
+        batch = self.storage.create_batch(_UID, 'col')
+        self.storage.append_items_to_batch(_UID, 'col', batch,
+                                           [{'id': 'o',
+                                             'payload': 'tweaked'}])
+        self.storage.apply_batch(_UID, 'col', batch)
+        res = self.storage.get_item(_UID, 'col', 'o')
+        self.assertEquals(res['payload'], 'tweaked')
+
     def test_get_collection_timestamps(self):
         self.storage.set_item(_UID, 'col1', '1', {'payload': _PLD})
         self.storage.set_item(_UID, 'col2', '1', {'payload': _PLD})

@@ -112,6 +112,8 @@ PAYLOAD_TYPE = Text(length=256*1024)
 PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
 
 
+# Common column definitions between BSO and batch upload item tables
+
 def _get_bso_columns(table_name):
     return (
         Column("userid", Integer, primary_key=True, nullable=False,
@@ -121,11 +123,13 @@ def _get_bso_columns(table_name):
         Column("id", String(64), primary_key=True, autoincrement=False),
         Column("sortindex", Integer),
         Column("modified", BigInteger, nullable=False),
-        # I'd like to default these to the emptry string and zero,
-        # but MySQL doesn't let you set a default on a TEXT column...
+        # I'd like to default this to the emptry string, but
+        # MySQL doesn't let you set a default on a TEXT column.
         Column("payload", PAYLOAD_TYPE, nullable=False),
-        Column("payload_size", Integer, nullable=False),
-        Column("ttl", Integer, server_default=sqltext(str(MAX_TTL))),
+        Column("payload_size", Integer, nullable=False,
+               server_default=sqltext("0")),
+        Column("ttl", Integer, nullable=False,
+               server_default=sqltext(str(MAX_TTL))),
         # Declare indexes.
         # We need to include the tablename in the index name due to sharding,
         # because index names in sqlite are global, not per-table.
@@ -145,21 +149,78 @@ def _get_bso_columns(table_name):
 
 bso = Table("bso", metadata, *_get_bso_columns("bso"))
 
+# Table mapping (user_id, collection_id) => batch IDs
+
+batch_uploads = Table(
+    "batch_uploads",
+    metadata,
+    Column("batch", BigInteger, primary_key=True, nullable=False),
+    Column("userid", Integer, primary_key=True, nullable=False,
+           autoincrement=False),
+    Column("collection", Integer, nullable=False)
+)
+
+# Column definitions for batch upload item table(s)
+#
+# These columns hold the batched uploads until either the client declares a
+# commit or the TTL expires.
+
+
+def _get_batch_item_columns(table_name):
+    return (
+        Column("batch", BigInteger, primary_key=True, nullable=False,
+               autoincrement=False),
+        Column("id", String(64), primary_key=True, nullable=False,
+               autoincrement=False),
+        # All these need to be nullable, because the batch upload
+        # may or may not set each individual field of each item.
+        # Also note that there's no "modified" column because the
+        # modification timestamp gets set on batch commit.
+        Column("sortindex", Integer, nullable=True),
+        Column("payload", PAYLOAD_TYPE, nullable=True),
+        Column("payload_size", Integer, nullable=True),
+        Column("ttl_offset", Integer, nullable=True)
+    )
+
+
+bui = Table("batch_upload_items", metadata,
+            *_get_batch_item_columns("batch_upload_items"))
+
+
 #  If the storage controller is doing sharding based on userid,
 #  then it will use the below functions to select a table from "bso0"
-#  to "bsoN" for each userid.
+#  to "bsoN" for each userid.  Ditto for batch_upload_items.
 
 BSO_SHARDS = {}
+BUI_SHARDS = {}
+
+
+def get_sharded_table(index, which="bso"):
+    """Get the Table object for table bso and batch_upload_items<N>."""
+    global BSO_SHARDS, BUI_SHARDS
+    if which == "bso":
+        shards = BSO_SHARDS
+        columns_func = _get_bso_columns
+    elif which == "batch_upload_items":
+        shards = BUI_SHARDS
+        columns_func = _get_batch_item_columns
+    else:
+        raise ValueError("Invalid sharded table type: %s" % (which))
+
+    table = shards.get(index)
+    if table is None:
+        table_name = "%s%d" % (which, index)
+        table = Table(table_name, metadata, *columns_func(table_name))
+        shards[index] = table
+    return table
 
 
 def get_bso_table(index):
-    """Get the Table object for table bso<N>."""
-    bso = BSO_SHARDS.get(index)
-    if bso is None:
-        table_name = "bso%d" % (index,)
-        bso = Table(table_name, metadata, *_get_bso_columns(table_name))
-        BSO_SHARDS[index] = bso
-    return bso
+    return get_sharded_table(index)
+
+
+def get_batch_item_table(index):
+    return get_sharded_table(index, which="batch_upload_items")
 
 
 class _QueueWithMaxBacklog(Queue):
@@ -298,12 +359,16 @@ class DBConnector(object):
         if create_tables:
             collections.create(self.engine, checkfirst=True)
             user_collections.create(self.engine, checkfirst=True)
+            batch_uploads.create(self.engine, checkfirst=True)
             if not self.shard:
                 bso.create(self.engine, checkfirst=True)
+                bui.create(self.engine, checkfirst=True)
             else:
                 for idx in xrange(self.shardsize):
                     bsoN = get_bso_table(idx)
                     bsoN.create(self.engine, checkfirst=True)
+                    buiN = get_batch_item_table(idx)
+                    buiN.create(self.engine, checkfirst=True)
 
         # Load the pre-built queries to use with this database backend.
         # Currently we have a generic set of queries, and some queries specific
@@ -372,6 +437,11 @@ class DBConnector(object):
                 qvars["bso"] = params["bso"]
             else:
                 qvars["bso"] = self.get_bso_table(params["userid"])
+        if "%(bui)s" in query:
+            if "bui" in params:
+                qvars["bui"] = params["bui"]
+            else:
+                qvars["bui"] = self.get_batch_item_table(params["batch"])
         if "%(ids)s" in query:
             bindparams = []
             for i, id in enumerate(params["ids"]):
@@ -387,6 +457,12 @@ class DBConnector(object):
         if not self.shard or userid is None:
             return bso
         return get_bso_table(userid % self.shardsize)
+
+    def get_batch_item_table(self, batchid):
+        """Get the batch_upload_items table object for the given userid."""
+        if not self.shard or batchid is None:
+            return bui
+        return get_batch_item_table(batchid % self.shardsize)
 
 
 def is_retryable_db_error(engine, exc):
@@ -740,11 +816,16 @@ class DBConnection(object):
         if not items:
             return 0
         # Find the table object into which we're inserting.
-        # To work properly with sharding, all items must have same userid
-        # so that we can select a single BSO table.
-        userid = items[0].get("userid")
         if table == "bso":
+            # To work properly with sharding, all items must have same userid
+            # so that we can select a single BSO table.
+            userid = items[0].get("userid")
             table = self._connector.get_bso_table(userid)
+        elif table == "batch_upload_items":
+            # To work properly with sharding all items must have same batchid
+            # so that we can select a single BUI table.
+            batchid = items[0].get("batch")
+            table = self._connector.get_batch_item_table(batchid)
         else:
             table = metadata.tables[table]
         # Dispatch to an appropriate implementation.

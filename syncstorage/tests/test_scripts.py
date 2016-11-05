@@ -12,7 +12,8 @@ from mozsvc.exceptions import BackendError
 
 from syncstorage.tests.support import StorageTestCase
 from syncstorage.storage import (load_storage_from_settings,
-                                 NotFoundError)
+                                 NotFoundError,
+                                 BATCH_LIFETIME)
 
 try:
     from syncstorage.storage.memcached import MemcachedStorage  # NOQA
@@ -112,22 +113,61 @@ class TestPurgeTTLScript(StorageTestCase):
         key = "syncstorage:storage:host:another-test-host"
         storage = self.config.registry[key]
 
-        def count_items():
-            COUNT_ITEMS = "select count(*) from %(bso)s "\
-                          "/* queryName=COUNT_ITEMS */"
+        def count_items(query):
             total_items = 0
             for i in xrange(storage.dbconnector.shardsize):
                 with storage.dbconnector.connect() as c:
-                    res = c.execute(COUNT_ITEMS % {"bso": "bso" + str(i)})
+                    res = c.execute(query % {
+                        "bso": "bso" + str(i),
+                        "bui": "batch_upload_items" + str(i)
+                    })
                     total_items += res.fetchall()[0][0]
             return total_items
+
+        def count_bso_items():
+            return count_items("select count(*) from %(bso)s "
+                               "/* queryName=COUNT_BSO_ITEMS */")
+
+        def count_bui_items():
+            return count_items("SELECT COUNT(*) FROM %(bui)s "
+                               "/* queryName=COUNT_BUI_ITEMS /*")
+
+        def count_batches():
+            query = "SELECT * FROM batch_uploads "\
+                    "/* queryName=PRINT_BATCHES /*"
+            with storage.dbconnector.connect() as c:
+                res = c.execute(query)
+            query = "SELECT COUNT(*) FROM batch_uploads "\
+                    "/* queryName=COUNT_BATCHES /*"
+            with storage.dbconnector.connect() as c:
+                res = c.execute(query)
+                return res.fetchall()[0][0]
 
         storage.set_item(1, "col", "test1", {"payload": "X", "ttl": 0})
         storage.set_item(1, "col", "test2", {"payload": "X", "ttl": 0})
         storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 30})
-        self.assertEquals(count_items(), 3)
+        self.assertEquals(count_bso_items(), 3)
 
-        time.sleep(1)
+        # Have to get a little creative here to insert old enough batch IDs.
+        batchid = int((time.time() - BATCH_LIFETIME) * 1000)
+        with storage.dbconnector.connect() as c:
+            c.execute("INSERT INTO batch_uploads (batch, userid, "
+                      "collection) VALUES (:batch, :userid, :collection) "
+                      "/* queryName=purgeBatchId */",
+                      {"batch": batchid, "userid": 1, "collection": 1})
+        storage.append_items_to_batch(1, "col", batchid,
+                                      [{"id": "test1", "payload": "Y"},
+                                       {"id": "test2", "payload": "Y"},
+                                       {"id": "test3", "payload": "Y"}])
+        batchid = storage.create_batch(3, "col")
+        storage.append_items_to_batch(3, "col", batchid,
+                                      [{"id": "test5", "payload": "Z"},
+                                       {"id": "test6", "payload": "Z"},
+                                       {"id": "test7", "payload": "Z"}])
+        self.assertEquals(count_bui_items(), 6)
+        self.assertEquals(count_batches(), 2)
+
+        time.sleep(1.1)
 
         # Long grace period == not purged
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
@@ -137,9 +177,11 @@ class TestPurgeTTLScript(StorageTestCase):
                             "--grace-period=30",
                             ini_file)
         assert proc.wait() == 0
-        self.assertEquals(count_items(), 3)
+        self.assertEquals(count_bso_items(), 3)
+        self.assertEquals(count_bui_items(), 6)
+        self.assertEquals(count_batches(), 2)
 
-        # Short grace period == not purged
+        # Short grace period == purged
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
         proc = spawn_script("purgettl.py",
                             "--oneshot",
@@ -147,4 +189,6 @@ class TestPurgeTTLScript(StorageTestCase):
                             "--grace-period=0",
                             ini_file)
         assert proc.wait() == 0
-        self.assertEquals(count_items(), 1)
+        self.assertEquals(count_bso_items(), 1)
+        self.assertEquals(count_bui_items(), 3)
+        self.assertEquals(count_batches(), 1)

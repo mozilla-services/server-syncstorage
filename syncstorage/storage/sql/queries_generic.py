@@ -12,6 +12,7 @@ In addition to standard bindparam syntax, the query loader supports some
 string interpolation variables with special meaning:
 
     * %(bso)s:   insert the name of the user's sharded BSO storage table
+    * %(bui)s:   insert the name of the user's sharded batch_upload_items table
     * %(ids)s:   insert a list of items matching the "ids" query parameter.
 
 """
@@ -92,6 +93,96 @@ DELETE_COLLECTION = "DELETE FROM user_collections WHERE userid=:userid "\
 DELETE_ITEMS = "DELETE FROM %(bso)s WHERE userid=:userid "\
                "AND collection=:collectionid AND id IN %(ids)s"
 
+CREATE_BATCH = "INSERT INTO batch_uploads (batch, userid, collection) "\
+                     "VALUES (:batch, :userid, :collection)"
+
+VALID_BATCH = "SELECT batch FROM batch_uploads WHERE batch = :batch " \
+                    "AND userid = :userid AND collection = :collection"
+
+# The semantics we want for applying a batch are roughly
+# those of an UPSERT, but there's no good generic way
+# to do that.  This is a best-effort, inefficient fallback
+# using only portable SQL syntax, that applies the batch in two
+# parts:
+#
+#  * Update any existing rows in-place, using subselects to
+#    access the data for each such row found.
+#  * Insert any new rows with a single INSERT ... SELECT.
+#
+# Yes, it's horrible, and made even more so due to the need to deal
+# with partial updates.  For production use we expect a db-specific
+# reimplementation that can do this in a single efficient query.
+
+APPLY_BATCH_UPDATE = """
+    UPDATE %(bso)s
+    SET
+        sortindex = COALESCE(
+            (SELECT sortindex FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.sortindex
+        ),
+        payload = COALESCE(
+            (SELECT payload FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.payload,
+            ''
+        ),
+        payload_size = COALESCE(
+            (SELECT payload_size FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.payload_size,
+            0
+        ),
+        ttl = COALESCE(
+            (SELECT ttl_offset + :ttl_base FROM %(bui)s WHERE
+                batch = :batch AND id = %(bso)s.id),
+            %(bso)s.ttl,
+            :default_ttl
+        ),
+        modified = :modified
+    WHERE
+        userid = (
+            SELECT userid FROM batch_uploads WHERE batch = :batch
+        ) AND
+        collection = (
+            SELECT collection FROM batch_uploads WHERE batch = :batch
+        ) AND
+        id IN (
+            SELECT id FROM %(bui)s WHERE batch = :batch
+        )
+"""
+
+APPLY_BATCH_INSERT = """
+    INSERT INTO %(bso)s
+        (userid, collection, id, sortindex, payload,
+        payload_size, ttl, modified)
+    SELECT
+       batch_uploads.userid,
+       batch_uploads.collection,
+       %(bui)s.id,
+       %(bui)s.sortindex,
+       COALESCE(%(bui)s.payload, ''),
+       COALESCE(%(bui)s.payload_size, 0),
+       COALESCE(%(bui)s.ttl_offset + :ttl_base, :default_ttl),
+       :modified
+    FROM batch_uploads
+    LEFT JOIN %(bui)s
+    ON
+        %(bui)s.batch = batch_uploads.batch
+    WHERE
+        batch_uploads.batch = :batch AND
+        %(bui)s.id NOT IN (
+            SELECT id
+            FROM %(bso)s
+            WHERE
+                userid = batch_uploads.userid AND
+                collection = batch_uploads.collection
+        )
+"""
+
+CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
+              "AND userid = :userid AND collection = :collection"
+
 
 def FIND_ITEMS(bso, params):
     """Item search query.
@@ -162,6 +253,19 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 # The idea is to delete them in small batches to keep overhead low.
 # Unfortunately there's no generic way to achieve this in SQL so the default
 # case winds up deleting all expired items.  There is a MySQL-specific
-# version using DELETE <blah> LIMIT 1000.
-PURGE_SOME_EXPIRED_ITEMS = "DELETE FROM %(bso)s "\
-                           "WHERE ttl < (UNIX_TIMESTAMP() - :grace) "
+# version using DELETE <ttlblah> LIMIT 1000.
+
+PURGE_SOME_EXPIRED_ITEMS = """
+    DELETE FROM %(bso)s
+    WHERE ttl < (UNIX_TIMESTAMP() - :grace)
+"""
+
+PURGE_BATCHES = """
+    DELETE FROM batch_uploads
+    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+"""
+
+PURGE_BATCH_CONTENTS = """
+    DELETE FROM %(bui)s
+    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+"""

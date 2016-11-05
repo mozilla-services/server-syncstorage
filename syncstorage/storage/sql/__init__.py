@@ -30,10 +30,13 @@ from syncstorage.storage import (SyncStorage,
                                  ConflictError,
                                  CollectionNotFoundError,
                                  ItemNotFoundError,
-                                 InvalidOffsetError)
+                                 InvalidOffsetError,
+                                 BATCH_LIFETIME)
 
 from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
                                                BackendError)
+
+from mozsvc.metrics import metrics_timer
 
 
 logger = logging.getLogger("syncstorage.storage.sql")
@@ -347,7 +350,7 @@ class SQLStorage(SyncStorage):
         if offset is not None:
             self.decode_offset(params, offset)
         rows = session.query_fetchall("FIND_ITEMS", params)
-        items = [self._row_to_bso(row) for row in rows]
+        items = [self._row_to_bso(row, int(session.timestamp)) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
         # timestamp and let it raise CollectionNotFoundError if necessary.
@@ -363,14 +366,18 @@ class SQLStorage(SyncStorage):
             "next_offset": next_offset,
         }
 
-    def _row_to_bso(self, row):
+    def _row_to_bso(self, row, timestamp):
         """Convert a database table row into a BSO object."""
         item = dict(row)
-        for key in ("userid", "collection", "payload_size", "ttl",):
+        for key in ("userid", "collection", "payload_size",):
             item.pop(key, None)
         ts = item.get("modified")
         if ts is not None:
             item["modified"] = bigint2ts(ts)
+        # Convert the ttl back into an offset from the current time.
+        ttl = item.get("ttl")
+        if ttl is not None:
+            item["ttl"] = ttl - timestamp
         return BSO(item)
 
     def encode_next_offset(self, params, items):
@@ -465,6 +472,86 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
+    def create_batch(self, session, userid, collection):
+        """Creates a batch in batch_uploads table"""
+        collectionid = self._get_collection_id(session, collection)
+        # Careful, there's some weirdness here!
+        #
+        # Sync timestamps are in seconds and quantized to two decimal places,
+        # so when we convert one to a bigint in milliseconds, the final digit
+        # is always zero. But we want to use the lower digits of the batchid
+        # for sharding writes via (batchid % num_tables), and leaving it as
+        # zero would skew the sharding distribution.
+        #
+        # So we mix in the lowest digit of the uid to improve the distribution
+        # while still letting us treat these ids as millisecond timestamps.
+        # It's yuck, but it works and it keeps the weirdness contained to this
+        # single line of code.
+        batchid = ts2bigint(session.timestamp) + (userid % 10)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CREATE_BATCH", params)
+        return batchid
+
+    @with_session
+    def valid_batch(self, session, userid, collection, batchid):
+        """Checks to see if the batch ID is valid and still open"""
+        # Avoid hitting the db for batches that are obviously too old.
+        # Recall that the batchid is a millisecond timestamp.
+        if (batchid / 1000 + BATCH_LIFETIME) < session.timestamp:
+            return False
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        valid = session.query_scalar("VALID_BATCH", params=params)
+        return valid
+
+    @metrics_timer("syncstorage.storage.sql.append_items_to_batch")
+    @with_session
+    def append_items_to_batch(self, session, userid, collection, batchid,
+                              items):
+        """Inserts items into batch_upload_items"""
+        rows = []
+        for data in items:
+            id_ = data["id"]
+            row = self._prepare_bui_row(session, batchid, id_, data)
+            rows.append(row)
+        session.insert_or_update("batch_upload_items", rows)
+        return session.timestamp
+
+    @metrics_timer("syncstorage.storage.sql.apply_batch")
+    @with_session
+    def apply_batch(self, session, userid, collection, batchid):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid,
+            "default_ttl": MAX_TTL,
+            "ttl_base": int(session.timestamp),
+            "modified": ts2bigint(session.timestamp)
+        }
+        session.query("APPLY_BATCH_UPDATE", params)
+        session.query("APPLY_BATCH_INSERT", params)
+        return self._touch_collection(session, userid, collectionid)
+
+    @with_session
+    def close_batch(self, session, userid, collection, batchid):
+        collectionid = self._get_collection_id(session, collection)
+        params = {
+            "batch": batchid,
+            "userid": userid,
+            "collection": collectionid
+        }
+        session.query("CLOSE_BATCH", params)
+
+    @with_session
     def delete_collection(self, session, userid, collection):
         """Deletes an entire collection."""
         collectionid = self._get_collection_id(session, collection)
@@ -540,7 +627,7 @@ class SQLStorage(SyncStorage):
         })
         if row is None:
             raise ItemNotFoundError
-        return self._row_to_bso(row)
+        return self._row_to_bso(row, int(session.timestamp))
 
     @with_session
     def set_item(self, session, userid, collection, item, data):
@@ -566,7 +653,7 @@ class SQLStorage(SyncStorage):
         row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]
-        # If a payload is provided, make sure to update dependant fields.
+        # If a payload is provided, make sure to update dependent fields.
         if "payload" in data:
             row["modified"] = ts2bigint(session.timestamp)
             row["payload"] = data["payload"]
@@ -579,6 +666,23 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = MAX_TTL
             else:
                 row["ttl"] = data["ttl"] + int(session.timestamp)
+        return row
+
+    def _prepare_bui_row(self, session, batchid, item, data):
+        row = {}
+        row["batch"] = batchid
+        row["id"] = item
+        if "sortindex" in data:
+            row["sortindex"] = data["sortindex"]
+        # If a payload is provided, make sure to update dependent fields.
+        if "payload" in data:
+            row["payload"] = data["payload"]
+            row["payload_size"] = len(data["payload"])
+        # If provided, ttl will be an offset in seconds.
+        # Store the raw offset, we'll add it to the commit time
+        # to get the absolute timestamp.
+        if "ttl" in data:
+            row["ttl_offset"] = data["ttl"]
         return row
 
     @with_session
@@ -598,10 +702,29 @@ class SQLStorage(SyncStorage):
     #
     # Administrative/maintenance methods.
     #
+    def purge_expired_items(self, grace_period=0, max_per_loop=1000):
+        """Purges expired items from the bso and batch-related tables."""
+        res = self._purge_expired_bsos(grace_period, max_per_loop)
+        num_bso_rows_purged = res["num_purged"]
+        is_complete = res["is_complete"]
 
-    @with_session
-    def purge_expired_items(self, session, grace_period=0, max_per_loop=1000):
-        """Purges items with an expired TTL from the database."""
+        res = self._purge_expired_batches(grace_period, max_per_loop)
+        num_batches_purged = res["num_purged"]
+        is_complete = is_complete and res["is_complete"]
+
+        res = self._purge_expired_batch_items(grace_period, max_per_loop)
+        num_bui_rows_purged = res["num_purged"]
+        is_complete = is_complete and res["is_complete"]
+
+        return {
+            "num_batches_purged": num_batches_purged,
+            "num_bso_rows_purged": num_bso_rows_purged,
+            "num_bui_rows_purged": num_bui_rows_purged,
+            "is_complete": is_complete,
+        }
+
+    def _purge_expired_bsos(self, grace_period=0, max_per_loop=1000):
+        """Purges BSOs with an expired TTL from the database."""
         # Get the set of all BSO tables in the database.
         # This will be different depending on whether sharding is done.
         if not self.dbconnector.shard:
@@ -611,42 +734,87 @@ class SQLStorage(SyncStorage):
                          for i in xrange(self.dbconnector.shardsize))
             assert len(tables) == self.dbconnector.shardsize
         # Purge each table in turn, summing rowcounts.
-        # We set an upper limit on the number of iterations, to avoid
-        # getting stuck indefinitely on a single table.
-        total_affected = 0
+        num_purged = 0
         is_incomplete = False
         for table in sorted(tables):
-            logger.info("Purging expired items from %s", table)
-            num_iters = 1
-            num_affected = 0
-            rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
+            res = self._purge_items_loop(table, "PURGE_SOME_EXPIRED_ITEMS", {
                 "bso": table,
                 "grace": grace_period,
                 "maxitems": max_per_loop,
             })
-            while rowcount > 0:
-                num_affected += rowcount
-                logger.debug("After %d iterations, %s items purged",
-                             num_iters, num_affected)
-                num_iters += 1
-                if num_iters > 100:
-                    logger.debug("Too many iterations, bailing out.")
-                    is_incomplete = True
-                    break
-                rowcount = session.query("PURGE_SOME_EXPIRED_ITEMS", {
-                    "bso": table,
-                    "grace": grace_period,
-                    "maxitems": max_per_loop,
-                })
-            logger.info("Purged %d expired items from %s",
-                        num_affected, table)
-            total_affected += num_affected
-        # Return the required data to the caller.
+            num_purged += res["num_purged"]
+            is_incomplete = is_incomplete or not res["is_complete"]
+        return {
+            "num_purged": num_purged,
+            "is_complete": not is_incomplete,
+        }
+
+    def _purge_expired_batches(self, grace_period=0, max_per_loop=1000):
+        return self._purge_items_loop("batch_uploads", "PURGE_BATCHES", {
+            "lifetime": BATCH_LIFETIME,
+            "grace": grace_period,
+            "maxitems": max_per_loop,
+        })
+
+    def _purge_expired_batch_items(self, grace_period=0, max_per_loop=1000):
+        # Get the set of all BUI tables in the database.
+        # This will be different depending on whether sharding is done.
+        if not self.dbconnector.shard:
+            tables = set(("batch_upload_items",))
+        else:
+            tables = set(self.dbconnector.get_batch_item_table(i).name
+                         for i in xrange(self.dbconnector.shardsize))
+            assert len(tables) == self.dbconnector.shardsize
+        # Purge each table in turn, summing rowcounts.
+        num_purged = 0
+        is_incomplete = False
+        for table in sorted(tables):
+            res = self._purge_items_loop(table, "PURGE_BATCH_CONTENTS", {
+                "bui": table,
+                "lifetime": BATCH_LIFETIME,
+                "grace": grace_period,
+                "maxitems": max_per_loop,
+            })
+            num_purged += res["num_purged"]
+            is_incomplete = is_incomplete or not res["is_complete"]
+        return {
+            "num_purged": num_purged,
+            "is_complete": not is_incomplete,
+        }
+
+    def _purge_items_loop(self, table, query, params):
+        """Helper function to incrementally purge items in a loop."""
+        # Purge some items, a few at a time, in a loop.
+        # We set an upper limit on the number of iterations, to avoid
+        # getting stuck indefinitely on a single table.
+        logger.info("Purging expired items from %s", table)
+        MAX_ITERS = 100
+        num_iters = 1
+        num_purged = 0
+        is_incomplete = False
+        # Note that we take a new session for each run of the query.
+        # This avoids holdig open a long-running transaction, so
+        # the incrementality can let other jobs run properly.
+        with self._get_or_create_session() as session:
+            rowcount = session.query(query, params)
+        while rowcount > 0:
+            num_purged += rowcount
+            logger.debug("After %d iterations, %s items purged",
+                         num_iters, num_purged)
+            num_iters += 1
+            if num_iters > MAX_ITERS:
+                logger.debug("Too many iterations, bailing out.")
+                is_incomplete = True
+                break
+            with self._get_or_create_session() as session:
+                rowcount = session.query(query, params)
+        logger.info("Purged %d expired items from %s", num_purged, table)
         # We use "is_incomplete" rather than "is_complete" in the code above
         # because we expect that, most of the time, the purge will complete.
         # So it's more efficient to flag the case when it doesn't.
+        # But the caller really wants to know is_complete.
         return {
-            "num_purged": total_affected,
+            "num_purged": num_purged,
             "is_complete": not is_incomplete,
         }
 

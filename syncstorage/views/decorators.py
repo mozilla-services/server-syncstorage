@@ -8,11 +8,13 @@ import logging
 from pyramid.httpexceptions import (HTTPNotFound,
                                     HTTPNotModified,
                                     HTTPServiceUnavailable,
-                                    HTTPPreconditionFailed)
+                                    HTTPPreconditionFailed,
+                                    HTTPBadRequest)
 
 from syncstorage.storage import (ConflictError,
                                  NotFoundError,
-                                 InvalidOffsetError)
+                                 InvalidOffsetError,
+                                 InvalidBatch)
 
 from syncstorage.views.util import (make_decorator,
                                     json_error,
@@ -52,6 +54,8 @@ def convert_storage_errors(viewfunc, request):
             "name": "offset",
             "description": "Invalid value for offset",
         }])
+    except InvalidBatch, e:
+        raise HTTPBadRequest("Invalid batch: %s" % e)
 
 
 @make_decorator

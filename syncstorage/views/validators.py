@@ -2,17 +2,21 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import re
+
+from base64 import b64decode
+
 from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
+from syncstorage.views.util import json_error, get_limit_config
 
 import logging
 logger = logging.getLogger("syncstorage.views.validators")
 
 
 BATCH_MAX_IDS = 100
-DEFAULT_BATCH_MAX_COUNT = BATCH_MAX_IDS
-DEFAULT_BATCH_MAX_BYTES = 1024 * 1024
+TRUE_REGEX = re.compile("^true$", re.I)
 
 
 def extract_target_resource(request):
@@ -162,6 +166,68 @@ def extract_query_params(request):
         request.validated["full"] = True
 
 
+def extract_batch_state(request):
+    """Validator to extract the batch state of a request for slightly
+    tidier code in the views.
+
+    If the "batch" parameter is has no value or has a value of "true" then
+    a new batch will be created.
+
+    If the "commit" parameter is has a value of "true", this batch
+    is to be committed and deleted.
+    """
+    # Don't extract or validate any of these params
+    # if the batch-upload feature is disabled.
+    settings = request.registry.settings
+    if not settings.get("storage.batch_upload_enabled", False):
+        return
+
+    request.validated["batch"] = False
+    batch_id = request.GET.get("batch")
+    if batch_id is not None:
+        if TRUE_REGEX.match(batch_id):
+            batch_id = True
+        else:
+            try:
+                batch_id = int(b64decode(batch_id))
+            except TypeError:
+                try:
+                    batch_id = int(batch_id)
+                except ValueError:
+                    msg = "Invalid batch ID: \"%s\"" % (batch_id,)
+                    request.errors.add("batch", "id", msg)
+        request.validated["batch"] = batch_id
+    elif batch_id is None and "batch" in request.GET:
+        request.validated["batch"] = True
+
+    request.validated["commit"] = False
+    commit = request.GET.get("commit")
+    if commit is not None:
+        if TRUE_REGEX.match(commit):
+            request.validated["commit"] = True
+        else:
+            msg = "commit parameter must be \"true\" to apply batches"
+            request.errors.add("batch", "commit", msg)
+
+    LIMITS = (
+      ("X-Weave-Records", "max_post_records"),
+      ("X-Weave-Bytes", "max_post_bytes"),
+      ("X-Weave-Total-Records", "max_total_records"),
+      ("X-Weave-Total-Bytes", "max_total_bytes"),
+    )
+    for (header, setting) in LIMITS:
+        try:
+            count = int(request.headers[header])
+        except ValueError:
+            msg = "Invalid integer value: %s" % (request.headers[header],)
+            request.errors.add("header", header, msg)
+            continue
+        except KeyError:
+            continue
+        if count > get_limit_config(request, setting):
+            raise json_error(400, "size-limit-exceeded")
+
+
 def parse_multiple_bsos(request):
     """Validator to parse a list of BSOs from the request body.
 
@@ -190,10 +256,8 @@ def parse_multiple_bsos(request):
         request.errors.add("body", "bsos", "Input data was not a list")
         return
 
-    BATCH_MAX_COUNT = request.registry.settings.get("storage.batch_max_count",
-                                                    DEFAULT_BATCH_MAX_COUNT)
-    BATCH_MAX_BYTES = request.registry.settings.get("storage.batch_max_bytes",
-                                                    DEFAULT_BATCH_MAX_BYTES)
+    BATCH_MAX_COUNT = get_limit_config(request, "max_post_records")
+    BATCH_MAX_BYTES = get_limit_config(request, "max_post_bytes")
 
     valid_bsos = {}
     invalid_bsos = {}

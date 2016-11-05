@@ -10,6 +10,7 @@ import optparse
 import random
 import json
 import urlparse
+import contextlib
 
 import unittest2
 import requests
@@ -51,6 +52,23 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         req = Request.blank(self.host_url)
         creds = auth_policy.encode_hawk_id(req, self.user_id)
         self.auth_token, self.auth_secret = creds
+
+    @contextlib.contextmanager
+    def _switch_user(self):
+        # Temporarily authenticate as a different user.
+        orig_user_id = self.user_id
+        orig_auth_token = self.auth_token
+        orig_auth_secret = self.auth_secret
+        try:
+            # We loop because the userids are randomly generated,
+            # so there's a small change we'll get the same one again.
+            while self.user_id == orig_user_id:
+                self._authenticate()
+            yield
+        finally:
+            self.user_id = orig_user_id
+            self.auth_token = orig_auth_token
+            self.auth_secret = orig_auth_secret
 
     def _cleanup_test_databases(self):
         # Don't cleanup databases unless we created them ourselves.
