@@ -16,6 +16,9 @@ from mozsvc.plugin import resolve_name
 
 logger = logging.getLogger("syncstorage.storage")
 
+# Rough guesstimate of the maximum reasonable life span of a batch.
+BATCH_LIFETIME = 60 * 60 * 2  # 2 hours, in seconds
+
 
 class StorageError(Exception):
     """Base class for exceptions raised from the storage backend."""

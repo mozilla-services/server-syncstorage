@@ -8,14 +8,12 @@ BUILD_TMP = /tmp/syncstorage-build.${USER}
 PYPI = https://pypi.python.org/simple
 
 export MOZSVC_SQLURI = sqlite:///:memory:
-#export MOZSVC_SQLURI = mysql://user:password@localhost/my_sync_db
 
 # Hackety-hack around OSX system python bustage.
 # The need for this should go away with a future osx/xcode update.
 ARCHFLAGS = -Wno-error=unused-command-line-argument-hard-error-in-future
 
 INSTALL = ARCHFLAGS=$(ARCHFLAGS) $(PIP) install -U -i $(PYPI)
-
 
 .PHONY: all build test
 

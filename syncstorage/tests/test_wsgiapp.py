@@ -65,3 +65,43 @@ class TestWSGIApp(StorageTestCase):
                 break
         else:
             assert False, "metrics were not collected"
+
+    def test_metrics_capture_for_batch_uploads(self):
+        app = TestApp(self.config.make_wsgi_app())
+
+        # Monkey-patch the app to make legitimate hawk-signed requests.
+        user_id = 42
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        req = Request.blank("http://localhost/")
+        auth_token, auth_secret = auth_policy.encode_hawk_id(req, user_id)
+
+        def new_do_request(req, *args, **kwds):
+            hawkauthlib.sign_request(req, auth_token, auth_secret)
+            return orig_do_request(req, *args, **kwds)
+
+        orig_do_request = app.do_request
+        app.do_request = new_do_request
+
+        collection = "/1.5/42/storage/col1"
+
+        with testfixtures.LogCapture() as logs:
+            bso = {"id": "1", "payload": "x"}
+            res = app.post_json(collection + "?batch=true", [bso])
+            batch = res.json["batch"]
+
+        for r in logs.records:
+            if "syncstorage.storage.sql.append_items_to_batch" in r.__dict__:
+                break
+        else:
+            assert False, "timer metrics were not emitted"
+
+        with testfixtures.LogCapture() as logs:
+            endpoint = collection + "?batch={0}&commit=true".format(batch)
+            app.post_json(endpoint, [])
+
+        # DB timing metrics should have been generated in a log message.
+        for r in logs.records:
+            if "syncstorage.storage.sql.apply_batch" in r.__dict__:
+                break
+        else:
+            assert False, "timer metrics were not emitted"
