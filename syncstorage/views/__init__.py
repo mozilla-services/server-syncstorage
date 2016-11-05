@@ -265,7 +265,7 @@ def get_collection(request):
     collection = request.validated["collection"]
 
     filters = {}
-    filter_names = ("ids", "newer", "limit", "offset", "sort")
+    filter_names = ("ids", "newer", "older", "limit", "offset", "sort")
     for name in filter_names:
         if name in request.validated:
             filters[name] = request.validated[name]

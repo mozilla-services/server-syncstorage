@@ -85,6 +85,7 @@ def extract_query_params(request):
     This validator will extract and validate the following search params:
 
         * newer: lower-bound on last-modified time (float timestamp)
+        * older: upper-bound on last-modified time (float timestamp)
         * sort:  order in which to return results (string)
         * limit:  maximum number of items to return (integer)
         * offset:  position at which to restart search (string)
@@ -103,6 +104,18 @@ def extract_query_params(request):
             request.errors.add("querystring", "newer", msg)
         else:
             request.validated["newer"] = newer
+
+    older = request.GET.get("older")
+    if older is not None:
+        try:
+            older = get_timestamp(older)
+            if older < 0:
+                raise ValueError
+        except ValueError:
+            msg = "Invalid value for older: %r" % (older,)
+            request.errors.add("querystring", "older", msg)
+        else:
+            request.validated["older"] = older
 
     limit = request.GET.get("limit")
     if limit is not None:

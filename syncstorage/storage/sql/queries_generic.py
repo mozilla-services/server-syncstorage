@@ -115,6 +115,8 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.modified > bindparam("newer"))
     if "newer_eq" in params:
         query = query.where(bso.c.modified >= bindparam("newer_eq"))
+    if "older" in params:
+        query = query.where(bso.c.modified < bindparam("older"))
     if "older_eq" in params:
         query = query.where(bso.c.modified <= bindparam("older_eq"))
     if "ttl" in params:

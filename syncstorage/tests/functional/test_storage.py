@@ -157,6 +157,35 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2?newer=%s' % (ts1 - 1))
         self.assertEquals(sorted(res.json), ['128', '129'])
 
+        # "older"
+        # Returns only ids for objects in the collection that have been last
+        # modified before the timestamp given.
+
+        self.app.delete(self.root + '/storage/col2')
+
+        bso = {'id': '128', 'payload': 'x'}
+        res = self.app.put_json(self.root + '/storage/col2/128', bso)
+        ts1 = float(res.headers["X-Last-Modified"])
+
+        bso = {'id': '129', 'payload': 'x'}
+        res = self.app.put_json(self.root + '/storage/col2/129', bso)
+        ts2 = float(res.headers["X-Last-Modified"])
+
+        self.assertTrue(ts1 < ts2)
+
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts1)
+        self.assertEquals(res.json, [])
+
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
+        self.assertEquals(res.json, ['128'])
+
+        res = self.app.get(self.root + '/storage/col2?older=%s' % (ts2 + 1))
+        self.assertEquals(sorted(res.json), ['128', '129'])
+
+        qs = '?older=%s&newer=%s' % (ts2 + 1, ts1)
+        res = self.app.get(self.root + '/storage/col2' + qs)
+        self.assertEquals(sorted(res.json), ['129'])
+
         # "full"
         # If defined, returns the full BSO, rather than just the id.
         res = self.app.get(self.root + '/storage/col2?full=1')
@@ -771,7 +800,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = res.json
 
         # trying weird args and make sure the server returns 400s
-        args = ('newer', 'limit', 'offset')
+        args = ('newer', 'older', 'limit', 'offset')
         for arg in args:
             value = randtext()
             self.app.get(self.root + '/storage/col2?%s=%s' % (arg, value),
@@ -873,6 +902,26 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/meh?newer=%s' % ts)
         res = res.json
         self.assertEquals(sorted(res), ['3', '4'])
+
+    def test_strict_older(self):
+        # send two bsos in the 'meh' collection
+        bso1 = {'id': '1', 'payload': _PLD}
+        bso2 = {'id': '2', 'payload': _PLD}
+        bsos = [bso1, bso2]
+        res = self.app.post_json(self.root + '/storage/meh', bsos)
+
+        # send two more bsos
+        bso3 = {'id': '3', 'payload': _PLD}
+        bso4 = {'id': '4', 'payload': _PLD}
+        bsos = [bso3, bso4]
+        res = self.app.post_json(self.root + '/storage/meh', bsos)
+        ts = float(res.headers["X-Last-Modified"])
+
+        # asking for bsos using older=ts where older is the timestamp
+        # of bso 3 and 4, should not return them
+        res = self.app.get(self.root + '/storage/meh?older=%s' % ts)
+        res = res.json
+        self.assertEquals(sorted(res), ['1', '2'])
 
     def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.
@@ -1285,6 +1334,47 @@ class TestStorage(StorageFunctionalTestCase):
                 # *after* the one that was used for the newer= timestamp.
                 self.assertEquals(sorted(int(item['id']) for item in items),
                                   range(start + 1, NUM_ITEMS))
+
+    def test_pagination_with_older_and_sort_by_newest(self):
+        # Twelve bsos with three different modification times.
+        NUM_ITEMS = 12
+        bsos = []
+        timestamps = []
+        for i in range(NUM_ITEMS):
+            bso = {'id': str(i), 'payload': 'x'}
+            bsos.append(bso)
+            if i % 4 == 3:
+                res = self.app.post_json(self.root + '/storage/col2', bsos)
+                ts = float(res.headers["X-Last-Modified"])
+                timestamps.append((i - 3, ts))
+                bsos = []
+
+        # Try with several different pagination sizes,
+        # to hit various boundary conditions.
+        for limit in (2, 3, 4, 5, 6):
+            for (start, ts) in timestamps:
+                query_url = self.root + '/storage/col2?full=true&sort=newest'
+                query_url += '&older=%s&limit=%s' % (ts, limit)
+
+                # Paginated-ly fetch all items.
+                items = []
+                res = self.app.get(query_url)
+                for item in res.json:
+                    if items:
+                        assert items[-1]['modified'] >= item['modified']
+                    items.append(item)
+                next_offset = res.headers.get('X-Weave-Next-Offset')
+                while next_offset is not None:
+                    res = self.app.get(query_url + "&offset=" + next_offset)
+                    for item in res.json:
+                        assert items[-1]['modified'] >= item['modified']
+                        items.append(item)
+                    next_offset = res.headers.get('X-Weave-Next-Offset')
+
+                # They should all be in order, up to the item *before*
+                # the one that was used for the older= timestamp.
+                self.assertEquals(sorted(int(item['id']) for item in items),
+                                  range(0, start))
 
 
 class TestStorageMemcached(TestStorage):
