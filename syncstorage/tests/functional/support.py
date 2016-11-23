@@ -55,6 +55,9 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
     @contextlib.contextmanager
     def _switch_user(self):
+        # It's hard to reliably switch users when testing a live server.
+        if self.distant:
+            raise unittest2.SkipTest("Skipped when testing a live server")
         # Temporarily authenticate as a different user.
         orig_user_id = self.user_id
         orig_auth_token = self.auth_token
@@ -62,8 +65,12 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         try:
             # We loop because the userids are randomly generated,
             # so there's a small change we'll get the same one again.
-            while self.user_id == orig_user_id:
+            for retry_count in xrange(10):
                 self._authenticate()
+                if self.user_id != orig_user_id:
+                    break
+            else:
+                raise RuntimeError("Failed to switch to new user id")
             yield
         finally:
             self.user_id = orig_user_id

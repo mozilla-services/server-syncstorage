@@ -299,5 +299,6 @@ def test_suite():
         suite.addTest(unittest2.makeSuite(TestMemcachedSQLStorage))
     return suite
 
+
 if __name__ == "__main__":
     unittest2.main(defaultTest="test_suite")

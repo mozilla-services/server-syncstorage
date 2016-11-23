@@ -234,6 +234,7 @@ def FIND_ITEMS(bso, params):
         query = query.offset(offset)
     return query
 
+
 # Queries operating on a particular item.
 
 DELETE_ITEM = "DELETE FROM %(bso)s WHERE userid=:userid AND "\
