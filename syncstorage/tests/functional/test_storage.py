@@ -1414,12 +1414,11 @@ class TestStorage(StorageFunctionalTestCase):
         bso4 = {'id': 'b', 'payload': 'pancreas'}
         resp = self.app.post_json(endpoint + '?batch=true', [bso3, bso4])
         batch = resp.json["batch"]
-        # This is sooooo going to break when it's run at just the wrong time
-        # and will result in a seriously confused person at the keyboard.
-        # guess = float(resp.headers["X-Last-Modified"])
-        # self.assertCloseEnough(batch / 1000, guess)
 
-        # make sure we don't get the pending batch
+        # The collection should not be reported as modified.
+        self.assertEquals(orig_modified, resp.headers['X-Last-Modified'])
+
+        # And reading from it shouldn't show the new records yet.
         resp = self.app.get(endpoint)
         res = resp.json
         res.sort()
@@ -1529,6 +1528,7 @@ class TestStorage(StorageFunctionalTestCase):
         ]
         resp = self.app.post_json(collection + '?batch=true', bsos)
         batch = resp.json["batch"]
+        self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
 
         # The updated item hasn't been written yet.
         resp = self.app.get(collection + '?full=1')
@@ -1571,12 +1571,16 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Bump ttls as a series of individual batch operations.
         resp = self.app.post_json(collection + '?batch=true', [], status=202)
+        orig_ts = float(resp.headers['X-Last-Modified'])
         batch = resp.json["batch"]
+
         endpoint = collection + '?batch={0}'.format(batch)
         resp = self.app.post_json(endpoint, [{'id': 'a', 'ttl': 2}],
                                   status=202)
+        self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
         resp = self.app.post_json(endpoint, [{'id': 'b', 'ttl': 2}],
                                   status=202)
+        self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
         resp = self.app.post_json(endpoint + '&commit=true', [],
                                   status=200)
 
