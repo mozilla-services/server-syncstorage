@@ -16,18 +16,17 @@ dependencies:
     # Create a version.json file for the app to serve; copy it to the CircleCI
     # artifacts directory for debugging.
     - >
-        printf '{"commit":"%s","version":"%s","source":"https://github.com/%s/%s","build":"%s"}\n' 
-        "$CIRCLE_SHA1" 
+        printf '{"commit":"%s","version":"%s","source":"https://github.com/%s/%s","build":"%s"}\n'
+        "$CIRCLE_SHA1"
         "$CIRCLE_TAG"
-        "$CIRCLE_PROJECT_USERNAME" 
-        "$CIRCLE_PROJECT_REPONAME" 
+        "$CIRCLE_PROJECT_USERNAME"
+        "$CIRCLE_PROJECT_REPONAME"
         "$CIRCLE_BUILD_URL"
         > version.json
     - cp version.json $CIRCLE_ARTIFACTS
 
     # build the actual deployment container
     - docker build -t app:build .
-    - docker images --no-trunc | awk '/^app/ {print $3}' | tee $CIRCLE_ARTIFACTS/docker-image-shasum256.txt
 
     # Clean up any old images; save the new one.
     - I="image-$(date +%j).tgz"; mkdir -p ~/docker; rm ~/docker/*; docker save app:build | pigz --fast -c > ~/docker/$I; ls -l ~/docker

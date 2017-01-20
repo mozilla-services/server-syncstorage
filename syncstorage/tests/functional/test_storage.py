@@ -1749,6 +1749,14 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res[2]['payload'], 'cee')
         self.assertEquals(res[3]['payload'], 'di')
 
+    # bug 1332552 make sure ttl:null use the default ttl
+    def test_create_bso_with_null_ttl(self):
+        bso = {"payload": "x", "ttl": None}
+        self.app.put_json(self.root + "/storage/col2/TEST1", bso)
+        time.sleep(0.1)
+        res = self.app.get(self.root + "/storage/col2/TEST1?full=1")
+        self.assertEquals(res.json["payload"], "x")
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
