@@ -2,8 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import logging
 import re
-
 from base64 import b64decode
 
 from syncstorage.bso import BSO, VALID_ID_REGEX
@@ -11,8 +11,8 @@ from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
 from syncstorage.views.util import json_error, get_limit_config
 
-import logging
-logger = logging.getLogger("syncstorage.views.validators")
+
+logger = logging.getLogger(__name__)
 
 
 BATCH_MAX_IDS = 100

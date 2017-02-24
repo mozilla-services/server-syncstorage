@@ -22,7 +22,7 @@ from syncstorage.storage import get_all_storages
 from syncstorage.storage.memcached import MemcachedStorage
 
 
-logger = logging.getLogger("syncstorage.scripts.mcread")
+logger = logging.getLogger(__name__)
 
 
 def read_memcache_data(config_file, input_file, output_file):

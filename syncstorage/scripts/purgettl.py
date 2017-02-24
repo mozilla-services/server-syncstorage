@@ -22,7 +22,7 @@ import syncstorage.scripts
 from syncstorage.storage import get_all_storages
 
 
-logger = logging.getLogger("syncstorage.scripts.prunettl")
+logger = logging.getLogger(__name__)
 
 
 def purge_expired_items(config_file, grace_period=0, max_per_loop=1000,
