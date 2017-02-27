@@ -14,7 +14,7 @@ import logging
 from mozsvc.plugin import resolve_name
 
 
-logger = logging.getLogger("syncstorage.storage")
+logger = logging.getLogger(__name__)
 
 # Rough guesstimate of the maximum reasonable life span of a batch.
 BATCH_LIFETIME = 60 * 60 * 2  # 2 hours, in seconds

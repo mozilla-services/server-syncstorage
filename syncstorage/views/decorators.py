@@ -20,7 +20,7 @@ from syncstorage.views.util import (make_decorator,
                                     json_error,
                                     get_resource_timestamp)
 
-logger = logging.getLogger("syncstorage")
+logger = logging.getLogger(__name__)
 
 ONE_KB = 1024
 ONE_MB = 1024 * 1024

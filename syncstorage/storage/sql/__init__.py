@@ -39,7 +39,7 @@ from syncstorage.storage.sql.dbconnect import (DBConnector, MAX_TTL,
 from mozsvc.metrics import metrics_timer
 
 
-logger = logging.getLogger("syncstorage.storage.sql")
+logger = logging.getLogger(__name__)
 
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.

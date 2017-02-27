@@ -50,7 +50,7 @@ def configure_script_logging(opts=None):
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(message)s"))
     handler.setLevel(loglevel)
-    logger = logging.getLogger("")
+    logger = logging.getLogger(__name__)
     logger.addHandler(handler)
     logger.setLevel(loglevel)
 

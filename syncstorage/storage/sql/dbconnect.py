@@ -46,7 +46,7 @@ from syncstorage.storage.sql import (queries_generic,
                                      queries_mysql)
 
 
-logger = logging.getLogger("syncstorage.storage.sql")
+logger = logging.getLogger(__name__)
 
 # Regex to match safe database field/column names.
 SAFE_FIELD_NAME_RE = re.compile("^[a-zA-Z0-9_]+$")

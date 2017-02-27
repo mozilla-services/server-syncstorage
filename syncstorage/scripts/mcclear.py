@@ -23,7 +23,7 @@ from syncstorage.storage.memcached import MemcachedStorage
 from syncstorage.scripts.mcread import maybe_open
 
 
-logger = logging.getLogger("syncstorage.scripts.mcclear")
+logger = logging.getLogger(__name__)
 
 
 def clear_memcache_data(config_file, input_file):

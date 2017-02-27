@@ -30,7 +30,7 @@ from syncstorage.views.decorators import (convert_storage_errors,
 from syncstorage.views.util import get_resource_timestamp, get_limit_config
 
 
-logger = logging.getLogger("syncstorage")
+logger = logging.getLogger(__name__)
 
 DEFAULT_VALIDATORS = (
     extract_target_resource,
