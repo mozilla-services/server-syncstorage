@@ -369,17 +369,22 @@ class MemcachedStorage(SyncStorage):
     def append_items_to_batch(self, userid, collection, batchid, items):
         """Appends items to the pending batch."""
         colmgr = self._get_collection_manager(collection)
-        ts = colmgr.append_items_to_batch(userid, batchid, items)
-        return ts
+        with self._mark_collection_dirty(userid, collection) as update:
+            ts = colmgr.append_items_to_batch(userid, batchid, items)
+            # Account for the size of the new items as they come in,
+            # since that's the only opportunity we have to see them.
+            # Don't update the timestamp yet though, as they're not committed.
+            size = sum(len(item.get("payload", "")) for item in items)
+            update(size_incr=size)
+            return ts
 
     def apply_batch(self, userid, collection, batchid):
         """Applies the batch"""
         colmgr = self._get_collection_manager(collection)
-        # prevts = colmgr.get_timestamp(userid)
-        with self._mark_collection_dirty(userid, collection):
+        with self._mark_collection_dirty(userid, collection) as update:
             ts = colmgr.apply_batch(userid, batchid)
-            # Lazy update should occur on following get_item/s
-        return ts
+            update(ts, ts)
+            return ts
 
     def close_batch(self, userid, collection, batchid):
         colmgr = self._get_collection_manager(collection)
@@ -762,7 +767,7 @@ class _CachedManagerBase(object):
                 if "payload" not in bso:
                     bso["payload"] = ""
                 data["items"][bso["id"]] = bso
-                data["modified"] = modified
+            data["modified"] = modified
         # Purge any items that have expired.
         # We can't do this as part of the purge_expired_items()
         # because we don't have a way to enumerate all user ids.

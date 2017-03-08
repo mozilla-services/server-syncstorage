@@ -72,17 +72,32 @@ class TestStorage(StorageFunctionalTestCase):
         finally:
             self.root = orig_root
 
-    def test_get_collections(self):
+    def test_get_info_collections(self):
         # col1 gets 3 items, col2 gets 5 items.
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
-        self.app.post_json(self.root + "/storage/col1", bsos)
+        resp = self.app.post_json(self.root + "/storage/col1", bsos)
+        ts1 = resp.json["modified"]
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.app.post_json(self.root + "/storage/col2", bsos)
+        resp = self.app.post_json(self.root + "/storage/col2", bsos)
+        ts2 = resp.json["modified"]
         # only those collections should appear in the query.
         resp = self.app.get(self.root + '/info/collections')
         res = resp.json
         keys = sorted(res.keys())
         self.assertEquals(keys, ["col1", "col2"])
+        self.assertEquals(res["col1"], ts1)
+        self.assertEquals(res["col2"], ts2)
+        # Updating items in col2, check timestamps.
+        bsos = [{"id": str(i), "payload": "yyy"} for i in xrange(2)]
+        resp = self.app.post_json(self.root + "/storage/col2", bsos)
+        self.assertTrue(ts2 < resp.json["modified"])
+        ts2 = resp.json["modified"]
+        resp = self.app.get(self.root + '/info/collections')
+        res = resp.json
+        keys = sorted(res.keys())
+        self.assertEquals(keys, ["col1", "col2"])
+        self.assertEquals(res["col1"], ts1)
+        self.assertEquals(res["col2"], ts2)
 
     def test_get_collection_count(self):
         # col1 gets 3 items, col2 gets 5 items.
@@ -1435,6 +1450,11 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(resp.json['modified'],
                           float(resp.headers['X-Last-Modified']))
 
+        # make sure /info/collections got updated
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), committed)
+        self.assertEquals(resp.json['col2'], committed)
+
         # make sure the changes applied
         resp = self.app.get(endpoint)
         res = resp.json
@@ -1636,20 +1656,68 @@ class TestStorage(StorageFunctionalTestCase):
           {'id': 'b', 'payload': 'bie'},
           {'id': 'c', 'payload': 'cee'}
         ]
-        resp = self.app.post_json(collection, bsos)
 
         resp = self.app.post_json(collection + '?batch=true&commit=true', bsos,
                                   status=200)
         self.assertTrue('batch' not in resp.json)
         self.assertTrue('modified' in resp.json)
+        committed = resp.json['modified']
+
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), committed)
+        self.assertEquals(resp.json['col2'], committed)
 
         resp = self.app.get(collection + '?full=1')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), committed)
         res = resp.json
         res.sort(key=lambda bso: bso['id'])
         self.assertEquals(len(res), 3)
         self.assertEquals(res[0]['payload'], 'aih')
         self.assertEquals(res[1]['payload'], 'bie')
         self.assertEquals(res[2]['payload'], 'cee')
+
+    def test_batch_uploads_properly_update_info_collections(self):
+        collection1 = self.root + '/storage/col1'
+        collection2 = self.root + '/storage/col2'
+        bsos = [
+          {'id': 'a', 'payload': 'aih'},
+          {'id': 'b', 'payload': 'bie'},
+          {'id': 'c', 'payload': 'cee'}
+        ]
+
+        resp = self.app.post_json(collection1, bsos)
+        ts1 = resp.json['modified']
+
+        resp = self.app.post_json(collection2, bsos)
+        ts2 = resp.json['modified']
+
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), ts2)
+        self.assertEquals(resp.json['col1'], ts1)
+        self.assertEquals(resp.json['col2'], ts2)
+
+        # Overwrite in place, timestamp should change.
+        resp = self.app.post_json(collection2 + '?batch=true&commit=true',
+                                  bsos[:2])
+        self.assertTrue(resp.json['modified'] > ts2)
+        ts2 = resp.json['modified']
+
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), ts2)
+        self.assertEquals(resp.json['col1'], ts1)
+        self.assertEquals(resp.json['col2'], ts2)
+
+        # Add new items, timestamp should change
+        resp = self.app.post_json(collection1 + '?batch=true&commit=true',
+                                  [{'id': 'd', 'payload': 'dee'}])
+        self.assertTrue(resp.json['modified'] > ts1)
+        self.assertTrue(resp.json['modified'] >= ts2)
+        ts1 = resp.json['modified']
+
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(float(resp.headers['X-Last-Modified']), ts1)
+        self.assertEquals(resp.json['col1'], ts1)
+        self.assertEquals(resp.json['col2'], ts2)
 
     def test_batch_with_failing_bsos(self):
         collection = self.root + '/storage/col2'
