@@ -176,12 +176,6 @@ def extract_batch_state(request):
     If the "commit" parameter is has a value of "true", this batch
     is to be committed and deleted.
     """
-    # Don't extract or validate any of these params
-    # if the batch-upload feature is disabled.
-    settings = request.registry.settings
-    if not settings.get("storage.batch_upload_enabled", False):
-        return
-
     request.validated["batch"] = False
     batch_id = request.GET.get("batch")
     if batch_id is not None:
@@ -208,6 +202,18 @@ def extract_batch_state(request):
         else:
             msg = "commit parameter must be \"true\" to apply batches"
             request.errors.add("batch", "commit", msg)
+
+    # If batch uploads are not enabled in the config then
+    # we want to:
+    #  * silently ignore attempts to start a new batch, which
+    #    will cause clients to fall back to non-batch mode.
+    #  * error out on attempts to continue an existing batch,
+    #    since we can't possibly do what the client expects.
+    settings = request.registry.settings
+    if not settings.get("storage.batch_upload_enabled", False):
+        if request.validated["batch"]:
+            if request.validated["batch"] is not True:
+                request.errors.add("batch", "id", "Batch uploads disabled")
 
     LIMITS = (
       ("X-Weave-Records", "max_post_records"),

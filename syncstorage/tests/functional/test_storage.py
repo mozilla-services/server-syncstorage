@@ -1921,6 +1921,11 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         bso6 = {'id': '13', 'payload': 'portnoy'}
         bso0 = {'id': '14', 'payload': 'itsybitsy'}
         commit = '?batch={0}&commit=true'.format(batch)
+        # This errors out because it's trying to use an in-flight batch.
+        resp = self.app.post_json(endpoint + commit, [bso5, bso6, bso0],
+                                  status=400)
+        # This requests a new batch, which is silently ignored and succeeds.
+        commit = '?batch=true&commit=true'.format(batch)
         resp = self.app.post_json(endpoint + commit, [bso5, bso6, bso0])
         assert 'batch' not in resp.json
         committed = resp.json['modified']
@@ -1948,9 +1953,9 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
     def test_we_dont_need_no_stinkin_batches(self):
         endpoint = self.root + '/storage/col2'
 
-        # invalid batch ID is not an error when preffed off
+        # invalid batch ID is still an error when preffed off
         bso1 = {'id': 'f', 'payload': 'pantomime'}
-        self.app.post_json(endpoint + '?batch=sammich', [bso1])
+        self.app.post_json(endpoint + '?batch=sammich', [bso1], status=400)
 
         # commit with no batch ID is not an error when preffed off
         self.app.post_json(endpoint + '?commit=true', [])
