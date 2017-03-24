@@ -25,6 +25,8 @@ VALID_ID_REGEX = re.compile("^[ -~]{1,64}$")  # <=64 printable characters
 
 SCALAR_TYPES = (int, long, basestring, decimal.Decimal)
 
+KNOWN_BAD_PAYLOAD_REGEX = re.compile(r'"IV":\s*"AAAAAAAAAAAAAAAAAAAAAA=="')
+
 
 class BSO(dict):
     """Holds BSO info"""
@@ -123,5 +125,13 @@ class BSO(dict):
             self['payload_size'] = len(payload.encode("utf8"))
             if self['payload_size'] > MAX_PAYLOAD_SIZE:
                 return False, 'payload too large'
+
+            # In practice, we know clients to send encrypted data in JSON
+            # serialized payload.  Perform some additional checks to ensure
+            # they're doing that correctly.  If it looks like they messed
+            # up the cypto then fail out completely.
+            if payload and payload[0] == "{":
+                if KNOWN_BAD_PAYLOAD_REGEX.search(payload):
+                    raise ValueError("BSO payload appears malformed")
 
         return True, None

@@ -6,6 +6,8 @@ import logging
 import re
 from base64 import b64decode
 
+from mozsvc.metrics import annotate_request
+
 from syncstorage.bso import BSO, VALID_ID_REGEX
 from syncstorage.util import get_timestamp, json_loads
 from syncstorage.storage import get_storage
@@ -287,7 +289,15 @@ def parse_multiple_bsos(request):
             request.errors.add("body", "bsos", "Input BSO has duplicate ID")
             return
 
-        consistent, msg = bso.validate()
+        try:
+            consistent, msg = bso.validate()
+        except ValueError:
+            # Something was very very wrong with the BSO,
+            # we want to error out entirely.
+            request.errors.add("body", "bso", "Known-bad BSO payload")
+            annotate_request(request, __name__ + ".known_bad_payload", 1)
+            return
+
         if not consistent:
             invalid_bsos[id] = msg
             # Log status on how many invalid BSOs we get, and why.
@@ -337,7 +347,15 @@ def parse_single_bso(request):
         request.errors.add("body", "bso", "Invalid BSO data")
         return
 
-    consistent, msg = bso.validate()
+    try:
+        consistent, msg = bso.validate()
+    except ValueError:
+        # Something was very very wrong with the BSO,
+        # we want to error out entirely.
+        request.errors.add("body", "bso", "Known-bad BSO payload")
+        annotate_request(request, __name__ + ".known_bad_payload", 1)
+        return
+
     if not consistent:
         request.errors.add("body", "bso", "Invalid BSO: " + msg)
         return

@@ -1825,6 +1825,16 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + "/storage/col2/TEST1?full=1")
         self.assertEquals(res.json["payload"], "x")
 
+    def test_rejection_of_known_bad_payloads(self):
+        bso = {
+            "payload": json_dumps({
+                "ciphertext": "IDontKnowWhatImDoing",
+                "IV": "AAAAAAAAAAAAAAAAAAAAAA==",
+            })
+        }
+        self.app.put_json(self.root + "/storage/col2/TEST1", bso, status=400)
+        self.app.post_json(self.root + "/storage/col2", [bso], status=400)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
