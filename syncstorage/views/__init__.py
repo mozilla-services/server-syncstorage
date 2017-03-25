@@ -21,7 +21,8 @@ from syncstorage.views.validators import (extract_target_resource,
                                           extract_query_params,
                                           extract_batch_state,
                                           parse_multiple_bsos,
-                                          parse_single_bso)
+                                          parse_single_bso,
+                                          check_for_known_bad_payloads)
 from syncstorage.views.decorators import (convert_storage_errors,
                                           sleep_and_retry_on_conflict,
                                           with_collection_lock,
@@ -36,6 +37,17 @@ DEFAULT_VALIDATORS = (
     extract_target_resource,
     extract_precondition_headers,
     extract_query_params,
+)
+
+POST_VALIDATORS = DEFAULT_VALIDATORS + (
+    extract_batch_state,
+    parse_multiple_bsos,
+    check_for_known_bad_payloads
+)
+
+PUT_VALIDATORS = DEFAULT_VALIDATORS + (
+    parse_single_bso,
+    check_for_known_bad_payloads
 )
 
 
@@ -318,8 +330,7 @@ def get_collection(request):
 
 
 @collection.post(accept="application/json", renderer="sync-json",
-                 validators=DEFAULT_VALIDATORS + (extract_batch_state,
-                                                  parse_multiple_bsos))
+                 validators=POST_VALIDATORS)
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
@@ -457,8 +468,7 @@ def get_item(request):
     return bso
 
 
-@item.put(renderer="sync-json",
-          validators=DEFAULT_VALIDATORS + (parse_single_bso,))
+@item.put(renderer="sync-json", validators=PUT_VALIDATORS)
 @default_decorators
 def put_item(request):
     storage = request.validated["storage"]

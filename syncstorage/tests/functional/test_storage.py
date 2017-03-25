@@ -1827,13 +1827,19 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_rejection_of_known_bad_payloads(self):
         bso = {
+            "id": "keys",
             "payload": json_dumps({
                 "ciphertext": "IDontKnowWhatImDoing",
                 "IV": "AAAAAAAAAAAAAAAAAAAAAA==",
             })
         }
-        self.app.put_json(self.root + "/storage/col2/TEST1", bso, status=400)
-        self.app.post_json(self.root + "/storage/col2", [bso], status=400)
+        # Fishy IVs are rejected on the "crypto" collection.
+        self.app.put_json(self.root + "/storage/crypto/keys", bso, status=400)
+        self.app.put_json(self.root + "/storage/crypto/blerg", bso, status=400)
+        self.app.post_json(self.root + "/storage/crypto", [bso], status=400)
+        # But are allowed on other collections.
+        self.app.put_json(self.root + "/storage/col2/keys", bso, status=200)
+        self.app.post_json(self.root + "/storage/col2", [bso], status=200)
 
 
 class TestStorageMemcached(TestStorage):

@@ -2,8 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import logging
 import re
+import logging
 from base64 import b64decode
 
 from mozsvc.metrics import annotate_request
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 BATCH_MAX_IDS = 100
 TRUE_REGEX = re.compile("^true$", re.I)
+KNOWN_BAD_PAYLOAD_REGEX = re.compile(r'"IV":\s*"AAAAAAAAAAAAAAAAAAAAAA=="')
 
 
 def extract_target_resource(request):
@@ -289,15 +290,7 @@ def parse_multiple_bsos(request):
             request.errors.add("body", "bsos", "Input BSO has duplicate ID")
             return
 
-        try:
-            consistent, msg = bso.validate()
-        except ValueError:
-            # Something was very very wrong with the BSO,
-            # we want to error out entirely.
-            request.errors.add("body", "bso", "Known-bad BSO payload")
-            annotate_request(request, __name__ + ".known_bad_payload", 1)
-            return
-
+        consistent, msg = bso.validate()
         if not consistent:
             invalid_bsos[id] = msg
             # Log status on how many invalid BSOs we get, and why.
@@ -347,17 +340,34 @@ def parse_single_bso(request):
         request.errors.add("body", "bso", "Invalid BSO data")
         return
 
-    try:
-        consistent, msg = bso.validate()
-    except ValueError:
-        # Something was very very wrong with the BSO,
-        # we want to error out entirely.
-        request.errors.add("body", "bso", "Known-bad BSO payload")
-        annotate_request(request, __name__ + ".known_bad_payload", 1)
-        return
-
+    consistent, msg = bso.validate()
     if not consistent:
         request.errors.add("body", "bso", "Invalid BSO: " + msg)
         return
 
     request.validated["bso"] = bso
+
+
+class KnownBadPayloadError(Exception):
+    pass
+
+
+def check_for_known_bad_payloads(request):
+    """Reject specific payloads known to indicate client issues."""
+    try:
+        # Turns out some clients are not as good at crypto as we'd like.
+        # Look for any signals that they might have messed it up and
+        # reject attempts to set /crypto/keys in that case.
+        if request.validated.get("collection") == "crypto":
+            incoming_bsos = []
+            if "bsos" in request.validated:
+                incoming_bsos.extend(request.validated["bsos"])
+            if "bso" in request.validated:
+                incoming_bsos.append(request.validated["bso"])
+            for bso in incoming_bsos:
+                payload = bso.get("payload")
+                if payload and KNOWN_BAD_PAYLOAD_REGEX.search(payload):
+                    raise KnownBadPayloadError
+    except KnownBadPayloadError:
+        annotate_request(request, __name__ + ".known_bad_payload", 1)
+        request.errors.add("body", "bso", "Known-bad BSO payload")
