@@ -1783,6 +1783,38 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res[2]['payload'], 'cee')
         self.assertEquals(res[3]['payload'], 'dii')
 
+    def test_users_with_the_same_batch_id_get_separate_data(self):
+        # Try to generate two users with the same batch-id.
+        # It might take a couple of attempts...
+        for _ in xrange(100):
+            bsos = [{'id': 'a', 'payload': 'aih'}]
+            req = '/storage/col1?batch=true'
+            resp = self.app.post_json(self.root + req, bsos)
+            batch1 = resp.json['batch']
+            with self._switch_user():
+                bsos = [{'id': 'b', 'payload': 'bee'}]
+                req = '/storage/col1?batch=true'
+                resp = self.app.post_json(self.root + req, bsos)
+                batch2 = resp.json['batch']
+                # Let the second user commit their batch.
+                req = '/storage/col1?batch={}&commit=true'.format(batch2)
+                self.app.post_json(self.root + req, [])
+                # It should only have a single item.
+                resp = self.app.get(self.root + '/storage/col1')
+                self.assertEquals(resp.json, ['b'])
+            # The first user's collection should still be empty.
+            # Now have the  first user commit their batch.
+            req = '/storage/col1?batch={}&commit=true'.format(batch1)
+            self.app.post_json(self.root + req, [])
+            # It should only have a single item.
+            resp = self.app.get(self.root + '/storage/col1')
+            self.assertEquals(resp.json, ['a'])
+            # If we didn't make a conflict, try again.
+            if batch1 == batch2:
+                break
+        else:
+            raise unittest2.SkipTest('failed to generate conflicting batchid')
+
     def test_batch_id_is_correctly_scoped_to_a_user(self):
         collection = self.root + '/storage/col1'
         bsos = [
@@ -2074,6 +2106,10 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         pass
 
     def test_batch_id_is_correctly_scoped_to_a_collection(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_users_with_the_same_batch_id_get_separate_data(self):
         # Without batch uploads, there's nothing for this test to test.
         pass
 

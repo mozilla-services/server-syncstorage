@@ -60,12 +60,14 @@ APPLY_BATCH_INSERT = """
     FROM batch_uploads
     LEFT JOIN %(bui)s
     ON
-        %(bui)s.batch = batch_uploads.batch
+        %(bui)s.batch = batch_uploads.batch AND
+        %(bui)s.userid = batch_uploads.userid
     LEFT OUTER JOIN %(bso)s AS existing
     ON
         existing.userid = batch_uploads.userid AND
         existing.collection = batch_uploads.collection AND
         existing.id = %(bui)s.id
     WHERE
-        batch_uploads.batch = :batch
+        batch_uploads.batch = :batch AND
+        batch_uploads.userid = :userid
 """

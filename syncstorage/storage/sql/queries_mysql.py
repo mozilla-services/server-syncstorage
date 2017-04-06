@@ -43,7 +43,7 @@ APPLY_BATCH_INSERT = """
         COALESCE(payload, ''),
         COALESCE(payload_size, 0)
     FROM %(bui)s
-    WHERE batch = :batch
+    WHERE batch = :batch AND userid = :userid
     ON DUPLICATE KEY UPDATE
         modified = :modified,
         sortindex = COALESCE(%(bui)s.sortindex,
