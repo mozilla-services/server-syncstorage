@@ -118,37 +118,36 @@ APPLY_BATCH_UPDATE = """
     SET
         sortindex = COALESCE(
             (SELECT sortindex FROM %(bui)s WHERE
-                batch = :batch AND id = %(bso)s.id),
+                batch = :batch AND userid = :userid AND id = %(bso)s.id),
             %(bso)s.sortindex
         ),
         payload = COALESCE(
             (SELECT payload FROM %(bui)s WHERE
-                batch = :batch AND id = %(bso)s.id),
+                batch = :batch AND userid = :userid AND id = %(bso)s.id),
             %(bso)s.payload,
             ''
         ),
         payload_size = COALESCE(
             (SELECT payload_size FROM %(bui)s WHERE
-                batch = :batch AND id = %(bso)s.id),
+                batch = :batch AND userid = :userid AND id = %(bso)s.id),
             %(bso)s.payload_size,
             0
         ),
         ttl = COALESCE(
             (SELECT ttl_offset + :ttl_base FROM %(bui)s WHERE
-                batch = :batch AND id = %(bso)s.id),
+                batch = :batch AND userid = :userid AND id = %(bso)s.id),
             %(bso)s.ttl,
             :default_ttl
         ),
         modified = :modified
     WHERE
-        userid = (
-            SELECT userid FROM batch_uploads WHERE batch = :batch
-        ) AND
+        userid = :userid AND
         collection = (
-            SELECT collection FROM batch_uploads WHERE batch = :batch
+            SELECT collection FROM batch_uploads
+            WHERE batch = :batch AND userid = :userid
         ) AND
         id IN (
-            SELECT id FROM %(bui)s WHERE batch = :batch
+            SELECT id FROM %(bui)s WHERE batch = :batch AND userid = :userid
         )
 """
 
@@ -168,9 +167,11 @@ APPLY_BATCH_INSERT = """
     FROM batch_uploads
     LEFT JOIN %(bui)s
     ON
-        %(bui)s.batch = batch_uploads.batch
+        %(bui)s.batch = batch_uploads.batch AND
+        %(bui)s.userid = batch_uploads.userid
     WHERE
         batch_uploads.batch = :batch AND
+        batch_uploads.userid = :userid AND
         %(bui)s.id NOT IN (
             SELECT id
             FROM %(bso)s

@@ -520,7 +520,7 @@ class SQLStorage(SyncStorage):
         rows = []
         for data in items:
             id_ = data["id"]
-            row = self._prepare_bui_row(session, batchid, id_, data)
+            row = self._prepare_bui_row(session, batchid, userid, id_, data)
             rows.append(row)
         session.insert_or_update("batch_upload_items", rows)
         return session.timestamp
@@ -668,9 +668,10 @@ class SQLStorage(SyncStorage):
                 row["ttl"] = data["ttl"] + int(session.timestamp)
         return row
 
-    def _prepare_bui_row(self, session, batchid, item, data):
+    def _prepare_bui_row(self, session, batchid, userid, item, data):
         row = {}
         row["batch"] = batchid
+        row["userid"] = userid
         row["id"] = item
         if "sortindex" in data:
             row["sortindex"] = data["sortindex"]

@@ -170,6 +170,8 @@ def _get_batch_item_columns(table_name):
     return (
         Column("batch", BigInteger, primary_key=True, nullable=False,
                autoincrement=False),
+        Column("userid", Integer, primary_key=True, nullable=False,
+               autoincrement=False),
         Column("id", String(64), primary_key=True, nullable=False,
                autoincrement=False),
         # All these need to be nullable, because the batch upload
