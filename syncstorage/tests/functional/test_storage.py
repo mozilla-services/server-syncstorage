@@ -166,6 +166,9 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.put_json(self.root + '/storage/col2/128', bso)
         ts1 = float(res.headers["X-Last-Modified"])
 
+        # delay to ensure unique timestamp
+        time.sleep(0.01)
+
         bso = {'id': '129', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/129', bso)
         ts2 = float(res.headers["X-Last-Modified"])
@@ -325,6 +328,7 @@ class TestStorage(StorageFunctionalTestCase):
         for index, sortindex in (('0', -1), ('1', 34), ('2', 12)):
             bso = {'id': index, 'payload': 'x', 'sortindex': sortindex}
             self.app.post_json(self.root + '/storage/col2', [bso])
+            time.sleep(0.01)
 
         res = self.app.get(self.root + '/storage/col2?sort=newest')
         res = res.json
@@ -374,6 +378,7 @@ class TestStorage(StorageFunctionalTestCase):
         for i in xrange(5):
             bsos = [{"id": str(i), "payload": "xxx"}]
             self.app.post_json(self.root + "/storage/col2", bsos)
+            time.sleep(0.02)
         # Get them all, along with their timestamps.
         res = self.app.get(self.root + '/storage/col2?full=true').json
         self.assertEquals(len(res), 5)
@@ -584,6 +589,9 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
         ts = float(res.headers['X-Last-Modified'])
+
+        # delay to ensure unique timestamp
+        time.sleep(0.02)
 
         # deleting item 13
         self.app.delete(self.root + '/storage/col2/13')
@@ -875,6 +883,7 @@ class TestStorage(StorageFunctionalTestCase):
         for i in xrange(5):
             bsos = [{"id": str(i), "payload": "xxx"}]
             self.app.post_json(self.root + "/storage/col2", bsos)
+            time.sleep(0.02)
 
         # make sure the server returns only proper precision timestamps.
         resp = self.app.get(self.root + '/storage/col2?full=1')
@@ -910,6 +919,8 @@ class TestStorage(StorageFunctionalTestCase):
         bsos = [bso1, bso2]
         res = self.app.post_json(self.root + '/storage/meh', bsos)
         ts = float(res.headers["X-Last-Modified"])
+
+        time.sleep(0.01)
 
         # send two more bsos
         bso3 = {'id': '3', 'payload': _PLD}
@@ -1338,6 +1349,7 @@ class TestStorage(StorageFunctionalTestCase):
                 ts = float(res.headers["X-Last-Modified"])
                 timestamps.append((i, ts))
                 bsos = []
+                time.sleep(0.05)
 
         # Try with several different pagination sizes,
         # to hit various boundary conditions.
