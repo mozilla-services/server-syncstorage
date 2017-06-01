@@ -574,6 +574,64 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
+    def test_delete_collection_then_post(self):
+        # creating a collection of three
+        bso1 = {'id': '12', 'payload': _PLD}
+        bso2 = {'id': '13', 'payload': _PLD}
+        bso3 = {'id': '14', 'payload': _PLD}
+        bsos = [bso1, bso2, bso3]
+
+        self.app.post_json(self.root + '/storage/col2', bsos)
+        res = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(len(res.json), 3)
+
+        resp = self.app.get(self.root + '/info/collections')
+        res = resp.json
+        self.assertTrue("col2" in res)
+
+        infoBefore = self.app.get(self.root + '/info/collections')
+
+        # Deleting the collection should result in:
+        #  - collection does not appear in /info/collections
+        #  - X-Last-Modified timestamp at the storage level changing
+        self.app.delete(self.root + '/storage/col2')
+        items = self.app.get(self.root + '/storage/col2').json
+        self.assertEquals(len(items), 0)
+
+        infoAfter1 = self.app.get(self.root + '/info/collections')
+        res = infoAfter1.json
+        self.assertTrue("col2" not in res)
+        self.assertTrue("X-Last-Modified" in resp.headers)
+        self.assertNotEqual(infoBefore.headers["X-Last-Modified"],
+                infoAfter1.headers["X-Last-Modified"])
+
+        # make sure the storage level timestamp stays the same
+        time.sleep(0.2)
+        infoAfter2 = self.app.get(self.root + '/info/collections')
+        self.assertEqual(infoAfter1.headers["X-Last-Modified"],
+                infoAfter2.headers["X-Last-Modified"])
+
+        # post BSOs again with X-I-U-S == 0
+        self.app.post_json(
+                self.root + '/storage/col2', bsos,
+                headers=[('X-If-Unmodified-Since', "0.00")])
+        infoAfter3 = self.app.get(self.root + '/info/collections')
+        self.assertNotEqual(infoAfter3.headers["X-Last-Modified"],
+                infoAfter2.headers["X-Last-Modified"])
+
+        # delete and POST again with X-I-U-S > 0
+        afterDel2 = self.app.delete(self.root + '/storage/col2')
+        items = self.app.get(self.root + '/storage/col2').json
+        self.assertEquals(len(items), 0)
+        self.app.post_json(
+                self.root + '/storage/col2', bsos,
+                headers=[('X-If-Unmodified-Since', "1.00")])
+
+        infoAfter4 = self.app.get(self.root + '/info/collections')
+        self.assertNotEqual(infoAfter4.headers["X-Last-Modified"],
+                infoAfter3.headers["X-Last-Modified"])
+
+
     def test_delete_item(self):
         # creating a collection of three
         bso1 = {'id': '12', 'payload': _PLD}
