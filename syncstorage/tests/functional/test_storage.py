@@ -602,8 +602,8 @@ class TestStorage(StorageFunctionalTestCase):
         res = infoAfter1.json
         self.assertTrue("col2" not in res)
         self.assertTrue("X-Last-Modified" in resp.headers)
-        self.assertNotEqual(infoBefore.headers["X-Last-Modified"],
-                            infoAfter1.headers["X-Last-Modified"])
+        self.assertTrue(float(infoBefore.headers["X-Last-Modified"]) <
+                        float(infoAfter1.headers["X-Last-Modified"]))
 
         # make sure the storage level timestamp stays the same
         time.sleep(0.2)
@@ -616,8 +616,8 @@ class TestStorage(StorageFunctionalTestCase):
                 self.root + '/storage/col2', bsos,
                 headers=[('X-If-Unmodified-Since', "0.00")])
         infoAfter3 = self.app.get(self.root + '/info/collections')
-        self.assertNotEqual(infoAfter3.headers["X-Last-Modified"],
-                            infoAfter2.headers["X-Last-Modified"])
+        self.assertTrue(float(infoAfter3.headers["X-Last-Modified"]) >
+                        float(infoAfter2.headers["X-Last-Modified"]))
 
         # delete and POST again with X-I-U-S > 0
         self.app.delete(self.root + '/storage/col2')
@@ -628,8 +628,8 @@ class TestStorage(StorageFunctionalTestCase):
                 headers=[('X-If-Unmodified-Since', "1.00")])
 
         infoAfter4 = self.app.get(self.root + '/info/collections')
-        self.assertNotEqual(infoAfter4.headers["X-Last-Modified"],
-                            infoAfter3.headers["X-Last-Modified"])
+        self.assertTrue(float(infoAfter4.headers["X-Last-Modified"]) >
+                        float(infoAfter3.headers["X-Last-Modified"]))
 
     def test_delete_item(self):
         # creating a collection of three
