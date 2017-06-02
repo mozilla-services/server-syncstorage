@@ -585,11 +585,12 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
-        resp = self.app.get(self.root + '/info/collections')
-        res = resp.json
+        infoBefore = self.app.get(self.root + '/info/collections')
+        res = infoBefore.json
         self.assertTrue("col2" in res)
 
-        infoBefore = self.app.get(self.root + '/info/collections')
+        # make sure the storage level timestamp changes
+        time.sleep(0.2)
 
         # Deleting the collection should result in:
         #  - collection does not appear in /info/collections
@@ -601,7 +602,8 @@ class TestStorage(StorageFunctionalTestCase):
         infoAfter1 = self.app.get(self.root + '/info/collections')
         res = infoAfter1.json
         self.assertTrue("col2" not in res)
-        self.assertTrue("X-Last-Modified" in resp.headers)
+        self.assertTrue("X-Last-Modified" in infoBefore.headers)
+        self.assertTrue("X-Last-Modified" in infoAfter1.headers)
         self.assertTrue(float(infoBefore.headers["X-Last-Modified"]) <
                         float(infoAfter1.headers["X-Last-Modified"]))
 
@@ -612,9 +614,8 @@ class TestStorage(StorageFunctionalTestCase):
                          infoAfter2.headers["X-Last-Modified"])
 
         # post BSOs again with X-I-U-S == 0
-        self.app.post_json(
-                self.root + '/storage/col2', bsos,
-                headers=[('X-If-Unmodified-Since', "0.00")])
+        self.app.post_json(self.root + '/storage/col2', bsos,
+                           headers=[('X-If-Unmodified-Since', "0.00")])
         infoAfter3 = self.app.get(self.root + '/info/collections')
         self.assertTrue(float(infoAfter3.headers["X-Last-Modified"]) >
                         float(infoAfter2.headers["X-Last-Modified"]))
@@ -623,9 +624,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.delete(self.root + '/storage/col2')
         items = self.app.get(self.root + '/storage/col2').json
         self.assertEquals(len(items), 0)
-        self.app.post_json(
-                self.root + '/storage/col2', bsos,
-                headers=[('X-If-Unmodified-Since', "1.00")])
+        self.app.post_json(self.root + '/storage/col2', bsos,
+                           headers=[('X-If-Unmodified-Since', "1.00")])
 
         infoAfter4 = self.app.get(self.root + '/info/collections')
         self.assertTrue(float(infoAfter4.headers["X-Last-Modified"]) >
