@@ -493,7 +493,11 @@ class SQLStorage(SyncStorage):
             "userid": userid,
             "collection": collectionid
         }
-        session.query("CREATE_BATCH", params)
+        try:
+            session.query("CREATE_BATCH", params)
+        except IntegrityError:
+            # The user tried to create two batches with the same timestamp.
+            raise ConflictError
         return batchid
 
     @with_session
@@ -550,6 +554,7 @@ class SQLStorage(SyncStorage):
             "collection": collectionid
         }
         session.query("CLOSE_BATCH", params)
+        session.query("CLOSE_BATCH_ITEMS", params)
 
     @with_session
     def delete_collection(self, session, userid, collection):

@@ -181,8 +181,15 @@ APPLY_BATCH_INSERT = """
         )
 """
 
-CLOSE_BATCH = "DELETE FROM batch_uploads WHERE batch = :batch " \
-              "AND userid = :userid AND collection = :collection"
+CLOSE_BATCH = """
+    DELETE FROM batch_uploads
+    WHERE batch = :batch AND userid = :userid AND collection = :collection
+"""
+
+CLOSE_BATCH_ITEMS = """
+    DELETE FROM %(bui)s
+    WHERE batch = :batch AND userid = :userid
+"""
 
 
 def FIND_ITEMS(bso, params):
