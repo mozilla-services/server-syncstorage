@@ -1815,6 +1815,34 @@ class TestStorage(StorageFunctionalTestCase):
         else:
             raise unittest2.SkipTest('failed to generate conflicting batchid')
 
+    def test_that_we_dont_resurrect_committed_batches(self):
+        # This retry loop tries to trigger a situation where we:
+        #  * create a batch with a single item
+        #  * successfully commit that batch
+        #  * create a new batch tht re-uses the same batchid
+        for _ in xrange(100):
+            bsos = [{'id': 'i', 'payload': 'aye'}]
+            req = '/storage/col1?batch=true'
+            resp = self.app.post_json(self.root + req, bsos)
+            batch1 = resp.json['batch']
+            req = '/storage/col1?batch={}&commit=true'.format(batch1)
+            self.app.post_json(self.root + req, [])
+            req = '/storage/col2?batch=true'
+            resp = self.app.post_json(self.root + req, [])
+            batch2 = resp.json['batch']
+            bsos = [{'id': 'j', 'payload': 'jay'}]
+            req = '/storage/col2?batch={}&commit=true'.format(batch2)
+            self.app.post_json(self.root + req, bsos)
+            # Retry if we failed to trigger re-use of the batchid.
+            if batch1 == batch2:
+                break
+        else:
+            raise unittest2.SkipTest('failed to trigger re-use of batchid')
+        # Despite having the same batchid, the second batch should
+        # be completely independent of the first.
+        resp = self.app.get(self.root + '/storage/col2')
+        self.assertEquals(resp.json, ['j'])
+
     def test_batch_id_is_correctly_scoped_to_a_user(self):
         collection = self.root + '/storage/col1'
         bsos = [
@@ -2110,6 +2138,10 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         pass
 
     def test_users_with_the_same_batch_id_get_separate_data(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_that_we_dont_resurrect_committed_batches(self):
         # Without batch uploads, there's nothing for this test to test.
         pass
 
