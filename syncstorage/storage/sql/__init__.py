@@ -47,11 +47,16 @@ logger = logging.getLogger(__name__)
 # highest ID in this collection.
 STANDARD_COLLECTIONS = {1: "clients", 2: "crypto", 3: "forms", 4: "history",
                         5: "keys", 6: "meta", 7: "bookmarks", 8: "prefs",
-                        9: "tabs", 10: "passwords", 11: "addons"}
+                        9: "tabs", 10: "passwords", 11: "addons",
+                        12: "addresses", 13: "creditcards"}
 
 FIRST_CUSTOM_COLLECTION_ID = 100
 
 MAX_COLLECTIONS_CACHE_SIZE = 1000
+
+
+assert FIRST_CUSTOM_COLLECTION_ID > len(STANDARD_COLLECTIONS)
+assert FIRST_CUSTOM_COLLECTION_ID > max(STANDARD_COLLECTIONS)
 
 
 def ts2bigint(timestamp):
