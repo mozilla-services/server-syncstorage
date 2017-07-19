@@ -1797,14 +1797,14 @@ class TestStorage(StorageFunctionalTestCase):
                 resp = self.app.post_json(self.root + req, bsos)
                 batch2 = resp.json['batch']
                 # Let the second user commit their batch.
-                req = '/storage/col1?batch={}&commit=true'.format(batch2)
+                req = '/storage/col1?batch={0}&commit=true'.format(batch2)
                 self.app.post_json(self.root + req, [])
                 # It should only have a single item.
                 resp = self.app.get(self.root + '/storage/col1')
                 self.assertEquals(resp.json, ['b'])
             # The first user's collection should still be empty.
             # Now have the  first user commit their batch.
-            req = '/storage/col1?batch={}&commit=true'.format(batch1)
+            req = '/storage/col1?batch={0}&commit=true'.format(batch1)
             self.app.post_json(self.root + req, [])
             # It should only have a single item.
             resp = self.app.get(self.root + '/storage/col1')
@@ -1825,13 +1825,13 @@ class TestStorage(StorageFunctionalTestCase):
             req = '/storage/col1?batch=true'
             resp = self.app.post_json(self.root + req, bsos)
             batch1 = resp.json['batch']
-            req = '/storage/col1?batch={}&commit=true'.format(batch1)
+            req = '/storage/col1?batch={0}&commit=true'.format(batch1)
             self.app.post_json(self.root + req, [])
             req = '/storage/col2?batch=true'
             resp = self.app.post_json(self.root + req, [])
             batch2 = resp.json['batch']
             bsos = [{'id': 'j', 'payload': 'jay'}]
-            req = '/storage/col2?batch={}&commit=true'.format(batch2)
+            req = '/storage/col2?batch={0}&commit=true'.format(batch2)
             self.app.post_json(self.root + req, bsos)
             # Retry if we failed to trigger re-use of the batchid.
             if batch1 == batch2:
