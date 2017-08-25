@@ -12,19 +12,19 @@ tailored to MySQL.
 
 PURGE_SOME_EXPIRED_ITEMS = """
     DELETE FROM %(bso)s
-    WHERE ttl < (UNIX_TIMESTAMP() - :grace)
+    WHERE ttl < (:now - :grace)
     ORDER BY ttl LIMIT :maxitems
 """
 
 PURGE_BATCHES = """
     DELETE FROM batch_uploads
-    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+    WHERE batch < (:now - :lifetime - :grace) * 1000
     ORDER BY batch LIMIT :maxitems
 """
 
 PURGE_BATCH_CONTENTS = """
     DELETE FROM %(bui)s
-    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+    WHERE batch < (:now - :lifetime - :grace) * 1000
     ORDER BY batch LIMIT :maxitems
 """
 

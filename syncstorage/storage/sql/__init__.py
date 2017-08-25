@@ -807,6 +807,7 @@ class SQLStorage(SyncStorage):
         # This avoids holdig open a long-running transaction, so
         # the incrementality can let other jobs run properly.
         with self._get_or_create_session() as session:
+            params["now"] = int(session.timestamp)
             rowcount = session.query(query, params)
         while rowcount > 0:
             num_purged += rowcount
