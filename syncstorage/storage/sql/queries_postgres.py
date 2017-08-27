@@ -53,25 +53,3 @@ END IF;
 END;
 $do$;
 """.strip()
-
-
-# Use correct timestamp functions for postgres.
-
-PURGE_SOME_EXPIRED_ITEMS = """
-    DELETE FROM %(bso)s
-    WHERE ttl < (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) - :grace)
-"""
-
-PURGE_BATCHES = """
-    DELETE FROM batch_uploads
-    WHERE batch < (
-        SELECT EXTRACT(EPOCH FROM CURRENT_TIMSTAMP) - :lifetime - :grace
-    ) * 1000
-"""
-
-PURGE_BATCH_CONTENTS = """
-    DELETE FROM %(bui)s
-    WHERE batch < (
-        SELECT EXTRACT(EPOCH FROM CURRENT_TIMSTAMP) - :lifetime - :grace
-    ) * 1000
-"""

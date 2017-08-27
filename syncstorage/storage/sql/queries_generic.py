@@ -266,15 +266,15 @@ ITEM_TIMESTAMP = "SELECT modified FROM %(bso)s "\
 
 PURGE_SOME_EXPIRED_ITEMS = """
     DELETE FROM %(bso)s
-    WHERE ttl < (UNIX_TIMESTAMP() - :grace)
+    WHERE ttl < (:now - :grace)
 """
 
 PURGE_BATCHES = """
     DELETE FROM batch_uploads
-    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+    WHERE batch < (:now - :lifetime - :grace) * 1000
 """
 
 PURGE_BATCH_CONTENTS = """
     DELETE FROM %(bui)s
-    WHERE batch < (UNIX_TIMESTAMP() - :lifetime - :grace) * 1000
+    WHERE batch < (:now - :lifetime - :grace) * 1000
 """

@@ -20,23 +20,6 @@ LOCK_COLLECTION_READ = "SELECT last_modified FROM user_collections "\
 LOCK_COLLECTION_WRITE = "SELECT last_modified FROM user_collections "\
                         "WHERE userid=:userid AND collection=:collectionid"
 
-# Use the correct timestamp-handling functions for sqlite.
-
-PURGE_SOME_EXPIRED_ITEMS = """
-    DELETE FROM %(bso)s
-    WHERE ttl < (strftime('%%s', 'now') - :grace)
-"""
-
-PURGE_BATCHES = """
-    DELETE FROM batch_uploads
-    WHERE batch < (strftime('%s', 'now') - :lifetime - :grace) * 1000
-"""
-
-PURGE_BATCH_CONTENTS = """
-    DELETE FROM %(bui)s
-    WHERE batch < (strftime('%%s', 'now') - :lifetime - :grace) * 1000
-"""
-
 # We can use INSERT OR REPLACE to apply a batch in a single query.
 # However, to correctly cope with with partial data udpates, we need
 # to join onto the original table in the SELECT clause so that we
