@@ -108,8 +108,7 @@ user_collections = Table(
 # It is used to create either sharded or non-shareded BSO storage tables,
 # depending on the run-time settings of the application.
 
-PAYLOAD_TYPE = Text(length=256*1024)
-PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
+PAYLOAD_TYPE = Text().with_variant(postgresql.TEXT(), 'postgresql')
 
 
 # Common column definitions between BSO and batch upload item tables

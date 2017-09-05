@@ -78,7 +78,7 @@ class TestWSGIApp(StorageTestCase):
         with testfixtures.LogCapture() as logs:
             app.post_json("/1.5/42/storage/bookmarks", [
                 {"id": "valid1", "payload": "thisisok"},
-                {"id": "invalid", "payload": "TOOBIG" * 1024 * 128},
+                {"id": "invalid", "payload": "TOOBIG" * 1024 * 1024 * 3},
                 {"id": "valid2", "payload": "thisisoktoo"},
             ])
 
@@ -87,7 +87,7 @@ class TestWSGIApp(StorageTestCase):
             if r.name == "syncstorage.views.validators":
                 expect_message = "Invalid BSO 42/bookmarks/invalid" \
                     " (payload too large):" \
-                    " BSO({\"id\": \"invalid\", \"payload_size\": 786432})"
+                    " BSO({\"id\": \"invalid\", \"payload_size\": 18874368})"
                 self.assertEqual(r.getMessage(), expect_message)
                 break
         else:
