@@ -1916,8 +1916,8 @@ class TestStorage(StorageFunctionalTestCase):
             )
 
         testEmptyCommit("application/json", "")
+        testEmptyCommit("application/json", "[]")
         testEmptyCommit("application/json", "{}")
-        testEmptyCommit("application/json", "", status=400)
 
         testEmptyCommit("application/newlines", "")
         testEmptyCommit("application/newlines", "\n", status=400)
