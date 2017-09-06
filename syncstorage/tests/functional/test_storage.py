@@ -1901,6 +1901,29 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.put_json(self.root + "/storage/col2/keys", bso, status=200)
         self.app.post_json(self.root + "/storage/col2", [bso], status=200)
 
+    # bug 1397357
+    def test_batch_empty_commit(self):
+        def testEmptyCommit(contentType, body, status=200):
+            bsos = [{'id': str(i), 'payload': 'X'} for i in range(5)]
+            res = self.app.post_json(self.root+'/storage/col?batch=true', bsos)
+            self.assertEquals(len(res.json['success']), 5)
+            self.assertEquals(len(res.json['failed']), 0)
+            batch = res.json["batch"]
+            self.app.post(
+                self.root+'/storage/col?commit=true&batch='+batch,
+                body, headers={"Content-Type": contentType},
+                status=status
+            )
+
+        testEmptyCommit("application/json", "")
+        testEmptyCommit("application/json", "[]")
+        testEmptyCommit("application/json", "{}")
+
+        testEmptyCommit("application/newlines", "")
+        testEmptyCommit("application/newlines", "\n", status=400)
+        testEmptyCommit("application/newlines", "{}", status=400)
+        testEmptyCommit("application/newlines", "[]", status=400)
+
 
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
