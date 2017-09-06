@@ -1915,9 +1915,9 @@ class TestStorage(StorageFunctionalTestCase):
                 status=status
             )
 
-        testEmptyCommit("application/json", "")
         testEmptyCommit("application/json", "[]")
-        testEmptyCommit("application/json", "{}")
+        testEmptyCommit("application/json", "{}", status=400)
+        testEmptyCommit("application/json", "", status=400)
 
         testEmptyCommit("application/newlines", "")
         testEmptyCommit("application/newlines", "\n", status=400)
@@ -2165,6 +2165,10 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         pass
 
     def test_that_we_dont_resurrect_committed_batches(self):
+        # Without batch uploads, there's nothing for this test to test.
+        pass
+
+    def test_batch_empty_commit(self):
         # Without batch uploads, there's nothing for this test to test.
         pass
 
