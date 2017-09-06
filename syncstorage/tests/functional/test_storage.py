@@ -1924,6 +1924,7 @@ class TestStorage(StorageFunctionalTestCase):
         testEmptyCommit("application/newlines", "{}", status=400)
         testEmptyCommit("application/newlines", "[]", status=400)
 
+
 class TestStorageMemcached(TestStorage):
     """Storage testcases run against the memcached backend, if available."""
 
