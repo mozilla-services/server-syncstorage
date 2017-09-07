@@ -251,7 +251,10 @@ def parse_multiple_bsos(request):
         if content_type in ("application/json", "text/plain", None):
             bso_datas = json_loads(request.body)
         elif content_type == "application/newlines":
-            bso_datas = [json_loads(ln) for ln in request.body.split("\n")]
+            bso_datas = []
+            if request.body:
+                for ln in request.body.split("\n"):
+                    bso_datas.append(json_loads(ln))
         else:
             msg = "Unsupported Media Type: %s" % (content_type,)
             request.errors.add("header", "Content-Type", msg)
