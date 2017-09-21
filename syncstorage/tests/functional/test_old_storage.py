@@ -20,7 +20,6 @@ from decimal import Decimal
 
 from syncstorage.tests.functional.support import StorageFunctionalTestCase
 from syncstorage.tests.functional.support import run_live_functional_tests
-from syncstorage.views.util import get_limit_config
 
 WEAVE_INVALID_WBO = 8
 
@@ -411,32 +410,6 @@ class TestOldStorage(StorageFunctionalTestCase):
         time.sleep(2.1)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
-
-    def test_batch(self):
-        max_count = get_limit_config(self.config, "max_post_records")
-        max_bytes = get_limit_config(self.config, "max_post_bytes")
-        self.assertEquals(max_bytes, 1024 * 1024)
-        # Test that batch uploads are correctly processed.
-        # Uploading max_count-5 small objects should succeed.
-        wbos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
-        res = res.json
-        self.assertEquals(len(res['success']), max_count - 5)
-        self.assertEquals(len(res['failed']), 0)
-        # Uploading max_count+5 items should produce five failures.
-        wbos = [{'id': str(i), 'payload': 'X'} for i in range(max_count + 5)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
-        res = res.json
-        self.assertEquals(len(res['success']), max_count)
-        self.assertEquals(len(res['failed']), 5)
-        # The test config has max_bytes=1M.
-        # Uploading 5 210MB items should produce one failure.
-        wbos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
-                for i in range(5)]
-        res = self.app.post_json(self.root + '/storage/col2', wbos)
-        res = res.json
-        self.assertEquals(len(res['success']), 4)
-        self.assertEquals(len(res['failed']), 1)
 
     def test_weird_args(self):
         # pushing some data in col2

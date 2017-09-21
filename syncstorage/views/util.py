@@ -8,6 +8,7 @@ import functools
 from pyramid.httpexceptions import HTTPError
 
 from syncstorage.storage import NotFoundError
+from syncstorage.bso import MAX_PAYLOAD_SIZE
 
 
 def json_error(status_code=400, status_message="error", errors=()):
@@ -89,11 +90,21 @@ def get_resource_timestamp(request):
 
 
 DEFAULT_LIMITS = {}
-DEFAULT_LIMITS["max_request_bytes"] = 1024 * 1024
+DEFAULT_LIMITS["max_record_payload_bytes"] = MAX_PAYLOAD_SIZE
 DEFAULT_LIMITS["max_post_records"] = 100
-DEFAULT_LIMITS["max_post_bytes"] = DEFAULT_LIMITS["max_request_bytes"]
+DEFAULT_LIMITS["max_post_bytes"] = 2 * 1024 * 1024
 DEFAULT_LIMITS["max_total_records"] = 100 * DEFAULT_LIMITS["max_post_records"]
 DEFAULT_LIMITS["max_total_bytes"] = 100 * DEFAULT_LIMITS["max_post_bytes"]
+
+# This is the upper bound on the Content-Length of any incoming request,
+# which in production is actually enforced by nginx.  It's important
+# that the value below agrees with the value configured into nginx,
+# otherwise clients might attempt large uploads that get rejected before
+# they ever reach the server application code.
+#
+# We default to max_post_bytes plus some slopt for metadata and JSON
+# formatting.
+DEFAULT_LIMITS["max_request_bytes"] = (2 * 1024 * 1024) + 4096
 
 
 def get_limit_config(request, limit):
