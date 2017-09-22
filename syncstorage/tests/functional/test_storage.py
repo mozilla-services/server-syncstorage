@@ -779,16 +779,20 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
-    def test_batch(self):
-        # This can't be run against a live server
-        # due to request size limits in nginx and
-        # the fact that it reads config variables.
-        if self.distant:
-            raise unittest2.SkipTest
+    def test_multi_item_post_limits(self):
+        res = self.app.get(self.root + '/info/configuration')
+        try:
+            max_bytes = res.json['max_post_bytes']
+            max_count = res.json['max_post_records']
+        except KeyError:
+            # Can't run against live server if it doesn't
+            # report the right config options.
+            if self.distant:
+                raise unittest2.SkipTest
+            max_bytes = get_limit_config(self.config, 'max_post_bytes')
+            max_count = get_limit_config(self.config, 'max_post_records')
 
-        # Test that batch uploads are correctly processed.
         # Uploading max_count-5 small objects should succeed.
-        max_count = get_limit_config(self.config, 'max_post_records')
         bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
@@ -802,15 +806,16 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res['success']), max_count)
         self.assertEquals(len(res['failed']), 5)
 
-        # The test config has max_bytes=1M.
-        # Uploading 5 210MB items should produce one failure.
-        max_bytes = get_limit_config(self.config, 'max_post_bytes')
-        self.assertEquals(max_bytes, 1024 * 1024)
-        bsos = [{'id': str(i), 'payload': "X" * (210 * 1024)}
-                for i in range(5)]
+        # Uploading items such that the last item puts us over the
+        # cumulative limit on payload size, should produce 1 failure.
+        # The item_size here is arbitrary, so I made it a prime in kB.
+        item_size = (227 * 1024)
+        max_items = max_bytes / item_size
+        bsos = [{'id': str(i), 'payload': "X" * item_size}
+                for i in range(max_items + 1)]
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
-        self.assertEquals(len(res['success']), 4)
+        self.assertEquals(len(res['success']), max_items)
         self.assertEquals(len(res['failed']), 1)
 
     def test_weird_args(self):
@@ -1509,24 +1514,87 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue('max_total_records' in limits)
         self.assertTrue('max_total_bytes' in limits)
         self.assertTrue('max_record_payload_bytes' in limits)
+        self.assertTrue('max_request_bytes' in limits)
 
         endpoint = self.root + '/storage/col2?batch=true'
 
+        # There are certain obvious constraints on these limits,
+        # violations of which would be very confusing for clients.
+
+        self.assertTrue(
+            limits['max_request_bytes'] > limits['max_post_bytes']
+        )
+        self.assertTrue(
+            limits['max_post_bytes'] >= limits['max_record_payload_bytes']
+        )
+        self.assertTrue(
+            limits['max_total_records'] >= limits['max_post_records']
+        )
+        self.assertTrue(
+            limits['max_total_bytes'] >= limits['max_post_bytes']
+        )
+
+        # `max_post_records` is an (inclusive) limit on
+        # the number of items in a single post.
+
+        res = self.app.post_json(endpoint, [], headers={
+          'X-Weave-Records': str(limits['max_post_records'])
+        })
+        self.assertFalse(res.json['failed'])
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Records': str(limits['max_post_records'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
+        bsos = [{'id': str(x), 'payload': ''}
+                for x in xrange(limits['max_post_records'])]
+        res = self.app.post_json(endpoint, bsos)
+        self.assertFalse(res.json['failed'])
+        bsos.append({'id': 'toomany', 'payload': ''})
+        res = self.app.post_json(endpoint, bsos)
+        self.assertEquals(res.json['failed']['toomany'], 'retry bso')
+
+        # `max_total_records` is an (inclusive) limit on the
+        # total number of items in a batch.  We can only enforce
+        # it if the client tells us this via header.
+
+        self.app.post_json(endpoint, [], headers={
+          'X-Weave-Total-Records': str(limits['max_total_records'])
+        })
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Total-Records': str(limits['max_total_records'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
+        # `max_post_bytes` is an (inclusive) limit on the
+        # total size of payloads in a single post.
+
+        self.app.post_json(endpoint, [], headers={
+          'X-Weave-Bytes': str(limits['max_post_bytes'])
+        })
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
+        bsos = [
+            {'id': 'little', 'payload': 'XXX'},
+            {'id': 'big', 'payload': 'X' * (limits['max_post_bytes'] - 3)}
+        ]
+        res = self.app.post_json(endpoint, bsos)
+        self.assertFalse(res.json['failed'])
+        bsos[1]['payload'] += 'X'
+        res = self.app.post_json(endpoint, bsos)
+        self.assertEqual(res.json['success'], ['little'])
+        self.assertEqual(res.json['failed']['big'], 'retry bytes')
+
+        # `max_total_bytes` is an (inclusive) limit on the
+        # total size of all payloads in a batch.  We can only enforce
+        # it if the client tells us this via header.
+
+        self.app.post_json(endpoint, [], headers={
+          'X-Weave-Total-Bytes': str(limits['max_total_bytes'])
+        })
         res = self.app.post_json(endpoint, [], headers={
           'X-Weave-Total-Bytes': str(limits['max_total_bytes'] + 1)
         }, status=400)

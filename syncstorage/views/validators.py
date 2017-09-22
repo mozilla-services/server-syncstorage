@@ -275,7 +275,8 @@ def parse_multiple_bsos(request):
     invalid_bsos = {}
 
     total_bytes = 0
-    for count, bso_data in enumerate(bso_datas):
+    count = 0
+    for bso_data in bso_datas:
         try:
             bso = BSO(bso_data)
         except ValueError:
@@ -303,12 +304,13 @@ def parse_multiple_bsos(request):
             logger.info(logmsg, userid, collection, id, msg, bso)
             continue
 
-        if count >= BATCH_MAX_COUNT:
+        count += 1
+        if count > BATCH_MAX_COUNT:
             invalid_bsos[id] = "retry bso"
             continue
 
         total_bytes += len(bso.get("payload", ""))
-        if total_bytes >= BATCH_MAX_BYTES:
+        if total_bytes > BATCH_MAX_BYTES:
             invalid_bsos[id] = "retry bytes"
             continue
 

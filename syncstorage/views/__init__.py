@@ -10,7 +10,7 @@ from pyramid.security import Allow
 
 from cornice import Service
 
-from syncstorage.bso import VALID_ID_REGEX, MAX_PAYLOAD_SIZE
+from syncstorage.bso import VALID_ID_REGEX
 from syncstorage.util import get_timestamp
 from syncstorage.storage import (ConflictError,
                                  NotFoundError,
@@ -205,6 +205,8 @@ def get_info_configuration(request):
     # Don't return batch-related limits if the feature isn't enabled.
     if request.registry.settings.get("storage.batch_upload_enabled", False):
         LIMIT_NAMES = (
+            "max_request_bytes",
+            "max_record_payload_bytes",
             "max_post_records",
             "max_post_bytes",
             "max_total_records",
@@ -213,12 +215,11 @@ def get_info_configuration(request):
     else:
         LIMIT_NAMES = (
             "max_request_bytes",
+            "max_record_payload_bytes",
         )
     limits = {}
     for name in LIMIT_NAMES:
         limits[name] = get_limit_config(request, name)
-    # This limit is hard-coded for now.
-    limits["max_record_payload_bytes"] = MAX_PAYLOAD_SIZE
     return limits
 
 
