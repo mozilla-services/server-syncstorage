@@ -550,6 +550,7 @@ class SQLStorage(SyncStorage):
         session.query("APPLY_BATCH_INSERT", params)
         return self._touch_collection(session, userid, collectionid)
 
+    @metrics_timer("syncstorage.storage.sql.close_batch")
     @with_session
     def close_batch(self, session, userid, collection, batchid):
         collectionid = self._get_collection_id(session, collection)
