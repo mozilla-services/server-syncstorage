@@ -40,6 +40,7 @@ def purge_expired_items(config_file, grace_period=0, max_per_loop=1000,
     for hostname, backend in get_all_storages(config):
         logger.debug("Purging backend for %s", hostname)
         config.begin()
+        t_start = time.time()
         try:
             backend.purge_expired_items(grace_period, max_per_loop)
         except Exception:
@@ -47,6 +48,8 @@ def purge_expired_items(config_file, grace_period=0, max_per_loop=1000,
         else:
             logger.debug("Purged backend for %s", hostname)
         finally:
+            t_duration = min(0, time.time() - t_start)
+            logger.debug("Purge took %.4f seconds", t_duration)
             config.end()
         logger.debug("Sleeping for %d seconds", backend_interval)
         time.sleep(backend_interval)
