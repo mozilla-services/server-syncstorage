@@ -804,7 +804,7 @@ class SQLStorage(SyncStorage):
         num_purged = 0
         is_incomplete = False
         # Note that we take a new session for each run of the query.
-        # This avoids holdig open a long-running transaction, so
+        # This avoids holding open a long-running transaction, so
         # the incrementality can let other jobs run properly.
         with self._get_or_create_session() as session:
             params["now"] = int(session.timestamp)

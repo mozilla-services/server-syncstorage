@@ -35,7 +35,7 @@ from sqlalchemy.sql import insert, update, text as sqltext
 from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
                         MetaData, Column, Table, Index)
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects import postgresql, mysql
 
 from mozsvc.metrics import metrics_timer, annotate_request
 from mozsvc.exceptions import BackendError
@@ -108,7 +108,9 @@ user_collections = Table(
 # It is used to create either sharded or non-shareded BSO storage tables,
 # depending on the run-time settings of the application.
 
-PAYLOAD_TYPE = Text().with_variant(postgresql.TEXT(), 'postgresql')
+PAYLOAD_TYPE = Text()
+PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(postgresql.TEXT(), 'postgresql')
+PAYLOAD_TYPE = PAYLOAD_TYPE.with_variant(mysql.MEDIUMTEXT(), 'mysql')
 
 
 # Common column definitions between BSO and batch upload item tables

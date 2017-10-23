@@ -53,3 +53,16 @@ END IF;
 END;
 $do$;
 """.strip()
+
+# Postgres seems to want to do 32-bit integer math by default,
+# so coerce things into bigints to avoid overflow.
+
+PURGE_BATCHES = """
+    DELETE FROM batch_uploads
+    WHERE batch < (:now - :lifetime - :grace)::BIGINT * 1000
+"""
+
+PURGE_BATCH_CONTENTS = """
+    DELETE FROM %(bui)s
+    WHERE batch < (:now - :lifetime - :grace)::BIGINT * 1000
+"""
