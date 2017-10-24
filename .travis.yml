@@ -28,5 +28,5 @@ before_script:
 
 script:
   - make test
-  - MOZSVC_SQLURI=pymysql://root@localhost/sync_test make test
-  - MOZSVC_SQLURI=postgresql://postgres@localhost/sync_test make test
+  - make test MOZSVC_SQLURI=pymysql://root@localhost/sync_test
+  - make test MOZSVC_SQLURI=postgresql://postgres@localhost/sync_test

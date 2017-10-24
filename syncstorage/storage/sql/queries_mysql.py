@@ -28,6 +28,14 @@ PURGE_BATCH_CONTENTS = """
     ORDER BY batch LIMIT :maxitems
 """
 
+OPTIMIZE_BATCHES_TABLE = """
+    OPTIMIZE TABLE batch_uploads
+"""
+
+OPTIMIZE_BUI_TABLE = """
+    OPTIMIZE TABLE %(bui)s
+"""
+
 # MySQL's non-standard ON DUPLICATE KEY UPDATE means we can
 # apply a batch efficiently with a single query.
 

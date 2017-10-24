@@ -468,7 +468,7 @@ class TestOldStorage(StorageFunctionalTestCase):
             stamp = wbo['modified']
             try:
                 self.assertEqual(stamp, stamp.quantize(two_place))
-            except:
+            except BaseException:
                 # XXX more info to track down this issue
                 msg = 'could not quantize '
                 msg += resp.body

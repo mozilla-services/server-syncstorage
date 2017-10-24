@@ -128,6 +128,8 @@ class SQLStorage(SyncStorage):
 
         self.sqluri = sqluri
         self.dbconnector = DBConnector(sqluri, **dbkwds)
+        self._optimize_table_after_purge = \
+            dbkwds.get("optimize_table_after_purge", True)
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.
@@ -550,6 +552,7 @@ class SQLStorage(SyncStorage):
         session.query("APPLY_BATCH_INSERT", params)
         return self._touch_collection(session, userid, collectionid)
 
+    @metrics_timer("syncstorage.storage.sql.close_batch")
     @with_session
     def close_batch(self, session, userid, collection, batchid):
         collectionid = self._get_collection_id(session, collection)
@@ -766,6 +769,7 @@ class SQLStorage(SyncStorage):
             "grace": grace_period,
             "maxitems": max_per_loop,
         })
+        self._maybe_optimize_table("OPTIMIZE_BATCHES_TABLE")
 
     def _purge_expired_batch_items(self, grace_period=0, max_per_loop=1000):
         # Get the set of all BUI tables in the database.
@@ -788,6 +792,7 @@ class SQLStorage(SyncStorage):
             })
             num_purged += res["num_purged"]
             is_incomplete = is_incomplete or not res["is_complete"]
+        self._maybe_optimize_table("OPTIMIZE_BUI_TABLE", {"bui": table})
         return {
             "num_purged": num_purged,
             "is_complete": not is_incomplete,
@@ -804,7 +809,7 @@ class SQLStorage(SyncStorage):
         num_purged = 0
         is_incomplete = False
         # Note that we take a new session for each run of the query.
-        # This avoids holdig open a long-running transaction, so
+        # This avoids holding open a long-running transaction, so
         # the incrementality can let other jobs run properly.
         with self._get_or_create_session() as session:
             params["now"] = int(session.timestamp)
@@ -829,6 +834,23 @@ class SQLStorage(SyncStorage):
             "num_purged": num_purged,
             "is_complete": not is_incomplete,
         }
+
+    def _maybe_optimize_table(self, query, params={}):
+        """Run an `OPTIMIZE TABLE` if configured to do so after purge.
+
+        Purging expired items involves doing a bunch of in-order deletes,
+        which For TokuDB tables can cause performance degradation of the
+        indexes as described in:
+
+          https://www.percona.com/blog/2015/02/11/tokudb-table-optimization-improvements/
+
+        We run an `OPTIMIZE TABLE` after each purge to keep this in check,
+        but allow it to be preffed off if necessary for operational reasons.
+        """
+        if self._optimize_table_after_purge:
+            if self.dbconnector.driver == "mysql":
+                with self._get_or_create_session() as session:
+                    session.query(query, params)
 
     #
     # Private methods for manipulating collections.
