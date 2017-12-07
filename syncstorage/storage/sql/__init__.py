@@ -128,6 +128,8 @@ class SQLStorage(SyncStorage):
 
         self.sqluri = sqluri
         self.dbconnector = DBConnector(sqluri, **dbkwds)
+        self._optimize_table_before_purge = \
+            dbkwds.get("optimize_table_before_purge", True)
         self._optimize_table_after_purge = \
             dbkwds.get("optimize_table_after_purge", True)
 
@@ -764,12 +766,14 @@ class SQLStorage(SyncStorage):
         }
 
     def _purge_expired_batches(self, grace_period=0, max_per_loop=1000):
-        return self._purge_items_loop("batch_uploads", "PURGE_BATCHES", {
+        self._maybe_optimize_table_before_purge("OPTIMIZE_BATCHES_TABLE")
+        res = self._purge_items_loop("batch_uploads", "PURGE_BATCHES", {
             "lifetime": BATCH_LIFETIME,
             "grace": grace_period,
             "maxitems": max_per_loop,
         })
-        self._maybe_optimize_table("OPTIMIZE_BATCHES_TABLE")
+        self._maybe_optimize_table_after_purge("OPTIMIZE_BATCHES_TABLE")
+        return res
 
     def _purge_expired_batch_items(self, grace_period=0, max_per_loop=1000):
         # Get the set of all BUI tables in the database.
@@ -784,6 +788,9 @@ class SQLStorage(SyncStorage):
         num_purged = 0
         is_incomplete = False
         for table in sorted(tables):
+            self._maybe_optimize_table_before_purge("OPTIMIZE_BUI_TABLE", {
+                "bui": table
+            })
             res = self._purge_items_loop(table, "PURGE_BATCH_CONTENTS", {
                 "bui": table,
                 "lifetime": BATCH_LIFETIME,
@@ -792,7 +799,9 @@ class SQLStorage(SyncStorage):
             })
             num_purged += res["num_purged"]
             is_incomplete = is_incomplete or not res["is_complete"]
-        self._maybe_optimize_table("OPTIMIZE_BUI_TABLE", {"bui": table})
+            self._maybe_optimize_table_after_purge("OPTIMIZE_BUI_TABLE", {
+                "bui": table
+            })
         return {
             "num_purged": num_purged,
             "is_complete": not is_incomplete,
@@ -835,11 +844,29 @@ class SQLStorage(SyncStorage):
             "is_complete": not is_incomplete,
         }
 
-    def _maybe_optimize_table(self, query, params={}):
+    def _maybe_optimize_table_before_purge(self, query, params={}):
+        """Run an `OPTIMIZE TABLE` if configured to do so before purge.
+
+        Purging expired items involves doing a bunch of in-order deletes,
+        which for TokuDB tables can cause performance degradation of the
+        indexes as described in:
+
+          https://www.percona.com/blog/2015/02/11/tokudb-table-optimization-improvements/
+
+        We run an `OPTIMIZE TABLE` before each purge so that the purge will
+        not get stuck churning on already-deleted garbage, but we allow it to
+        be preffed off if necessary for operational reasons.
+        """
+        if self._optimize_table_before_purge:
+            if self.dbconnector.driver == "mysql":
+                with self._get_or_create_session() as session:
+                    session.query(query, params)
+
+    def _maybe_optimize_table_after_purge(self, query, params={}):
         """Run an `OPTIMIZE TABLE` if configured to do so after purge.
 
         Purging expired items involves doing a bunch of in-order deletes,
-        which For TokuDB tables can cause performance degradation of the
+        which for TokuDB tables can cause performance degradation of the
         indexes as described in:
 
           https://www.percona.com/blog/2015/02/11/tokudb-table-optimization-improvements/
