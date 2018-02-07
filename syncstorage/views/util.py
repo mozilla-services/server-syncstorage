@@ -102,7 +102,7 @@ DEFAULT_LIMITS["max_total_bytes"] = 100 * DEFAULT_LIMITS["max_post_bytes"]
 # otherwise clients might attempt large uploads that get rejected before
 # they ever reach the server application code.
 #
-# We default to max_post_bytes plus some slopt for metadata and JSON
+# We default to max_post_bytes plus some slop for metadata and JSON
 # formatting.
 DEFAULT_LIMITS["max_request_bytes"] = (2 * 1024 * 1024) + 4096
 

@@ -18,6 +18,7 @@ import unittest2
 
 import re
 import sys
+import json
 import time
 import random
 import string
@@ -784,6 +785,7 @@ class TestStorage(StorageFunctionalTestCase):
         try:
             max_bytes = res.json['max_post_bytes']
             max_count = res.json['max_post_records']
+            max_req_bytes = res.json['max_request_bytes']
         except KeyError:
             # Can't run against live server if it doesn't
             # report the right config options.
@@ -791,6 +793,7 @@ class TestStorage(StorageFunctionalTestCase):
                 raise unittest2.SkipTest
             max_bytes = get_limit_config(self.config, 'max_post_bytes')
             max_count = get_limit_config(self.config, 'max_post_records')
+            max_req_bytes = get_limit_config(self.config, 'max_request_bytes')
 
         # Uploading max_count-5 small objects should succeed.
         bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
@@ -810,9 +813,15 @@ class TestStorage(StorageFunctionalTestCase):
         # cumulative limit on payload size, should produce 1 failure.
         # The item_size here is arbitrary, so I made it a prime in kB.
         item_size = (227 * 1024)
-        max_items = max_bytes / item_size
-        bsos = [{'id': str(i), 'payload': "X" * item_size}
-                for i in range(max_items + 1)]
+        max_items, leftover = divmod(max_bytes, item_size)
+        bsos = [{'id': str(i), 'payload': 'X' * item_size}
+                for i in range(max_items)]
+        bsos.append({'id': str(max_items), 'payload': 'X' * (leftover + 1)})
+
+        # Check that we don't go over the limit on raw request bytes,
+        # which would get us rejected in production with a 413.
+        self.assertTrue(len(json.dumps(bsos)) < max_req_bytes)
+
         res = self.app.post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), max_items)
