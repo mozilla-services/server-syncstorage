@@ -8,18 +8,12 @@ It implements the API defined at:
    * https://docs.services.mozilla.com/storage/apis-1.5.html
 
 This code is only one part of the full Sync Server stack and is unlikely
-to be useful in isolation.  It also supports a version of the Sync protocol
-that is not yet used in production.
+to be useful in isolation.
 
-If you want to run a self-hosted version of the Sync Server for use with
-existing versions of Firefox, you should start from here:
+If you want to run a self-hosted version of the Sync Server,
+you should start from here:
 
-   * https://docs.services.mozilla.com/howtos/run-sync.html
-
-If you want to run a self-hosted version of the new protocol for testing
-in-development clients, you should start from here:
-
-   * https://github.com/mozilla-services/server-full2
+   * https://docs.services.mozilla.com/howtos/run-sync-1.5.html
 
 More general information can be found at the following links:
 
