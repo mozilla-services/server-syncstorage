@@ -30,7 +30,7 @@ jobs:
           command: |
             set -x
             curl -L -o /tmp/docker-$DOCKER_VERSION.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$DOCKER_VERSION.tgz
-            [[ `sha256sum /tmp/docker-17.12.1-ce.tgz  | cut -d' ' -f1` = 1270dce1bd7e1838d62ae21d2505d87f16efc1d9074645571daaefdfd0c14054 ]]
+            [[ `sha256sum /tmp/docker-$DOCKER_VERSION.tgz  | cut -d' ' -f1` = $DOCKER_CHECKSUM ]]
             tar -xz -C /tmp -f /tmp/docker-$DOCKER_VERSION.tgz
             mv /tmp/docker/* /usr/bin
       - run:
