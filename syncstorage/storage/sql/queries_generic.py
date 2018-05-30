@@ -223,16 +223,15 @@ def FIND_ITEMS(bso, params):
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work consistently.
     # The default order is by timestamp, which if efficient due to the index.
-    # NOTE: ideally we would sort by "id" here as secondary column, to get a
-    # consistent total ordering.  But we don't want to bloat the index, so
-    # we just assume that the db gives results in a consistent order.
+    # We sort by "id" as a secondary column to ensure a consistent total
+    # ordering, which is important when paginating large requests.
     sort = params.get("sort", None)
     if sort == 'index':
-        query = query.order_by(bso.c.sortindex.desc())
+        query = query.order_by(bso.c.sortindex.desc(), bso.c.id.desc())
     elif sort == 'oldest':
-        query = query.order_by(bso.c.modified.asc())
+        query = query.order_by(bso.c.modified.asc(), bso.c.id.asc())
     else:
-        query = query.order_by(bso.c.modified.desc())
+        query = query.order_by(bso.c.modified.desc(), bso.c.id.asc())
     # Apply limit and/or offset.
     limit = params.get("limit", None)
     if limit is not None:
