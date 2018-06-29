@@ -122,16 +122,19 @@ class SQLStorage(SyncStorage):
                                  exist at startup
         * shard/shardsize:       enable sharding of the BSO table
 
+        * sort_by_id:           enable sorting by ID for the FIND_ITEMS
+                                 query
+
     """
 
     def __init__(self, sqluri, standard_collections=False, **dbkwds):
-
         self.sqluri = sqluri
         self.dbconnector = DBConnector(sqluri, **dbkwds)
         self._optimize_table_before_purge = \
             dbkwds.get("optimize_table_before_purge", True)
         self._optimize_table_after_purge = \
             dbkwds.get("optimize_table_after_purge", True)
+        self._sort_by_id = dbkwds.get("sort_by_id", False)
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.
@@ -358,7 +361,11 @@ class SQLStorage(SyncStorage):
         offset = params.pop("offset", None)
         if offset is not None:
             self.decode_offset(params, offset)
-        rows = session.query_fetchall("FIND_ITEMS", params)
+        rows = session.query_fetchall(
+            "FIND_ITEMS",
+            params,
+            callable_kwargs={'sort_by_id': self._sort_by_id}
+        )
         items = [self._row_to_bso(row, int(session.timestamp)) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
@@ -1055,10 +1062,14 @@ class SQLStorageSession(object):
         return self.connection.query_fetchone(query, params)
 
     @convert_db_errors
-    def query_fetchall(self, query, params={}):
+    def query_fetchall(self, query, params={}, callable_kwargs={}):
         """Execute a database query, returning iterator over the results."""
         assert self._nesting_level > 0, "Session has not been started"
-        return self.connection.query_fetchall(query, params)
+        return self.connection.query_fetchall(
+            query,
+            params,
+            callable_kwargs=callable_kwargs
+        )
 
     def begin(self):
         """Enter the context of this session.

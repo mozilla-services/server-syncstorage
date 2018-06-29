@@ -192,7 +192,7 @@ CLOSE_BATCH_ITEMS = """
 """
 
 
-def FIND_ITEMS(bso, params):
+def FIND_ITEMS(bso, params, sort_by_id=False):
     """Item search query.
 
     Unlike all the other pre-built queries, this one really can't be written
@@ -222,16 +222,22 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work consistently.
-    # The default order is by timestamp, which if efficient due to the index.
-    # We sort by "id" as a secondary column to ensure a consistent total
-    # ordering, which is important when paginating large requests.
+    # The default order is by timestamp, which is efficient due to the index.
+    # If enabled, we sort by "id" as a secondary column to ensure a consistent
+    # total ordering, which is important when paginating large requests.
+    # This is disabled by default because it makes queries much slower in
+    # older versions of MySQL.
+
     sort = params.get("sort", None)
     if sort == 'index':
-        query = query.order_by(bso.c.sortindex.desc(), bso.c.id.desc())
+        order_args = [bso.c.sortindex.desc(), bso.c.id.desc()]
     elif sort == 'oldest':
-        query = query.order_by(bso.c.modified.asc(), bso.c.id.asc())
+        order_args = [bso.c.modified.asc(), bso.c.id.asc()]
     else:
-        query = query.order_by(bso.c.modified.desc(), bso.c.id.asc())
+        order_args = [bso.c.modified.desc(), bso.c.id.asc()]
+    if not sort_by_id:
+        order_args.pop()
+    query = query.order_by(*order_args)
     # Apply limit and/or offset.
     limit = params.get("limit", None)
     if limit is not None:
