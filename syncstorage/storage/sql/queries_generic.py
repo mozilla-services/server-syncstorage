@@ -192,7 +192,7 @@ CLOSE_BATCH_ITEMS = """
 """
 
 
-def FIND_ITEMS(bso, params, sort_by_id=False):
+def FIND_ITEMS(bso, params):
     """Item search query.
 
     Unlike all the other pre-built queries, this one really can't be written
@@ -223,11 +223,9 @@ def FIND_ITEMS(bso, params, sort_by_id=False):
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work consistently.
     # The default order is by timestamp, which is efficient due to the index.
-    # If enabled, we sort by "id" as a secondary column to ensure a consistent
+    # We also want to sort by "id" as a secondary column to ensure a consistent
     # total ordering, which is important when paginating large requests.
-    # This is disabled by default because it makes queries much slower in
-    # older versions of MySQL.
-
+    # Since "id" is in the primary key, that *should* be efficient...
     sort = params.get("sort", None)
     if sort == 'index':
         order_args = [bso.c.sortindex.desc(), bso.c.id.desc()]
@@ -235,7 +233,10 @@ def FIND_ITEMS(bso, params, sort_by_id=False):
         order_args = [bso.c.modified.asc(), bso.c.id.asc()]
     else:
         order_args = [bso.c.modified.desc(), bso.c.id.asc()]
-    if not sort_by_id:
+    # ...but unfortunately, sorting by "id" causes a significant slowdown on
+    # older versions of MySQL, so it's disabled by default and must be
+    # explicitly opted in to via config.
+    if not params.get("force_consistent_sort_order", False):
         order_args.pop()
     query = query.order_by(*order_args)
     # Apply limit and/or offset.

@@ -118,12 +118,16 @@ class SQLStorage(SyncStorage):
 
         * standard_collections:  use fixed pre-determined ids for common
                                  collection names
+
         * create_tables:         create the database tables if they don't
                                  exist at startup
+
         * shard/shardsize:       enable sharding of the BSO table
 
-        * sort_by_id:           enable sorting by ID for the FIND_ITEMS
-                                 query
+        * force_consistent_sort_order:  use an explicit total ordering when
+                                        sorting items in the FIND_ITEMS query;
+                                        expensive and unnecessary on older
+                                        versions of MySQL.
 
     """
 
@@ -134,7 +138,10 @@ class SQLStorage(SyncStorage):
             dbkwds.get("optimize_table_before_purge", True)
         self._optimize_table_after_purge = \
             dbkwds.get("optimize_table_after_purge", True)
-        self._sort_by_id = dbkwds.get("sort_by_id", False)
+        self._default_find_params = {
+            "force_consistent_sort_order":
+                dbkwds.get("force_consistent_sort_order", False),
+        }
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.
@@ -345,6 +352,8 @@ class SQLStorage(SyncStorage):
 
     def _find_items(self, session, userid, collection, **params):
         """Find items matching the given search parameters."""
+        for key, value in self._default_find_params.iteritems():
+            params.setdefault(key, value)
         params["userid"] = userid
         params["collectionid"] = self._get_collection_id(session, collection)
         if "ttl" not in params:
@@ -361,11 +370,7 @@ class SQLStorage(SyncStorage):
         offset = params.pop("offset", None)
         if offset is not None:
             self.decode_offset(params, offset)
-        rows = session.query_fetchall(
-            "FIND_ITEMS",
-            params,
-            callable_kwargs={'sort_by_id': self._sort_by_id}
-        )
+        rows = session.query_fetchall("FIND_ITEMS", params)
         items = [self._row_to_bso(row, int(session.timestamp)) for row in rows]
         # If the query returned no results, we don't know whether that's
         # because it's empty or because it doesn't exist.  Read the collection
@@ -1062,14 +1067,10 @@ class SQLStorageSession(object):
         return self.connection.query_fetchone(query, params)
 
     @convert_db_errors
-    def query_fetchall(self, query, params={}, callable_kwargs={}):
+    def query_fetchall(self, query, params={}):
         """Execute a database query, returning iterator over the results."""
         assert self._nesting_level > 0, "Session has not been started"
-        return self.connection.query_fetchall(
-            query,
-            params,
-            callable_kwargs=callable_kwargs
-        )
+        return self.connection.query_fetchall(query, params)
 
     def begin(self):
         """Enter the context of this session.

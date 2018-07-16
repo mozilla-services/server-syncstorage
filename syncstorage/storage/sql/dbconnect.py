@@ -411,7 +411,7 @@ class DBConnector(object):
         """Create a new DBConnection object from this connector."""
         return DBConnection(self)
 
-    def get_query(self, name, params, callable_kwargs={}):
+    def get_query(self, name, params):
         """Get the named pre-built query.
 
         This method returns an SQLAlchemy query object for the named query,
@@ -429,7 +429,7 @@ class DBConnector(object):
         # If it's a callable, call it with the sharded bso table.
         if callable(query):
             bso = self.get_bso_table(params.get("userid"))
-            return query(bso, params, **callable_kwargs)
+            return query(bso, params)
         # If it's a string, do some interpolation and return it.
         # XXX TODO: we could pre-parse these queries at load time to look for
         # string interpolation variables, saving some time on each call.
@@ -783,11 +783,9 @@ class DBConnection(object):
         finally:
             res.close()
 
-    def query_fetchall(self, query_name, params=None, annotations=None,
-                       callable_kwargs={}):
+    def query_fetchall(self, query_name, params=None, annotations=None):
         """Execute a named query, returning iterator over the results."""
-        query = self._connector.get_query(query_name, params,
-                                          callable_kwargs=callable_kwargs)
+        query = self._connector.get_query(query_name, params)
         if query is not None:
             if annotations is None:
                 annotations = {}
