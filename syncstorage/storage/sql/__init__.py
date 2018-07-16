@@ -118,20 +118,30 @@ class SQLStorage(SyncStorage):
 
         * standard_collections:  use fixed pre-determined ids for common
                                  collection names
+
         * create_tables:         create the database tables if they don't
                                  exist at startup
+
         * shard/shardsize:       enable sharding of the BSO table
+
+        * force_consistent_sort_order:  use an explicit total ordering when
+                                        sorting items in the FIND_ITEMS query;
+                                        expensive and unnecessary on older
+                                        versions of MySQL.
 
     """
 
     def __init__(self, sqluri, standard_collections=False, **dbkwds):
-
         self.sqluri = sqluri
         self.dbconnector = DBConnector(sqluri, **dbkwds)
         self._optimize_table_before_purge = \
             dbkwds.get("optimize_table_before_purge", True)
         self._optimize_table_after_purge = \
             dbkwds.get("optimize_table_after_purge", True)
+        self._default_find_params = {
+            "force_consistent_sort_order":
+                dbkwds.get("force_consistent_sort_order", False),
+        }
 
         # There doesn't seem to be a reliable cross-database way to set the
         # initial value of an autoincrement column.
@@ -342,6 +352,8 @@ class SQLStorage(SyncStorage):
 
     def _find_items(self, session, userid, collection, **params):
         """Find items matching the given search parameters."""
+        for key, value in self._default_find_params.iteritems():
+            params.setdefault(key, value)
         params["userid"] = userid
         params["collectionid"] = self._get_collection_id(session, collection)
         if "ttl" not in params:

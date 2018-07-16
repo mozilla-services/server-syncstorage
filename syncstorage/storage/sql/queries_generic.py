@@ -222,17 +222,23 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.ttl > bindparam("ttl"))
     # Sort it in the order requested.
     # We always sort by *something*, so that limit/offset work consistently.
-    # The default order is by timestamp, which if efficient due to the index.
-    # NOTE: ideally we would sort by "id" here as secondary column, to get a
-    # consistent total ordering.  But we don't want to bloat the index, so
-    # we just assume that the db gives results in a consistent order.
+    # The default order is by timestamp, which is efficient due to the index.
+    # We also want to sort by "id" as a secondary column to ensure a consistent
+    # total ordering, which is important when paginating large requests.
+    # Since "id" is in the primary key, that *should* be efficient...
     sort = params.get("sort", None)
     if sort == 'index':
-        query = query.order_by(bso.c.sortindex.desc())
+        order_args = [bso.c.sortindex.desc(), bso.c.id.desc()]
     elif sort == 'oldest':
-        query = query.order_by(bso.c.modified.asc())
+        order_args = [bso.c.modified.asc(), bso.c.id.asc()]
     else:
-        query = query.order_by(bso.c.modified.desc())
+        order_args = [bso.c.modified.desc(), bso.c.id.asc()]
+    # ...but unfortunately, sorting by "id" causes a significant slowdown on
+    # older versions of MySQL, so it's disabled by default and must be
+    # explicitly opted in to via config.
+    if not params.get("force_consistent_sort_order", False):
+        order_args.pop()
+    query = query.order_by(*order_args)
     # Apply limit and/or offset.
     limit = params.get("limit", None)
     if limit is not None:
