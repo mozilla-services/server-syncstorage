@@ -16,7 +16,7 @@ entry_points = """
 main = syncstorage:main
 """
 
-version = "1.6.13"
+version = "1.6.14"
 
 
 setup(name='SyncStorage',
