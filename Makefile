@@ -1,27 +1,29 @@
-VIRTUALENV = virtualenv
+SYSTEMPYTHON = `which python2 python | head -n 1`
+VIRTUALENV = virtualenv --python=$(SYSTEMPYTHON)
 NOSE = local/bin/nosetests -s
 TESTS = syncstorage/tests
 PYTHON = local/bin/python
 PIP = local/bin/pip
 PIP_CACHE = /tmp/pip-cache.${USER}
 BUILD_TMP = /tmp/syncstorage-build.${USER}
-PYPI = https://pypi.python.org/simple
+PYPI = https://pypi.org/simple
 
 export MOZSVC_SQLURI = sqlite:///:memory:
 
 # Hackety-hack around OSX system python bustage.
 # The need for this should go away with a future osx/xcode update.
 ARCHFLAGS = -Wno-error=unused-command-line-argument-hard-error-in-future
+CFLAGS = -Wno-error=write-strings
 
-INSTALL = ARCHFLAGS=$(ARCHFLAGS) $(PIP) install -U -i $(PYPI)
+INSTALL = ARCHFLAGS=$(ARCHFLAGS) CFLAGS=$(CFLAGS) $(PIP) install -U -i $(PYPI)
 
 .PHONY: all build test
 
 all:	build
 
 build:
-	$(VIRTUALENV) --no-site-packages --distribute ./local
-	$(INSTALL) --upgrade Distribute pip
+	$(VIRTUALENV) --no-site-packages ./local
+	$(INSTALL) --upgrade "setuptools>=0.7" pip
 	$(INSTALL) -r requirements.txt
 	$(PYTHON) ./setup.py develop
 

@@ -1,7 +1,6 @@
 language: python
 
 python:
-  - "2.6"
   - "2.7"
 
 services:
@@ -20,7 +19,7 @@ notifications:
 
 install:
   - make build
-  - ./local/bin/pip install psycopg2
+  - ./local/bin/pip install psycopg2-binary
 
 before_script:
   - mysql -e 'create database sync_test;'

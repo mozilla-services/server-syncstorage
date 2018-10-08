@@ -5,4 +5,5 @@ their contributions under the MPLv2.0:
 * Toby Elliott <telliott@mozilla.com>
 * Tarek Ziadé <tarek@mozilla.com>
 * Nicolas Steinmetz <nsteinmetz@gmail.com>
+* Niko Wenselowski <niko@nerdno.de>
 

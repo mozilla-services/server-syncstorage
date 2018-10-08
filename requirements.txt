@@ -9,18 +9,17 @@ WebTest==2.0.18
 beautifulsoup4==4.4.1
 configparser==3.5.0b2
 cornice==0.17
-flake8==2.4.1
+flake8==3.5.0
+# Require at least pycodestyle 2.3 as of https://gitlab.com/pycqa/flake8/issues/381
+pycodestyle>=2.3.0
 gevent==1.0.2
 greenlet==0.4.9
 gunicorn==19.9.0
 hawkauthlib==0.1.1
 konfig==0.9
 linecache2==1.0.0
-mccabe==0.3.1
 mozsvc==0.10
 nose==1.3.7
-pep8==1.6.2
-pyflakes==1.0.0
 pymysql-sa==1.0
 pyramid-hawkauth==0.1.0
 pyramid==1.9.1
