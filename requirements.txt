@@ -11,7 +11,7 @@ configparser==3.5.0b2
 cornice==0.17
 flake8==3.5.0
 # Require at least pycodestyle 2.3 as of https://gitlab.com/pycqa/flake8/issues/381
-pycodestyle>=2.3.0
+pycodestyle==2.3.1
 gevent==1.0.2
 greenlet==0.4.9
 gunicorn==19.9.0
