@@ -29,6 +29,11 @@ def spawn_script(name, *args, **kwds):
     return subprocess.Popen(command, **kwds)
 
 
+_USER1 = {"uid": 1}
+_USER2 = {"uid": 2}
+_USER3 = {"uid": 3}
+
+
 class TestMemcacheManagementScripts(StorageTestCase):
 
     TEST_INI_FILE = "tests-memcached.ini"
@@ -50,12 +55,12 @@ class TestMemcacheManagementScripts(StorageTestCase):
 
     def test_mcclear_script(self):
         # Create some data in cached collections, for three different users.
-        self.storage.set_item(1, "meta", "test", {"payload": "test"})
-        self.storage.set_item(1, "tabs", "test", {"payload": "test"})
-        self.storage.set_item(2, "meta", "test", {"payload": "test"})
-        self.storage.set_item(2, "tabs", "test", {"payload": "test"})
-        self.storage.set_item(3, "meta", "test", {"payload": "test"})
-        self.storage.set_item(3, "tabs", "test", {"payload": "test"})
+        self.storage.set_item(_USER1, "meta", "test", {"payload": "test"})
+        self.storage.set_item(_USER1, "tabs", "test", {"payload": "test"})
+        self.storage.set_item(_USER2, "meta", "test", {"payload": "test"})
+        self.storage.set_item(_USER2, "tabs", "test", {"payload": "test"})
+        self.storage.set_item(_USER3, "meta", "test", {"payload": "test"})
+        self.storage.set_item(_USER3, "tabs", "test", {"payload": "test"})
         # Initially, they should all have some data in memcache.
         self.assertTrue(self.storage.cache.get("1:metadata"))
         self.assertTrue(self.storage.cache.get("2:metadata"))
@@ -71,21 +76,21 @@ class TestMemcacheManagementScripts(StorageTestCase):
         self.assertFalse(self.storage.cache.get("2:metadata"))
         self.assertFalse(self.storage.cache.get("3:metadata"))
         # They should also have lost their tabs, which exist only in memcache.
-        self.assertTrue(self.storage.get_item(1, "tabs", "test"))
+        self.assertTrue(self.storage.get_item(_USER1, "tabs", "test"))
         self.assertRaises(NotFoundError,
-                          self.storage.get_item, 2, "tabs", "test")
+                          self.storage.get_item, _USER2, "tabs", "test")
         self.assertRaises(NotFoundError,
-                          self.storage.get_item, 3, "tabs", "test")
+                          self.storage.get_item, _USER3, "tabs", "test")
         # But all meta items should be intact, because DB.
-        self.assertTrue(self.storage.get_item(1, "meta", "test"))
-        self.assertTrue(self.storage.get_item(2, "meta", "test"))
-        self.assertTrue(self.storage.get_item(3, "meta", "test"))
+        self.assertTrue(self.storage.get_item(_USER1, "meta", "test"))
+        self.assertTrue(self.storage.get_item(_USER2, "meta", "test"))
+        self.assertTrue(self.storage.get_item(_USER3, "meta", "test"))
 
     def test_mcread_script(self):
         # Create some data in cached collections, for three different users.
-        self.storage.set_item(1, "tabs", "test1", {"payload": "test1"})
-        self.storage.set_item(2, "tabs", "test2", {"payload": "test2"})
-        self.storage.set_item(3, "tabs", "test3", {"payload": "test3"})
+        self.storage.set_item(_USER1, "tabs", "test1", {"payload": "test1"})
+        self.storage.set_item(_USER2, "tabs", "test2", {"payload": "test2"})
+        self.storage.set_item(_USER3, "tabs", "test3", {"payload": "test3"})
         # Run the mcread script on users 2 and 3.
         ini_file = os.path.join(os.path.dirname(__file__), self.TEST_INI_FILE)
         proc = spawn_script("mcread.py", ini_file,
@@ -143,9 +148,9 @@ class TestPurgeTTLScript(StorageTestCase):
                 res = c.execute(query)
                 return res.fetchall()[0][0]
 
-        storage.set_item(1, "col", "test1", {"payload": "X", "ttl": 0})
-        storage.set_item(1, "col", "test2", {"payload": "X", "ttl": 0})
-        storage.set_item(1, "col", "test3", {"payload": "X", "ttl": 30})
+        storage.set_item(_USER1, "col", "test1", {"payload": "X", "ttl": 0})
+        storage.set_item(_USER1, "col", "test2", {"payload": "X", "ttl": 0})
+        storage.set_item(_USER1, "col", "test3", {"payload": "X", "ttl": 30})
         self.assertEquals(count_bso_items(), 3)
 
         # Have to get a little creative here to insert old enough batch IDs.
@@ -155,12 +160,12 @@ class TestPurgeTTLScript(StorageTestCase):
                       "collection) VALUES (:batch, :userid, :collection) "
                       "/* queryName=purgeBatchId */",
                       {"batch": batchid, "userid": 1, "collection": 1})
-        storage.append_items_to_batch(1, "col", batchid,
+        storage.append_items_to_batch(_USER1, "col", batchid,
                                       [{"id": "test1", "payload": "Y"},
                                        {"id": "test2", "payload": "Y"},
                                        {"id": "test3", "payload": "Y"}])
-        batchid = storage.create_batch(3, "col")
-        storage.append_items_to_batch(3, "col", batchid,
+        batchid = storage.create_batch(_USER3, "col")
+        storage.append_items_to_batch(_USER3, "col", batchid,
                                       [{"id": "test5", "payload": "Z"},
                                        {"id": "test6", "payload": "Z"},
                                        {"id": "test7", "payload": "Z"}])

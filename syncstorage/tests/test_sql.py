@@ -17,7 +17,7 @@ from syncstorage.tests.test_storage import StorageTestsMixin
 
 from mozsvc.exceptions import BackendError
 
-_UID = 1
+_USER = {'uid': 1}
 _PLD = '*' * 500
 
 
@@ -39,19 +39,19 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         config = get_test_configurator(__file__, 'tests-nocreate.ini')
         storage = load_and_register("storage", config)
         bsos = [{"id": "TEST", "payload": _PLD}]
-        self.assertRaises(BackendError, storage.set_items, _UID, "test", bsos)
+        self.assertRaises(BackendError, storage.set_items, _USER, "test", bsos)
 
         # Storage with create_tables explicitly set to false.
         # This should fail because the table is absent
         config = get_test_configurator(__file__, 'tests-dontcreate.ini')
         storage = load_and_register("storage", config)
-        self.assertRaises(BackendError, storage.set_items, _UID, "test", bsos)
+        self.assertRaises(BackendError, storage.set_items, _USER, "test", bsos)
 
         # Storage with create_tables explicit set to true.
         # This should succeed because the table gets created.
         config = get_test_configurator(__file__, 'tests-docreate.ini')
         storage = load_and_register("storage", config)
-        storage.set_items(_UID, "test", bsos)
+        storage.set_items(_USER, "test", bsos)
 
     def test_shard(self):
         # Use a configuration with sharding enabled.
@@ -59,7 +59,7 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         storage = load_and_register("storage", config)
 
         # Make sure it's using the expected table name.
-        table = storage.dbconnector.get_bso_table(_UID).name
+        table = storage.dbconnector.get_bso_table(_USER['uid']).name
         self.assertEqual(table, 'bso1')
 
         # The table should initially be empty.
@@ -71,9 +71,9 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         # Do a few things on the DB
         id1 = 'ec1b7457-003a-45a9-bf1c-c34e37225ad7'
         id2 = '339f52e1-deed-497c-837a-1ab25a655e37'
-        storage.set_item(_UID, 'col1', id1, {'payload': _PLD})
-        storage.set_item(_UID, 'col1', id2, {'payload': _PLD * 89})
-        self.assertEquals(len(storage.get_items(_UID, 'col1')["items"]), 2)
+        storage.set_item(_USER, 'col1', id1, {'payload': _PLD})
+        storage.set_item(_USER, 'col1', id2, {'payload': _PLD * 89})
+        self.assertEquals(len(storage.get_items(_USER, 'col1')["items"]), 2)
 
         # Now make sure we did that in the right table
         with storage.dbconnector.connect() as c:
@@ -169,27 +169,30 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         # This forces the purge script to run several iterations.
         items = [{"id": "SHORT" + str(i), "payload": str(i), "ttl": 0}
                  for i in xrange(2000)]
-        self.storage.set_items(_UID, "col", items)
+        self.storage.set_items(_USER, "col", items)
 
         # Add 5 items with long ttl to the db.
         items = [{"id": "LONG" + str(i), "payload": str(i), "ttl": 10}
                  for i in xrange(5)]
-        self.storage.set_items(_UID, "col", items)
+        self.storage.set_items(_USER, "col", items)
 
         # Wait for ttls to expire.
         # The items should be in the database, but not read by the backend.
         time.sleep(1)
         self.assertEquals(count_items(), 2005)
-        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
+        self.assertEquals(len(self.storage.get_items(_USER, "col")["items"]),
+                          5)
 
         # Purging with a long grace period will not remove them.
         res = self.storage.purge_expired_items(grace_period=100)
         self.assertEquals(res["num_bso_rows_purged"], 0)
         self.assertEquals(count_items(), 2005)
-        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
+        self.assertEquals(len(self.storage.get_items(_USER, "col")["items"]),
+                          5)
 
         # Purging with no grace period should remove them from the database.
         res = self.storage.purge_expired_items(grace_period=0)
         self.assertEquals(res["num_bso_rows_purged"], 2000)
         self.assertEquals(count_items(), 5)
-        self.assertEquals(len(self.storage.get_items(_UID, "col")["items"]), 5)
+        self.assertEquals(len(self.storage.get_items(_USER, "col")["items"]),
+                          5)

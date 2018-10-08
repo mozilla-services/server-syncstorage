@@ -94,7 +94,7 @@ def check_storage_quota(viewfunc, request):
         return viewfunc(request)
 
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     quota_size = request.registry.settings.get("storage.quota_size")
 
     # Don't do anything if quotas are not enabled.
@@ -103,10 +103,10 @@ def check_storage_quota(viewfunc, request):
 
     # Get the total size used from the underlying store, which may be cached.
     # If we're close to going over quota, ask it to recalculate fresher info.
-    used = storage.get_total_size(userid)
+    used = storage.get_total_size(user)
     left = quota_size - used
     if left < ONE_MB:
-        used = storage.get_total_size(userid, recalculate=True)
+        used = storage.get_total_size(user, recalculate=True)
         left = quota_size - used
 
     # Look for new items that will be written by this request,
@@ -175,7 +175,7 @@ def with_collection_lock(viewfunc, request):
     If the request does not target a specific collection, no lock is taken.
     """
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated.get("collection")
 
     # If we're not operating on a collection, don't take a lock.
@@ -189,5 +189,5 @@ def with_collection_lock(viewfunc, request):
         lock_collection = storage.lock_for_read
     else:
         lock_collection = storage.lock_for_write
-    with lock_collection(userid, collection):
+    with lock_collection(user, collection):
         return viewfunc(request)

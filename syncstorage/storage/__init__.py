@@ -67,11 +67,11 @@ class SyncStorage(object):
     lock_for_read() method should be used by threads that only need to read
     the data, like so::
 
-          with storage.lock_for_read(userid, collection):
-              ts = storage.get_collection_timestamp(userid, collection)
+          with storage.lock_for_read(user, collection):
+              ts = storage.get_collection_timestamp(user, collection)
               if ts <= if_modified_since:
                   raise HTTPNotModified
-              return storage.get_items(userid, collection, newer=ts)
+              return storage.get_items(user, collection, newer=ts)
 
     Any thread holding a read lock on a collection is guaranteed to see a
     fixed, consistent view of the data in that collection.  It will be
@@ -81,11 +81,11 @@ class SyncStorage(object):
     The lock_for_write() method should be used by threads that need to modify
     the data, like so::
 
-          with storage.lock_for_write(userid, collection):
-              ts = storage.get_collection_timestamp(userid, collection)
+          with storage.lock_for_write(user, collection):
+              ts = storage.get_collection_timestamp(user, collection)
               if ts > if_unmodified_since:
                   raise HTTPModified
-              storage.set_items(userid, collection, new_items)
+              storage.set_items(user, collection, new_items)
 
     There is no guarantee of mutual temporal exclusion between readers and
     writers.  For example, backends that natively support Multi-Version
@@ -98,11 +98,11 @@ class SyncStorage(object):
     # APIs for collection-level locking.
     #
 
-    def lock_for_read(self, userid, collection):
+    def lock_for_read(self, user, collection):
         """Context manager locking the storage for consistent reads.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: the name of the collection to lock.
 
         Returns:
@@ -112,11 +112,11 @@ class SyncStorage(object):
             CollectionNotFoundError: the user has no such collection.
         """
 
-    def lock_for_write(self, userid, collection):
+    def lock_for_write(self, user, collection):
         """Context manager locking the storage for consistent writes.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: the name of the collection to lock.
 
         Returns:
@@ -131,55 +131,55 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_storage_timestamp(self, userid):
+    def get_storage_timestamp(self, user):
         """Returns the last-modified timestamp for the entire storage.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
 
         Returns:
             The last-modified timestamp for the entire storage.
         """
 
     @abc.abstractmethod
-    def get_collection_timestamps(self, userid):
+    def get_collection_timestamps(self, user):
         """Returns the collection timestamps for a user.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
 
         Returns:
             A dict mapping collection names to their last-modified timestamp.
         """
 
     @abc.abstractmethod
-    def get_collection_counts(self, userid):
+    def get_collection_counts(self, user):
         """Returns the collection counts.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
 
         Returns:
             A dict mapping collection names to their item count.
         """
 
     @abc.abstractmethod
-    def get_collection_sizes(self, userid):
+    def get_collection_sizes(self, user):
         """Returns the total size for each collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
 
         Returns:
             A dict mapping collection names to their total size.
         """
 
     @abc.abstractmethod
-    def get_total_size(self, userid, recalculate=False):
+    def get_total_size(self, user, recalculate=False):
         """Returns the total size a user's stored data.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             recalculate: whether to recalculate any cached size data.
 
         Returns:
@@ -187,11 +187,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def delete_storage(self, userid):
+    def delete_storage(self, user):
         """Removes all data for the user.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
 
         Returns:
             None
@@ -205,11 +205,11 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_collection_timestamp(self, userid, collection):
+    def get_collection_timestamp(self, user, collection):
         """Returns the last-modified timestamp for the named collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
 
         Returns:
@@ -220,12 +220,12 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def get_items(self, userid, collection, items=None, newer=None,
+    def get_items(self, user, collection, items=None, newer=None,
                   older=None, limit=None, offset=None, sort=None):
         """Returns items from a collection
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             items: list of strings identifying items to return.
             newer: float; only return items newer than this timestamp.
@@ -245,12 +245,12 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def get_item_ids(self, userid, collection, items=None, newer=None,
+    def get_item_ids(self, user, collection, items=None, newer=None,
                      older=None, limit=None, offset=None, sort=None):
         """Returns item ids from a collection
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             items: list of strings identifying items to return.
             newer: float; only return items newer than this timestamp.
@@ -270,11 +270,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def set_items(self, userid, collection, items):
+    def set_items(self, user, collection, items):
         """Creates or updates multiple items in a collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             items: a list of dicts giving data for each item.
 
@@ -286,11 +286,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def delete_collection(self, userid, collection):
+    def delete_collection(self, user, collection):
         """Deletes an entire collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
 
         Returns:
@@ -302,11 +302,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def delete_items(self, userid, collection, items):
+    def delete_items(self, user, collection, items):
         """Deletes multiple items from a collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             items: list of strings identifying the items to be removed.
 
@@ -319,11 +319,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def create_batch(self, userid, collection):
+    def create_batch(self, user, collection):
         """Creates a batch for multi-POST batch uploads.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
 
         Returns:
@@ -331,11 +331,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def valid_batch(self, userid, collection, batchid):
+    def valid_batch(self, user, collection, batchid):
         """Verifies that a batch ID exists for a given user's collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             batchid: big integer batch identifier for this batch
 
@@ -345,12 +345,12 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def append_items_to_batch(self, userid, collection, batchid, items):
+    def append_items_to_batch(self, user, collection, batchid, items):
         """Creates or updates multiple items from a multi-POST batch to a
         batch.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             batchid: big integer batch identifier for this batch
             items: a list of dicts giving data for each item.
@@ -363,11 +363,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def apply_batch(self, userid, collection, batchid):
+    def apply_batch(self, user, collection, batchid):
         """Applies the pending batch.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             batchid: big integer batch identifier for this batch
 
@@ -380,11 +380,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def close_batch(self, userid, collection, batchid):
+    def close_batch(self, user, collection, batchid):
         """Close a specific batch.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             batchid: big integer batch identifier for this batch
         """
@@ -394,11 +394,11 @@ class SyncStorage(object):
     #
 
     @abc.abstractmethod
-    def get_item_timestamp(self, userid, collection, item):
+    def get_item_timestamp(self, user, collection, item):
         """Returns the last-modified timestamp for the named item.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             item: string identifying the item.
 
@@ -411,11 +411,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def get_item(self, userid, collection, item):
+    def get_item(self, user, collection, item):
         """Returns one item from a collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             item: string identifying the item.
 
@@ -428,11 +428,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def set_item(self, userid, collection, item, data):
+    def set_item(self, user, collection, item, data):
         """Creates or updates a single item in a collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             item: string identifying the item
             data: dict containing the new item data.
@@ -447,11 +447,11 @@ class SyncStorage(object):
         """
 
     @abc.abstractmethod
-    def delete_item(self, userid, collection, item):
+    def delete_item(self, user, collection, item):
         """Deletes a single item from a collection.
 
         Args:
-            userid: integer identifying the user in the storage.
+            user: user object identifying the user in the storage.
             collection: name of the collection.
             item: string identifying the item
 

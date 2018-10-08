@@ -146,19 +146,19 @@ class MemcachedStorage(SyncStorage):
         # This is needed to make the read locking API reentrant.
         self._tldata = threading.local()
 
-    def iter_cache_keys(self, userid):
-        """Iterator over all potential cache keys for the given userid.
+    def iter_cache_keys(self, user):
+        """Iterator over all potential cache keys for the given user.
 
-        This method yields all potential cache keys for the given userid,
+        This method yields all potential cache keys for the given user,
         including their metadata key and the keys for any cached collections.
         The yielded keys do *not* include the key prefix, if any.
         """
-        yield _key(userid, "metadata")
+        yield _key(user["uid"], "metadata")
         for colmgr in self.cached_collections.itervalues():
-            for key in colmgr.iter_cache_keys(userid):
+            for key in colmgr.iter_cache_keys(user):
                 yield key
         for colmgr in self.cache_only_collections.itervalues():
-            for key in colmgr.iter_cache_keys(userid):
+            for key in colmgr.iter_cache_keys(user):
                 yield key
 
     def _get_collection_manager(self, collection):
@@ -188,23 +188,24 @@ class MemcachedStorage(SyncStorage):
     # the lock, it will eventually expire.
     #
 
-    def lock_for_read(self, userid, collection):
+    def lock_for_read(self, user, collection):
         """Acquire a shared read lock on the named collection."""
         if self.cache_lock or collection in self.cache_only_collections:
-            return self._lock_in_memcache(userid, collection)
+            return self._lock_in_memcache(user, collection)
         else:
-            return self.storage.lock_for_read(userid, collection)
+            return self.storage.lock_for_read(user, collection)
 
-    def lock_for_write(self, userid, collection):
+    def lock_for_write(self, user, collection):
         """Acquire an exclusive write lock on the named collection."""
         if self.cache_lock or collection in self.cache_only_collections:
-            return self._lock_in_memcache(userid, collection)
+            return self._lock_in_memcache(user, collection)
         else:
-            return self.storage.lock_for_write(userid, collection)
+            return self.storage.lock_for_write(user, collection)
 
     @contextlib.contextmanager
-    def _lock_in_memcache(self, userid, collection):
+    def _lock_in_memcache(self, user, collection):
         """Helper method to take a memcache-level lock on a collection."""
+        userid = user["uid"]
         # Use a thread-local set of held locks to make this reentrant.
         try:
             locked_collections = self._tldata.locked_collections
@@ -233,84 +234,84 @@ class MemcachedStorage(SyncStorage):
     # APIs to operate on the entire storage.
     #
 
-    def get_storage_timestamp(self, userid):
+    def get_storage_timestamp(self, user):
         """Returns the last-modified timestamp for the entire storage."""
         # Try to use the cached value.
-        ts = self._get_metadata(userid)["modified"]
+        ts = self._get_metadata(user)["modified"]
         # Fall back to live data if it's dirty.
         if ts is None:
-            ts = self.storage.get_storage_timestamp(userid)
+            ts = self.storage.get_storage_timestamp(user)
             for colmgr in self.cache_only_collections.itervalues():
                 try:
-                    ts = max(ts, colmgr.get_timestamp(userid))
+                    ts = max(ts, colmgr.get_timestamp(user))
                 except CollectionNotFoundError:
                     pass
         return ts
 
-    def get_collection_timestamps(self, userid):
+    def get_collection_timestamps(self, user):
         """Returns the collection timestamps for a user."""
         # Try to use the cached value.
-        timestamps = self._get_metadata(userid)["collections"]
+        timestamps = self._get_metadata(user)["collections"]
         # Fall back to live data for any collections that are dirty.
         for collection, ts in timestamps.items():
             if ts is None:
                 colmgr = self._get_collection_manager(collection)
                 try:
-                    timestamps[collection] = colmgr.get_timestamp(userid)
+                    timestamps[collection] = colmgr.get_timestamp(user)
                 except CollectionNotFoundError:
                     del timestamps[collection]
         return timestamps
 
-    def get_collection_counts(self, userid):
+    def get_collection_counts(self, user):
         """Returns the collection counts."""
         # Read most of the data from the database.
-        counts = self.storage.get_collection_counts(userid)
+        counts = self.storage.get_collection_counts(user)
         # Add in counts for collections stored only in memcache.
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)["items"]
+                items = colmgr.get_items(user)["items"]
             except CollectionNotFoundError:
                 pass
             else:
                 counts[colmgr.collection] = len(items)
         return counts
 
-    def get_collection_sizes(self, userid):
+    def get_collection_sizes(self, user):
         """Returns the total size for each collection."""
         # Read most of the data from the database.
-        sizes = self.storage.get_collection_sizes(userid)
+        sizes = self.storage.get_collection_sizes(user)
         # Add in sizes for collections stored only in memcache.
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)["items"]
+                items = colmgr.get_items(user)["items"]
                 payloads = (item.get("payload", "") for item in items)
                 sizes[colmgr.collection] = sum(len(p) for p in payloads)
             except CollectionNotFoundError:
                 pass
         # Since we've just gone to the trouble of recalculating sizes,
         # we might as well update the cached total size as well.
-        self._update_total_size(userid, sum(sizes.itervalues()))
+        self._update_total_size(user, sum(sizes.itervalues()))
         return sizes
 
-    def get_total_size(self, userid, recalculate=False):
+    def get_total_size(self, user, recalculate=False):
         """Returns the total size of a user's storage data."""
-        return self._get_metadata(userid, recalculate)["size"]
+        return self._get_metadata(user, recalculate)["size"]
 
-    def delete_storage(self, userid):
+    def delete_storage(self, user):
         """Removes all data for the user."""
-        for key in self.iter_cache_keys(userid):
+        for key in self.iter_cache_keys(user):
             self.cache.delete(key)
-        self.storage.delete_storage(userid)
+        self.storage.delete_storage(user)
 
     #
     # APIs to operate on an individual collection
     #
 
-    def get_collection_timestamp(self, userid, collection):
+    def get_collection_timestamp(self, user, collection):
         """Returns the last-modified timestamp for the named collection."""
         # It's likely cheaper to read all cached timestamps out of memcache
         # than to read just the single timestamp from the database.
-        timestamps = self.get_collection_timestamps(userid)
+        timestamps = self.get_collection_timestamps(user)
         try:
             ts = timestamps[collection]
         except KeyError:
@@ -318,59 +319,59 @@ class MemcachedStorage(SyncStorage):
         # Refresh from the live data if dirty.
         if ts is None:
             colmgr = self._get_collection_manager(collection)
-            ts = colmgr.get_timestamp(userid)
+            ts = colmgr.get_timestamp(user)
         return ts
 
-    def get_items(self, userid, collection, **kwds):
+    def get_items(self, user, collection, **kwds):
         """Returns items from a collection"""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.get_items(userid, **kwds)
+        return colmgr.get_items(user, **kwds)
 
-    def get_item_ids(self, userid, collection, **kwds):
+    def get_item_ids(self, user, collection, **kwds):
         """Returns item idss from a collection"""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.get_item_ids(userid, **kwds)
+        return colmgr.get_item_ids(user, **kwds)
 
-    def set_items(self, userid, collection, items):
+    def set_items(self, user, collection, items):
         """Creates or updates multiple items in a collection."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.set_items(userid, items)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.set_items(user, items)
             size = sum(len(item.get("payload", "")) for item in items)
             update(ts, ts, size)
             return ts
 
-    def delete_collection(self, userid, collection):
+    def delete_collection(self, user, collection):
         """Deletes an entire collection."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.del_collection(userid)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.del_collection(user)
             update(ts, None)
             return ts
 
-    def delete_items(self, userid, collection, items):
+    def delete_items(self, user, collection, items):
         """Deletes multiple items from a collection."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.del_items(userid, items)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.del_items(user, items)
             update(ts, ts)
             return ts
 
-    def create_batch(self, userid, collection):
+    def create_batch(self, user, collection):
         """Creates batch for a give user's collection."""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.create_batch(userid)
+        return colmgr.create_batch(user)
 
-    def valid_batch(self, userid, collection, batchid):
+    def valid_batch(self, user, collection, batchid):
         """Verifies that a batch ID is valid"""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.valid_batch(userid, batchid)
+        return colmgr.valid_batch(user, batchid)
 
-    def append_items_to_batch(self, userid, collection, batchid, items):
+    def append_items_to_batch(self, user, collection, batchid, items):
         """Appends items to the pending batch."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.append_items_to_batch(userid, batchid, items)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.append_items_to_batch(user, batchid, items)
             # Account for the size of the new items as they come in,
             # since that's the only opportunity we have to see them.
             # Don't update the timestamp yet though, as they're not committed.
@@ -378,46 +379,46 @@ class MemcachedStorage(SyncStorage):
             update(size_incr=size)
             return ts
 
-    def apply_batch(self, userid, collection, batchid):
+    def apply_batch(self, user, collection, batchid):
         """Applies the batch"""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.apply_batch(userid, batchid)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.apply_batch(user, batchid)
             update(ts, ts)
             return ts
 
-    def close_batch(self, userid, collection, batchid):
+    def close_batch(self, user, collection, batchid):
         colmgr = self._get_collection_manager(collection)
-        return colmgr.close_batch(userid, batchid)
+        return colmgr.close_batch(user, batchid)
 
     #
     # Items APIs
     #
 
-    def get_item_timestamp(self, userid, collection, item):
+    def get_item_timestamp(self, user, collection, item):
         """Returns the last-modified timestamp for the named item."""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.get_item_timestamp(userid, item)
+        return colmgr.get_item_timestamp(user, item)
 
-    def get_item(self, userid, collection, item):
+    def get_item(self, user, collection, item):
         """Returns one item from a collection."""
         colmgr = self._get_collection_manager(collection)
-        return colmgr.get_item(userid, item)
+        return colmgr.get_item(user, item)
 
-    def set_item(self, userid, collection, item, data):
+    def set_item(self, user, collection, item, data):
         """Creates or updates a single item in a collection."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            res = colmgr.set_item(userid, item, data)
+        with self._mark_collection_dirty(user, collection) as update:
+            res = colmgr.set_item(user, item, data)
             size = len(data.get("payload", ""))
             update(res["modified"], res["modified"], size)
             return res
 
-    def delete_item(self, userid, collection, item):
+    def delete_item(self, user, collection, item):
         """Deletes a single item from a collection."""
         colmgr = self._get_collection_manager(collection)
-        with self._mark_collection_dirty(userid, collection) as update:
-            ts = colmgr.del_item(userid, item)
+        with self._mark_collection_dirty(user, collection) as update:
+            ts = colmgr.del_item(user, item)
             update(ts, ts)
             return ts
 
@@ -438,7 +439,7 @@ class MemcachedStorage(SyncStorage):
     #  Private APIs for managing the cached metadata
     #
 
-    def _get_metadata(self, userid, recalculate_size=False):
+    def _get_metadata(self, user, recalculate_size=False):
         """Get the metadata dict, recalculating things if necessary.
 
         This method pulls the dict of metadata out of memcache and returns it.
@@ -448,7 +449,7 @@ class MemcachedStorage(SyncStorage):
         If recalculate_size is given and True, then the cache size value will
         be recalculated from the store if it is more than an hour old.
         """
-        key = _key(userid, "metadata")
+        key = _key(user["uid"], "metadata")
         data, casid = self.cache.gets(key)
         # If there is no cached metadata, initialize it from the storage.
         # Use CAS to avoid overwriting other changes, but don't error out if
@@ -456,17 +457,17 @@ class MemcachedStorage(SyncStorage):
         if data is None:
             # Get the mapping of collection names to timestamps.
             # Make sure to include any cache-only collections.
-            timestamps = self.storage.get_collection_timestamps(userid)
+            timestamps = self.storage.get_collection_timestamps(user)
             for colmgr in self.cached_collections.itervalues():
                 if colmgr.collection not in timestamps:
                     try:
-                        ts = colmgr.get_timestamp(userid)
+                        ts = colmgr.get_timestamp(user)
                         timestamps[colmgr.collection] = ts
                     except CollectionNotFoundError:
                         pass
             # Get the storage-level modified time.
             # Make sure it's not less than any collection-level timestamp.
-            ts = self.storage.get_storage_timestamp(userid)
+            ts = self.storage.get_storage_timestamp(user)
             if timestamps:
                 ts = max(ts, max(timestamps.itervalues()))
             # Calculate the total size if requested,
@@ -476,7 +477,7 @@ class MemcachedStorage(SyncStorage):
                 size = 0
             else:
                 last_size_recalc = int(time.time())
-                size = self._recalculate_total_size(userid)
+                size = self._recalculate_total_size(user)
             # Store it all back into the cache.
             data = {
                 "size": size,
@@ -491,27 +492,27 @@ class MemcachedStorage(SyncStorage):
             recalc_period = time.time() - data["last_size_recalc"]
             if recalc_period > SIZE_RECALCULATION_PERIOD:
                 data["last_size_recalc"] = int(time.time())
-                data["size"] = self._recalculate_total_size(userid)
+                data["size"] = self._recalculate_total_size(user)
                 self.cache.cas(key, data, casid)
         return data
 
-    def _update_total_size(self, userid, size):
+    def _update_total_size(self, user, size):
         """Update the cached value for total storage size."""
-        key = _key(userid, "metadata")
+        key = _key(user["uid"], "metadata")
         data, casid = self.cache.gets(key)
         if data is None:
-            self._get_metadata(userid)
+            self._get_metadata(user)
             data, casid = self.cache.gets(key)
         data["last_size_recalc"] = int(time.time())
         data["size"] = size
         self.cache.cas(key, data, casid)
 
-    def _recalculate_total_size(self, userid):
+    def _recalculate_total_size(self, user):
         """Re-calculate total size from the database."""
-        size = self.storage.get_total_size(userid)
+        size = self.storage.get_total_size(user)
         for colmgr in self.cache_only_collections.itervalues():
             try:
-                items = colmgr.get_items(userid)["items"]
+                items = colmgr.get_items(user)["items"]
                 payloads = (item.get("payload", "") for item in items)
                 size += sum(len(p) for p in payloads)
             except CollectionNotFoundError:
@@ -519,7 +520,7 @@ class MemcachedStorage(SyncStorage):
         return size
 
     @contextlib.contextmanager
-    def _mark_collection_dirty(self, userid, collection):
+    def _mark_collection_dirty(self, user, collection):
         """Context manager for marking collections as dirty during write.
 
         To prevent the cache from getting out of sync with the underlying store
@@ -533,19 +534,19 @@ class MemcachedStorage(SyncStorage):
         level storage timestamp, collection-level timestamp, and a total size
         increment as its three arguments.  Example usage::
 
-            with self._mark_collection_dirty(userid, collection) as update:
+            with self._mark_collection_dirty(user, collection) as update:
                 colobj = self._get_collection_manager(collection)
-                ts = colobj.set_item(userid, "test", {"payload": "TEST"})
+                ts = colobj.set_item(user, "test", {"payload": "TEST"})
                 update(ts, ts, len("TEST"))
 
         """
         # Get the old values from the metadata.
         # We can't call _get_metadata directly because we also want the casid.
-        key = _key(userid, "metadata")
+        key = _key(user["uid"], "metadata")
         data, casid = self.cache.gets(key)
         if data is None:
             # No cached data, so refresh.
-            self._get_metadata(userid)
+            self._get_metadata(user)
             data, casid = self.cache.gets(key)
 
         # Write None into the metadata to mark things as dirty.
@@ -608,66 +609,66 @@ class UncachedManager(object):
         self.owner = owner
         self.collection = collection
 
-    def get_timestamp(self, userid):
+    def get_timestamp(self, user):
         storage = self.owner.storage
-        return storage.get_collection_timestamp(userid, self.collection)
+        return storage.get_collection_timestamp(user, self.collection)
 
-    def get_items(self, userid, **kwds):
+    def get_items(self, user, **kwds):
         storage = self.owner.storage
-        return storage.get_items(userid, self.collection, **kwds)
+        return storage.get_items(user, self.collection, **kwds)
 
-    def get_item_ids(self, userid, **kwds):
+    def get_item_ids(self, user, **kwds):
         storage = self.owner.storage
-        return storage.get_item_ids(userid, self.collection, **kwds)
+        return storage.get_item_ids(user, self.collection, **kwds)
 
-    def set_items(self, userid, items):
+    def set_items(self, user, items):
         storage = self.owner.storage
-        return storage.set_items(userid, self.collection, items)
+        return storage.set_items(user, self.collection, items)
 
-    def del_collection(self, userid):
+    def del_collection(self, user):
         storage = self.owner.storage
-        return storage.delete_collection(userid, self.collection)
+        return storage.delete_collection(user, self.collection)
 
-    def del_items(self, userid, items):
+    def del_items(self, user, items):
         storage = self.owner.storage
-        return storage.delete_items(userid, self.collection, items)
+        return storage.delete_items(user, self.collection, items)
 
-    def get_item_timestamp(self, userid, item):
+    def get_item_timestamp(self, user, item):
         storage = self.owner.storage
-        return storage.get_item_timestamp(userid, self.collection, item)
+        return storage.get_item_timestamp(user, self.collection, item)
 
-    def get_item(self, userid, item):
+    def get_item(self, user, item):
         storage = self.owner.storage
-        return storage.get_item(userid, self.collection, item)
+        return storage.get_item(user, self.collection, item)
 
-    def set_item(self, userid, item, bso):
+    def set_item(self, user, item, bso):
         storage = self.owner.storage
-        return storage.set_item(userid, self.collection, item, bso)
+        return storage.set_item(user, self.collection, item, bso)
 
-    def del_item(self, userid, item):
+    def del_item(self, user, item):
         storage = self.owner.storage
-        return storage.delete_item(userid, self.collection, item)
+        return storage.delete_item(user, self.collection, item)
 
-    def create_batch(self, userid):
+    def create_batch(self, user):
         storage = self.owner.storage
-        return storage.create_batch(userid, self.collection)
+        return storage.create_batch(user, self.collection)
 
-    def valid_batch(self, userid, batchid):
+    def valid_batch(self, user, batchid):
         storage = self.owner.storage
-        return storage.valid_batch(userid, self.collection, batchid)
+        return storage.valid_batch(user, self.collection, batchid)
 
-    def append_items_to_batch(self, userid, batchid, items):
+    def append_items_to_batch(self, user, batchid, items):
         storage = self.owner.storage
-        return storage.append_items_to_batch(userid, self.collection, batchid,
+        return storage.append_items_to_batch(user, self.collection, batchid,
                                              items)
 
-    def apply_batch(self, userid, batchid):
+    def apply_batch(self, user, batchid):
         storage = self.owner.storage
-        return storage.apply_batch(userid, self.collection, batchid)
+        return storage.apply_batch(user, self.collection, batchid)
 
-    def close_batch(self, userid, batchid):
+    def close_batch(self, user, batchid):
         storage = self.owner.storage
-        return storage.close_batch(userid, self.collection, batchid)
+        return storage.close_batch(user, self.collection, batchid)
 
 
 class _CachedManagerBase(object):
@@ -682,11 +683,11 @@ class _CachedManagerBase(object):
         self.owner = owner
         self.collection = collection
 
-    def get_key(self, userid):
-        return _key(userid, "c", self.collection)
+    def get_key(self, user):
+        return _key(user["uid"], "c", self.collection)
 
-    def iter_cache_keys(self, userid):
-        yield self.get_key(userid)
+    def iter_cache_keys(self, user):
+        yield self.get_key(user)
 
     @property
     def storage(self):
@@ -701,22 +702,22 @@ class _CachedManagerBase(object):
     # All the rest of the functionality is implemented in terms of these.
     #
 
-    def get_cached_data(self, userid):
+    def get_cached_data(self, user):
         raise NotImplementedError
 
-    def set_items(self, userid, items):
+    def set_items(self, user, items):
         raise NotImplementedError
 
-    def del_collection(self, userid):
+    def del_collection(self, user):
         raise NotImplementedError
 
-    def del_items(self, userid, items):
+    def del_items(self, user, items):
         raise NotImplementedError
 
-    def set_item(self, userid, item, bso):
+    def set_item(self, user, item, bso):
         raise NotImplementedError
 
-    def del_item(self, userid, item):
+    def del_item(self, user, item):
         raise NotImplementedError
 
     #
@@ -725,7 +726,7 @@ class _CachedManagerBase(object):
     # need to layer different steps around it.
     #
 
-    def _set_items(self, userid, items, modified, data, casid):
+    def _set_items(self, user, items, modified, data, casid):
         """Update the cached data by setting the given items.
 
         This method performs the equivalent of SyncStorage.set_items() on
@@ -779,12 +780,12 @@ class _CachedManagerBase(object):
                 expired_ids.add(id)
         for id in expired_ids:
             del data["items"][id]
-        key = self.get_key(userid)
+        key = self.get_key(user)
         if not self.cache.cas(key, data, casid):
             raise ConflictError
         return num_created
 
-    def _del_items(self, userid, items, modified, data, casid):
+    def _del_items(self, user, items, modified, data, casid):
         """Update the cached data by deleting the given items.
 
         This method performs the equivalent of SyncStorage.delete_items() on
@@ -804,7 +805,7 @@ class _CachedManagerBase(object):
                 num_deleted += 1
         if num_deleted > 0:
             data["modified"] = modified
-        key = self.get_key(userid)
+        key = self.get_key(user)
         if not self.cache.cas(key, data, casid):
             raise ConflictError
         return num_deleted
@@ -813,13 +814,13 @@ class _CachedManagerBase(object):
     # Methods whose implementation can be shared between subclasses.
     #
 
-    def get_timestamp(self, userid):
-        data, _ = self.get_cached_data(userid)
+    def get_timestamp(self, user):
+        data, _ = self.get_cached_data(user)
         if data is None:
             raise CollectionNotFoundError
         return data["modified"]
 
-    def get_items(self, userid, **kwds):
+    def get_items(self, user, **kwds):
         # Decode kwds into individual filter values.
         newer = kwds.pop("newer", None)
         older = kwds.pop("older", None)
@@ -830,7 +831,7 @@ class _CachedManagerBase(object):
         for unknown_kwd in kwds:
             raise TypeError("Unknown keyword argument: %s" % (unknown_kwd,))
         # Read all the items out of the cache.
-        data, _ = self.get_cached_data(userid)
+        data, _ = self.get_cached_data(user)
         if data is None:
             raise CollectionNotFoundError
         # Restrict to certain item ids if specified.
@@ -884,19 +885,19 @@ class _CachedManagerBase(object):
             if ttl is None or ttl > now:
                 yield bso
 
-    def get_item_ids(self, userid, **kwds):
-        res = self.get_items(userid, **kwds)
+    def get_item_ids(self, user, **kwds):
+        res = self.get_items(user, **kwds)
         res["items"] = [bso["id"] for bso in res["items"]]
         return res
 
-    def get_item(self, userid, item):
-        items = self.get_items(userid, ids=[item])["items"]
+    def get_item(self, user, item):
+        items = self.get_items(user, ids=[item])["items"]
         if not items:
             raise ItemNotFoundError
         return items[0]
 
-    def get_item_timestamp(self, userid, item):
-        return self.get_item(userid, item)["modified"]
+    def get_item_timestamp(self, user, item):
+        return self.get_item(user, item)["modified"]
 
 
 class CacheOnlyManager(_CachedManagerBase):
@@ -907,57 +908,57 @@ class CacheOnlyManager(_CachedManagerBase):
     internally and uses CAS to avoid conflicting writes.
     """
 
-    def get_batches_key(self, userid):
-        return _key(userid, "c", self.collection, "batches")
+    def get_batches_key(self, user):
+        return _key(user["uid"], "c", self.collection, "batches")
 
-    def iter_cache_keys(self, userid):
-        for key in super(CacheOnlyManager, self).iter_cache_keys(userid):
+    def iter_cache_keys(self, user):
+        for key in super(CacheOnlyManager, self).iter_cache_keys(user):
             yield key
-        yield self.get_batches_key(userid)
+        yield self.get_batches_key(user)
 
-    def get_cached_data(self, userid):
-        return self.cache.gets(self.get_key(userid))
+    def get_cached_data(self, user):
+        return self.cache.gets(self.get_key(user))
 
-    def set_items(self, userid, items):
+    def set_items(self, user, items):
         modified = get_timestamp()
-        data, casid = self.get_cached_data(userid)
-        self._set_items(userid, items, modified, data, casid)
+        data, casid = self.get_cached_data(user)
+        self._set_items(user, items, modified, data, casid)
         return modified
 
-    def del_collection(self, userid):
-        if not self.cache.delete(self.get_key(userid)):
+    def del_collection(self, user):
+        if not self.cache.delete(self.get_key(user)):
             raise CollectionNotFoundError
         return get_timestamp()
 
-    def del_items(self, userid, items):
+    def del_items(self, user, items):
         modified = get_timestamp()
-        data, casid = self.get_cached_data(userid)
-        self._del_items(userid, items, modified, data, casid)
+        data, casid = self.get_cached_data(user)
+        self._del_items(user, items, modified, data, casid)
         return data["modified"]
 
-    def set_item(self, userid, item, bso):
+    def set_item(self, user, item, bso):
         bso["id"] = item
         modified = get_timestamp()
-        data, casid = self.get_cached_data(userid)
-        num_created = self._set_items(userid, [bso], modified, data, casid)
+        data, casid = self.get_cached_data(user)
+        num_created = self._set_items(user, [bso], modified, data, casid)
         return {
             "created": num_created == 1,
             "modified": modified,
         }
 
-    def del_item(self, userid, item):
+    def del_item(self, user, item):
         modified = get_timestamp()
-        data, casid = self.get_cached_data(userid)
-        num_deleted = self._del_items(userid, [item], modified, data, casid)
+        data, casid = self.get_cached_data(user)
+        num_deleted = self._del_items(user, [item], modified, data, casid)
         if num_deleted == 0:
             raise ItemNotFoundError
         return modified
 
-    def get_cached_batches(self, userid, ts=None):
+    def get_cached_batches(self, user, ts=None):
         if ts is None:
             ts = get_timestamp()
         ts = int(ts)
-        bdata, bcasid = self.cache.gets(self.get_batches_key(userid))
+        bdata, bcasid = self.cache.gets(self.get_batches_key(user))
         # Remove any expired batches, but let the
         # calling code write it back out to memcache.
         if bdata:
@@ -966,9 +967,9 @@ class CacheOnlyManager(_CachedManagerBase):
                     del bdata[batchid]
         return bdata, bcasid
 
-    def create_batch(self, userid):
+    def create_batch(self, user):
         ts = get_timestamp()
-        bdata, bcasid = self.get_cached_batches(userid, ts)
+        bdata, bcasid = self.get_cached_batches(user, ts)
         batchid = int(ts * 1000)
         if not bdata:
             bdata = {}
@@ -978,49 +979,49 @@ class CacheOnlyManager(_CachedManagerBase):
             "created": int(ts),
             "items": []
         }
-        key = self.get_batches_key(userid)
+        key = self.get_batches_key(user)
         if not self.cache.cas(key, bdata, bcasid):
             raise ConflictError
         return batchid
 
-    def valid_batch(self, userid, batch):
+    def valid_batch(self, user, batch):
         ts = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid, ts)
+        bdata, bcasid = self.get_cached_batches(user, ts)
         if not bdata:
             return False
         return (batchid in bdata)
 
-    def append_items_to_batch(self, userid, batch, items):
+    def append_items_to_batch(self, user, batch, items):
         modified = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid, modified)
+        bdata, bcasid = self.get_cached_batches(user, modified)
         # Invalid, closed, or expired batch
         if not bdata or batchid not in bdata:
             raise InvalidBatch(batch)
 
         bdata[batchid]["items"].extend(items)
-        key = self.get_batches_key(userid)
+        key = self.get_batches_key(user)
         if not self.cache.cas(key, bdata, bcasid):
             raise ConflictError
         return modified
 
-    def apply_batch(self, userid, batch):
+    def apply_batch(self, user, batch):
         modified = get_timestamp()
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid, modified)
+        bdata, bcasid = self.get_cached_batches(user, modified)
         # Invalid, closed, or expired batch
         if not bdata or batchid not in bdata:
             raise InvalidBatch(batch)
 
-        data, casid = self.get_cached_data(userid)
-        self._set_items(userid, bdata[batchid]["items"], modified, data, casid)
+        data, casid = self.get_cached_data(user)
+        self._set_items(user, bdata[batchid]["items"], modified, data, casid)
         return modified
 
-    def close_batch(self, userid, batch):
+    def close_batch(self, user, batch):
         batchid = str(batch)
-        bdata, bcasid = self.get_cached_batches(userid)
-        key = self.get_batches_key(userid)
+        bdata, bcasid = self.get_cached_batches(user)
+        key = self.get_batches_key(user)
 
         try:
             del bdata[batchid]
@@ -1044,13 +1045,13 @@ class CachedManager(_CachedManagerBase):
     underlying store.
     """
 
-    def get_cached_data(self, userid, refresh_if_missing=True):
+    def get_cached_data(self, user, refresh_if_missing=True):
         """Get the cached collection data, pulling into cache if missing.
 
         This method returns the cached collection data, populating it from
         the underlying store if it is not cached.
         """
-        key = self.get_key(userid)
+        key = self.get_key(user)
         data, casid = self.cache.gets(key)
         if data is None and refresh_if_missing:
             data = {}
@@ -1058,11 +1059,11 @@ class CachedManager(_CachedManagerBase):
                 storage = self.storage
                 collection = self.collection
                 ttl_base = int(get_timestamp())
-                with self.owner.lock_for_read(userid, collection):
-                    ts = storage.get_collection_timestamp(userid, collection)
+                with self.owner.lock_for_read(user, collection):
+                    ts = storage.get_collection_timestamp(user, collection)
                     data["modified"] = ts
                     data["items"] = {}
-                    for bso in storage.get_items(userid, collection)["items"]:
+                    for bso in storage.get_items(user, collection)["items"]:
                         if bso.get("ttl") is not None:
                             bso["ttl"] = ttl_base + bso["ttl"]
                         data["items"][bso["id"]] = bso
@@ -1072,7 +1073,7 @@ class CachedManager(_CachedManagerBase):
                 data = None
         return data, casid
 
-    def set_items(self, userid, items):
+    def set_items(self, user, items):
         storage = self.storage
         # Leave the cache empty if any of posted bsos were missing a payload.
         # This will cause us to lazily read in the defaults from the db.
@@ -1081,76 +1082,76 @@ class CachedManager(_CachedManagerBase):
             if "payload" not in item:
                 refresh_if_missing = False
                 break
-        with self._mark_dirty(userid, refresh_if_missing) as (data, casid):
-            ts = storage.set_items(userid, self.collection, items)
+        with self._mark_dirty(user, refresh_if_missing) as (data, casid):
+            ts = storage.set_items(user, self.collection, items)
         # Update the cached data in-place to reflect the changes.
         if refresh_if_missing:
-            self._set_items(userid, items, ts, data, casid)
+            self._set_items(user, items, ts, data, casid)
         return ts
 
-    def del_collection(self, userid):
-        self.cache.delete(self.get_key(userid))
-        return self.storage.delete_collection(userid, self.collection)
+    def del_collection(self, user):
+        self.cache.delete(self.get_key(user))
+        return self.storage.delete_collection(user, self.collection)
 
-    def del_items(self, userid, items):
+    def del_items(self, user, items):
         storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            ts = storage.delete_items(userid, self.collection, items)
+        with self._mark_dirty(user) as (data, casid):
+            ts = storage.delete_items(user, self.collection, items)
         # Update the cached data, if there was any present.
         if data is not None:
-            self._del_items(userid, items, ts, data, casid)
+            self._del_items(user, items, ts, data, casid)
         return ts
 
-    def set_item(self, userid, item, bso):
+    def set_item(self, user, item, bso):
         storage = self.storage
         # Leave the cache empty if the posted bso was missing a payload.
         # This will cause us to lazily read in the defaults from the db.
         refresh_if_missing = True
         if "payload" not in bso:
             refresh_if_missing = False
-        with self._mark_dirty(userid, refresh_if_missing) as (data, casid):
-            res = storage.set_item(userid, self.collection, item, bso)
+        with self._mark_dirty(user, refresh_if_missing) as (data, casid):
+            res = storage.set_item(user, self.collection, item, bso)
         # Update the cached data in-place to reflect the change.
         if refresh_if_missing:
             bso["id"] = item
-            self._set_items(userid, [bso], res["modified"], data, casid)
+            self._set_items(user, [bso], res["modified"], data, casid)
         return res
 
-    def del_item(self, userid, item):
+    def del_item(self, user, item):
         storage = self.storage
-        with self._mark_dirty(userid) as (data, casid):
-            ts = storage.delete_item(userid, self.collection, item)
+        with self._mark_dirty(user) as (data, casid):
+            ts = storage.delete_item(user, self.collection, item)
         # Update the cached data, if there was any present.
         if data is not None:
-            self._del_items(userid, [item], ts, data, casid)
+            self._del_items(user, [item], ts, data, casid)
         return ts
 
-    def create_batch(self, userid):
-        return self.storage.create_batch(userid, self.collection)
+    def create_batch(self, user):
+        return self.storage.create_batch(user, self.collection)
 
-    def valid_batch(self, userid, batchid):
-        return self.storage.valid_batch(userid, self.collection, batchid)
+    def valid_batch(self, user, batchid):
+        return self.storage.valid_batch(user, self.collection, batchid)
 
-    def append_items_to_batch(self, userid, batchid, items):
+    def append_items_to_batch(self, user, batchid, items):
         # Since the items do not appear in the collection until we
         # apply the batch, we don't need to mark anything dirty here.
-        return self.storage.append_items_to_batch(userid, self.collection,
+        return self.storage.append_items_to_batch(user, self.collection,
                                                   batchid, items)
 
-    def apply_batch(self, userid, batchid):
+    def apply_batch(self, user, batchid):
         # Applying the batch will render our cached data inaccurate.
         # Just leave it emptied, and lazily re-populate on next fetch.
         storage = self.storage
-        with self._mark_dirty(userid):
-            ts = storage.apply_batch(userid, self.collection, batchid)
+        with self._mark_dirty(user):
+            ts = storage.apply_batch(user, self.collection, batchid)
         return ts
 
-    def close_batch(self, userid, batchid):
+    def close_batch(self, user, batchid):
         storage = self.storage
-        storage.close_batch(userid, self.collection, batchid)
+        storage.close_batch(user, self.collection, batchid)
 
     @contextlib.contextmanager
-    def _mark_dirty(self, userid, refresh_if_missing=False):
+    def _mark_dirty(self, user, refresh_if_missing=False):
         """Context manager to temporarily remove the cached data during write.
 
         All operations that may modify the underlying collection should be
@@ -1162,8 +1163,8 @@ class CachedManager(_CachedManagerBase):
         should update the cache with the new data.
         """
         # Grab the current cache state so we can pass it to calling function.
-        key = self.get_key(userid)
-        data, casid = self.get_cached_data(userid, refresh_if_missing)
+        key = self.get_key(user)
+        data, casid = self.get_cached_data(user, refresh_if_missing)
         # Remove it from the cache so that we don't serve stale data.
         # A CAS-DELETE here would be nice, but memcached doesn't have one.
         if data is not None:
@@ -1179,7 +1180,7 @@ class CachedManager(_CachedManagerBase):
                 self.cache.add(key, data)
             raise
 
-    def _set_items(self, userid, *args):
+    def _set_items(self, user, *args):
         """Update cached data with new items, or clear it on conflict.
 
         This method extends the base class _set_items method so that any
@@ -1189,11 +1190,11 @@ class CachedManager(_CachedManagerBase):
         just clear the cached data and let it re-populate on demand.
         """
         try:
-            return super(CachedManager, self)._set_items(userid, *args)
+            return super(CachedManager, self)._set_items(user, *args)
         except StorageError:
-            self.cache.delete(self.get_key(userid))
+            self.cache.delete(self.get_key(user))
 
-    def _del_items(self, userid, *args):
+    def _del_items(self, user, *args):
         """Update cached data with deleted items, or clear it on conflict.
 
         This method extends the base class _del_items method so that any
@@ -1203,6 +1204,6 @@ class CachedManager(_CachedManagerBase):
         just clear the cached data and let it re-populate on demand.
         """
         try:
-            return super(CachedManager, self)._del_items(userid, *args)
+            return super(CachedManager, self)._del_items(user, *args)
         except StorageError:
-            self.cache.delete(self.get_key(userid))
+            self.cache.delete(self.get_key(user))
