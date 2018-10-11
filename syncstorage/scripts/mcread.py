@@ -49,7 +49,7 @@ def read_memcache_data(config_file, input_file, output_file):
                 uid = uid.strip()
                 if uid:
                     logger.info("Reading data for %s", uid)
-                    for key in backend.iter_cache_keys(uid):
+                    for key in backend.iter_cache_keys({"uid": uid}):
                         value = backend.cache.get(key)
                         if value is not None:
                             output_fileobj.write("%s %s\n" % (key, value))

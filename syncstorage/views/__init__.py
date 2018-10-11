@@ -163,7 +163,11 @@ item = SyncStorageService(name="item",
 @default_decorators
 def get_info_timestamps(request):
     storage = request.validated["storage"]
-    timestamps = storage.get_collection_timestamps(request.validated["userid"])
+    # This route allows access with recently-expired tokens,
+    # rejigger request.user to permit this.
+    if "expired_uid" in request.user:
+        request.user["uid"] = request.user.pop("expired_uid")
+    timestamps = storage.get_collection_timestamps(request.user)
     request.response.headers["X-Weave-Records"] = str(len(timestamps))
     return timestamps
 
@@ -172,7 +176,7 @@ def get_info_timestamps(request):
 @default_decorators
 def get_info_counts(request):
     storage = request.validated["storage"]
-    counts = storage.get_collection_counts(request.validated["userid"])
+    counts = storage.get_collection_counts(request.user)
     request.response.headers["X-Weave-Records"] = str(len(counts))
     return counts
 
@@ -181,7 +185,7 @@ def get_info_counts(request):
 @default_decorators
 def get_info_quota(request):
     storage = request.validated["storage"]
-    used = storage.get_total_size(request.validated["userid"]) / ONE_KB
+    used = storage.get_total_size(request.user) / ONE_KB
     quota = request.registry.settings.get("storage.quota_size", None)
     if quota is not None:
         quota = quota / ONE_KB
@@ -192,7 +196,7 @@ def get_info_quota(request):
 @default_decorators
 def get_info_usage(request):
     storage = request.validated["storage"]
-    sizes = storage.get_collection_sizes(request.validated["userid"])
+    sizes = storage.get_collection_sizes(request.user)
     for collection, size in sizes.iteritems():
         sizes[collection] = size / ONE_KB
     request.response.headers["X-Weave-Records"] = str(len(sizes))
@@ -227,7 +231,7 @@ def get_info_configuration(request):
 @default_decorators
 def delete_storage(request):
     storage = request.validated["storage"]
-    storage.delete_storage(request.validated["userid"])
+    storage.delete_storage(request.user)
     return {}
 
 
@@ -235,7 +239,7 @@ def delete_storage(request):
 @default_decorators
 def delete_all(request):
     storage = request.validated["storage"]
-    storage.delete_storage(request.validated["userid"])
+    storage.delete_storage(request.user)
     return {}
 
 
@@ -304,7 +308,7 @@ def get_collection_with_internal_pagination(request):
 @check_storage_quota
 def get_collection(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
 
     filters = {}
@@ -314,11 +318,11 @@ def get_collection(request):
             filters[name] = request.validated[name]
 
     if request.validated.get("full", False):
-        res = storage.get_items(userid, collection, **filters)
+        res = storage.get_items(user, collection, **filters)
         for bso in res["items"]:
             bso.pop("ttl", None)
     else:
-        res = storage.get_item_ids(userid, collection, **filters)
+        res = storage.get_item_ids(user, collection, **filters)
     next_offset = res.get("next_offset")
     if next_offset is not None:
         request.response.headers["X-Weave-Next-Offset"] = str(next_offset)
@@ -335,7 +339,7 @@ def get_collection(request):
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
@@ -352,7 +356,7 @@ def post_collection(request):
     for (id, error) in invalid_bsos.iteritems():
         res["failed"][id] = error
 
-    ts = storage.set_items(userid, collection, bsos)
+    ts = storage.set_items(user, collection, bsos)
     res["success"].extend([bso["id"] for bso in bsos])
     res['modified'] = ts
     request.response.headers["X-Last-Modified"] = str(ts)
@@ -362,7 +366,7 @@ def post_collection(request):
 
 def post_collection_batch(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     bsos = request.validated["bsos"]
     invalid_bsos = request.validated["invalid_bsos"]
@@ -386,7 +390,7 @@ def post_collection_batch(request):
     try:
         if batch is True:
             try:
-                batch = storage.create_batch(userid, collection)
+                batch = storage.create_batch(user, collection)
             except ConflictError, e:
                 logger.error('Collision in batch creation!')
                 logger.error(e)
@@ -396,13 +400,13 @@ def post_collection_batch(request):
                 logger.error(e)
                 raise
         else:
-            i = storage.valid_batch(userid, collection, batch)
+            i = storage.valid_batch(user, collection, batch)
             if not i:
                 raise InvalidBatch
 
         if bsos:
             try:
-                storage.append_items_to_batch(userid, collection, batch, bsos)
+                storage.append_items_to_batch(user, collection, batch, bsos)
             except ConflictError:
                 raise
             except Exception, e:
@@ -415,7 +419,7 @@ def post_collection_batch(request):
 
         if commit:
             try:
-                ts = storage.apply_batch(userid, collection, batch)
+                ts = storage.apply_batch(user, collection, batch)
             except ConflictError, e:
                 logger.error('Collision in batch commit!')
                 logger.error(e)
@@ -427,7 +431,7 @@ def post_collection_batch(request):
             else:
                 res['modified'] = ts
                 request.response.headers["X-Last-Modified"] = str(ts)
-                storage.close_batch(userid, collection, batch)
+                storage.close_batch(user, collection, batch)
                 request.response.status = 200
         else:
             res["batch"] = b64encode(str(batch))
@@ -441,30 +445,30 @@ def post_collection_batch(request):
 @default_decorators
 def delete_collection(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     ids = request.validated.get("ids")
 
     # For b/w compat, non-existent collections must not give an error.
     try:
         if ids is None:
-            ts = storage.delete_collection(userid, collection)
+            ts = storage.delete_collection(user, collection)
         else:
-            ts = storage.delete_items(userid, collection, ids)
+            ts = storage.delete_items(user, collection, ids)
             request.response.headers["X-Last-Modified"] = str(ts)
         return {"modified": ts}
     except NotFoundError:
-        return {"modified": storage.get_storage_timestamp(userid)}
+        return {"modified": storage.get_storage_timestamp(user)}
 
 
 @item.get(accept="application/json", renderer="sync-json")
 @default_decorators
 def get_item(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     item = request.validated["item"]
-    bso = storage.get_item(userid, collection, item)
+    bso = storage.get_item(user, collection, item)
     bso.pop("ttl", None)
     return bso
 
@@ -473,12 +477,12 @@ def get_item(request):
 @default_decorators
 def put_item(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     item = request.validated["item"]
     bso = request.validated["bso"]
 
-    res = storage.set_item(userid, collection, item, bso)
+    res = storage.set_item(user, collection, item, bso)
     ts = res["modified"]
     request.response.headers["X-Last-Modified"] = str(ts)
     return ts
@@ -488,11 +492,11 @@ def put_item(request):
 @default_decorators
 def delete_item(request):
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated["collection"]
     item = request.validated["item"]
 
-    ts = storage.delete_item(userid, collection, item)
+    ts = storage.delete_item(user, collection, item)
     return {"modified": ts}
 
 

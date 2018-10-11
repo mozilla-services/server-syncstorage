@@ -71,10 +71,17 @@ class SyncStorageAuthenticationPolicy(TokenServerAuthenticationPolicy):
                 # it falls within the allowable expired-token window.
                 try:
                     data = tm.parse_token(tokenid, now=now)
+                    userid = data["uid"]
                 except tokenlib.errors.ExpiredTokenError:
                     recently = now - self.expired_token_timeout
                     data = tm.parse_token(tokenid, now=recently)
-                    data["uid"] = "expired:%d" % (data["uid"],)
+                    # We replace the uid with a special string to ensure that
+                    # calling code doesn't accidentally treat the token as
+                    # valid. If it wants to use the expired uid, it will have
+                    # to explicitly dig it back out from `request.user`.
+                    userid = data["uid"]
+                    request.user["expired_uid"] = data["expired_uid"] = userid
+                    userid = data["uid"] = "expired:%d" % (userid,)
             except ValueError:
                 # Token validation failed, move on to the next secret.
                 continue
@@ -88,7 +95,6 @@ class SyncStorageAuthenticationPolicy(TokenServerAuthenticationPolicy):
         # Sanity-check the contained data.
         # Any errors raise ValueError, triggering auth failure.
         try:
-            userid = data["uid"]
             token_node_name = data["node"]
         except KeyError, e:
             msg = "missing value in token data: %s"

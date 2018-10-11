@@ -193,8 +193,9 @@ class SQLStorage(SyncStorage):
     # Note: you can't use the @with_session decorator here.
     # It doesn't work right because of the generator-contextmanager thing.
     @contextlib.contextmanager
-    def lock_for_read(self, userid, collection):
+    def lock_for_read(self, user, collection):
         """Acquire a shared read lock on the named collection."""
+        userid = user["uid"]
         with self._get_or_create_session() as session:
             try:
                 collectionid = self._get_collection_id(session, collection)
@@ -225,8 +226,9 @@ class SQLStorage(SyncStorage):
     # Note: you can't use the @with_session decorator here.
     # It doesn't work right because of the generator-contextmanager thing.
     @contextlib.contextmanager
-    def lock_for_write(self, userid, collection):
+    def lock_for_write(self, user, collection):
         """Acquire an exclusive write lock on the named collection."""
+        userid = user["uid"]
         with self._get_or_create_session() as session:
             collectionid = self._get_collection_id(session, collection, True)
             locked = session.locked_collections.get((userid, collectionid))
@@ -254,16 +256,18 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def get_storage_timestamp(self, session, userid):
+    def get_storage_timestamp(self, session, user):
         """Returns the last-modified timestamp for the entire storage."""
+        userid = user["uid"]
         ts = session.query_scalar("STORAGE_TIMESTAMP", params={
             "userid": userid,
         }, default=0)
         return bigint2ts(ts)
 
     @with_session
-    def get_collection_timestamps(self, session, userid):
+    def get_collection_timestamps(self, session, user):
         """Returns the collection timestamps for a user."""
+        userid = user["uid"]
         res = session.query_fetchall("COLLECTIONS_TIMESTAMPS", {
             "userid": userid,
         })
@@ -273,8 +277,9 @@ class SQLStorage(SyncStorage):
         return res
 
     @with_session
-    def get_collection_counts(self, session, userid):
+    def get_collection_counts(self, session, user):
         """Returns the collection counts."""
+        userid = user["uid"]
         res = session.query_fetchall("COLLECTIONS_COUNTS", {
             "userid": userid,
             "ttl": int(session.timestamp),
@@ -282,8 +287,9 @@ class SQLStorage(SyncStorage):
         return self._map_collection_names(session, res)
 
     @with_session
-    def get_collection_sizes(self, session, userid):
+    def get_collection_sizes(self, session, user):
         """Returns the total size for each collection."""
+        userid = user["uid"]
         res = session.query_fetchall("COLLECTIONS_SIZES", {
             "userid": userid,
             "ttl": int(session.timestamp),
@@ -294,8 +300,9 @@ class SQLStorage(SyncStorage):
         return self._map_collection_names(session, rows)
 
     @with_session
-    def get_total_size(self, session, userid, recalculate=False):
+    def get_total_size(self, session, user, recalculate=False):
         """Returns the total size a user's stored data."""
+        userid = user["uid"]
         size = session.query_scalar("STORAGE_SIZE", {
             "userid": userid,
             "ttl": int(session.timestamp),
@@ -305,8 +312,9 @@ class SQLStorage(SyncStorage):
         return int(size)
 
     @with_session
-    def delete_storage(self, session, userid):
+    def delete_storage(self, session, user):
         """Removes all data for the user."""
+        userid = user["uid"]
         session.query("DELETE_ALL_BSOS", {
             "userid": userid,
         })
@@ -319,8 +327,9 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def get_collection_timestamp(self, session, userid, collection):
+    def get_collection_timestamp(self, session, user, collection):
         """Returns the last-modified timestamp of a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         # The last-modified timestamp may be cached on the session.
         cached_ts = session.cache[(userid, collectionid)].last_modified
@@ -336,22 +345,23 @@ class SQLStorage(SyncStorage):
         return bigint2ts(ts)
 
     @with_session
-    def get_items(self, session, userid, collection, **params):
+    def get_items(self, session, user, collection, **params):
         """Returns items from a collection."""
-        return self._find_items(session, userid, collection, **params)
+        return self._find_items(session, user, collection, **params)
 
     @with_session
-    def get_item_ids(self, session, userid, collection, **params):
+    def get_item_ids(self, session, user, collection, **params):
         """Returns item ids from a collection."""
         # Select only the fields we need, including those that might
         # be used for limit/offset pagination.
         params["fields"] = ["id", "modified", "sortindex"]
-        res = self._find_items(session, userid, collection, **params)
+        res = self._find_items(session, user, collection, **params)
         res["items"] = [item["id"] for item in res["items"]]
         return res
 
-    def _find_items(self, session, userid, collection, **params):
+    def _find_items(self, session, user, collection, **params):
         """Find items matching the given search parameters."""
+        userid = user["uid"]
         for key, value in self._default_find_params.iteritems():
             params.setdefault(key, value)
         params["userid"] = userid
@@ -376,7 +386,7 @@ class SQLStorage(SyncStorage):
         # because it's empty or because it doesn't exist.  Read the collection
         # timestamp and let it raise CollectionNotFoundError if necessary.
         if not items:
-            self.get_collection_timestamp(session, userid, collection)
+            self.get_collection_timestamp(session, user, collection)
         # Check if we read past the original limit, set next_offset if so.
         next_offset = None
         if limit is not None and len(items) > limit:
@@ -475,8 +485,9 @@ class SQLStorage(SyncStorage):
             raise InvalidOffsetError(offset)
 
     @with_session
-    def set_items(self, session, userid, collection, items):
+    def set_items(self, session, user, collection, items):
         """Creates or updates multiple items in a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection, create=1)
         rows = []
         for data in items:
@@ -493,8 +504,9 @@ class SQLStorage(SyncStorage):
         return self._touch_collection(session, userid, collectionid)
 
     @with_session
-    def create_batch(self, session, userid, collection):
+    def create_batch(self, session, user, collection):
         """Creates a batch in batch_uploads table"""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         # Careful, there's some weirdness here!
         #
@@ -522,8 +534,9 @@ class SQLStorage(SyncStorage):
         return batchid
 
     @with_session
-    def valid_batch(self, session, userid, collection, batchid):
+    def valid_batch(self, session, user, collection, batchid):
         """Checks to see if the batch ID is valid and still open"""
+        userid = user["uid"]
         # Avoid hitting the db for batches that are obviously too old.
         # Recall that the batchid is a millisecond timestamp.
         if (batchid / 1000 + BATCH_LIFETIME) < session.timestamp:
@@ -539,9 +552,10 @@ class SQLStorage(SyncStorage):
 
     @metrics_timer("syncstorage.storage.sql.append_items_to_batch")
     @with_session
-    def append_items_to_batch(self, session, userid, collection, batchid,
+    def append_items_to_batch(self, session, user, collection, batchid,
                               items):
         """Inserts items into batch_upload_items"""
+        userid = user["uid"]
         rows = []
         for data in items:
             id_ = data["id"]
@@ -552,7 +566,8 @@ class SQLStorage(SyncStorage):
 
     @metrics_timer("syncstorage.storage.sql.apply_batch")
     @with_session
-    def apply_batch(self, session, userid, collection, batchid):
+    def apply_batch(self, session, user, collection, batchid):
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         params = {
             "batch": batchid,
@@ -568,7 +583,8 @@ class SQLStorage(SyncStorage):
 
     @metrics_timer("syncstorage.storage.sql.close_batch")
     @with_session
-    def close_batch(self, session, userid, collection, batchid):
+    def close_batch(self, session, user, collection, batchid):
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         params = {
             "batch": batchid,
@@ -579,8 +595,9 @@ class SQLStorage(SyncStorage):
         session.query("CLOSE_BATCH_ITEMS", params)
 
     @with_session
-    def delete_collection(self, session, userid, collection):
+    def delete_collection(self, session, user, collection):
         """Deletes an entire collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         count = session.query("DELETE_COLLECTION_ITEMS", {
             "userid": userid,
@@ -592,11 +609,12 @@ class SQLStorage(SyncStorage):
         })
         if count == 0:
             raise CollectionNotFoundError
-        return self.get_storage_timestamp(userid)
+        return self.get_storage_timestamp(user)
 
     @with_session
-    def delete_items(self, session, userid, collection, items):
+    def delete_items(self, session, user, collection, items):
         """Deletes multiple items from a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         session.query("DELETE_ITEMS", {
             "userid": userid,
@@ -629,8 +647,9 @@ class SQLStorage(SyncStorage):
     #
 
     @with_session
-    def get_item_timestamp(self, session, userid, collection, item):
+    def get_item_timestamp(self, session, user, collection, item):
         """Returns the last-modified timestamp for the named item."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         ts = session.query_scalar("ITEM_TIMESTAMP", {
             "userid": userid,
@@ -643,8 +662,9 @@ class SQLStorage(SyncStorage):
         return bigint2ts(ts)
 
     @with_session
-    def get_item(self, session, userid, collection, item):
+    def get_item(self, session, user, collection, item):
         """Returns one item from a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         row = session.query_fetchone("ITEM_DETAILS", {
             "userid": userid,
@@ -657,8 +677,9 @@ class SQLStorage(SyncStorage):
         return self._row_to_bso(row, int(session.timestamp))
 
     @with_session
-    def set_item(self, session, userid, collection, item, data):
+    def set_item(self, session, user, collection, item, data):
         """Creates or updates a single item in a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection, create=1)
         row = self._prepare_bso_row(session, userid, collectionid, item, data)
         defaults = {
@@ -714,8 +735,9 @@ class SQLStorage(SyncStorage):
         return row
 
     @with_session
-    def delete_item(self, session, userid, collection, item):
+    def delete_item(self, session, user, collection, item):
         """Deletes a single item from a collection."""
+        userid = user["uid"]
         collectionid = self._get_collection_id(session, collection)
         rowcount = session.query("DELETE_ITEM", {
             "userid": userid,

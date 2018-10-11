@@ -67,24 +67,24 @@ def get_resource_timestamp(request):
     If the target resource does not exist, it returns zero.
     """
     storage = request.validated["storage"]
-    userid = request.validated["userid"]
+    user = request.user
     collection = request.validated.get("collection")
     item = request.validated.get("item")
 
     # No collection name => return overall storage timestamp.
     if collection is None:
-        return storage.get_storage_timestamp(userid)
+        return storage.get_storage_timestamp(user)
 
     # No item id => return timestamp of whole collection.
     if item is None:
         try:
-            return storage.get_collection_timestamp(userid, collection)
+            return storage.get_collection_timestamp(user, collection)
         except NotFoundError:
             return 0
 
     # Otherwise, return timestamp of specific item.
     try:
-        return storage.get_item_timestamp(userid, collection, item)
+        return storage.get_item_timestamp(user, collection, item)
     except NotFoundError:
         return 0
 

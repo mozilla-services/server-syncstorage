@@ -48,7 +48,7 @@ def clear_memcache_data(config_file, input_file):
             uid = uid.strip()
             if uid:
                 logger.info("Clearing data for %s", uid)
-                for key in backend.iter_cache_keys(uid):
+                for key in backend.iter_cache_keys({"uid": uid}):
                     backend.cache.delete(key)
                 logger.debug("Cleared data for %s", uid)
 
