@@ -2,12 +2,14 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from pyramid.request import Request
 from pyramid.security import IAuthenticationPolicy
+from pyramid.httpexceptions import HTTPUnauthorized
 import hawkauthlib
 
 from webtest import TestApp
 import testfixtures
+
+from mozsvc.user import RequestWithUser as Request
 
 from syncstorage.storage import get_storage
 from syncstorage.tests.support import StorageTestCase
@@ -51,6 +53,14 @@ class TestWSGIApp(StorageTestCase):
         app.do_request = new_do_request
 
         return app
+
+    def _make_signed_req(self, userid, user):
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        req = Request.blank("http://localhost/")
+        auth_token, auth_secret = auth_policy.encode_hawk_id(req, userid, user)
+        hawkauthlib.sign_request(req, auth_token, auth_secret)
+        req.metrics = {}
+        return req
 
     def test_the_it_works_page(self):
         app = self._make_test_app()
@@ -132,3 +142,64 @@ class TestWSGIApp(StorageTestCase):
                 break
         else:
             assert False, "timer metrics were not emitted"
+
+    def test_receiving_old_style_fxa_uid_in_auth_token(self):
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        req = self._make_signed_req(42, {
+            "fxa_uid": "hashed-uid",
+            "device_id": "hashed-device-id",
+        })
+
+        self.assertEquals(auth_policy.authenticated_userid(req), 42)
+
+        self.assertEquals(req.metrics["metrics_uid"], "hashed-uid")
+        self.assertEquals(req.metrics["metrics_device_id"], "hashed-device-id")
+
+        self.assertNotIn("fxa_uid", req.user)
+        self.assertNotIn("fxa_kid", req.user)
+
+    def test_receiving_new_style_fxa_uid_in_auth_token(self):
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        req = self._make_signed_req(42, {
+            "fxa_uid": "raw-uid",
+            "fxa_kid": "raw-kid",
+            "hashed_fxa_uid": "hashed-uid",
+            "hashed_device_id": "hashed-device-id",
+        })
+
+        self.assertEquals(auth_policy.authenticated_userid(req), 42)
+
+        self.assertEquals(req.metrics["metrics_uid"], "hashed-uid")
+        self.assertEquals(req.metrics["metrics_device_id"], "hashed-device-id")
+
+        self.assertEquals(req.user["fxa_uid"], "raw-uid")
+        self.assertEquals(req.user["fxa_kid"], "raw-kid")
+
+    def test_validation_of_user_data_from_token(self):
+        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
+        check_auth = auth_policy.authenticated_userid
+
+        req = self._make_signed_req(42, {
+            "fxa_uid": "invalid\nuid",
+            "fxa_kid": "raw-kid",
+            "hashed_fxa_uid": "hashed-uid",
+            "hashed_device_id": "hashed-device-id",
+        })
+        self.assertRaises(HTTPUnauthorized, check_auth, req)
+
+        req = self._make_signed_req(42, {
+            "fxa_uid": "raw-uid",
+            "fxa_kid": "invalid!kid",
+            "hashed_fxa_uid": "hashed-uid",
+            "hashed_device_id": "hashed-device-id",
+        })
+        self.assertRaises(HTTPUnauthorized, check_auth, req)
+
+        req = self._make_signed_req(42, {
+            "uid": "invalid string userid",
+            "fxa_uid": "raw-uid",
+            "fxa_kid": "raw-kid",
+            "hashed_fxa_uid": "hashed-uid",
+            "hashed_device_id": "hashed-device-id",
+        })
+        self.assertRaises(HTTPUnauthorized, check_auth, req)
