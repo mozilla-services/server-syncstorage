@@ -24,7 +24,7 @@ pymysql-sa==1.0
 pyramid-hawkauth==0.1.0
 pyramid==1.9.1
 repoze.lru==0.6
-requests==2.8.0
+requests==2.20.0
 simplejson==3.8.0
 six==1.10.0
 testfixtures==4.3.3
