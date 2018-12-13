@@ -17,7 +17,8 @@ def get_timestamp(value=None):
     try:
         if not isinstance(value, decimal.Decimal):
             value = decimal.Decimal(str(value))
-        return value.quantize(TWO_DECIMAL_PLACES)
+        return value.quantize(TWO_DECIMAL_PLACES,
+                              rounding=decimal.ROUND_CEILING)
     except decimal.InvalidOperation, e:
         raise ValueError(str(e))
 

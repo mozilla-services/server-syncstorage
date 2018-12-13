@@ -178,7 +178,7 @@ class SQLStorage(SyncStorage):
     #
     # For SQLite we depend on its database-level locking.  Read locks begin
     # a transaction and select something from the database, which creates
-    # a SHARED lock.  Write locks begin an exlusive transaction, which
+    # a SHARED lock.  Write locks begin an exclusive transaction, which
     # creates an EXCLUSIVE lock on the database.
     #
     # For MySQL (and other unsupported databases) we do explicit locking
