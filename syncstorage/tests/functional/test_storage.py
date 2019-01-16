@@ -915,6 +915,7 @@ class TestStorage(StorageFunctionalTestCase):
             msg = 'Timestamp used: %s' % ts
             msg += ' ' + self.app.get(self.root + '/storage/col2?full=1').body
             msg += ' Timestamps received: %s' % str(timestamps)
+            msg += ' Result of newer query: %s' % res
             raise AssertionError(msg)
 
     def test_strict_newer(self):

@@ -6,14 +6,15 @@ import sys
 import time
 import threading
 import traceback
+import uuid
 
 from syncstorage.storage import (SyncStorage,
                                  ConflictError,
                                  ItemNotFoundError,
                                  CollectionNotFoundError)
 
-_USER1 = {'uid': 1}
-_USER2 = {'uid': 2}
+_USER1 = {'uid': 1, 'fxa_uid': str(uuid.uuid4())}
+_USER2 = {'uid': 2, 'fxa_uid': str(uuid.uuid4())}
 _PLD = '*' * 500
 
 

@@ -31,7 +31,12 @@ def set_x_timestamp_header(handler, registry):
         # The storage might have created a new timestamp when processing
         # a write.  Report that one if it's newer than the current one.
         ts2 = get_timestamp(response.headers.get("X-Last-Modified"))
-        response.headers["X-Weave-Timestamp"] = str(max(ts1, ts2))
+        if not ts2 or request.method in ("GET", "HEAD",):
+            response.headers["X-Weave-Timestamp"] = str(max(ts1, ts2))
+        elif ts2:
+            response.headers["X-Weave-Timestamp"] = str(ts2)
+        else:
+            response.headers["X-Weave-Timestamp"] = str(ts1)
         return response
 
     return set_x_timestamp_header_tween

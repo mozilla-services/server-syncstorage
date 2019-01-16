@@ -136,12 +136,12 @@ def check_storage_quota(viewfunc, request):
 def check_precondition_headers(viewfunc, request):
     """View decorator to check X-If-[Unm|M]odified-Since headers.
 
-    This decorator checks pre-validated vlaues from the X-If-Modified-Since
+    This decorator checks pre-validated values from the X-If-Modified-Since
     and X-If-Unmodified-Since headers against the actual last-modified
     time of the target resource.  If the preconditions are not met then
     it raises the appropriate error response.
 
-    In addition, any retreived value for the last-modified time will be
+    In addition, any retrieved value for the last-modified time will be
     stored in the response headers for return to the client.  This may save
     having to look it up again when the response is being rendered.
     """
@@ -189,5 +189,6 @@ def with_collection_lock(viewfunc, request):
         lock_collection = storage.lock_for_read
     else:
         lock_collection = storage.lock_for_write
+
     with lock_collection(user, collection):
         return viewfunc(request)

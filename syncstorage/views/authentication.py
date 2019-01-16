@@ -2,17 +2,15 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import logging
 import re
 import time
-import logging
 
 import tokenlib
 import tokenlib.errors
-
-from zope.interface import implements
-from pyramid.interfaces import IAuthenticationPolicy
 from mozsvc.user import TokenServerAuthenticationPolicy
-
+from pyramid.interfaces import IAuthenticationPolicy
+from zope.interface import implements
 
 logger = logging.getLogger(__name__)
 

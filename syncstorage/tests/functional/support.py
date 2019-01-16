@@ -11,6 +11,7 @@ import random
 import json
 import urlparse
 import contextlib
+import uuid
 
 import unittest2
 import requests
@@ -50,7 +51,14 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         self.user_id = random.randint(1, 100000)
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank(self.host_url)
-        creds = auth_policy.encode_hawk_id(req, self.user_id)
+        creds = auth_policy.encode_hawk_id(
+            req, self.user_id, extra={
+                # Include a hashed_fxa_uid to trigger uid/kid extraction
+                "hashed_fxa_uid": str(uuid.uuid4()),
+                "fxa_uid": str(uuid.uuid4()),
+                "fxa_kid": str(uuid.uuid4()),
+            }
+        )
         self.auth_token, self.auth_secret = creds
 
     @contextlib.contextmanager
@@ -219,10 +227,12 @@ def run_live_functional_tests(TestCaseClass, argv=None):
 
     # Now use the unittest2 runner to execute them.
     suite = unittest2.TestSuite()
-    suite.addTest(unittest2.makeSuite(LiveTestCases))
+    test_prefix = os.environ.get("SYNC_TEST_PREFIX", "test")
+    suite.addTest(unittest2.makeSuite(LiveTestCases, prefix=test_prefix))
     runner = unittest2.TextTestRunner(
         stream=sys.stderr,
         failfast=opts.failfast,
+        verbosity=2,
     )
     res = runner.run(suite)
     if not res.wasSuccessful():
