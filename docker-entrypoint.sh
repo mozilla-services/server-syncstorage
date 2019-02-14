@@ -15,7 +15,7 @@ case "$1" in
         exec gunicorn \
             --paste "$_SETTINGS_FILE" \
             --bind ${HOST-127.0.0.1}:${PORT-8000}\
-            --worker-class mozsvc.gunicorn_worker.MozSvcGeventWorker \
+            --worker-class ${WORKER_CLASS} \
             --timeout ${SYNC_TIMEOUT-600} \
             --workers ${WEB_CONCURRENCY-1}\
             --graceful-timeout ${SYNC_GRACEFUL_TIMEOUT-660}\
