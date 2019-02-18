@@ -67,6 +67,11 @@ class TestWSGIApp(StorageTestCase):
         r = app.get("/")
         self.assertTrue("It Works!" in r.body)
 
+    def test_lbheartbeat_page(self):
+        app = self._make_test_app()
+        r = app.get("/__lbheartbeat__")
+        self.assertEqual({}, r.json)
+
     def test_metrics_capture(self):
         app = self._make_test_app()
 
