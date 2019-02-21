@@ -134,6 +134,25 @@ def get_site_root(request):
     return "It Works!  SyncStorage is successfully running on this host."
 
 
+# The /__lbheartbeat__ route is used by mozsvc load-balancer infra
+# to detect when a webhead is out of service.
+
+lbheartbeat = Service(name="lbheartbeat", path='/__lbheartbeat__',
+                      description="Web head health")
+
+
+@lbheartbeat.get()
+def get_lbheartbeat(request):
+    """Return successful healthy response.
+
+    If the load-balancer tries to access this URL and fails, this means the
+    web head is not operational and should be dropped.
+    """
+    return {}
+
+
+# The remianing routes are for the actual syncstorage service.
+
 service_root = SyncStorageService(name="service_root",
                                   path="")
 
