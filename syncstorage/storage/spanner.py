@@ -912,11 +912,22 @@ class SpannerStorage(SyncStorage):
                 uncached_ids.append(id)
         # Use a single query to fetch the names for all uncached collections.
         if uncached_ids:
+            bind_names = ["@id_%d" % x
+                          for x in range(1, len(uncached_ids) + 1)]
+            bind = {}
+            bind_types = {}
+            for i, id in enumerate(uncached_ids, 1):
+                bind["id_%d" % (i,)] = id
+                bind_types["id_%d" % (i,)] = param_types.INT64
+
             with self._database.snapshot() as snapshot:
                 uncached_names = snapshot.execute_sql(
-                    queries.COLLECTION_NAMES,
-                    params={"ids": uncached_ids},
-                    param_types=param_types.Array(param_types.INT64),
+                    getq(queries.COLLECTION_NAMES).replace(
+                        "@ids",
+                        '(%s)' % ', '.join(bind_names)
+                    ),
+                    params=bind,
+                    param_types=bind_types
                 )
             for id, name in uncached_names:
                 names[id] = name
