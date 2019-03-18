@@ -19,7 +19,10 @@ CREATE TABLE bso (
   INTERLEAVE IN PARENT user_collections ON DELETE CASCADE;
 
 CREATE INDEX BsoTtl ON bso(ttl);
-CREATE INDEX BsoLastModified ON bso(userid, collection, modified);
+-- TODO: modified DESC's ideal for the default sort order but client can
+-- also specify ASC
+CREATE INDEX BsoLastModified ON bso(userid, collection, modified DESC),
+  INTERLEAVE IN user_collections;
 
 CREATE TABLE collections (
     collectionid    INT64 NOT NULL,

@@ -340,8 +340,11 @@ class SpannerStorage(SyncStorage):
             bind["offset"] = params["offset"]
             bind_types["offset"] = param_types.INT64
             if limit is None:
-                # avoid sqlalchemy defaulting to LIMIT -1 when none provided
-                params["limit"] = bind["limit"] = INT64_MAX
+                # avoid sqlalchemy defaulting to LIMIT -1 when none provided.
+                # subtract offset to avoid overflow errors (that only occur w/
+                # a FORCE_INDEX= directive) OutOfRange: 400 int64 overflow:
+                # <INT64_MAX> + offset
+                params["limit"] = bind["limit"] = INT64_MAX - params["offset"]
                 bind_types["limit"] = param_types.INT64
 
         # Convert timestamp types
@@ -352,7 +355,12 @@ class SpannerStorage(SyncStorage):
 
         # Generate the query
         query = FIND_ITEMS(bso, params)
-        query = str(query.compile()).replace(":", "@")
+        query = str(query.compile())
+        query = query.replace(
+            "FROM bso",
+            "FROM bso@{FORCE_INDEX=BsoLastModified}"
+        )
+        query = query.replace(":", "@")
 
         result = session.transaction.execute_sql(
             query,
