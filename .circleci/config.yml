@@ -2,17 +2,14 @@ version: 2
 jobs:
   build:
     docker:
-      # base image
-      - image: ubuntu:16.04
+    docker:
+      - image: docker:stable-git
     steps:
       - checkout
       - setup_remote_docker
       - run:
           name: Install essential packages
-          command: |
-            apt-get update
-            apt-get install -y ca-certificates curl build-essential make git
-
+          command: apk add --no-cache bash
       - run:
           name: Create version.json
           command: |
@@ -24,15 +21,6 @@ jobs:
             "$CIRCLE_BUILD_URL" > version.json
       - store_artifacts:
           path: version.json
-      # FIXME: should use an image w/ docker installed by default
-      - run:
-          name: Install Docker
-          command: |
-            set -x
-            curl -L -o /tmp/docker-$DOCKER_VERSION.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$DOCKER_VERSION.tgz
-            [[ `sha256sum /tmp/docker-$DOCKER_VERSION.tgz  | cut -d' ' -f1` = $DOCKER_CHECKSUM ]]
-            tar -xz -C /tmp -f /tmp/docker-$DOCKER_VERSION.tgz
-            mv /tmp/docker/* /usr/bin
       - run:
           name: Build deployment container image
           command: docker build -t app:build .
