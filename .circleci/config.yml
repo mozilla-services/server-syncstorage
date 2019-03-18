@@ -5,13 +5,21 @@ jobs:
       # base image
       - image: ubuntu:16.04
     steps:
+      # workaround circleci's fallback git's "object not found" error w/ tag
+      # builds
+      - run:
+          name: Install Docker build dependencies
+          command: |
+            apt-get update
+            apt-get install -y openssh-client git
+
       - checkout
       - setup_remote_docker
       - run:
           name: Install essential packages
           command: |
             apt-get update
-            apt-get install -y ca-certificates curl build-essential make git
+            apt-get install -y ca-certificates curl build-essential make
 
       - run:
           name: Create version.json
