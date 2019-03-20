@@ -117,7 +117,9 @@ class SpannerStorage(SyncStorage):
         instance_id, database_id = sqluri[len("spanner://"):].split(":")
         self.client = spanner.Client()
         self._instance = self.client.instance(instance_id)
-        self._pool = pool = spanner.BurstyPool()
+        self._pool = pool = spanner.BurstyPool(
+            target_size=int(dbkwds.get("pool_size", 100))
+        )
         self._database = self._instance.database(database_id, pool=pool)
 
         self.standard_collections = standard_collections
