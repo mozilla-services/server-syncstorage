@@ -121,6 +121,8 @@ class SpannerStorage(SyncStorage):
             target_size=int(dbkwds.get("pool_size", 100))
         )
         self._database = self._instance.database(database_id, pool=pool)
+        # for debugging: support disabling FORCE_INDEX=BsoLastModified
+        self._force_bsolm_index = dbkwds.get("_force_bsolm_index", True)
 
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
@@ -358,10 +360,11 @@ class SpannerStorage(SyncStorage):
         # Generate the query
         query = FIND_ITEMS(bso, params)
         query = str(query.compile())
-        query = query.replace(
-            "FROM bso",
-            "FROM bso@{FORCE_INDEX=BsoLastModified}"
-        )
+        if self._force_bsolm_index:
+            query = query.replace(
+                "FROM bso",
+                "FROM bso@{FORCE_INDEX=BsoLastModified}"
+            )
         query = query.replace(":", "@")
 
         result = session.transaction.execute_sql(
