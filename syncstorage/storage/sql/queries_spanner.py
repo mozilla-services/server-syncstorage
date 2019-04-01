@@ -1,4 +1,4 @@
-from sqlalchemy.sql import select, bindparam
+from sqlalchemy.sql import select, bindparam, text
 
 DATABASE_CREATE_DDL = """\
 CREATE TABLE user_collections (
@@ -89,8 +89,14 @@ def FIND_ITEMS(bso, params):
         query = query.where(bso.c.id.in_(params.get("ids")))
     if "newer" in params:
         query = query.where(bso.c.modified > bindparam("newer"))
+        # Google's suggested forcing both ends of the range here
+        # (echoed in Spanner's best practices doc), though it doesn't
+        # seem to affect FIND_ITEMS query plan (and why would it?)
+        query = query.where(bso.c.modified <= text("CURRENT_TIMESTAMP()"))
     if "newer_eq" in params:
         query = query.where(bso.c.modified >= bindparam("newer_eq"))
+        # see above
+        query = query.where(bso.c.modified <= text("CURRENT_TIMESTAMP()"))
     if "older" in params:
         query = query.where(bso.c.modified < bindparam("older"))
     if "older_eq" in params:
