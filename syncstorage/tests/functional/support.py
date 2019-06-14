@@ -40,6 +40,10 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
         # Monkey-patch the app to sign all requests with the token.
         def new_do_request(req, *args, **kwds):
+            # XXX: we may need a toggle for the test runner that
+            # enables these sleeps
+            import time
+            time.sleep(0.01)
             hawkauthlib.sign_request(req, self.auth_token, self.auth_secret)
             return orig_do_request(req, *args, **kwds)
         orig_do_request = self.app.do_request

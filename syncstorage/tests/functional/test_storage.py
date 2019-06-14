@@ -1066,6 +1066,17 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.put_json(coll_url + "/" + bso["id"], bso, status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
+    def test_client_modified_ignored(self):
+        coll_url = self.root + "/storage/col2"
+        modified = 1500000150.22
+        bso = {"id": "1", "modified": modified}
+        res = self.app.put_json(coll_url + "/" + bso["id"], bso)
+        self.assertTrue(float(res.body) != modified)
+        bso = {"id": "2", "modified": modified}
+        res = self.app.post_json(coll_url, [bso])
+        self.assertTrue(res.json["success"] and not res.json["failed"])
+        self.assertTrue(res.json["modified"] != modified)
+
     def test_that_batch_gets_are_limited_to_max_number_of_ids(self):
         bso = {"id": "1", "payload": "testing"}
         self.app.put_json(self.root + "/storage/col2/1", bso)

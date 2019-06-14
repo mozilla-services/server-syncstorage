@@ -118,8 +118,6 @@ class SyncStorageService(Service):
         path = path.replace("{item}",
                             "{item:%s}" % (BSO_ID_REGEX,))
         # Add path prefix for the API version number and userid.
-        # XXX TODO: current FF client hardcodes "1.1" as the version number.
-        # We accept it for now but should disable this eventually.
         path = "/{api:1\\.5}/{userid:[0-9]{1,10}}" + path
         return path
 
