@@ -74,14 +74,14 @@ class TestStorage(StorageFunctionalTestCase):
             self.root = orig_root
 
     def retry(self, method, *args, **kwargs):
-        for i in range(0, 10):
-            try:
-                return getattr(self.app, method)(*args, **kwargs)
-            except webtest.AppError as ex:
-                print("Retrying... {}".format(ex))
-                if "500 " not in ex.message and "503 " not in ex.message:
-                    raise ex
-                time.sleep(0.100)
+        func = getattr(self.app, method)
+        try:
+            return func(*args, **kwargs)
+        except webtest.AppError as ex:
+            if "500 " not in ex.message and "503 " not in ex.message:
+                raise ex
+            time.sleep(0.01)
+            return func(*args, **kwargs)
 
     def test_get_info_collections(self):
         # col1 gets 3 items, col2 gets 5 items.
