@@ -61,7 +61,7 @@ class TestStorage(StorageFunctionalTestCase):
         super(TestStorage, self).setUp()
         self.root = '/1.5/%d' % (self.user_id,)
         # Reset the storage to a known state, aka "empty".
-        self.retry("delete", self.root)
+        self.retry_delete(self.root)
 
     @contextlib.contextmanager
     def _switch_user(self):
@@ -73,8 +73,16 @@ class TestStorage(StorageFunctionalTestCase):
         finally:
             self.root = orig_root
 
-    def retry(self, method, *args, **kwargs):
-        func = getattr(self.app, method)
+    def retry_post_json(self, *args, **kwargs):
+        return self._retry_send(self.app.post_json, *args, **kwargs)
+
+    def retry_put_json(self, *args, **kwargs):
+        return self._retry_send(self.app.put_json, *args, **kwargs)
+
+    def retry_delete(self, *args, **kwargs):
+        return self._retry_send(self.app.delete, *args, **kwargs)
+
+    def _retry_send(self, func, *args, **kwargs):
         try:
             return func(*args, **kwargs)
         except webtest.AppError as ex:
@@ -86,13 +94,13 @@ class TestStorage(StorageFunctionalTestCase):
     def test_get_info_collections(self):
         # col1 gets 3 items, col2 gets 5 items.
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
-        resp = self.retry("post_json", self.root + "/storage/col1", bsos)
+        resp = self.retry_post_json(self.root + "/storage/col1", bsos)
         ts1 = resp.json["modified"]
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        resp = self.retry("post_json", self.root + "/storage/col2", bsos)
+        resp = self.retry_post_json(self.root + "/storage/col2", bsos)
         ts2 = resp.json["modified"]
         # only those collections should appear in the query.
-        resp = self.retry("get", self.root + '/info/collections')
+        resp = self.app.get(self.root + '/info/collections')
         res = resp.json
         keys = sorted(res.keys())
         self.assertEquals(keys, ["col1", "col2"])
@@ -100,10 +108,10 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res["col2"], ts2)
         # Updating items in col2, check timestamps.
         bsos = [{"id": str(i), "payload": "yyy"} for i in xrange(2)]
-        resp = self.retry("post_json", self.root + "/storage/col2", bsos)
+        resp = self.retry_post_json(self.root + "/storage/col2", bsos)
         self.assertTrue(ts2 < resp.json["modified"])
         ts2 = resp.json["modified"]
-        resp = self.retry("get", self.root + '/info/collections')
+        resp = self.app.get(self.root + '/info/collections')
         res = resp.json
         keys = sorted(res.keys())
         self.assertEquals(keys, ["col1", "col2"])
@@ -113,9 +121,9 @@ class TestStorage(StorageFunctionalTestCase):
     def test_get_collection_count(self):
         # col1 gets 3 items, col2 gets 5 items.
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
-        self.retry("post_json", self.root + "/storage/col1", bsos)
+        self.retry_post_json(self.root + "/storage/col1", bsos)
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
         # those counts should be reflected back in query.
         resp = self.app.get(self.root + '/info/collection_counts')
         res = resp.json
@@ -135,7 +143,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # 2. add a new collection + stuff
         bso = {'id': '125', 'payload': _PLD}
-        self.retry("put_json", self.root + '/storage/xxxx/125', bso)
+        self.retry_put_json(self.root + '/storage/xxxx/125', bso)
 
         # 3. get collection info again, should find the new ones
         resp = self.app.get(self.root + '/info/collections')
@@ -143,15 +151,15 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_get_collection(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
 
         # non-existent collections appear as empty
-        resp = self.retry("get", self.root + '/storage/nonexistent')
+        resp = self.app.get(self.root + '/storage/nonexistent')
         res = resp.json
         self.assertEquals(res, [])
 
         # try just getting all items at once.
-        resp = self.retry("get", self.root + '/storage/col2')
+        resp = self.app.get(self.root + '/storage/col2')
         res = resp.json
         res.sort()
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
@@ -162,7 +170,7 @@ class TestStorage(StorageFunctionalTestCase):
         # "ids"
         # Returns the ids for objects in the collection that are in the
         # provided comma-separated list.
-        res = self.retry("get", self.root + '/storage/col2?ids=1,3,17')
+        res = self.app.get(self.root + '/storage/col2?ids=1,3,17')
         res = res.json
         res.sort()
         self.assertEquals(res, ['1', '3'])
@@ -171,197 +179,197 @@ class TestStorage(StorageFunctionalTestCase):
         # Returns only ids for objects in the collection that have been last
         # modified after the timestamp given.
 
-        self.retry("delete", self.root + '/storage/col2')
+        self.retry_delete(self.root + '/storage/col2')
 
         bso = {'id': '128', 'payload': 'x'}
-        res = self.retry("put_json", self.root + '/storage/col2/128', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/128', bso)
         ts1 = float(res.headers["X-Last-Modified"])
 
         bso = {'id': '129', 'payload': 'x'}
-        res = self.retry("put_json", self.root + '/storage/col2/129', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/129', bso)
         ts2 = float(res.headers["X-Last-Modified"])
 
         self.assertTrue(ts1 < ts2)
 
-        res = self.retry("get", self.root + '/storage/col2?newer=%s' % ts1)
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts1)
         self.assertEquals(res.json, ['129'])
 
-        res = self.retry("get", self.root + '/storage/col2?newer=%s' % ts2)
+        res = self.app.get(self.root + '/storage/col2?newer=%s' % ts2)
         self.assertEquals(res.json, [])
 
-        res = self.retry("get",
-                         self.root + '/storage/col2?newer=%s' % (ts1 - 1))
+        res = self.app.get(
+            self.root + '/storage/col2?newer=%s' % (ts1 - 1))
         self.assertEquals(sorted(res.json), ['128', '129'])
 
         # "older"
         # Returns only ids for objects in the collection that have been last
         # modified before the timestamp given.
 
-        self.retry("delete", self.root + '/storage/col2')
+        self.retry_delete(self.root + '/storage/col2')
 
         bso = {'id': '128', 'payload': 'x'}
-        res = self.retry("put_json", self.root + '/storage/col2/128', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/128', bso)
         ts1 = float(res.headers["X-Last-Modified"])
 
         bso = {'id': '129', 'payload': 'x'}
-        res = self.retry("put_json", self.root + '/storage/col2/129', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/129', bso)
         ts2 = float(res.headers["X-Last-Modified"])
 
         self.assertTrue(ts1 < ts2)
 
-        res = self.retry("get", self.root + '/storage/col2?older=%s' % ts1)
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts1)
         self.assertEquals(res.json, [])
 
-        res = self.retry("get", self.root + '/storage/col2?older=%s' % ts2)
+        res = self.app.get(self.root + '/storage/col2?older=%s' % ts2)
         self.assertEquals(res.json, ['128'])
 
-        res = self.retry("get",
-                         self.root + '/storage/col2?older=%s' % (ts2 + 1))
+        res = self.app.get(
+            self.root + '/storage/col2?older=%s' % (ts2 + 1))
         self.assertEquals(sorted(res.json), ['128', '129'])
 
         qs = '?older=%s&newer=%s' % (ts2 + 1, ts1)
-        res = self.retry("get", self.root + '/storage/col2' + qs)
+        res = self.app.get(self.root + '/storage/col2' + qs)
         self.assertEquals(sorted(res.json), ['129'])
 
         # "full"
         # If defined, returns the full BSO, rather than just the id.
-        res = self.retry("get", self.root + '/storage/col2?full=1')
+        res = self.app.get(self.root + '/storage/col2?full=1')
         keys = res.json[0].keys()
         keys.sort()
         wanted = ['id', 'modified', 'payload']
         self.assertEquals(keys, wanted)
 
-        res = self.retry("get", self.root + '/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertTrue(isinstance(res.json, list))
 
         # "limit"
         # Sets the maximum number of ids that will be returned
-        self.retry("delete", self.root + '/storage/col2')
+        self.retry_delete(self.root + '/storage/col2')
 
         bsos = []
         for i in range(10):
             bso = {'id': str(i), 'payload': 'x', 'sortindex': i}
             bsos.append(bso)
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
 
         query_url = self.root + '/storage/col2?sort=index'
-        res = self.retry("get", query_url)
+        res = self.app.get(query_url)
         all_items = res.json
         self.assertEquals(len(all_items), 10)
 
-        res = self.retry("get", query_url + '&limit=2')
+        res = self.app.get(query_url + '&limit=2')
         self.assertEquals(res.json, all_items[:2])
 
         # "offset"
         # Skips over items that have already been returned.
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&limit=3&offset=' + next_offset)
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
         self.assertEquals(res.json, all_items[2:5])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&offset=' + next_offset)
+        res = self.app.get(query_url + '&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
-        res = self.retry("get",
-                         query_url + '&limit=10000&offset=' + next_offset)
+        res = self.app.get(
+            query_url + '&limit=10000&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
         # "offset" again, this time ordering by descending timestamp.
         query_url = self.root + '/storage/col2?sort=newest'
-        res = self.retry("get", query_url)
+        res = self.app.get(query_url)
         all_items = res.json
         self.assertEquals(len(all_items), 10)
 
-        res = self.retry("get", query_url + '&limit=2')
+        res = self.app.get(query_url + '&limit=2')
         self.assertEquals(res.json, all_items[:2])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&limit=3&offset=' + next_offset)
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
         self.assertEquals(res.json, all_items[2:5])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&offset=' + next_offset)
+        res = self.app.get(query_url + '&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
-        res = self.retry("get",
-                         query_url + '&limit=10000&offset=' + next_offset)
+        res = self.app.get(
+            query_url + '&limit=10000&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
 
         # "offset" again, this time ordering by ascending timestamp.
         query_url = self.root + '/storage/col2?sort=oldest'
-        res = self.retry("get", query_url)
+        res = self.app.get(query_url)
         all_items = res.json
         self.assertEquals(len(all_items), 10)
 
-        res = self.retry("get", query_url + '&limit=2')
+        res = self.app.get(query_url + '&limit=2')
         self.assertEquals(res.json, all_items[:2])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&limit=3&offset=' + next_offset)
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
         self.assertEquals(res.json, all_items[2:5])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&offset=' + next_offset)
+        res = self.app.get(query_url + '&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
-        res = self.retry("get",
-                         query_url + '&limit=10000&offset=' + next_offset)
+        res = self.app.get(
+            query_url + '&limit=10000&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
 
         # "offset" once more, this time with no explicit ordering
         query_url = self.root + '/storage/col2?'
-        res = self.retry("get", query_url)
+        res = self.app.get(query_url)
         all_items = res.json
         self.assertEquals(len(all_items), 10)
 
-        res = self.retry("get", query_url + '&limit=2')
+        res = self.app.get(query_url + '&limit=2')
         self.assertEquals(res.json, all_items[:2])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&limit=3&offset=' + next_offset)
+        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
         self.assertEquals(res.json, all_items[2:5])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.retry("get", query_url + '&offset=' + next_offset)
+        res = self.app.get(query_url + '&offset=' + next_offset)
         self.assertEquals(res.json, all_items[5:])
         self.assertTrue("X-Weave-Next-Offset" not in res.headers)
 
-        res = self.retry("get",
-                         query_url + '&limit=10000&offset=' + next_offset)
+        res = self.app.get(
+            query_url + '&limit=10000&offset=' + next_offset)
 
         # "sort"
         #   'newest': Orders by timestamp number (newest first)
         #   'oldest': Orders by timestamp number (oldest first)
         #   'index':  Orders by the sortindex descending (highest weight first)
-        self.retry("delete", self.root + '/storage/col2')
+        self.retry_delete(self.root + '/storage/col2')
 
         for index, sortindex in (('0', -1), ('1', 34), ('2', 12)):
             bso = {'id': index, 'payload': 'x', 'sortindex': sortindex}
-            self.retry("post_json", self.root + '/storage/col2', [bso])
+            self.retry_post_json(self.root + '/storage/col2', [bso])
 
-        res = self.retry("get", self.root + '/storage/col2?sort=newest')
+        res = self.app.get(self.root + '/storage/col2?sort=newest')
         res = res.json
         self.assertEquals(res, ['2', '1', '0'])
 
-        res = self.retry("get", self.root + '/storage/col2?sort=oldest')
+        res = self.app.get(self.root + '/storage/col2?sort=oldest')
         res = res.json
         self.assertEquals(res, ['0', '1', '2'])
 
-        res = self.retry("get", self.root + '/storage/col2?sort=index')
+        res = self.app.get(self.root + '/storage/col2?sort=index')
         res = res.json
         self.assertEquals(res, ['1', '2', '0'])
 
     def test_alternative_formats(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
 
         # application/json
-        res = self.retry("get", self.root + '/storage/col2',
-                         headers=[('Accept', 'application/json')])
+        res = self.app.get(self.root + '/storage/col2',
+                           headers=[('Accept', 'application/json')])
         self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
         res = res.json
@@ -369,8 +377,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
         # application/newlines
-        res = self.retry("get", self.root + '/storage/col2',
-                         headers=[('Accept', 'application/newlines')])
+        res = self.app.get(self.root + '/storage/col2',
+                           headers=[('Accept', 'application/newlines')])
         self.assertEquals(res.content_type, 'application/newlines')
 
         self.assertTrue(res.body.endswith('\n'))
@@ -379,18 +387,18 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res, ['0', '1', '2', '3', '4'])
 
         # unspecified format defaults to json
-        res = self.retry("get", self.root + '/storage/col2')
+        res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
         # unkown format gets a 406
-        self.retry("get", self.root + '/storage/col2',
-                   headers=[('Accept', 'x/yy')], status=406)
+        self.app.get(self.root + '/storage/col2',
+                     headers=[('Accept', 'x/yy')], status=406)
 
     def test_set_collection_with_if_modified_since(self):
         # Create five items with different timestamps.
         for i in xrange(5):
             bsos = [{"id": str(i), "payload": "xxx"}]
-            self.retry("post_json", self.root + "/storage/col2", bsos)
+            self.retry_post_json(self.root + "/storage/col2", bsos)
         # Get them all, along with their timestamps.
         res = self.app.get(self.root + '/storage/col2?full=true').json
         self.assertEquals(len(res), 5)
@@ -406,7 +414,7 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_get_item(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
         # grabbing object 1 from col2
         res = self.app.get(self.root + '/storage/col2/1')
         res = res.json
@@ -433,14 +441,14 @@ class TestStorage(StorageFunctionalTestCase):
     def test_set_item(self):
         # let's create an object
         bso = {'payload': _PLD}
-        self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        self.retry_put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/storage/col2/12345')
         res = res.json
         self.assertEquals(res['payload'], _PLD)
 
         # now let's update it
         bso = {'payload': 'YYY'}
-        self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        self.retry_put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/storage/col2/12345')
         res = res.json
         self.assertEquals(res['payload'], 'YYY')
@@ -450,7 +458,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/12')
@@ -464,7 +472,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '13', 'payload': 'XyX'}
         bso2 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
 
         # checking what we did
         res = self.app.get(self.root + '/storage/col2/14')
@@ -479,7 +487,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': 'two', 'payload': _PLD,
                 'sortindex': 'FAIL'}
         bsos = [bso1, bso2]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_set_collection_input_formats(self):
@@ -494,7 +502,7 @@ class TestStorage(StorageFunctionalTestCase):
         items = self.app.get(self.root + "/storage/col2").json
         self.assertEquals(len(items), 2)
         # If we send an unknown content type, we get an error.
-        self.retry("delete", self.root + "/storage/col2")
+        self.retry_delete(self.root + "/storage/col2")
         body = json_dumps(bsos)
         self.app.post(self.root + '/storage/col2', body, headers={
             "Content-Type": "application/octet-stream"
@@ -511,7 +519,7 @@ class TestStorage(StorageFunctionalTestCase):
         item = self.app.get(self.root + "/storage/col2/TEST").json
         self.assertEquals(item["payload"], _PLD)
         # If we send json with some other content type, it should fail
-        self.retry("delete", self.root + "/storage/col2")
+        self.retry_delete(self.root + "/storage/col2")
         self.app.put(self.root + '/storage/col2/TEST', body, headers={
             "Content-Type": "application/octet-stream"
         }, status=415)
@@ -551,12 +559,12 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(items[1]["payload"], bsos[1]["payload"])
 
     def test_collection_usage(self):
-        self.retry("delete", self.root + "/storage")
+        self.retry_delete(self.root + "/storage")
 
         bso1 = {'id': '13', 'payload': 'XyX'}
         bso2 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
 
         res = self.app.get(self.root + '/info/collection_usage')
         usage = res.json
@@ -570,24 +578,24 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': '13', 'payload': _PLD}
         bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
         # deleting all items
-        self.retry("delete", self.root + '/storage/col2')
+        self.retry_delete(self.root + '/storage/col2')
         items = self.app.get(self.root + '/storage/col2').json
         self.assertEquals(len(items), 0)
 
         # Deletes the ids for objects in the collection that are in the
         # provided comma-separated list.
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
-        self.retry("delete", self.root + '/storage/col2?ids=12,14')
+        self.retry_delete(self.root + '/storage/col2?ids=12,14')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
-        self.retry("delete", self.root + '/storage/col2?ids=13')
+        self.retry_delete(self.root + '/storage/col2?ids=13')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
@@ -597,18 +605,18 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': '13', 'payload': _PLD}
         bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
         ts = float(res.headers['X-Last-Modified'])
 
         # deleting item 13
-        self.retry("delete", self.root + '/storage/col2/13')
+        self.retry_delete(self.root + '/storage/col2/13')
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 2)
 
         # unexisting item should return a 404
-        self.retry("delete", self.root + '/storage/col2/12982', status=404)
+        self.retry_delete(self.root + '/storage/col2/12982', status=404)
 
         # The collection should get an updated timestsamp.
         res = self.app.get(self.root + '/info/collections')
@@ -620,15 +628,15 @@ class TestStorage(StorageFunctionalTestCase):
         bso2 = {'id': '13', 'payload': _PLD}
         bso3 = {'id': '14', 'payload': _PLD}
         bsos = [bso1, bso2, bso3]
-        self.retry("post_json", self.root + '/storage/col2', bsos)
+        self.retry_post_json(self.root + '/storage/col2', bsos)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
         # deleting all
-        self.retry("delete", self.root + '/storage')
+        self.retry_delete(self.root + '/storage')
         items = self.app.get(self.root + '/storage/col2').json
         self.assertEquals(len(items), 0)
-        self.retry("delete", self.root + '/storage/col2', status=200)
+        self.retry_delete(self.root + '/storage/col2', status=200)
         self.assertEquals(len(items), 0)
 
     def test_x_timestamp_header(self):
@@ -637,7 +645,7 @@ class TestStorage(StorageFunctionalTestCase):
             raise unittest2.SkipTest
 
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
 
         now = round(time.time(), 2)
         time.sleep(0.01)
@@ -648,10 +656,10 @@ class TestStorage(StorageFunctionalTestCase):
         now = round(time.time(), 2)
         time.sleep(0.01)
         bso = {'payload': _PLD}
-        res = self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/12345', bso)
         self.assertTrue(now < float(res.headers['X-Weave-Timestamp']))
         self.assertTrue(abs(now -
-                        float(res.headers['X-Weave-Timestamp'])) < 200)
+                            float(res.headers['X-Weave-Timestamp'])) < 200)
 
         # getting the timestamp with a POST
         now = round(time.time(), 2)
@@ -659,34 +667,30 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '12', 'payload': _PLD}
         bso2 = {'id': '13', 'payload': _PLD}
         bsos = [bso1, bso2]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         self.assertTrue(now < float(res.headers['X-Weave-Timestamp']))
 
     def test_ifunmodifiedsince(self):
         bso = {'id': '12345', 'payload': _PLD}
-        res = self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/12345', bso)
         # Using an X-If-Unmodified-Since in the past should cause 412s.
         ts = str(float(res.headers['X-Last-Modified']) - 1)
         bso = {'id': '12345', 'payload': _PLD + "XXX"}
-        res = self.retry(
-            "put_json",
+        res = self.retry_put_json(
             self.root + '/storage/col2/12345', bso,
             headers=[('X-If-Unmodified-Since', ts)],
             status=412)
         self.assertTrue("X-Last-Modified" in res.headers)
-        res = self.retry(
-            "delete",
+        res = self.retry_delete(
             self.root + '/storage/col2/12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=412)
         self.assertTrue("X-Last-Modified" in res.headers)
-        self.retry(
-            "post_json",
+        self.retry_post_json(
             self.root + '/storage/col2', [bso],
             headers=[('X-If-Unmodified-Since', ts)],
             status=412)
-        self.retry(
-            "delete",
+        self.retry_delete(
             self.root + '/storage/col2?ids=12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=412)
@@ -701,11 +705,10 @@ class TestStorage(StorageFunctionalTestCase):
         # Deleting items from a collection should give 412 even if some
         # other, unrelated item in the collection has been modified.
         ts = res.headers['X-Last-Modified']
-        res2 = self.retry("put_json", self.root + '/storage/col2/54321', {
+        res2 = self.retry_put_json(self.root + '/storage/col2/54321', {
             'payload': _PLD,
         })
-        self.retry(
-            "delete",
+        self.retry_delete(
             self.root + '/storage/col2?ids=12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=412)
@@ -717,8 +720,7 @@ class TestStorage(StorageFunctionalTestCase):
                           res.headers['X-Last-Modified'])
         # Using an X-If-Unmodified-Since equal to
         # X-Last-Modified should allow the request to succeed.
-        res = self.retry(
-            "post_json",
+        res = self.retry_post_json(
             self.root + '/storage/col2', [bso],
             headers=[('X-If-Unmodified-Since', ts)],
             status=200)
@@ -727,13 +729,11 @@ class TestStorage(StorageFunctionalTestCase):
             self.root + '/storage/col2/12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=200)
-        self.retry(
-            "delete",
+        self.retry_delete(
             self.root + '/storage/col2/12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=200)
-        res = self.retry(
-            "put_json",
+        res = self.retry_put_json(
             self.root + '/storage/col2/12345', bso,
             headers=[('X-If-Unmodified-Since', '0')],
             status=200)
@@ -742,8 +742,7 @@ class TestStorage(StorageFunctionalTestCase):
             self.root + '/storage/col2',
             headers=[('X-If-Unmodified-Since', ts)],
             status=200)
-        self.retry(
-            "delete",
+        self.retry_delete(
             self.root + '/storage/col2?ids=12345',
             headers=[('X-If-Unmodified-Since', ts)],
             status=200)
@@ -752,7 +751,7 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.app.get(self.root + '/info/quota')
         old_used = res.json[0]
         bso = {'payload': _PLD}
-        self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        self.retry_put_json(self.root + '/storage/col2/12345', bso)
         res = self.app.get(self.root + '/info/quota')
         used = res.json[0]
         self.assertEquals(used - old_used, len(_PLD) / 1024.0)
@@ -763,41 +762,41 @@ class TestStorage(StorageFunctionalTestCase):
             raise unittest2.SkipTest
 
         # Clear out any data that's already in the store.
-        self.retry("delete", self.root + "/storage")
+        self.retry_delete(self.root + "/storage")
 
         # Set a low quota for the storage.
         self.config.registry.settings["storage.quota_size"] = 700
 
         # Check the the remaining quota is correctly reported.
         bso = {'payload': _PLD}
-        res = self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/12345', bso)
         wanted = str(round(200 / 1024.0, 2))
         self.assertEquals(res.headers['X-Weave-Quota-Remaining'], wanted)
 
         # Set the quota so that they're over their limit.
         self.config.registry.settings["storage.quota_size"] = 10
         bso = {'payload': _PLD}
-        res = self.retry("put_json", self.root + '/storage/col2/12345', bso,
-                         status=403)
+        res = self.retry_put_json(self.root + '/storage/col2/12345', bso,
+                                  status=403)
         self.assertEquals(res.content_type.split(";")[0], 'application/json')
         self.assertEquals(res.json["status"], "quota-exceeded")
 
     def test_get_collection_ttl(self):
         bso = {'payload': _PLD, 'ttl': 0}
-        res = self.retry("put_json", self.root + '/storage/col2/12345', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/12345', bso)
         time.sleep(1.1)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(res.json, [])
 
         bso = {'payload': _PLD, 'ttl': 2}
-        res = self.retry("put_json", self.root + '/storage/col2/123456', bso)
+        res = self.retry_put_json(self.root + '/storage/col2/123456', bso)
 
         # it should exists now
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
 
         # trying a second put again
-        self.retry("put_json", self.root + '/storage/col2/123456', bso)
+        self.retry_put_json(self.root + '/storage/col2/123456', bso)
 
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
@@ -822,14 +821,14 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Uploading max_count-5 small objects should succeed.
         bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count - 5)]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), max_count - 5)
         self.assertEquals(len(res['failed']), 0)
 
         # Uploading max_count+5 items should produce five failures.
         bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_count + 5)]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), max_count)
         self.assertEquals(len(res['failed']), 5)
@@ -847,7 +846,7 @@ class TestStorage(StorageFunctionalTestCase):
         # which would get us rejected in production with a 413.
         self.assertTrue(len(json.dumps(bsos)) < max_req_bytes)
 
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), max_items)
         self.assertEquals(len(res['failed']), 1)
@@ -855,7 +854,7 @@ class TestStorage(StorageFunctionalTestCase):
     def test_weird_args(self):
         # pushing some data in col2
         bsos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
 
         # trying weird args and make sure the server returns 400s
@@ -878,7 +877,7 @@ class TestStorage(StorageFunctionalTestCase):
         # pushing some data in col2
         bsos = [{'id': '6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d' % i,
                  'payload': _PLD} for i in range(5)]
-        res = self.retry("post_json", self.root + '/storage/passwords', bsos)
+        res = self.retry_post_json(self.root + '/storage/passwords', bsos)
         res = res.json
         self.assertEquals(len(res["success"]), 5)
 
@@ -886,7 +885,7 @@ class TestStorage(StorageFunctionalTestCase):
         ids = ','.join(['6820f3ca-6e8a-4ff4-8af7-8b3625d7d65%d' % i
                         for i in range(2)])
 
-        self.retry("delete", self.root + '/storage/passwords?ids=%s' % ids)
+        self.retry_delete(self.root + '/storage/passwords?ids=%s' % ids)
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
         self.assertEqual(len(res.json), 0)
@@ -896,13 +895,13 @@ class TestStorage(StorageFunctionalTestCase):
     def test_specifying_ids_with_percent_encoded_query_string(self):
         # create some items
         bsos = [{'id': 'test-%d' % i, 'payload': _PLD} for i in range(5)]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res["success"]), 5)
         # now delete some of them
         ids = ','.join(['test-%d' % i for i in range(2)])
         ids = urllib.quote(ids)
-        self.retry("delete", self.root + '/storage/col2?ids=%s' % ids)
+        self.retry_delete(self.root + '/storage/col2?ids=%s' % ids)
         # check that the correct items were deleted
         res = self.app.get(self.root + '/storage/col2?ids=%s' % ids)
         self.assertEqual(len(res.json), 0)
@@ -913,7 +912,7 @@ class TestStorage(StorageFunctionalTestCase):
         # Create five items with different timestamps.
         for i in xrange(5):
             bsos = [{"id": str(i), "payload": "xxx"}]
-            self.retry("post_json", self.root + "/storage/col2", bsos)
+            self.retry_post_json(self.root + "/storage/col2", bsos)
 
         # make sure the server returns only proper precision timestamps.
         resp = self.app.get(self.root + '/storage/col2?full=1')
@@ -948,14 +947,14 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '1', 'payload': _PLD}
         bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
-        res = self.retry("post_json", self.root + '/storage/meh', bsos)
+        res = self.retry_post_json(self.root + '/storage/meh', bsos)
         ts = float(res.headers["X-Last-Modified"])
 
         # send two more bsos
         bso3 = {'id': '3', 'payload': _PLD}
         bso4 = {'id': '4', 'payload': _PLD}
         bsos = [bso3, bso4]
-        res = self.retry("post_json", self.root + '/storage/meh', bsos)
+        res = self.retry_post_json(self.root + '/storage/meh', bsos)
 
         # asking for bsos using newer=ts where newer is the timestamp
         # of bso 1 and 2, should not return them
@@ -968,13 +967,13 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '1', 'payload': _PLD}
         bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
-        res = self.retry("post_json", self.root + '/storage/meh', bsos)
+        res = self.retry_post_json(self.root + '/storage/meh', bsos)
 
         # send two more bsos
         bso3 = {'id': '3', 'payload': _PLD}
         bso4 = {'id': '4', 'payload': _PLD}
         bsos = [bso3, bso4]
-        res = self.retry("post_json", self.root + '/storage/meh', bsos)
+        res = self.retry_post_json(self.root + '/storage/meh', bsos)
         ts = float(res.headers["X-Last-Modified"])
 
         # asking for bsos using older=ts where older is the timestamp
@@ -986,41 +985,41 @@ class TestStorage(StorageFunctionalTestCase):
     def test_handling_of_invalid_json_in_bso_uploads(self):
         # Single upload with JSON that's not a BSO.
         bso = "notabso"
-        res = self.retry("put_json", self.root + '/storage/col2/invalid', bso,
-                         status=400)
+        res = self.retry_put_json(self.root + '/storage/col2/invalid', bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
         bso = 42
-        res = self.retry("put_json", self.root + '/storage/col2/invalid', bso,
-                         status=400)
+        res = self.retry_put_json(self.root + '/storage/col2/invalid', bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
         bso = {'id': ["1", "2"], 'payload': {'3': '4'}}
-        res = self.retry("put_json", self.root + '/storage/col2/invalid', bso,
-                         status=400)
+        res = self.retry_put_json(self.root + '/storage/col2/invalid', bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
         # Batch upload with JSON that's not a list of BSOs
         bsos = "notalist"
-        res = self.retry("post_json", self.root + '/storage/col2', bsos,
-                         status=400)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos,
+                                   status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
         bsos = 42
-        res = self.retry("post_json", self.root + '/storage/col2', bsos,
-                         status=400)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos,
+                                   status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
         # Batch upload a list with something that's not a valid data dict.
         # It should fail out entirely, as the input is seriously broken.
         bsos = [{'id': '1', 'payload': 'GOOD'}, "BAD"]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos,
-                         status=400)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos,
+                                   status=400)
 
         # Batch upload a list with something that's an invalid BSO.
         # It should process the good entry and fail for the bad.
         bsos = [{'id': '1', 'payload': 'GOOD'}, {'id': '2', 'invalid': 'ya'}]
-        res = self.retry("post_json", self.root + '/storage/col2', bsos)
+        res = self.retry_post_json(self.root + '/storage/col2', bsos)
         res = res.json
         self.assertEquals(len(res['success']), 1)
         self.assertEquals(len(res['failed']), 1)
@@ -1031,80 +1030,78 @@ class TestStorage(StorageFunctionalTestCase):
         # The newline cases are especially nuanced because \n
         # gets special treatment from the regex library.
         bso = {"id": "A\nB", "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         bso = {"id": "A\n", "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         bso = {"id": "\nN", "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         bso = {"id": "A\tB", "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         # Invalid ID - empty string is not acceptable.
         bso = {"id": "", "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
         # Invalid ID - too long
         bso = {"id": "X" * 65, "payload": "testing"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=404)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso, status=404)
         # Invalid sortindex - not an integer
         bso = {"id": "TEST", "payload": "testing", "sortindex": "meh"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid sortindex - not an integer
         bso = {"id": "TEST", "payload": "testing", "sortindex": "2.6"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid sortindex - larger than max value
         bso = {"id": "TEST", "payload": "testing", "sortindex": "1" + "0" * 9}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid payload - not a string
         bso = {"id": "TEST", "payload": 42}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid ttl - not an integer
         bso = {"id": "TEST", "payload": "testing", "ttl": "eh?"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid ttl - not an integer
         bso = {"id": "TEST", "payload": "testing", "ttl": "4.2"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json", coll_url + "/" + bso["id"], bso,
-                         status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso,
+                                  status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
         # Invalid BSO - unknown field
         bso = {"id": "TEST", "unexpected": "spanish-inquisition"}
-        res = self.retry("post_json", coll_url, [bso])
+        res = self.retry_post_json(coll_url, [bso])
         self.assertTrue(res.json["failed"] and not res.json["success"])
-        res = self.retry("put_json",
-                         coll_url + "/" + bso["id"], bso, status=400)
+        res = self.retry_put_json(coll_url + "/" + bso["id"], bso, status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
     def test_that_batch_gets_are_limited_to_max_number_of_ids(self):
         bso = {"id": "1", "payload": "testing"}
-        self.retry("put_json", self.root + "/storage/col2/1", bso)
+        self.retry_put_json(self.root + "/storage/col2/1", bso)
 
         # Getting with less than the limit works OK.
         ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS - 1))
@@ -1124,36 +1121,35 @@ class TestStorage(StorageFunctionalTestCase):
         bso = {"id": "1", "payload": "testing"}
 
         # Deleting with less than the limit works OK.
-        self.retry("put_json", self.root + "/storage/col2/1", bso)
+        self.retry_put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS - 1))
-        self.retry("delete", self.root + "/storage/col2?ids=" + ids)
+        self.retry_delete(self.root + "/storage/col2?ids=" + ids)
 
         # Deleting with equal to the limit works OK.
-        self.retry("put_json", self.root + "/storage/col2/1", bso)
+        self.retry_put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS))
-        self.retry("delete", self.root + "/storage/col2?ids=" + ids)
+        self.retry_delete(self.root + "/storage/col2?ids=" + ids)
 
         # Deleting with more than the limit fails.
-        self.retry("put_json", self.root + "/storage/col2/1", bso)
+        self.retry_put_json(self.root + "/storage/col2/1", bso)
         ids = ",".join(str(i) for i in xrange(BATCH_MAX_IDS + 1))
-        self.retry("delete", self.root + "/storage/col2?ids=" + ids,
-                   status=400)
+        self.retry_delete(self.root + "/storage/col2?ids=" + ids, status=400)
 
     def test_that_expired_items_can_be_overwritten_via_PUT(self):
         # Upload something with a small ttl.
         bso = {"payload": "XYZ", "ttl": 0}
-        self.retry("put_json", self.root + "/storage/col2/TEST", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST", bso)
         # Wait for it to expire.
         time.sleep(0.02)
         self.app.get(self.root + "/storage/col2/TEST", status=404)
         # Overwriting it should still work.
         bso = {"payload": "XYZ", "ttl": 42}
-        self.retry("put_json", self.root + "/storage/col2/TEST", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST", bso)
 
     def test_if_modified_since_on_info_views(self):
         # Store something, so the views have a modified time > 0.
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
-        self.retry("post_json", self.root + "/storage/col1", bsos)
+        self.retry_post_json(self.root + "/storage/col1", bsos)
         INFO_VIEWS = ("/info/collections", "/info/quota",
                       "/info/collection_usage", "/info/collection_counts")
         # Get the initial last-modified version.
@@ -1170,7 +1166,7 @@ class TestStorage(StorageFunctionalTestCase):
             self.app.get(self.root + view, headers=headers, status=304)
         # Change a collection.
         bso = {"payload": "TEST"}
-        r = self.retry("put_json", self.root + "/storage/col2/TEST", bso)
+        r = self.retry_put_json(self.root + "/storage/col2/TEST", bso)
         ts2 = r.headers["X-Last-Modified"]
         # Using the previous version should read the updated data.
         headers = {"X-If-Modified-Since": str(ts1)}
@@ -1183,7 +1179,7 @@ class TestStorage(StorageFunctionalTestCase):
         # XXX TODO: the storage-level timestamp is not tracked correctly
         # after deleting a collection, so this test fails for now.
         # # Delete a collection.
-        # r = self.retry("delete", self.root + "/storage/col2")
+        # r = self.retry_delete(self.root + "/storage/col2")
         # ts3 = r.headers["X-Last-Modified"]
         # # Using the previous timestamp should read the updated data.
         # headers = {"X-If-Modified-Since": str(ts2)}
@@ -1196,7 +1192,7 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_that_x_last_modified_is_sent_for_all_get_requests(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
-        self.retry("post_json", self.root + "/storage/col2", bsos)
+        self.retry_post_json(self.root + "/storage/col2", bsos)
         r = self.app.get(self.root + "/info/collections")
         self.assertTrue("X-Last-Modified" in r.headers)
         r = self.app.get(self.root + "/info/collection_counts")
@@ -1208,17 +1204,17 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_update_of_ttl_without_sending_data(self):
         bso = {"payload": "x", "ttl": 1}
-        self.retry("put_json", self.root + "/storage/col2/TEST1", bso)
-        self.retry("put_json", self.root + "/storage/col2/TEST2", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST1", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST2", bso)
         # Before those expire, update ttl on one that exists
         # and on one that does not.
         time.sleep(0.2)
         bso = {"ttl": 10}
-        self.retry("put_json", self.root + "/storage/col2/TEST2", bso)
-        self.retry("put_json", self.root + "/storage/col2/TEST3", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST2", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST3", bso)
         # Update some other field on TEST1, which should leave ttl untouched.
         bso = {"sortindex": 3}
-        self.retry("put_json", self.root + "/storage/col2/TEST1", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST1", bso)
         # If we wait, TEST1 should expire but the others should not.
         time.sleep(0.8)
         items = self.app.get(self.root + "/storage/col2?full=1").json
@@ -1235,7 +1231,7 @@ class TestStorage(StorageFunctionalTestCase):
     def test_bulk_update_of_ttls_without_sending_data(self):
         # Create 5 BSOs with a ttl of 1 second.
         bsos = [{"id": str(i), "payload": "x", "ttl": 1} for i in xrange(5)]
-        r = self.retry("post_json", self.root + "/storage/col2", bsos)
+        r = self.retry_post_json(self.root + "/storage/col2", bsos)
         ts1 = float(r.headers["X-Last-Modified"])
         # Before they expire, bulk-update the ttl to something longer.
         # Also send data for some that don't exist yet.
@@ -1244,7 +1240,7 @@ class TestStorage(StorageFunctionalTestCase):
         time.sleep(0.2)
         bsos = [{"id": str(i), "ttl": 10} for i in xrange(3, 7)]
         bsos[0]["payload"] = "xx"
-        r = self.retry("post_json", self.root + "/storage/col2", bsos)
+        r = self.retry_post_json(self.root + "/storage/col2", bsos)
         self.assertEquals(len(r.json["success"]), 4)
         ts2 = float(r.headers["X-Last-Modified"])
         # If we wait then items 0, 1, 2 should have expired.
@@ -1268,26 +1264,26 @@ class TestStorage(StorageFunctionalTestCase):
 
     def test_that_negative_integer_fields_are_not_accepted(self):
         # ttls cannot be negative
-        self.retry("put_json", self.root + "/storage/col2/TEST", {
+        self.retry_put_json(self.root + "/storage/col2/TEST", {
             "payload": "TEST",
             "ttl": -1,
         }, status=400)
         # limit cannot be negative
-        self.retry("put_json", self.root + "/storage/col2/TEST",
-                   {"payload": "X"})
+        self.retry_put_json(self.root + "/storage/col2/TEST",
+                            {"payload": "X"})
         self.app.get(self.root + "/storage/col2?limit=-1", status=400)
         # X-If-Modified-Since cannot be negative
         self.app.get(self.root + "/storage/col2", headers={
             "X-If-Modified-Since": "-3",
         }, status=400)
         # X-If-Unmodified-Since cannot be negative
-        self.retry("put_json", self.root + "/storage/col2/TEST", {
+        self.retry_put_json(self.root + "/storage/col2/TEST", {
             "payload": "TEST",
         }, headers={
             "X-If-Unmodified-Since": "-3",
         }, status=400)
         # sortindex actually *can* be negative
-        self.retry("put_json", self.root + "/storage/col2/TEST", {
+        self.retry_put_json(self.root + "/storage/col2/TEST", {
             "payload": "TEST",
             "sortindex": -42,
         }, status=200)
@@ -1299,8 +1295,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + '/storage/meta/global', status=404)
         res = self.app.get(self.root + '/storage/meta')
         self.assertEquals(res.json, [])
-        self.retry("put_json", self.root + '/storage/meta/global',
-                   {'payload': 'blob'})
+        self.retry_put_json(self.root + '/storage/meta/global',
+                            {'payload': 'blob'})
         res = self.app.get(self.root + '/storage/meta')
         self.assertEquals(res.json, ['global'])
         res = self.app.get(self.root + '/storage/meta/global')
@@ -1313,8 +1309,8 @@ class TestStorage(StorageFunctionalTestCase):
         modified_re = r"['\"]modified['\"]:\s*[0-9]+\.[0-9][0-9]\s*[,}]"
         self.assertTrue(re.search(modified_re, res.body))
         # Any client-specified "modified" field should be ignored
-        res = self.retry("put_json", self.root + '/storage/meta/global',
-                         {'payload': 'blob', 'modified': 12})
+        res = self.retry_put_json(self.root + '/storage/meta/global',
+                                  {'payload': 'blob', 'modified': 12})
         ts = float(res.headers['X-Weave-Timestamp'])
         res = self.app.get(self.root + '/storage/meta/global')
         self.assertEquals(res.json['modified'], ts)
@@ -1325,10 +1321,10 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res.json, 0)
 
     def test_that_internal_server_fields_are_not_echoed(self):
-        self.retry("post_json", self.root + '/storage/col1',
-                   [{'id': 'one', 'payload': 'blob'}])
-        self.retry("put_json", self.root + '/storage/col1/two',
-                   {'payload': 'blub'})
+        self.retry_post_json(self.root + '/storage/col1',
+                             [{'id': 'one', 'payload': 'blob'}])
+        self.retry_put_json(self.root + '/storage/col1/two',
+                            {'payload': 'blub'})
         res = self.app.get(self.root + '/storage/col1?full=1')
         self.assertEquals(len(res.json), 2)
         for item in res.json:
@@ -1351,7 +1347,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # Write some items while we've got a good token.
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
-        resp = self.retry("post_json", self.root + "/storage/col1", bsos)
+        resp = self.retry_post_json(self.root + "/storage/col1", bsos)
         ts = float(resp.headers["X-Last-Modified"])
 
         # Check that we can read the info correctly.
@@ -1370,7 +1366,7 @@ class TestStorage(StorageFunctionalTestCase):
 
         # The expired token cannot be used for normal operations.
         bsos = [{"id": str(i), "payload": "aaa"} for i in xrange(3)]
-        self.retry("post_json", self.root + "/storage/col1", bsos, status=401)
+        self.retry_post_json(self.root + "/storage/col1", bsos, status=401)
         self.app.get(self.root + "/storage/col1", status=401)
 
         # But it still allows access to /info/collections.
@@ -1387,8 +1383,8 @@ class TestStorage(StorageFunctionalTestCase):
             bso = {'id': str(i), 'payload': 'x'}
             bsos.append(bso)
             if i % 4 == 3:
-                res = self.retry("post_json", self.root + '/storage/col2',
-                                 bsos)
+                res = self.retry_post_json(self.root + '/storage/col2',
+                                           bsos)
                 ts = float(res.headers["X-Last-Modified"])
                 timestamps.append((i, ts))
                 bsos = []
@@ -1429,8 +1425,8 @@ class TestStorage(StorageFunctionalTestCase):
             bso = {'id': str(i), 'payload': 'x'}
             bsos.append(bso)
             if i % 4 == 3:
-                res = self.retry("post_json", self.root + '/storage/col2',
-                                 bsos)
+                res = self.retry_post_json(self.root + '/storage/col2',
+                                           bsos)
                 ts = float(res.headers["X-Last-Modified"])
                 timestamps.append((i - 3, ts))
                 bsos = []
@@ -1475,14 +1471,14 @@ class TestStorage(StorageFunctionalTestCase):
         bso1 = {'id': '12', 'payload': 'elegance'}
         bso2 = {'id': '13', 'payload': 'slovenly'}
         bsos = [bso1, bso2]
-        self.retry("post_json", endpoint, bsos)
+        self.retry_post_json(endpoint, bsos)
 
         resp = self.app.get(endpoint + '/12')
         orig_modified = resp.headers['X-Last-Modified']
 
         bso3 = {'id': 'a', 'payload': 'internal'}
         bso4 = {'id': 'b', 'payload': 'pancreas'}
-        resp = self.retry("post_json", endpoint + '?batch=true', [bso3, bso4])
+        resp = self.retry_post_json(endpoint + '?batch=true', [bso3, bso4])
         batch = resp.json["batch"]
 
         # The collection should not be reported as modified.
@@ -1500,7 +1496,7 @@ class TestStorage(StorageFunctionalTestCase):
         bso6 = {'id': '13', 'payload': 'portnoy'}
         bso0 = {'id': '14', 'payload': 'itsybitsy'}
         commit = '?batch={0}&commit=true'.format(batch)
-        resp = self.retry("post_json", endpoint + commit, [bso5, bso6, bso0])
+        resp = self.retry_post_json(endpoint + commit, [bso5, bso6, bso0])
         committed = resp.json['modified']
         self.assertEquals(resp.json['modified'],
                           float(resp.headers['X-Last-Modified']))
@@ -1530,12 +1526,12 @@ class TestStorage(StorageFunctionalTestCase):
         # empty commit POST
         bso7 = {'id': 'a', 'payload': 'burrito'}
         bso8 = {'id': 'e', 'payload': 'chocolate'}
-        resp = self.retry("post_json", endpoint + '?batch=true', [bso7, bso8])
+        resp = self.retry_post_json(endpoint + '?batch=true', [bso7, bso8])
         batch = resp.json["batch"]
         time.sleep(1)
         commit = '?batch={0}&commit=true'.format(batch)
 
-        resp1 = self.retry("post_json", endpoint + commit, [])
+        resp1 = self.retry_post_json(endpoint + commit, [])
         committed = resp1.json['modified']
         self.assertEquals(committed, float(resp1.headers['X-Last-Modified']))
 
@@ -1552,11 +1548,10 @@ class TestStorage(StorageFunctionalTestCase):
 
         # invalid batch ID
         bso1 = {'id': 'f', 'payload': 'pantomime'}
-        self.retry("post_json", endpoint + '?batch=sammich', [bso1],
-                   status=400)
+        self.retry_post_json(endpoint + '?batch=sammich', [bso1], status=400)
 
         # commit with no batch ID
-        self.retry("post_json", endpoint + '?commit=true', [], status=400)
+        self.retry_post_json(endpoint + '?commit=true', [], status=400)
 
     def test_batch_size_limits(self):
         limits = self.app.get(self.root + '/info/configuration').json
@@ -1588,43 +1583,43 @@ class TestStorage(StorageFunctionalTestCase):
         # `max_post_records` is an (inclusive) limit on
         # the number of items in a single post.
 
-        res = self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Records': str(limits['max_post_records'])
+        res = self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Records': str(limits['max_post_records'])
         })
         self.assertFalse(res.json['failed'])
-        res = self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Records': str(limits['max_post_records'] + 1)
+        res = self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Records': str(limits['max_post_records'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
         bsos = [{'id': str(x), 'payload': ''}
                 for x in xrange(limits['max_post_records'])]
-        res = self.retry("post_json", endpoint, bsos)
+        res = self.retry_post_json(endpoint, bsos)
         self.assertFalse(res.json['failed'])
         bsos.append({'id': 'toomany', 'payload': ''})
-        res = self.retry("post_json", endpoint, bsos)
+        res = self.retry_post_json(endpoint, bsos)
         self.assertEquals(res.json['failed']['toomany'], 'retry bso')
 
         # `max_total_records` is an (inclusive) limit on the
         # total number of items in a batch.  We can only enforce
         # it if the client tells us this via header.
 
-        self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Total-Records': str(limits['max_total_records'])
+        self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Total-Records': str(limits['max_total_records'])
         })
-        res = self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Total-Records': str(limits['max_total_records'] + 1)
+        res = self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Total-Records': str(limits['max_total_records'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
         # `max_post_bytes` is an (inclusive) limit on the
         # total size of payloads in a single post.
 
-        self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Bytes': str(limits['max_post_bytes'])
+        self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Bytes': str(limits['max_post_bytes'])
         })
-        res = self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
+        res = self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
@@ -1632,10 +1627,10 @@ class TestStorage(StorageFunctionalTestCase):
             {'id': 'little', 'payload': 'XXX'},
             {'id': 'big', 'payload': 'X' * (limits['max_post_bytes'] - 3)}
         ]
-        res = self.retry("post_json", endpoint, bsos)
+        res = self.retry_post_json(endpoint, bsos)
         self.assertFalse(res.json['failed'])
         bsos[1]['payload'] += 'X'
-        res = self.retry("post_json", endpoint, bsos)
+        res = self.retry_post_json(endpoint, bsos)
         self.assertEqual(res.json['success'], ['little'])
         self.assertEqual(res.json['failed']['big'], 'retry bytes')
 
@@ -1643,29 +1638,29 @@ class TestStorage(StorageFunctionalTestCase):
         # total size of all payloads in a batch.  We can only enforce
         # it if the client tells us this via header.
 
-        self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Total-Bytes': str(limits['max_total_bytes'])
+        self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Total-Bytes': str(limits['max_total_bytes'])
         })
-        res = self.retry("post_json", endpoint, [], headers={
-          'X-Weave-Total-Bytes': str(limits['max_total_bytes'] + 1)
+        res = self.retry_post_json(endpoint, [], headers={
+            'X-Weave-Total-Bytes': str(limits['max_total_bytes'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
 
     def test_batch_partial_update(self):
         collection = self.root + '/storage/col2'
         bsos = [
-          {'id': 'a', 'payload': 'aai'},
-          {'id': 'b', 'payload': 'bee', 'sortindex': 17}
+            {'id': 'a', 'payload': 'aai'},
+            {'id': 'b', 'payload': 'bee', 'sortindex': 17}
         ]
-        resp = self.retry("post_json", collection, bsos)
+        resp = self.retry_post_json(collection, bsos)
         orig_ts = float(resp.headers['X-Last-Modified'])
 
         # Update one, and add a new one.
         bsos = [
-          {'id': 'b', 'payload': 'bii'},
-          {'id': 'c', 'payload': 'sea'},
+            {'id': 'b', 'payload': 'bii'},
+            {'id': 'c', 'payload': 'sea'},
         ]
-        resp = self.retry("post_json", collection + '?batch=true', bsos)
+        resp = self.retry_post_json(collection + '?batch=true', bsos)
         batch = resp.json["batch"]
         self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
 
@@ -1681,7 +1676,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(res[1]['sortindex'], 17)
 
         endpoint = collection + '?batch={0}&commit=true'.format(batch)
-        resp = self.retry("post_json", endpoint, [])
+        resp = self.retry_post_json(endpoint, [])
         commit_ts = float(resp.headers['X-Last-Modified'])
 
         # The changes have now been applied.
@@ -1702,27 +1697,26 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_ttl_update(self):
         collection = self.root + '/storage/col2'
         bsos = [
-          {'id': 'a', 'payload': 'ayy'},
-          {'id': 'b', 'payload': 'bea'},
-          {'id': 'c', 'payload': 'see'}
+            {'id': 'a', 'payload': 'ayy'},
+            {'id': 'b', 'payload': 'bea'},
+            {'id': 'c', 'payload': 'see'}
         ]
-        resp = self.retry("post_json", collection, bsos)
+        resp = self.retry_post_json(collection, bsos)
 
         # Bump ttls as a series of individual batch operations.
-        resp = self.retry("post_json", collection + '?batch=true', [],
-                          status=202)
+        resp = self.retry_post_json(collection + '?batch=true', [],
+                                    status=202)
         orig_ts = float(resp.headers['X-Last-Modified'])
         batch = resp.json["batch"]
 
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.retry("post_json", endpoint, [{'id': 'a', 'ttl': 2}],
-                          status=202)
+        resp = self.retry_post_json(endpoint, [{'id': 'a', 'ttl': 2}],
+                                    status=202)
         self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
-        resp = self.retry("post_json", endpoint, [{'id': 'b', 'ttl': 2}],
-                          status=202)
+        resp = self.retry_post_json(endpoint, [{'id': 'b', 'ttl': 2}],
+                                    status=202)
         self.assertEquals(orig_ts, float(resp.headers['X-Last-Modified']))
-        resp = self.retry("post_json", endpoint + '&commit=true', [],
-                          status=200)
+        resp = self.retry_post_json(endpoint + '&commit=true', [], status=200)
 
         # The payloads should be unchanged
         resp = self.app.get(collection + '?full=1')
@@ -1743,18 +1737,17 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_ttl_is_based_on_commit_timestamp(self):
         collection = self.root + '/storage/col2'
 
-        resp = self.retry("post_json", collection + '?batch=true', [],
-                          status=202)
+        resp = self.retry_post_json(collection + '?batch=true', [], status=202)
         batch = resp.json["batch"]
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.retry("post_json", endpoint, [{'id': 'a', 'ttl': 3}],
-                          status=202)
+        resp = self.retry_post_json(endpoint, [{'id': 'a', 'ttl': 3}],
+                                    status=202)
 
         # Put some time between upload timestamp and commit timestamp.
         time.sleep(1.5)
 
-        resp = self.retry("post_json", endpoint + '&commit=true', [],
-                          status=200)
+        resp = self.retry_post_json(endpoint + '&commit=true', [],
+                                    status=200)
 
         # Wait a little; if ttl is taken from the time of the commit
         # then it should not kick in just yet.
@@ -1773,13 +1766,13 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_with_immediate_commit(self):
         collection = self.root + '/storage/col2'
         bsos = [
-          {'id': 'a', 'payload': 'aih'},
-          {'id': 'b', 'payload': 'bie'},
-          {'id': 'c', 'payload': 'cee'}
+            {'id': 'a', 'payload': 'aih'},
+            {'id': 'b', 'payload': 'bie'},
+            {'id': 'c', 'payload': 'cee'}
         ]
 
-        resp = self.retry("post_json", collection + '?batch=true&commit=true',
-                          bsos, status=200)
+        resp = self.retry_post_json(collection + '?batch=true&commit=true',
+                                    bsos, status=200)
         self.assertTrue('batch' not in resp.json)
         self.assertTrue('modified' in resp.json)
         committed = resp.json['modified']
@@ -1801,15 +1794,15 @@ class TestStorage(StorageFunctionalTestCase):
         collection1 = self.root + '/storage/col1'
         collection2 = self.root + '/storage/col2'
         bsos = [
-          {'id': 'a', 'payload': 'aih'},
-          {'id': 'b', 'payload': 'bie'},
-          {'id': 'c', 'payload': 'cee'}
+            {'id': 'a', 'payload': 'aih'},
+            {'id': 'b', 'payload': 'bie'},
+            {'id': 'c', 'payload': 'cee'}
         ]
 
-        resp = self.retry("post_json", collection1, bsos)
+        resp = self.retry_post_json(collection1, bsos)
         ts1 = resp.json['modified']
 
-        resp = self.retry("post_json", collection2, bsos)
+        resp = self.retry_post_json(collection2, bsos)
         ts2 = resp.json['modified']
 
         resp = self.app.get(self.root + '/info/collections')
@@ -1818,8 +1811,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(resp.json['col2'], ts2)
 
         # Overwrite in place, timestamp should change.
-        resp = self.retry("post_json", collection2 + '?batch=true&commit=true',
-                          bsos[:2])
+        resp = self.retry_post_json(collection2 + '?batch=true&commit=true',
+                                    bsos[:2])
         self.assertTrue(resp.json['modified'] > ts2)
         ts2 = resp.json['modified']
 
@@ -1829,8 +1822,8 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(resp.json['col2'], ts2)
 
         # Add new items, timestamp should change
-        resp = self.retry("post_json", collection1 + '?batch=true&commit=true',
-                          [{'id': 'd', 'payload': 'dee'}])
+        resp = self.retry_post_json(collection1 + '?batch=true&commit=true',
+                                    [{'id': 'd', 'payload': 'dee'}])
         self.assertTrue(resp.json['modified'] > ts1)
         self.assertTrue(resp.json['modified'] >= ts2)
         ts1 = resp.json['modified']
@@ -1843,20 +1836,20 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_with_failing_bsos(self):
         collection = self.root + '/storage/col2'
         bsos = [
-          {'id': 'a', 'payload': 'aai'},
-          {'id': 'b\n', 'payload': 'i am invalid', 'sortindex': 17}
+            {'id': 'a', 'payload': 'aai'},
+            {'id': 'b\n', 'payload': 'i am invalid', 'sortindex': 17}
         ]
-        resp = self.retry("post_json", collection + '?batch=true', bsos)
+        resp = self.retry_post_json(collection + '?batch=true', bsos)
         self.assertEqual(len(resp.json['failed']), 1)
         self.assertEqual(len(resp.json['success']), 1)
         batch = resp.json["batch"]
 
         bsos = [
-          {'id': 'c', 'payload': 'sea'},
-          {'id': 'd', 'payload': 'dii', 'ttl': -12},
+            {'id': 'c', 'payload': 'sea'},
+            {'id': 'd', 'payload': 'dii', 'ttl': -12},
         ]
         endpoint = collection + '?batch={0}&commit=true'.format(batch)
-        resp = self.retry("post_json", endpoint, bsos)
+        resp = self.retry_post_json(endpoint, bsos)
         self.assertEqual(len(resp.json['failed']), 1)
         self.assertEqual(len(resp.json['success']), 1)
 
@@ -1874,27 +1867,28 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_id_is_correctly_scoped_to_a_collection(self):
         collection1 = self.root + '/storage/col1'
         bsos = [
-          {'id': 'a', 'payload': 'aih'},
-          {'id': 'b', 'payload': 'bie'},
-          {'id': 'c', 'payload': 'cee'}
+            {'id': 'a', 'payload': 'aih'},
+            {'id': 'b', 'payload': 'bie'},
+            {'id': 'c', 'payload': 'cee'}
         ]
-        resp = self.retry("post_json", collection1 + '?batch=true', bsos)
+        resp = self.retry_post_json(collection1 + '?batch=true', bsos)
         batch = resp.json['batch']
 
         # I should not be able to add to that batch in a different collection.
         endpoint2 = self.root + '/storage/col2?batch={0}'.format(batch)
-        resp = self.retry("post_json", endpoint2,
-                          [{'id': 'd', 'payload': 'dii'}], status=400)
+        resp = self.retry_post_json(
+                endpoint2,
+                [{'id': 'd', 'payload': 'dii'}],
+                status=400)
 
         # I should not be able to commit that batch in a different collection.
-        resp = self.retry("post_json", endpoint2 + '&commit=true', [],
-                          status=400)
+        resp = self.retry_post_json(endpoint2 + '&commit=true', [], status=400)
 
         # I should still be able to use the batch in the correct collection.
         endpoint1 = collection1 + '?batch={0}'.format(batch)
-        resp = self.retry("post_json", endpoint1,
-                          [{'id': 'd', 'payload': 'dii'}])
-        resp = self.retry("post_json", endpoint1 + '&commit=true', [])
+        resp = self.retry_post_json(endpoint1,
+                                    [{'id': 'd', 'payload': 'dii'}])
+        resp = self.retry_post_json(endpoint1 + '&commit=true', [])
 
         resp = self.app.get(collection1 + '?full=1')
         res = resp.json
@@ -1911,23 +1905,23 @@ class TestStorage(StorageFunctionalTestCase):
         for _ in xrange(100):
             bsos = [{'id': 'a', 'payload': 'aih'}]
             req = '/storage/col1?batch=true'
-            resp = self.retry("post_json", self.root + req, bsos)
+            resp = self.retry_post_json(self.root + req, bsos)
             batch1 = resp.json['batch']
             with self._switch_user():
                 bsos = [{'id': 'b', 'payload': 'bee'}]
                 req = '/storage/col1?batch=true'
-                resp = self.retry("post_json", self.root + req, bsos)
+                resp = self.retry_post_json(self.root + req, bsos)
                 batch2 = resp.json['batch']
                 # Let the second user commit their batch.
                 req = '/storage/col1?batch={0}&commit=true'.format(batch2)
-                self.retry("post_json", self.root + req, [])
+                self.retry_post_json(self.root + req, [])
                 # It should only have a single item.
                 resp = self.app.get(self.root + '/storage/col1')
                 self.assertEquals(resp.json, ['b'])
             # The first user's collection should still be empty.
             # Now have the  first user commit their batch.
             req = '/storage/col1?batch={0}&commit=true'.format(batch1)
-            self.retry("post_json", self.root + req, [])
+            self.retry_post_json(self.root + req, [])
             # It should only have a single item.
             resp = self.app.get(self.root + '/storage/col1')
             self.assertEquals(resp.json, ['a'])
@@ -1945,16 +1939,16 @@ class TestStorage(StorageFunctionalTestCase):
         for _ in xrange(100):
             bsos = [{'id': 'i', 'payload': 'aye'}]
             req = '/storage/col1?batch=true'
-            resp = self.retry("post_json", self.root + req, bsos)
+            resp = self.retry_post_json(self.root + req, bsos)
             batch1 = resp.json['batch']
             req = '/storage/col1?batch={0}&commit=true'.format(batch1)
-            self.retry("post_json", self.root + req, [])
+            self.retry_post_json(self.root + req, [])
             req = '/storage/col2?batch=true'
-            resp = self.retry("post_json", self.root + req, [])
+            resp = self.retry_post_json(self.root + req, [])
             batch2 = resp.json['batch']
             bsos = [{'id': 'j', 'payload': 'jay'}]
             req = '/storage/col2?batch={0}&commit=true'.format(batch2)
-            self.retry("post_json", self.root + req, bsos)
+            self.retry_post_json(self.root + req, bsos)
             # Retry if we failed to trigger re-use of the batchid.
             if batch1 == batch2:
                 break
@@ -1968,28 +1962,29 @@ class TestStorage(StorageFunctionalTestCase):
     def test_batch_id_is_correctly_scoped_to_a_user(self):
         collection = self.root + '/storage/col1'
         bsos = [
-          {'id': 'a', 'payload': 'aih'},
-          {'id': 'b', 'payload': 'bie'},
-          {'id': 'c', 'payload': 'cee'}
+            {'id': 'a', 'payload': 'aih'},
+            {'id': 'b', 'payload': 'bie'},
+            {'id': 'c', 'payload': 'cee'}
         ]
-        resp = self.retry("post_json", collection + '?batch=true', bsos)
+        resp = self.retry_post_json(collection + '?batch=true', bsos)
         batch = resp.json['batch']
 
         with self._switch_user():
             # I should not be able to add to that batch as a different user.
             endpoint = self.root + '/storage/col1?batch={0}'.format(batch)
-            resp = self.retry("post_json", endpoint,
-                              [{'id': 'd', 'payload': 'di'}], status=400)
+            resp = self.retry_post_json(
+                endpoint,
+                [{'id': 'd', 'payload': 'di'}],
+                status=400)
 
             # I should not be able to commit that batch as a different user.
-            resp = self.retry("post_json", endpoint + '&commit=true', [],
-                              status=400)
+            resp = self.retry_post_json(endpoint + '&commit=true', [],
+                                        status=400)
 
         # I should still be able to use the batch in the original user.
         endpoint = collection + '?batch={0}'.format(batch)
-        resp = self.retry("post_json", endpoint,
-                          [{'id': 'd', 'payload': 'di'}])
-        resp = self.retry("post_json", endpoint + '&commit=true', [])
+        resp = self.retry_post_json(endpoint, [{'id': 'd', 'payload': 'di'}])
+        resp = self.retry_post_json(endpoint + '&commit=true', [])
 
         resp = self.app.get(collection + '?full=1')
         res = resp.json
@@ -2003,7 +1998,7 @@ class TestStorage(StorageFunctionalTestCase):
     # bug 1332552 make sure ttl:null use the default ttl
     def test_create_bso_with_null_ttl(self):
         bso = {"payload": "x", "ttl": None}
-        self.retry("put_json", self.root + "/storage/col2/TEST1", bso)
+        self.retry_put_json(self.root + "/storage/col2/TEST1", bso)
         time.sleep(0.1)
         res = self.app.get(self.root + "/storage/col2/TEST1?full=1")
         self.assertEquals(res.json["payload"], "x")
@@ -2017,23 +2012,21 @@ class TestStorage(StorageFunctionalTestCase):
             })
         }
         # Fishy IVs are rejected on the "crypto" collection.
-        self.retry("put_json", self.root + "/storage/crypto/keys", bso,
-                   status=400)
-        self.retry("put_json", self.root + "/storage/crypto/blerg", bso,
-                   status=400)
-        self.retry("post_json", self.root + "/storage/crypto", [bso],
-                   status=400)
+        self.retry_put_json(self.root + "/storage/crypto/keys", bso,
+                            status=400)
+        self.retry_put_json(self.root + "/storage/crypto/blerg", bso,
+                            status=400)
+        self.retry_post_json(self.root + "/storage/crypto", [bso], status=400)
         # But are allowed on other collections.
-        self.retry("put_json", self.root + "/storage/col2/keys", bso,
-                   status=200)
-        self.retry("post_json", self.root + "/storage/col2", [bso], status=200)
+        self.retry_put_json(self.root + "/storage/col2/keys", bso, status=200)
+        self.retry_post_json(self.root + "/storage/col2", [bso], status=200)
 
     # bug 1397357
     def test_batch_empty_commit(self):
         def testEmptyCommit(contentType, body, status=200):
             bsos = [{'id': str(i), 'payload': 'X'} for i in range(5)]
-            res = self.retry("post_json", self.root+'/storage/col?batch=true',
-                             bsos)
+            res = self.retry_post_json(self.root+'/storage/col?batch=true',
+                                       bsos)
             self.assertEquals(len(res.json['success']), 5)
             self.assertEquals(len(res.json['failed']), 0)
             batch = res.json["batch"]
@@ -2078,14 +2071,14 @@ class TestStorageMemcached(TestStorage):
         bso1 = {'id': '1', 'payload': _PLD}
         bso2 = {'id': '2', 'payload': _PLD}
         bsos = [bso1, bso2]
-        res = self.retry("post_json", self.root + '/storage/tabs', bsos)
+        res = self.retry_post_json(self.root + '/storage/tabs', bsos)
         ts1 = float(res.headers["X-Last-Modified"])
 
         # send two more bsos
         bso3 = {'id': '3', 'payload': _PLD}
         bso4 = {'id': '4', 'payload': _PLD}
         bsos = [bso3, bso4]
-        res = self.retry("post_json", self.root + '/storage/tabs', bsos)
+        res = self.retry_post_json(self.root + '/storage/tabs', bsos)
         ts2 = float(res.headers["X-Last-Modified"])
         self.assertTrue(ts1 < ts2)
 
@@ -2127,10 +2120,10 @@ class TestStorageMemcached(TestStorage):
             bsos = [bso1, bso2]
 
             # we get a 503 for both POST and PUT
-            self.retry("post_json", self.root + '/storage/tabs', bsos,
-                       status=503)
-            self.retry("put_json", self.root + '/storage/tabs/sure', bso1,
-                       status=503)
+            self.retry_post_json(self.root + '/storage/tabs', bsos,
+                                 status=503)
+            self.retry_put_json(self.root + '/storage/tabs/sure', bso1,
+                                status=503)
         finally:
             for key in self.config.registry:
                 if key.startswith("syncstorage:storage:"):
@@ -2169,12 +2162,12 @@ class TestStorageMemcached(TestStorage):
             bsos = [bso1, bso2]
 
             # on batch, we get back a 503
-            self.retry("post_json", self.root + '/storage/tabs', bsos,
-                       status=503)
+            self.retry_post_json(self.root + '/storage/tabs', bsos,
+                                 status=503)
 
             # on single PUT, we get a 503
-            self.retry("put_json", self.root + '/storage/tabs/sure', bso1,
-                       status=503)
+            self.retry_put_json(self.root + '/storage/tabs/sure', bso1,
+                                status=503)
         finally:
             for key in self.config.registry:
                 if key.startswith("syncstorage:storage:"):
@@ -2204,11 +2197,11 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         bso1 = {'id': '12', 'payload': 'elegance'}
         bso2 = {'id': '13', 'payload': 'slovenly'}
         bsos = [bso1, bso2]
-        self.retry("post_json", endpoint, bsos)
+        self.retry_post_json(endpoint, bsos)
 
         bso3 = {'id': 'a', 'payload': 'internal'}
         bso4 = {'id': 'b', 'payload': 'pancreas'}
-        resp = self.retry("post_json", endpoint + '?batch=true', [bso3, bso4])
+        resp = self.retry_post_json(endpoint + '?batch=true', [bso3, bso4])
         assert 'batch' not in resp.json
         batch = '123456'
 
@@ -2217,11 +2210,11 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         bso0 = {'id': '14', 'payload': 'itsybitsy'}
         commit = '?batch={0}&commit=true'.format(batch)
         # This errors out because it's trying to use an in-flight batch.
-        resp = self.retry("post_json", endpoint + commit, [bso5, bso6, bso0],
-                          status=400)
+        resp = self.retry_post_json(endpoint + commit, [bso5, bso6, bso0],
+                                    status=400)
         # This requests a new batch, which is silently ignored and succeeds.
         commit = '?batch=true&commit=true'.format(batch)
-        resp = self.retry("post_json", endpoint + commit, [bso5, bso6, bso0])
+        resp = self.retry_post_json(endpoint + commit, [bso5, bso6, bso0])
         assert 'batch' not in resp.json
         committed = resp.json['modified']
         self.assertEquals(resp.json['modified'],
@@ -2250,11 +2243,11 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
 
         # invalid batch ID is still an error when preffed off
         bso1 = {'id': 'f', 'payload': 'pantomime'}
-        self.retry("post_json", endpoint + '?batch=sammich', [bso1],
-                   status=400)
+        self.retry_post_json(endpoint + '?batch=sammich', [bso1],
+                             status=400)
 
         # commit with no batch ID is not an error when preffed off
-        self.retry("post_json", endpoint + '?commit=true', [])
+        self.retry_post_json(endpoint + '?commit=true', [])
 
     def test_batch_partial_update(self):
         # Without batch uploads, there's nothing for this test to test.
