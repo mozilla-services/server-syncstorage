@@ -71,9 +71,10 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         # Do a few things on the DB
         id1 = 'ec1b7457-003a-45a9-bf1c-c34e37225ad7'
         id2 = '339f52e1-deed-497c-837a-1ab25a655e37'
-        storage.set_item(_USER, 'col1', id1, {'payload': _PLD})
-        storage.set_item(_USER, 'col1', id2, {'payload': _PLD * 89})
-        self.assertEquals(len(storage.get_items(_USER, 'col1')["items"]), 2)
+        storage.set_item(_USER, 'xxx_col1', id1, {'payload': _PLD})
+        storage.set_item(_USER, 'xxx_col1', id2, {'payload': _PLD * 89})
+        self.assertEquals(
+            len(storage.get_items(_USER, 'xxx_col1')["items"]), 2)
 
         # Now make sure we did that in the right table
         with storage.dbconnector.connect() as c:

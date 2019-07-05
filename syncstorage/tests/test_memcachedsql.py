@@ -46,16 +46,16 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def test_basic(self):
         # just make sure calls goes through
-        self.storage.set_item(_USER, 'col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col1', '1', {'payload': _PLD})
 
         # these calls should be cached
-        res = self.storage.get_item(_USER, 'col1', '1')
+        res = self.storage.get_item(_USER, 'xxx_col1', '1')
         self.assertEquals(res['payload'], _PLD)
 
         # this should remove the cache
-        self.storage.delete_collection(_USER, 'col1')
+        self.storage.delete_collection(_USER, 'xxx_col1')
         self.assertRaises(CollectionNotFoundError,
-                          self.storage.get_items, _USER, 'col1')
+                          self.storage.get_items, _USER, 'xxx_col1')
 
     def test_meta_global(self):
         self.storage.set_item(_USER, 'meta', 'global', {'payload': _PLD})
@@ -231,28 +231,28 @@ class TestMemcachedSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def test_that_cache_is_cleared_when_things_are_deleted(self):
         # just make sure calls goes through
-        self.storage.set_item(_USER, 'col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col1', '1', {'payload': _PLD})
 
         # these calls should be cached
-        res = self.storage.get_item(_USER, 'col1', '1')
+        res = self.storage.get_item(_USER, 'xxx_col1', '1')
         self.assertEquals(res['payload'], _PLD)
 
         # this should remove the cache
-        self.storage.delete_collection(_USER, 'col1')
+        self.storage.delete_collection(_USER, 'xxx_col1')
         self.assertRaises(CollectionNotFoundError,
-                          self.storage.get_items, _USER, 'col1')
+                          self.storage.get_items, _USER, 'xxx_col1')
 
-        self.storage.set_item(_USER, 'col1', '1', {'payload': _PLD})
-        self.storage.set_item(_USER, 'col1', '2', {'payload': _PLD})
-        self.storage.set_item(_USER, 'col1', '3', {'payload': _PLD})
-        self.storage.set_item(_USER, 'col2', '4', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col1', '2', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col1', '3', {'payload': _PLD})
+        self.storage.set_item(_USER, 'xxx_col2', '4', {'payload': _PLD})
 
-        items = self.storage.get_items(_USER, 'col1')["items"]
+        items = self.storage.get_items(_USER, 'xxx_col1')["items"]
         self.assertEquals(len(items), 3)
 
         self.storage.delete_storage(_USER)
         self.assertRaises(CollectionNotFoundError,
-                          self.storage.get_items, _USER, 'col1')
+                          self.storage.get_items, _USER, 'xxx_col1')
 
         timestamps = self.storage.get_collection_timestamps(_USER)
         self.assertEquals(len(timestamps), 0)
