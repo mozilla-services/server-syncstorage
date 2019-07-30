@@ -86,9 +86,7 @@ class TestStorage(StorageFunctionalTestCase):
         try:
             return func(*args, **kwargs)
         except webtest.AppError as ex:
-            # TODO: Temporarily accept 500 & 503 due to bug in syncstorage-rs
-            # replace 500 with 409 in the future.
-            if "500 " not in ex.message and "503 " not in ex.message:
+            if "409 " not in ex.message and "503 " not in ex.message:
                 raise ex
             time.sleep(0.01)
             return func(*args, **kwargs)
@@ -1576,7 +1574,6 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertTrue('max_request_bytes' in limits)
 
         endpoint = self.root + '/storage/xxx_col2?batch=true'
-
         # There are certain obvious constraints on these limits,
         # violations of which would be very confusing for clients.
 
@@ -1635,7 +1632,6 @@ class TestStorage(StorageFunctionalTestCase):
             'X-Weave-Bytes': str(limits['max_post_bytes'] + 1)
         }, status=400)
         self.assertEquals(res.json, WEAVE_SIZE_LIMIT_EXCEEDED)
-
         bsos = [
             {'id': 'little', 'payload': 'XXX'},
             {'id': 'big', 'payload': 'X' * (limits['max_post_bytes'] - 3)}
