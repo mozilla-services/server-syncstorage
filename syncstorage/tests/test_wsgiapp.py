@@ -124,7 +124,7 @@ class TestWSGIApp(StorageTestCase):
         orig_do_request = app.do_request
         app.do_request = new_do_request
 
-        collection = "/1.5/42/storage/col1"
+        collection = "/1.5/42/storage/xxx_col1"
 
         with testfixtures.LogCapture() as logs:
             bso = {"id": "1", "payload": "x"}

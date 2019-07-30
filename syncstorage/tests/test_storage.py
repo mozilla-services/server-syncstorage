@@ -68,21 +68,21 @@ class StorageTestsMixin(object):
         self.assertEquals(res['payload'], 'tweaked')
 
     def test_get_collection_timestamps(self):
-        self.storage.set_item(_USER1, 'col1', '1', {'payload': _PLD})
-        self.storage.set_item(_USER1, 'col2', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col2', '1', {'payload': _PLD})
 
         timestamps = self.storage.get_collection_timestamps(_USER1)
         names = timestamps.keys()
-        self.assertTrue('col1' in names)
-        self.assertTrue('col2' in names)
-        col2ts = self.storage.get_collection_timestamp(_USER1, 'col2')
-        self.assertAlmostEquals(col2ts, timestamps['col2'])
+        self.assertTrue('xxx_col1' in names)
+        self.assertTrue('xxx_col2' in names)
+        xxx_col2ts = self.storage.get_collection_timestamp(_USER1, 'xxx_col2')
+        self.assertAlmostEquals(xxx_col2ts, timestamps['xxx_col2'])
 
         # check that when we have several users, the method
         # still returns the same timestamp for the first user
         # which differs from the second user
-        self.storage.set_item(_USER1, 'col1', '1', {'payload': _PLD})
-        self.storage.set_item(_USER1, 'col2', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col2', '1', {'payload': _PLD})
 
         user1_timestamps = self.storage.get_collection_timestamps(_USER1)
         user1_timestamps = user1_timestamps.items()
@@ -96,35 +96,36 @@ class StorageTestsMixin(object):
 
     def test_storage_size(self):
         before = self.storage.get_total_size(_USER1)
-        self.storage.set_item(_USER1, 'col1', '1', {'payload': _PLD})
-        self.storage.set_item(_USER1, 'col1', '2', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', '2', {'payload': _PLD})
         wanted = len(_PLD) * 2
         self.assertEquals(self.storage.get_total_size(_USER1) - before, wanted)
 
     def test_ttl(self):
-        self.storage.set_item(_USER1, 'col1', '1', {'payload': _PLD})
-        self.storage.set_item(_USER1, 'col1', '2', {'payload': _PLD, 'ttl': 0})
+        self.storage.set_item(_USER1, 'xxx_col1', '1', {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', '2',
+                              {'payload': _PLD, 'ttl': 0})
         time.sleep(1.1)
-        items = self.storage.get_items(_USER1, 'col1')["items"]
+        items = self.storage.get_items(_USER1, 'xxx_col1')["items"]
         self.assertEquals(len(items), 1)
-        items = self.storage.get_items(_USER1, 'col1', ttl=-1)["items"]
+        items = self.storage.get_items(_USER1, 'xxx_col1', ttl=-1)["items"]
         self.assertEquals(len(items), 2)
 
     def test_dashed_ids(self):
         id1 = 'ec1b7457-003a-45a9-bf1c-c34e37225ad7'
         id2 = '339f52e1-deed-497c-837a-1ab25a655e37'
-        self.storage.set_item(_USER1, 'col1', id1, {'payload': _PLD})
-        self.storage.set_item(_USER1, 'col1', id2, {'payload': _PLD * 89})
-        items = self.storage.get_items(_USER1, 'col1')["items"]
+        self.storage.set_item(_USER1, 'xxx_col1', id1, {'payload': _PLD})
+        self.storage.set_item(_USER1, 'xxx_col1', id2, {'payload': _PLD * 89})
+        items = self.storage.get_items(_USER1, 'xxx_col1')["items"]
         self.assertEquals(len(items), 2)
-        self.storage.delete_items(_USER1, 'col1', [id1, id2])
-        items = self.storage.get_items(_USER1, 'col1')["items"]
+        self.storage.delete_items(_USER1, 'xxx_col1', [id1, id2])
+        items = self.storage.get_items(_USER1, 'xxx_col1')["items"]
         self.assertEquals(len(items), 0)
 
     def test_collection_locking_enforces_consistency(self):
         # Create the collection and get initial timestamp.
         bso = {"id": "TEST", "payload": _PLD}
-        ts0 = self.storage.set_items(_USER1, "col1", [bso])
+        ts0 = self.storage.set_items(_USER1, "xxx_col1", [bso])
 
         # Some events to coordinate action between the threads.
         read_locked = threading.Event()
@@ -147,19 +148,19 @@ class StorageTestsMixin(object):
         # match the initial timestamp despite concurrent write thread.
         @catch_failures
         def reader_thread():
-            with self.storage.lock_for_read(_USER1, "col1"):
+            with self.storage.lock_for_read(_USER1, "xxx_col1"):
                 read_locked.set()
-                ts1 = self.storage.get_collection_timestamp(_USER1, "col1")
+                ts1 = self.storage.get_collection_timestamp(_USER1, "xxx_col1")
                 self.assertEquals(ts0, ts1)
                 # Give the writer a chance to update the value.
                 # It may be blocking on us though, so don't wait forever.
                 write_complete.wait(timeout=1)
-                ts2 = self.storage.get_collection_timestamp(_USER1, "col1")
+                ts2 = self.storage.get_collection_timestamp(_USER1, "xxx_col1")
                 self.assertEquals(ts1, ts2)
             # After releasing our read lock, the writer should complete.
             # Make sure its changes are visible to this thread.
             write_complete.wait()
-            ts3 = self.storage.get_collection_timestamp(_USER1, "col1")
+            ts3 = self.storage.get_collection_timestamp(_USER1, "xxx_col1")
             self.assertTrue(ts2 < ts3)
 
         # A writer thread.  It waits until the collection is locked for
@@ -172,17 +173,18 @@ class StorageTestsMixin(object):
             storage = self.storage
             while True:
                 try:
-                    with self.storage.lock_for_write(_USER1, "col1"):
-                        ts1 = storage.get_collection_timestamp(_USER1, "col1")
+                    with self.storage.lock_for_write(_USER1, "xxx_col1"):
+                        ts1 = storage.get_collection_timestamp(_USER1,
+                                                               "xxx_col1")
                         self.assertEquals(ts0, ts1)
-                        ts2 = storage.set_items(_USER1, "col1", [bso])
+                        ts2 = storage.set_items(_USER1, "xxx_col1", [bso])
                         self.assertTrue(ts1 < ts2)
                         break
                 except ConflictError:
                     continue
             write_complete.set()
             # Check that our changes are visible outside of the lock.
-            ts3 = storage.get_collection_timestamp(_USER1, "col1")
+            ts3 = storage.get_collection_timestamp(_USER1, "xxx_col1")
             self.assertEquals(ts2, ts3)
 
         reader = threading.Thread(target=reader_thread)
