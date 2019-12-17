@@ -1107,6 +1107,20 @@ class TestStorage(StorageFunctionalTestCase):
         res = self.retry_put_json(coll_url + "/" + bso["id"], bso, status=400)
         self.assertEquals(res.json, WEAVE_INVALID_WBO)
 
+    def test_that_bsos_can_have_a_collection_field(self):
+        # The "collection" field is accepted, but ignored.
+        bso1 = {'id': '1', 'payload': _PLD, 'collection': 'xxx'}
+        bso2 = {'id': '2', 'payload': _PLD, 'collection': 'yyy'}
+        bsos = [bso1, bso2]
+
+        res = self.retry_post_json(self.root + '/storage/xxx', bsos)
+        self.assertEquals(len(res.json["success"]), 2)
+        self.assertEquals(len(res.json["failed"]), 0)
+
+        self.retry_put_json(self.root + '/storage/xxx/3', bso1)
+        res = self.app.get(self.root + "/storage/xxx")
+        self.assertEquals(len(res.json), 3)
+
     def test_that_batch_gets_are_limited_to_max_number_of_ids(self):
         bso = {"id": "1", "payload": "testing"}
         self.retry_put_json(self.root + "/storage/xxx_col2/1", bso)
