@@ -55,7 +55,7 @@ umemcache==1.6.3
 unittest2==1.1.0
 urllib3==1.24.2
 venusian==1.0
-waitress==1.1.0
+waitress==1.4.1
 WebOb==1.7.4
 WebTest==2.0.18
 WSGIProxy==0.2.2
