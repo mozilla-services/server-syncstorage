@@ -44,11 +44,13 @@ logger = logging.getLogger(__name__)
 # For efficiency, it's possible to use fixed pre-determined IDs for
 # common collection names.  This is the canonical list of such names.
 # Non-standard collections will be allocated IDs starting from the
-# highest ID in this collection.
+# `FIRST_CUSTOM_COLLECTION_ID`, which must be larger than the highest
+# key in this collection.
 STANDARD_COLLECTIONS = {1: "clients", 2: "crypto", 3: "forms", 4: "history",
                         5: "keys", 6: "meta", 7: "bookmarks", 8: "prefs",
                         9: "tabs", 10: "passwords", 11: "addons",
-                        12: "addresses", 13: "creditcards"}
+                        12: "addresses", 13: "creditcards",
+                        14: "extension-storage"}
 
 FIRST_CUSTOM_COLLECTION_ID = 100
 
