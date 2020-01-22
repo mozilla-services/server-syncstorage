@@ -422,6 +422,10 @@ class MemcachedStorage(SyncStorage):
             update(ts, ts)
             return ts
 
+    def is_migrating(self, user):
+        """Is the user in migration?"""
+        return self.storage.is_migrating(user)
+
     #
     # Administrative/maintenance methods.
     #

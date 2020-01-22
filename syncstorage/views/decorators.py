@@ -28,6 +28,10 @@ ONE_MB = 1024 * 1024
 # How long the client should wait before retrying a conflicting write.
 RETRY_AFTER = 10
 
+# How long a client should wait to retry. It won't succeed, but should
+# return a 4xx error punting them to the new server.
+MIGRATION_RETRY_AFTER = 300
+
 
 @make_decorator
 def convert_storage_errors(viewfunc, request):
@@ -192,3 +196,19 @@ def with_collection_lock(viewfunc, request):
 
     with lock_collection(user, collection):
         return viewfunc(request)
+
+
+@make_decorator
+def check_migration(viewfunc, request):
+    """Check if a given user is in a migration state, return 503.
+
+    NOTE: once a user migration has started DO NOT RETURN A 2xx
+    WITHOUT REMOVING THE meta/global RECORD!
+
+    """
+    storage = request.validated["storage"]
+    if storage.is_migrating(request.user):
+        raise HTTPServiceUnavailable(
+            headers={"Retry-After": MIGRATION_RETRY_AFTER}
+        )
+    return viewfunc(request)
