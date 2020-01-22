@@ -397,6 +397,25 @@ class SQLStorage(SyncStorage):
             "next_offset": next_offset,
         }
 
+    @with_session
+    def is_migrating(self, session, user):
+        """Returns True if the user is migrating.
+
+        This should probably NOT be a cached call, since migration
+        may start at any time during a client sync.
+
+        any error will percolate up as a 500, which will be safer than
+        guessing if a migration has not yet started.
+
+        """
+        userid = user.get("fxa_uid")
+        if userid is not None:
+            res = session.query_fetchone("MIGRATION_CHECK", {
+                "fxa_uid": userid
+            })
+            return res is not None
+        return False
+
     def _row_to_bso(self, row, timestamp):
         """Convert a database table row into a BSO object."""
         item = dict(row)

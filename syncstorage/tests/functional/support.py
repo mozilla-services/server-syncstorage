@@ -45,7 +45,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request
 
-    def _authenticate(self):
+    def _authenticate(self, fxa_uid=None):
         # For basic testing, use a random uid and sign our own tokens.
         # Subclasses might like to override this and use a live tokenserver.
         self.user_id = random.randint(1, 100000)
@@ -55,7 +55,7 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
             req, self.user_id, extra={
                 # Include a hashed_fxa_uid to trigger uid/kid extraction
                 "hashed_fxa_uid": str(uuid.uuid4()),
-                "fxa_uid": str(uuid.uuid4()),
+                "fxa_uid": fxa_uid or str(uuid.uuid4()),
                 "fxa_kid": str(uuid.uuid4()),
             }
         )

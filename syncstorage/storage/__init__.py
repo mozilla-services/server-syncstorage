@@ -464,6 +464,21 @@ class SyncStorage(object):
             ItemNotFoundError: the collection contains no such item.
         """
 
+    @abc.abstractmethod
+    def is_migrating(self, user):
+        """Determine if a given user record is migrating to a new storage backend
+
+        Args:
+            user: user object identifying the user in the storage.
+
+        Returns:
+            Boolean indicating if this user is in migration.
+
+        Raises:
+            None
+
+        """
+
     #
     # Administrative/maintenance methods.
     #

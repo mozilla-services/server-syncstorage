@@ -27,7 +27,8 @@ from syncstorage.views.decorators import (convert_storage_errors,
                                           sleep_and_retry_on_conflict,
                                           with_collection_lock,
                                           check_precondition_headers,
-                                          check_storage_quota)
+                                          check_storage_quota,
+                                          check_migration)
 from syncstorage.views.util import get_resource_timestamp, get_limit_config
 
 
@@ -179,6 +180,7 @@ item = SyncStorageService(name="item",
 
 @info_timestamps.get(accept="application/json", renderer="sync-json",
                      acl=expired_token_acl)
+@check_migration
 @default_decorators
 def get_info_timestamps(request):
     storage = request.validated["storage"]
@@ -192,6 +194,7 @@ def get_info_timestamps(request):
 
 
 @info_counts.get(accept="application/json", renderer="sync-json")
+@check_migration
 @default_decorators
 def get_info_counts(request):
     storage = request.validated["storage"]
@@ -201,6 +204,7 @@ def get_info_counts(request):
 
 
 @info_quota.get(accept="application/json", renderer="sync-json")
+@check_migration
 @default_decorators
 def get_info_quota(request):
     storage = request.validated["storage"]
@@ -212,6 +216,7 @@ def get_info_quota(request):
 
 
 @info_usage.get(accept="application/json", renderer="sync-json")
+@check_migration
 @default_decorators
 def get_info_usage(request):
     storage = request.validated["storage"]
@@ -223,6 +228,7 @@ def get_info_usage(request):
 
 
 @info_configuration.get(accept="application/json", renderer="sync-json")
+@check_migration
 @default_decorators
 def get_info_configuration(request):
     # Don't return batch-related limits if the feature isn't enabled.
@@ -247,6 +253,7 @@ def get_info_configuration(request):
 
 
 @storage.delete(renderer="sync-json")
+@check_migration
 @default_decorators
 def delete_storage(request):
     storage = request.validated["storage"]
@@ -255,6 +262,7 @@ def delete_storage(request):
 
 
 @service_root.delete(renderer="sync-json")
+@check_migration
 @default_decorators
 def delete_all(request):
     storage = request.validated["storage"]
@@ -264,6 +272,7 @@ def delete_all(request):
 
 @collection.get(accept="application/json", renderer="sync-json")
 @collection.get(accept="application/newlines", renderer="sync-newlines")
+@check_migration
 @convert_storage_errors
 def get_collection_with_internal_pagination(request):
     """Get the contents of a collection, in a respectful manner.
@@ -324,6 +333,7 @@ def get_collection_with_internal_pagination(request):
 @sleep_and_retry_on_conflict
 @with_collection_lock
 @check_precondition_headers
+@check_migration
 @check_storage_quota
 def get_collection(request):
     storage = request.validated["storage"]
@@ -355,6 +365,7 @@ def get_collection(request):
 
 @collection.post(accept="application/json", renderer="sync-json",
                  validators=POST_VALIDATORS)
+@check_migration
 @default_decorators
 def post_collection(request):
     storage = request.validated["storage"]
@@ -383,6 +394,7 @@ def post_collection(request):
     return res
 
 
+@check_migration
 def post_collection_batch(request):
     storage = request.validated["storage"]
     user = request.user
@@ -461,6 +473,7 @@ def post_collection_batch(request):
 
 
 @collection.delete(renderer="sync-json")
+@check_migration
 @default_decorators
 def delete_collection(request):
     storage = request.validated["storage"]
@@ -481,6 +494,7 @@ def delete_collection(request):
 
 
 @item.get(accept="application/json", renderer="sync-json")
+@check_migration
 @default_decorators
 def get_item(request):
     storage = request.validated["storage"]
@@ -493,6 +507,7 @@ def get_item(request):
 
 
 @item.put(renderer="sync-json", validators=PUT_VALIDATORS)
+@check_migration
 @default_decorators
 def put_item(request):
     storage = request.validated["storage"]
@@ -508,6 +523,7 @@ def put_item(request):
 
 
 @item.delete(renderer="sync-json")
+@check_migration
 @default_decorators
 def delete_item(request):
     storage = request.validated["storage"]

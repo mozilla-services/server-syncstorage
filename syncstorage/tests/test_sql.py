@@ -4,6 +4,7 @@
 
 import time
 import threading
+import uuid
 
 from mozsvc.plugin import load_and_register
 from mozsvc.tests.support import get_test_configurator
@@ -197,3 +198,35 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         self.assertEquals(count_items(), 5)
         self.assertEquals(len(self.storage.get_items(_USER, "col")["items"]),
                           5)
+
+    def _set_migrating_state(self, id, state):
+        with self.storage.dbconnector.connect() as connect:
+            connect.execute(
+                """
+                INSERT INTO migration
+                    (fxa_uid, started_at, state)
+                VALUES
+                    (:id, :time, :state)
+                /* queryName=migrate */""",
+                params={
+                    "id": id,
+                    "time": int(time.time()),
+                    "state": state
+                }
+            )
+
+    def test_migrating(self):
+        migrating_id = str(uuid.uuid4())
+        self.assertFalse(
+            self.storage.is_migrating(
+                {"fxa_uid": migrating_id,
+                 "uid": 1}
+            )
+        )
+        self._set_migrating_state(migrating_id, 'in_progress')
+        self.assertTrue(
+            self.storage.is_migrating(
+                {"fxa_uid": migrating_id,
+                 "uid": 1}
+            )
+        )

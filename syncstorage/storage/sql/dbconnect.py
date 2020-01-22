@@ -102,6 +102,22 @@ user_collections = Table(
 )
 
 
+# Table listing migration state for users
+#
+# This table contains the users in progress for migration. This table may
+# be updated by the external user migration script
+# A fxa_uid appearing in this table should cause the server to return a 5xx
+# response. It's important that the server NEVER return a 2xx response.
+
+migration = Table(
+    "migration",
+    metadata,
+    Column("fxa_uid", String(255), primary_key=True, nullable=False),
+    Column("started_at", BigInteger, nullable=False),
+    Column("state", String(32))  # unknown/NULL, in_progress, complete
+)
+
+
 # Column definitions for BSO storage table/tables.
 #
 # This list class defines the columns used for storage of BSO records.
@@ -363,6 +379,7 @@ class DBConnector(object):
             collections.create(self.engine, checkfirst=True)
             user_collections.create(self.engine, checkfirst=True)
             batch_uploads.create(self.engine, checkfirst=True)
+            migration.create(self.engine, checkfirst=True)
             if not self.shard:
                 bso.create(self.engine, checkfirst=True)
                 bui.create(self.engine, checkfirst=True)
