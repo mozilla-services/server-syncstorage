@@ -36,14 +36,17 @@ class TestWSGIApp(StorageTestCase):
         sqluri = get_storage(req).sqluri
         self.assertTrue(sqluri.startswith("sqlite:////tmp/another-test-host-"))
 
-    def _make_test_app(self):
+    def _make_test_app(self, user=None):
         app = TestApp(self.config.make_wsgi_app())
 
         # Monkey-patch the app to make legitimate hawk-signed requests.
-        user_id = 42
+        if user is None:
+            user = {}
+        user_id = user.get('uid', 42)
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank("http://localhost/")
-        auth_token, auth_secret = auth_policy.encode_hawk_id(req, user_id)
+        auth_token, auth_secret = auth_policy.encode_hawk_id(req, user_id,
+                                                             user)
 
         def new_do_request(req, *args, **kwds):
             hawkauthlib.sign_request(req, auth_token, auth_secret)
@@ -57,6 +60,7 @@ class TestWSGIApp(StorageTestCase):
     def _make_signed_req(self, userid, user):
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank("http://localhost/")
+        req.registry = self.config.registry
         auth_token, auth_secret = auth_policy.encode_hawk_id(req, userid, user)
         hawkauthlib.sign_request(req, auth_token, auth_secret)
         req.metrics = {}
@@ -109,20 +113,7 @@ class TestWSGIApp(StorageTestCase):
             assert False, "log was not generated"
 
     def test_metrics_capture_for_batch_uploads(self):
-        app = TestApp(self.config.make_wsgi_app())
-
-        # Monkey-patch the app to make legitimate hawk-signed requests.
-        user_id = 42
-        auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
-        req = Request.blank("http://localhost/")
-        auth_token, auth_secret = auth_policy.encode_hawk_id(req, user_id)
-
-        def new_do_request(req, *args, **kwds):
-            hawkauthlib.sign_request(req, auth_token, auth_secret)
-            return orig_do_request(req, *args, **kwds)
-
-        orig_do_request = app.do_request
-        app.do_request = new_do_request
+        app = self._make_test_app()
 
         collection = "/1.5/42/storage/xxx_col1"
 
@@ -147,6 +138,31 @@ class TestWSGIApp(StorageTestCase):
                 break
         else:
             assert False, "timer metrics were not emitted"
+
+    def test_503s_for_migrating_users(self):
+        user = {
+            "uid": 42,
+            "fxa_uid": "foobar",
+            "fxa_kid": "001122",
+            "hashed_fxa_uid": "aabbcc",
+        }
+        app = self._make_test_app(user)
+        req = self._make_signed_req(user["uid"], user)
+
+        # There's no public API for marking a user as migrated.
+        storage = get_storage(req)
+        with storage.dbconnector.connect() as connection:
+            connection.execute("""
+                INSERT INTO migration (fxa_uid, started)
+                VALUES (:fxa_uid, :started)
+                /* queryName=migrate */
+            """, params={
+                "fxa_uid": "foobar",
+                "started": 12345
+            })
+
+        res = app.get("/1.5/42/info/collections", status=503)
+        self.assertTrue("Retry-After" in res.headers)
 
     def test_receiving_old_style_fxa_uid_in_auth_token(self):
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
