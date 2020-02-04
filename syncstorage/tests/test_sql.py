@@ -31,7 +31,7 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
 
     def setUp(self):
         super(TestSQLStorage, self).setUp()
-        settings = self.config.registry.setting
+        settings = self.config.registry.settings
         self.storage = load_storage_from_settings("storage", settings)
 
     def test_no_create(self):
@@ -216,8 +216,8 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
             )
 
     def test_migrating(self):
-        settings = self.config.registry.setting
-        settings['allow_migration'] = True
+        settings = self.config.registry.settings
+        settings['storage.allow_migration'] = True
         self.storage = load_storage_from_settings("storage", settings)
 
         migrating_id = str(uuid.uuid4())
@@ -236,7 +236,6 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
         )
 
         self.storage.allow_migration = False
-        self._set_migrating_state(migrating_id, 'in_progress')
         self.assertFalse(
             self.storage.is_migrating(
                 {"fxa_uid": migrating_id,
