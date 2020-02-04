@@ -25,6 +25,7 @@ import string
 import urllib
 import webtest
 import contextlib
+import uuid
 # import math
 
 from pyramid.interfaces import IAuthenticationPolicy
@@ -1767,21 +1768,21 @@ class TestStorage(StorageFunctionalTestCase):
                                     status=202)
 
         # Put some time between upload timestamp and commit timestamp.
-        time.sleep(1.5)
+        time.sleep(2.4)
 
         resp = self.retry_post_json(endpoint + '&commit=true', [],
                                     status=200)
 
         # Wait a little; if ttl is taken from the time of the commit
         # then it should not kick in just yet.
-        time.sleep(1.6)
+        time.sleep(0.7)
         resp = self.app.get(collection)
         res = resp.json
         self.assertEquals(len(res), 1)
         self.assertEquals(res[0], 'a')
 
         # Wait some more, and the ttl should kick in.
-        time.sleep(1.6)
+        time.sleep(2.4)
         resp = self.app.get(collection)
         res = resp.json
         self.assertEquals(len(res), 0)
@@ -1964,6 +1965,15 @@ class TestStorage(StorageFunctionalTestCase):
             req = '/storage/xxx_col1?batch=true'
             resp = self.retry_post_json(self.root + req, bsos)
             batch1 = resp.json['batch']
+            try:
+                uuid.UUID(batch1)
+            except ValueError:
+                pass
+            else:
+                # On the Spanner backend: batch ids are uuid4s which
+                # should almost never collide. Plus this test will run
+                # too long, potentially expiring auth tokens
+                raise unittest2.SkipTest('N/A to Spanner backend')
             req = '/storage/xxx_col1?batch={0}&commit=true'.format(batch1)
             self.retry_post_json(self.root + req, [])
             req = '/storage/xxx_col2?batch=true'
