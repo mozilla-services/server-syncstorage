@@ -206,6 +206,10 @@ def with_collection_lock(viewfunc, request):
 def check_migration(viewfunc, request):
     """Check if a given user is in a migration state, return 503.
 
+    This feature is only enabled via the following setting.
+        [storage]
+        allow_migration = True
+
     NOTE: once a user migration has started DO NOT RETURN A 2xx
     WITHOUT REMOVING THE meta/global RECORD!
 

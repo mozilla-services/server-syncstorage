@@ -379,7 +379,10 @@ class DBConnector(object):
             collections.create(self.engine, checkfirst=True)
             user_collections.create(self.engine, checkfirst=True)
             batch_uploads.create(self.engine, checkfirst=True)
-            migration.create(self.engine, checkfirst=True)
+            # only create migration if "[storage]:allow_migration" flag
+            # is set
+            if kwds.get("allow_migration", False):
+                migration.create(self.engine, checkfirst=True)
             if not self.shard:
                 bso.create(self.engine, checkfirst=True)
                 bui.create(self.engine, checkfirst=True)

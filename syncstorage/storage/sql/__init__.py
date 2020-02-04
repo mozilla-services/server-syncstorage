@@ -132,6 +132,7 @@ class SQLStorage(SyncStorage):
     """
 
     def __init__(self, sqluri, standard_collections=False, **dbkwds):
+        self.allow_migration = dbkwds.get("allow_migration", False)
         self.sqluri = sqluri
         self.dbconnector = DBConnector(sqluri, **dbkwds)
         self._optimize_table_before_purge = \
@@ -408,12 +409,13 @@ class SQLStorage(SyncStorage):
         guessing if a migration has not yet started.
 
         """
-        userid = user.get("fxa_uid")
-        if userid is not None:
-            res = session.query_fetchone("MIGRATION_CHECK", {
-                "fxa_uid": userid
-            })
-            return res is not None
+        if self.allow_migration:
+            userid = user.get("fxa_uid")
+            if userid is not None:
+                res = session.query_fetchone("MIGRATION_CHECK", {
+                    "fxa_uid": userid
+                })
+                return res is not None
         return False
 
     def _row_to_bso(self, row, timestamp):
