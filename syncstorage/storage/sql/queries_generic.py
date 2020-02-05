@@ -191,6 +191,12 @@ CLOSE_BATCH_ITEMS = """
     WHERE batch = :batch AND userid = :userid
 """
 
+MIGRATION_CHECK = """
+    SELECT started_at FROM migration
+    WHERE fxa_uid = :fxa_uid
+    LIMIT 1
+"""
+
 
 def FIND_ITEMS(bso, params):
     """Item search query.
