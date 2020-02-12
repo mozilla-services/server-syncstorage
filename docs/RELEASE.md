@@ -10,13 +10,13 @@ These steps outline what is required for a new production release.
 
 ## Versions
 
-Versionling should use a `{major}.{minor}.{patch}` version scheme. New `{major}` versions are only issued if backwards compatibility is impacted. `{ minor}` involves introduction of new features. `{patch}` versions involve bug fixes only.
+Versioning should use a `{major}.{minor}.{patch}` version scheme. New `{major}` versions are only issued if backwards compatibility is impacted. `{ minor}` involves introduction of new features. `{patch}` versions involve bug fixes only.
 
 ## Release Process
 
 1. switch to `master` branch
 1. `git pull` to ensure local copy is completely up-to-date
-1. git diff origin/master to ensure there are no local staged or uncommited changes.
+1. `git diff origin/master` to ensure there are no local staged or uncommited changes.
 1. run local testing to ensure no artifacts or other local changes that might break tests have been introduced.
 1. change the release branch: `git checkout -b release/{major}.{minor}` (note `{version}` will be used as short-hand for `{major}.{minor}`)
 1. edit `version` in `setup.py` to reflect current release version.
