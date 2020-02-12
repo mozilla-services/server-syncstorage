@@ -114,13 +114,15 @@ migration = Table(
     metadata,
     Column("fxa_uid", String(255), primary_key=True, nullable=False),
     Column("started_at", BigInteger, nullable=False),
-    Column("state", SmallInteger) 
+    Column("state", SmallInteger, default=0)
 )
+
 
 class MigrationState:
     UKNOWN = 0
     IN_PROGRESS = 1
     COMPLETE = 2
+
 
 # Column definitions for BSO storage table/tables.
 #
