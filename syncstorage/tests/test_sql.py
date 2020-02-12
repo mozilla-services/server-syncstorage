@@ -12,6 +12,7 @@ from mozsvc.tests.support import get_test_configurator
 from syncstorage.tests.support import StorageTestCase
 from syncstorage.storage import load_storage_from_settings
 from syncstorage.storage.sql.dbconnect import (create_engine,
+                                               MigrationState,
                                                QueuePoolWithMaxBacklog)
 
 from syncstorage.tests.test_storage import StorageTestsMixin
@@ -227,7 +228,7 @@ class TestSQLStorage(StorageTestCase, StorageTestsMixin):
                  "uid": 1}
             )
         )
-        self._set_migrating_state(migrating_id, 'in_progress')
+        self._set_migrating_state(migrating_id, MigrationState.IN_PROGRESS)
         self.assertTrue(
             self.storage.is_migrating(
                 {"fxa_uid": migrating_id,

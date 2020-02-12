@@ -194,6 +194,7 @@ CLOSE_BATCH_ITEMS = """
 MIGRATION_CHECK = """
     SELECT started_at FROM migration
     WHERE fxa_uid = :fxa_uid
+    AND state > 0
     LIMIT 1
 """
 
