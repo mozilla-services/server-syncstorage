@@ -12,6 +12,7 @@ import testfixtures
 from mozsvc.user import RequestWithUser as Request
 
 from syncstorage.storage import get_storage
+from syncstorage.storage.sql.dbconnect import MigrationState
 from syncstorage.tests.support import StorageTestCase
 
 
@@ -159,7 +160,7 @@ class TestWSGIApp(StorageTestCase):
             """, params={
                 "fxa_uid": "foobar",
                 "started_at": 12345,
-                "state": "in_progress",
+                "state": MigrationState.IN_PROGRESS,
             })
 
         res = app.get("/1.5/42/info/collections", status=503)

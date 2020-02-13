@@ -34,7 +34,7 @@ from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql import insert, update, text as sqltext
 from sqlalchemy.exc import DBAPIError, OperationalError, TimeoutError
 from sqlalchemy import (Integer, String, Text, BigInteger,
-                        MetaData, Column, Table, Index)
+                        MetaData, Column, Table, Index, SmallInteger)
 from sqlalchemy.dialects import postgresql, mysql
 
 from mozsvc.metrics import metrics_timer, annotate_request
@@ -114,8 +114,14 @@ migration = Table(
     metadata,
     Column("fxa_uid", String(255), primary_key=True, nullable=False),
     Column("started_at", BigInteger, nullable=False),
-    Column("state", String(32))  # unknown/NULL, in_progress, complete
+    Column("state", SmallInteger, default=0)
 )
+
+
+class MigrationState:
+    UKNOWN = 0
+    IN_PROGRESS = 1
+    COMPLETE = 2
 
 
 # Column definitions for BSO storage table/tables.
