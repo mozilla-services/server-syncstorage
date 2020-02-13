@@ -19,3 +19,8 @@ More general information can be found at the following links:
 
    * https://mozilla-services.readthedocs.io/en/latest/storage
    * https://wiki.mozilla.org/Services/Sync
+
+
+## Release Procedure
+
+Please consult the [Release Procedure document](docs/RELEASE.md).
