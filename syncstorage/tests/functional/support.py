@@ -40,7 +40,8 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
 
         # Monkey-patch the app to sign all requests with the token.
         def new_do_request(req, *args, **kwds):
-            hawkauthlib.sign_request(req, self.auth_token, self.auth_secret)
+            if self.auth_token:
+                hawkauthlib.sign_request(req, self.auth_token, self.auth_secret)
             return orig_do_request(req, *args, **kwds)
         orig_do_request = self.app.do_request
         self.app.do_request = new_do_request

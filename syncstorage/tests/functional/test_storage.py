@@ -1405,6 +1405,33 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(resp.json.keys(), ["xxx_col1"])
         self.assertEquals(resp.json["xxx_col1"], ts)
 
+    def test_accessing_info_collections_with_no_auth_header(self):
+        # This can't be run against a live server because we
+        # have to forge an auth token to test things properly.
+        #if self.distant:
+        #    raise unittest2.SkipTest
+
+        # Write some items while we've got a good token.
+        bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(3)]
+        resp = self.retry_post_json(self.root + "/storage/xxx_col1", bsos)
+        ts = float(resp.headers["X-Last-Modified"])
+
+        # Check that we can read the info correctly.
+        resp = self.app.get(self.root + '/info/collections')
+        self.assertEquals(resp.json.keys(), ["xxx_col1"])
+        self.assertEquals(resp.json["xxx_col1"], ts)
+
+        # Omit the Authorization header
+        self.auth_token = self.auth_secret = None
+
+        # Invalid for normal operations
+        bsos = [{"id": str(i), "payload": "aaa"} for i in xrange(3)]
+        self.retry_post_json(self.root + "/storage/xxx_col1", bsos, status=401)
+        self.app.get(self.root + "/storage/xxx_col1", status=401)
+
+        # and /info/collections.
+        resp = self.app.get(self.root + '/info/collections', status=401)
+
     def test_pagination_with_newer_and_sort_by_oldest(self):
         # Twelve bsos with three different modification times.
         NUM_ITEMS = 12
