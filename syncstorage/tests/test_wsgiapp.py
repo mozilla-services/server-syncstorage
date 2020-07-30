@@ -185,7 +185,7 @@ class TestWSGIApp(StorageTestCase):
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = self._make_signed_req(42, {
             "fxa_uid": "raw-uid",
-            "fxa_kid": "raw-kid",
+            "fxa_kid": "raw-new_kI-d",
             "hashed_fxa_uid": "hashed-uid",
             "hashed_device_id": "hashed-device-id",
         })
@@ -196,7 +196,7 @@ class TestWSGIApp(StorageTestCase):
         self.assertEquals(req.metrics["metrics_device_id"], "hashed-device-id")
 
         self.assertEquals(req.user["fxa_uid"], "raw-uid")
-        self.assertEquals(req.user["fxa_kid"], "raw-kid")
+        self.assertEquals(req.user["fxa_kid"], "raw-new_kI-d")
 
     def test_validation_of_user_data_from_token(self):
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)

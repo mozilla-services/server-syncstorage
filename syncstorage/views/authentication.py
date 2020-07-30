@@ -20,7 +20,7 @@ DEFAULT_EXPIRED_TOKEN_TIMEOUT = 60 * 60 * 2  # 2 hours, in seconds
 # Coarse validation of FxA userid, device ids, and key ids.
 # This is not supposed to catch all invalid cases, but to act as a backstop
 # that the ids are safe to use and store internally.
-VALID_FXA_ID_REGEX = re.compile("^[A-Za-z0-9=-]{1,64}$")
+VALID_FXA_ID_REGEX = re.compile("^[A-Za-z0-9=\\-_]{1,64}$")
 
 
 class SyncStorageAuthenticationPolicy(TokenServerAuthenticationPolicy):
