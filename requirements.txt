@@ -43,7 +43,7 @@ pyramid-hawkauth==0.1.0
 pytz==2019.1
 repoze.lru==0.6
 requests==2.20.0
-rsa==4.0
+rsa==4.5
 simplejson==3.8.0
 six==1.10.0
 SQLAlchemy==1.3.3
