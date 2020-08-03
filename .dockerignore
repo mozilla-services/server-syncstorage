@@ -3,4 +3,3 @@ local/
 *.egg-info/
 docs/
 **/*.pyc
-syncstorage/tests/
