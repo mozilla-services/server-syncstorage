@@ -150,7 +150,7 @@ class TestStorage(StorageFunctionalTestCase):
         resp = self.app.get(self.root + '/info/collections')
         self.assertEquals(len(resp.json), numcols + 1)
 
-    def test_get_collection(self):
+    def test_get_collection_bro(self):
         bsos = [{"id": str(i), "payload": "xxx"} for i in xrange(5)]
         self.retry_post_json(self.root + "/storage/xxx_col2", bsos)
 
@@ -264,7 +264,10 @@ class TestStorage(StorageFunctionalTestCase):
         # "offset"
         # Skips over items that have already been returned.
         next_offset = res.headers["X-Weave-Next-Offset"]
-        res = self.app.get(query_url + '&limit=3&offset=' + next_offset)
+        res = self.app.get(query_url + '&limit=3&offset=' + "foo:bar", status=400)
+        try: from nose.tools import set_trace
+        except ImportError: from pdb import set_trace
+        set_trace()
         self.assertEquals(res.json, all_items[2:5])
 
         next_offset = res.headers["X-Weave-Next-Offset"]
@@ -852,6 +855,158 @@ class TestStorage(StorageFunctionalTestCase):
         self.assertEquals(len(res['success']), max_items)
         self.assertEquals(len(res['failed']), 1)
 
+    def test_batch_limits(self):
+        res = self.app.get(self.root + '/info/configuration')
+        try:
+            max_total_records = res.json['max_total_records']
+            max_total_bytes = res.json['max_total_bytes']
+        except KeyError:
+            # Can't run against live server if it doesn't
+            # report the right config options.
+            if self.distant:
+                raise unittest2.SkipTest
+            raise
+
+        endpoint = self.root + '/storage/xxx_col2'
+
+        """
+        # Uploading total_max_records should succeed
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_total_records)]
+        resp = self.retry_post_json(endpoint + '?batch=true', bsos)
+        batch = resp.json["batch"]
+        print(max_total_records, batch)
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+        """
+
+        max_total_records = 2000
+        #max_total_records = 1999
+        print(max_total_records)
+        resp = self.retry_post_json(endpoint + '?batch=true', [])
+        batch = resp.json["batch"]
+
+        chunk_size = 100
+        bsos = [{'id': str(i), 'payload': 'X', 'sortindex': 3, 'ttl': 9000} for i in range(max_total_records)]
+        for i in range(0, max_total_records, chunk_size):
+            chunk_end = i + chunk_size
+            chunk = bsos[i:chunk_end]
+            commit = "&commit=true" if chunk_end >= max_total_records else ""
+            status = 200 if commit else 202
+            print(i, chunk_end, len(chunk), commit, status)
+            resp = self.retry_post_json(endpoint + '?batch=%s%s' % (batch, commit), chunk, status=status, headers={"user-agent": "foobar baz Moz"})
+        """
+        # total_max_records + should fail
+        chunk_size = 100
+        chunk_count = (max_total_records / 100) + 1
+        batch = "true"
+        for chunk_i in range(chunk_count):
+            bsos = [{'id': 'c%s-%i' % (chunk_i, i), 'payload': 'X'} for i in range(max_total_records)]
+            resp = self.retry_post_json(endpoint + '?batch=%s' % batch, bsos)
+            if chunk_i == 0:
+                batch = resp.json["batch"]
+        """
+
+        '''
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+
+        resp = self.retry_post_json(endpoint + '?batch=true', [])
+        batch = resp.json["batch"]
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_total_records + 1)]
+        for i in range(0, max_total_records, chunk_size):
+            chunk = bsos[i:i + chunk_size]
+            resp = self.retry_post_json(endpoint + '?batch=%s' % batch, chunk)
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+        '''
+
+    def test_batch_limits_all_updates(self):
+        res = self.app.get(self.root + '/info/configuration')
+        try:
+            max_total_records = res.json['max_total_records']
+            max_total_bytes = res.json['max_total_bytes']
+        except KeyError:
+            # Can't run against live server if it doesn't
+            # report the right config options.
+            if self.distant:
+                raise unittest2.SkipTest
+            raise
+
+        endpoint = self.root + '/storage/xxx_col2'
+
+        """
+        # Uploading total_max_records should succeed
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_total_records)]
+        resp = self.retry_post_json(endpoint + '?batch=true', bsos)
+        batch = resp.json["batch"]
+        print(max_total_records, batch)
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+        """
+
+        max_total_records = 2000
+        #max_total_records = 1999
+        max_total_records = 1666
+        #max_total_records = 1999
+        max_total_records = 1667
+        print(max_total_records)
+        resp = self.retry_post_json(endpoint + '?batch=true', [])
+        batch = resp.json["batch"]
+
+        chunk_size = 100
+        bsos = [{'id': str(i), 'payload': 'X', 'sortindex': 3, 'ttl': 9000} for i in range(max_total_records)]
+        for i in range(0, max_total_records, chunk_size):
+            chunk_end = i + chunk_size
+            chunk = bsos[i:chunk_end]
+            commit = "&commit=true" if chunk_end >= max_total_records else ""
+            status = 200 if commit else 202
+            print(i, chunk_end, len(chunk), commit, status)
+            resp = self.retry_post_json(endpoint + '?batch=%s%s' % (batch, commit), chunk, status=status, headers={"user-agent": "foobar baz Moz"})
+
+        resp = self.retry_post_json(endpoint + '?batch=true', [])
+        batch = resp.json["batch"]
+        bsos = [{'id': str(i), 'payload': 'new X', 'sortindex': 4, 'ttl': 10000} for i in range(max_total_records)]
+        for i in range(0, max_total_records, chunk_size):
+            chunk_end = i + chunk_size
+            chunk = bsos[i:chunk_end]
+            commit = "&commit=true" if chunk_end >= max_total_records else ""
+            status = 200 if commit else 202
+            print(i, chunk_end, len(chunk), commit, status)
+            resp = self.retry_post_json(endpoint + '?batch=%s%s' % (batch, commit), chunk, status=status, headers={"user-agent": "foobar baz Moz"})
+
+        """
+        # total_max_records + should fail
+        chunk_size = 100
+        chunk_count = (max_total_records / 100) + 1
+        batch = "true"
+        for chunk_i in range(chunk_count):
+            bsos = [{'id': 'c%s-%i' % (chunk_i, i), 'payload': 'X'} for i in range(max_total_records)]
+            resp = self.retry_post_json(endpoint + '?batch=%s' % batch, bsos)
+            if chunk_i == 0:
+                batch = resp.json["batch"]
+        """
+
+        '''
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+
+        resp = self.retry_post_json(endpoint + '?batch=true', [])
+        batch = resp.json["batch"]
+        bsos = [{'id': str(i), 'payload': 'X'} for i in range(max_total_records + 1)]
+        for i in range(0, max_total_records, chunk_size):
+            chunk = bsos[i:i + chunk_size]
+            resp = self.retry_post_json(endpoint + '?batch=%s' % batch, chunk)
+        commit = '?batch={0}&commit=true'.format(batch)
+        resp = self.retry_post_json(endpoint + commit, [])
+        committed = resp.json['modified']
+        '''
+
+
     def test_weird_args(self):
         # pushing some data in xxx_col2
         bsos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
@@ -1319,8 +1474,7 @@ class TestStorage(StorageFunctionalTestCase):
         self.app.get(self.root + '/storage/meta/global', status=404)
         res = self.app.get(self.root + '/storage/meta')
         self.assertEquals(res.json, [])
-        self.retry_put_json(self.root + '/storage/meta/global',
-                            {'payload': 'blob'})
+        self.retry_put_json(self.root + '/storage/meta/global')
         res = self.app.get(self.root + '/storage/meta')
         self.assertEquals(res.json, ['global'])
         res = self.app.get(self.root + '/storage/meta/global')
@@ -1956,6 +2110,7 @@ class TestStorage(StorageFunctionalTestCase):
             raise unittest2.SkipTest('failed to generate conflicting batchid')
 
     def test_that_we_dont_resurrect_committed_batches(self):
+        raise unittest2.SkipTest('2long')
         # This retry loop tries to trigger a situation where we:
         #  * create a batch with a single item
         #  * successfully commit that batch
