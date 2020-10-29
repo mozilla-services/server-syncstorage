@@ -882,6 +882,8 @@ class TestStorage(StorageFunctionalTestCase):
 
         max_total_records = 2000
         #max_total_records = 1999
+        max_total_records = 1666
+        #max_total_records = 1667
         print(max_total_records)
         resp = self.retry_post_json(endpoint + '?batch=true', [])
         batch = resp.json["batch"]
@@ -951,8 +953,10 @@ class TestStorage(StorageFunctionalTestCase):
         max_total_records = 2000
         #max_total_records = 1999
         max_total_records = 1666
+        max_total_records = 1665
         #max_total_records = 1999
-        max_total_records = 1667
+        #max_total_records = 1667
+        #max_total_records = 1666
         print(max_total_records)
         resp = self.retry_post_json(endpoint + '?batch=true', [])
         batch = resp.json["batch"]
