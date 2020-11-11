@@ -17,8 +17,8 @@ COPY requirements.txt /app/requirements.txt
 # we the app needs to link to it
 RUN apk add --update build-base ca-certificates && \
     pip install -r requirements.txt && \
-    apk del --purge build-base gcc && \
     apk add libstdc++
+#   apk del --purge build-base gcc && \
 
 
 # Copy in the whole app after dependencies have been installed & cached
