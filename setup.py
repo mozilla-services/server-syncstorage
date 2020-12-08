@@ -4,10 +4,20 @@
 
 from setuptools import setup, find_packages
 
-install_requires = ['SQLALchemy', 'unittest2', 'simplejson', 'pyramid',
-                    'mozsvc[memcache]>=0.8', 'cornice', 'pyramid_hawkauth',
-                    'PyMySQL', 'pymysql_sa', 'wsgiproxy', 'webtest',
-                    'requests', 'PyBrowserID', 'testfixtures']
+def load_req(filename):
+    """Load a pip style requirement file."""
+    reqs = []
+    with open(filename, "r") as file:
+        for line in file.readlines():
+            line = line.strip()
+            if line.startswith("-r"):
+                content = load_req(line.split(' ')[1])
+                reqs.extend(content)
+                continue
+            reqs.append(line)
+    return reqs
+
+install_requires = load_req("requirements.txt")
 
 entry_points = """
 [paste.app_factory]
@@ -15,7 +25,6 @@ main = syncstorage:main
 """
 
 version = "1.8.0"
-
 
 setup(name='SyncStorage',
       version=version,
