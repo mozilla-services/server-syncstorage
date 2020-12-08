@@ -1,8 +1,9 @@
-SYSTEMPYTHON = `which python2 python | head -n 1`
+SYSTEMPYTHON = `which python2 pypy python | head -n 1`
 VIRTUALENV = virtualenv --python=$(SYSTEMPYTHON)
 NOSE = local/bin/nosetests -s
 TESTS = syncstorage/tests
 PYTHON = local/bin/python
+EASY_INSTALL = local/bin/easy_install
 PIP = local/bin/pip
 PIP_CACHE = /tmp/pip-cache.${USER}
 BUILD_TMP = /tmp/syncstorage-build.${USER}
@@ -22,13 +23,15 @@ INSTALL = ARCHFLAGS=$(ARCHFLAGS) CFLAGS=$(CFLAGS) $(PIP) install -U -i $(PYPI)
 all:	build
 
 build:
-	$(VIRTUALENV) --no-site-packages ./local
-	$(INSTALL) --upgrade "setuptools>=0.7" pip
+	# The latest `pip` doesn't work with pypy 2.7 on some platforms.
+	# Pin to a working version; ref https://github.com/pypa/pip/issues/8653
+	$(VIRTUALENV) --no-pip ./local
+	$(EASY_INSTALL) pip==20.1.1
+	$(INSTALL) --upgrade "setuptools>=0.7"
 	$(INSTALL) -r requirements.txt
 	$(PYTHON) ./setup.py develop
 
 test:
-	$(INSTALL) nose flake8
 	# Check that flake8 passes before bothering to run anything.
 	# This can really cut down time wasted by typos etc.
 	./local/bin/flake8 syncstorage
