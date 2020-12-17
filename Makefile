@@ -1,4 +1,4 @@
-SYSTEMPYTHON = `which python2 python | head -n 1`
+SYSTEMPYTHON = `which python2.7 python | head -n 1`
 VIRTUALENV = virtualenv --python=$(SYSTEMPYTHON)
 NOSE = local/bin/nosetests -s
 TESTS = syncstorage/tests
@@ -22,6 +22,7 @@ INSTALL = ARCHFLAGS=$(ARCHFLAGS) CFLAGS=$(CFLAGS) $(PIP) install -U -i $(PYPI)
 all:	build
 
 build:
+	$(SYSTEMPYTHON) --version
 	$(VIRTUALENV) --no-site-packages ./local
 	$(INSTALL) --upgrade "setuptools>=0.7" pip
 	$(INSTALL) -r requirements.txt

@@ -1,5 +1,91 @@
-version: 2
+version: 2.1
+
+defaults:
+  docker_login: &docker_login
+    run:
+      name: Login to Dockerhub
+      command: |
+        if [ "${DOCKER_USER}" == "" ] || [ "${DOCKER_PASS}" == "" ]; then
+            echo "Skipping Login to Dockerhub, no credentials."
+        else
+            echo "${DOCKER_PASS}" | docker login -u="${DOCKER_USER}" --password-stdin
+        fi
+
 jobs:
+  test_mysql:
+    docker:
+      - image: debian:stable-slim
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+      - image: circleci/mysql:5.7
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+        environment:
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: sync_test
+    working_directory: /app
+    steps:
+      - *docker_login
+      - run:
+          name: Install Docker build dependencies
+          command: |
+            apt update
+            apt install -y git python2.7 build-essential virtualenv python2.7-dev default-mysql-client
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: install
+          command: |
+            python2.7 --version
+            # mysql -e 'create database sync_test;'
+            mysql -u root -prootpw -h 127.0.0.1 -e 'SET GLOBAL max_connections=512;'
+            make build
+            ./local/bin/pip install psycopg2-binary
+      - run:
+          name: test
+          command: |
+            make test MOZSVC_SQLURI=pymysql://test:test@127.0.0.1/sync_test
+            make safetycheck
+  test_postgres:
+    docker:
+      - image: debian:stable-slim
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+      - image: circleci/postgres
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+        environment:
+          PGUSER: test
+          PGPASSWORD: test
+          PGDATABASE: sync_test
+    working_directory: /app
+    steps:
+      - *docker_login
+      - run:
+          name: Install Docker build dependencies
+          command: |
+            apt update
+            apt install -y git python2.7 build-essential virtualenv python2.7-dev
+            python2.7 --version
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: install
+          command: |
+            # psql -c 'create database synctest;' -U test
+            make build
+            ./local/bin/pip install psycopg2-binary
+      - run:
+          name: test
+          command: |
+            make test MOZSVC_SQLURI=postgresql://test:test@localhost/sync_test
+
   build:
     docker:
       - image: docker:stable-git
@@ -56,7 +142,19 @@ workflows:
 
   build-test-push:
     jobs:
+      - test_mysql:
+          filters:
+            tags:
+              only: /.*/
+      # NOTE: connection to postgres failing
+      #- test_postgres:
+      #    filters:
+      #      tags:
+      #        only: /.*/
       - build:
+          requires:
+            - test_mysql
+       #     - test_postgres
           filters:
             tags:
               only: /.*/
