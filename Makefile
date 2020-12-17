@@ -23,17 +23,11 @@ INSTALL = ARCHFLAGS=$(ARCHFLAGS) CFLAGS=$(CFLAGS) $(PIP) install -U -i $(PYPI)
 all:	build
 
 build:
-<<<<<<< HEAD
-	$(SYSTEMPYTHON) --version
-	$(VIRTUALENV) --no-site-packages ./local
-	$(INSTALL) --upgrade "setuptools>=0.7" pip
-=======
 	# The latest `pip` doesn't work with pypy 2.7 on some platforms.
 	# Pin to a working version; ref https://github.com/pypa/pip/issues/8653
 	$(VIRTUALENV) --no-pip ./local
 	$(EASY_INSTALL) pip==20.1.1
 	$(INSTALL) --upgrade "setuptools>=0.7"
->>>>>>> 8f48618be5b0ea5f517be34d8c0bc458e9e98847
 	$(INSTALL) -r requirements.txt
 	$(PYTHON) ./setup.py develop
 
