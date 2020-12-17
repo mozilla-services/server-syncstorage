@@ -29,7 +29,6 @@ jobs:
           MYSQL_DATABASE: sync_test
     working_directory: /app
     steps:
-      - *docker_login
       - run:
           name: Install Docker build dependencies
           command: |
