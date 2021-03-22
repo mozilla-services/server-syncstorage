@@ -1,0 +1,5 @@
+.*
+local/
+*.egg-info/
+docs/
+**/*.pyc
