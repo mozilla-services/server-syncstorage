@@ -30,7 +30,7 @@ Paste==2.0.2
 PasteDeploy==2.0.1
 plaster==1.0
 plaster-pastedeploy==0.7
-protobuf==3.7.1
+protobuf==3.15.0
 pyasn1==0.4.5
 pyasn1-modules==0.2.4
 PyBrowserID==0.9.2
