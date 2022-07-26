@@ -42,7 +42,7 @@ test:
 	./local/bin/gunicorn --paste ./syncstorage/tests/tests.ini --workers 1 --worker-class mozsvc.gunicorn_worker.MozSvcGeventWorker & SERVER_PID=$$! ; sleep 2 ; ./local/bin/python syncstorage/tests/functional/test_storage.py http://localhost:5000 ; kill $$SERVER_PID
 
 safetycheck:
-	$(INSTALL) safety
+	$(INSTALL) safety==1.8.7
 	# Check for any dependencies with security issues.
 	# We ignore a known issue with gevent, because we can't update to it yet.
 	./local/bin/safety check --full-report --ignore 25837
