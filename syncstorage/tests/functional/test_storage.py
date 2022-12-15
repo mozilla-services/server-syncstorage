@@ -2407,7 +2407,7 @@ class TestStorageWithBatchUploadDisabled(TestStorage):
         resp = self.retry_post_json(endpoint + commit, [bso5, bso6, bso0],
                                     status=400)
         # This requests a new batch, which is silently ignored and succeeds.
-        commit = '?batch=true&commit=true'.format(batch)
+        commit = '?batch=true&commit=true'
         resp = self.retry_post_json(endpoint + commit, [bso5, bso6, bso0])
         assert 'batch' not in resp.json
         committed = resp.json['modified']
