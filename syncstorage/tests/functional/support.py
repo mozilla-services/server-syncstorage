@@ -48,15 +48,20 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
     def _authenticate(self, fxa_uid=None):
         # For basic testing, use a random uid and sign our own tokens.
         # Subclasses might like to override this and use a live tokenserver.
+        if fxa_uid is None:
+            fxa_uid = str(uuid.uuid4())
         self.user_id = random.randint(1, 100000)
+        self.fxa_uid = fxa_uid
+        self.fxa_kid = str(uuid.uuid4())
+        self.hashed_fxa_uid = str(uuid.uuid4())
         auth_policy = self.config.registry.getUtility(IAuthenticationPolicy)
         req = Request.blank(self.host_url)
         creds = auth_policy.encode_hawk_id(
             req, self.user_id, extra={
                 # Include a hashed_fxa_uid to trigger uid/kid extraction
-                "hashed_fxa_uid": str(uuid.uuid4()),
-                "fxa_uid": fxa_uid or str(uuid.uuid4()),
-                "fxa_kid": str(uuid.uuid4()),
+                "hashed_fxa_uid": self.hashed_fxa_uid,
+                "fxa_uid": self.fxa_uid,
+                "fxa_kid": self.fxa_kid,
             }
         )
         self.auth_token, self.auth_secret = creds
@@ -68,6 +73,9 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
             raise unittest2.SkipTest("Skipped when testing a live server")
         # Temporarily authenticate as a different user.
         orig_user_id = self.user_id
+        orig_fxa_uid = self.fxa_uid
+        orig_fxa_kid = self.fxa_kid
+        orig_hashed_fxa_uid = self.hashed_fxa_uid
         orig_auth_token = self.auth_token
         orig_auth_secret = self.auth_secret
         try:
@@ -82,6 +90,9 @@ class StorageFunctionalTestCase(FunctionalTestCase, StorageTestCase):
             yield
         finally:
             self.user_id = orig_user_id
+            self.fxa_uid = orig_fxa_uid
+            self.fxa_kid = orig_fxa_kid
+            self.hashed_fxa_uid = orig_hashed_fxa_uid
             self.auth_token = orig_auth_token
             self.auth_secret = orig_auth_secret
 

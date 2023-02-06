@@ -974,6 +974,10 @@ class SpannerStorage(SyncStorage):
             self._collections_by_name[collection] = collectionid
             self._collections_by_id[collectionid] = collection
 
+    @with_session
+    def is_migrating(self, session, user):
+        return False
+
 
 class SpannerStorageSession(object):
     """Object representing a data access session."""
