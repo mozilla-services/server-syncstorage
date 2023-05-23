@@ -42,7 +42,7 @@ pyramid==1.9.1
 pyramid-hawkauth==0.1.0
 pytz==2019.1
 repoze.lru==0.6
-requests==2.25.0
+requests==2.31.0
 rsa==4.5
 simplejson==3.8.0
 six==1.10.0
