@@ -1,6 +1,6 @@
 beautifulsoup4==4.4.1
 cachetools==3.1.0
-certifi==2019.3.9
+certifi==2023.7.22
 chardet==3.0.4
 configparser==3.5.0b2
 cornice==0.17
