@@ -21,7 +21,7 @@ CREATE TABLE bso (
 CREATE INDEX BsoTtl ON bso(ttl);
 -- TODO: modified DESC's ideal for the default sort order but client can
 -- also specify ASC
-CREATE INDEX BsoLastModified ON bso(userid, collection, modified DESC),
+CREATE INDEX BsoLastModified ON bso(userid, collection, modified DESC, ttl),
   INTERLEAVE IN user_collections;
 
 CREATE TABLE collections (
@@ -85,7 +85,7 @@ def FIND_ITEMS(bso, params):
     query = query.where(bso.c.collection == bindparam("collectionid"))
     # Filter by the various query parameters.
     if "ids" in params:
-        # Sadly, we can't use a bindparam in an "IN" expression.
+        # XXX: could utilize spanner's 'in UNNEST(<array>)'
         query = query.where(bso.c.id.in_(params.get("ids")))
     if "newer" in params:
         query = query.where(bso.c.modified > bindparam("newer"))

@@ -53,6 +53,9 @@ INT64_MAX = 2 ** 63 - 1
 
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
+# a bogus FIND_ITEMS bind param
+BOGUS_ID = object()
+
 
 def dt2ts(dt):
     """Convert a Python datetime to seconds"""
@@ -121,8 +124,18 @@ class SpannerStorage(SyncStorage):
             target_size=int(dbkwds.get("pool_size", 100))
         )
         self._database = self._instance.database(database_id, pool=pool)
+
         # for debugging: support disabling FORCE_INDEX=BsoLastModified
         self._force_bsolm_index = dbkwds.get("_force_bsolm_index", True)
+        # split FIND_ITEMS' query in 2 (first query BsoLastModified
+        # then query bso with its results)
+        self._bsolm_index_separate = dbkwds.get(
+            "_bsolm_index_separate",
+            False
+        )
+        if self._bsolm_index_separate:
+            assert self._force_bsolm_index, \
+                "_bsolm_index_separate requires _force_bsolm_index"
 
         self.standard_collections = standard_collections
         if self.standard_collections and dbkwds.get("create_tables", False):
@@ -358,12 +371,67 @@ class SpannerStorage(SyncStorage):
                 bind_types[ts_var] = param_types.TIMESTAMP
 
         # Generate the query
+        fields = params.get("fields")
+        offset_params = params
+
+        if self._bsolm_index_separate and fields is None:
+            # Split the get_items query (TODO: get_item_ids could
+            # reference solely the index) query in 2:
+            # #1: query BsoLastModified directly for bso ids
+            # #2: query bso w/ 'id IN UNNEST([<ids from #1>])'
+
+            bsolm_params = params.copy()
+            bsolm_params["fields"] = ["id"]
+            bsolm_query = FIND_ITEMS(bso, bsolm_params)
+            bsolm_query = str(bsolm_query.compile())
+            bsolm_query = bsolm_query.replace(
+                "FROM bso",
+                "FROM bso@{FORCE_INDEX=BsoLastModified}"
+            )
+            bsolm_query = bsolm_query.replace(":", "@")
+
+            result = session.transaction.execute_sql(
+                bsolm_query,
+                params=bind,
+                param_types=bind_types,
+            )
+            ids = [row[0] for row in list(result)]
+
+            # keep the orig. for encode_next_offset
+            offset_params = params.copy()
+
+            # Setup a 'id IN (:id_1)' bind param for #2 (replacing it
+            # below)
+            params["ids"] = [BOGUS_ID]
+            bind["ids"] = ids
+            bind_types["ids"] = param_types.Array(param_types.STRING)
+
+            # offset/limit are accomplished in query #1 and don't make
+            # sense for #2
+            if limit is not None:
+                del params["limit"]
+                del bind["limit"]
+                del bind_types["limit"]
+            if offset is not None:
+                # restore this later
+                del params["offset"]
+                del bind["offset"]
+                del bind_types["offset"]
+            # simiarly modified ranges/ttl aren't needed in #2
+            for param in ("newer", "newer_eq", "older", "older_eq", "ttl"):
+                params.pop(param, None)
+
         query = FIND_ITEMS(bso, params)
         query = str(query.compile())
-        if self._force_bsolm_index:
+        if self._force_bsolm_index and not self._bsolm_index_separate:
             query = query.replace(
                 "FROM bso",
                 "FROM bso@{FORCE_INDEX=BsoLastModified}"
+            )
+        if self._bsolm_index_separate and fields is None:
+            query = query.replace(
+                "bso.id IN (:id_1)",
+                "bso.id IN UNNEST(@ids)"
             )
         query = query.replace(":", "@")
 
@@ -390,7 +458,7 @@ class SpannerStorage(SyncStorage):
         next_offset = None
         if limit is not None and len(items) > limit:
             items = items[:-1]
-            next_offset = self.encode_next_offset(params, items)
+            next_offset = self.encode_next_offset(offset_params, items)
         return {
             "items": items,
             "next_offset": next_offset,
